@@ -15,6 +15,15 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting %s [env=%s]", settings.app_name, settings.app_env)
+
+    if settings.app_env == "development":
+        import app.db.init_models  # noqa: F401 — registers all models with Base
+        from app.db.base import Base
+        from app.db.session import engine
+
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created / verified")
+
     yield
     logger.info("Shutting down %s", settings.app_name)
 
