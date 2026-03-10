@@ -5,4 +5,5 @@
 
 from app.modules.audit_logs.model import AuditLog  # noqa: F401
 from app.modules.auth.model import PasswordResetToken  # noqa: F401
+from app.modules.restaurants.model import Restaurant  # noqa: F401
 from app.modules.users.model import User  # noqa: F401

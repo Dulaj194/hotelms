@@ -5,6 +5,7 @@ import ForgotPassword from "@/pages/auth/ForgotPassword";
 import Login from "@/pages/auth/Login";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
+import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
 
 function App() {
   return (
@@ -21,6 +22,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/restaurant"
+          element={
+            <ProtectedRoute>
+              <RestaurantProfile />
             </ProtectedRoute>
           }
         />

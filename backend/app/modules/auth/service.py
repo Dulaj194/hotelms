@@ -25,8 +25,8 @@ from app.modules.auth.repository import (
 )
 from app.modules.auth.schemas import ForgotPasswordResponse, TokenResponse
 from app.modules.users.repository import (
+    get_by_id_global,
     get_user_by_email,
-    get_user_by_id,
     update_last_login,
     update_password,
 )
@@ -217,7 +217,9 @@ def refresh(
             detail="Session store unavailable. Please try again later.",
         )
 
-    user = get_user_by_id(db, user_id)
+    # Use global lookup — token refresh is an auth flow that must access
+    # the user before tenant context can be verified.
+    user = get_by_id_global(db, user_id)
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -79,3 +79,63 @@ def require_roles(*roles: str):
         return current_user
 
     return _check
+
+
+# ─── Tenant-aware dependencies ───────────────────────────────────────────────────────
+#
+# DESIGN RULE: These helpers are the single source of truth for tenant context.
+# Protected routes must use these dependencies — they must NEVER accept
+# restaurant_id from request body, query params, or URL path for authenticated
+# tenant operations. The authenticated JWT → DB user record is the only
+# trusted source of restaurant context.
+
+
+def get_current_restaurant_id(
+    current_user=Depends(get_current_user),
+) -> int | None:
+    """
+    TENANT SECURITY: Derives restaurant context from the authenticated user.
+
+    The restaurant_id is read from the DB-backed User object, which was loaded
+    using the verified JWT subject claim. It is never derived from any
+    client-supplied value.
+
+    - super_admin: returns restaurant_id (may be None — platform-level admin)
+    - tenant-bound users: returns restaurant_id, or raises 403 if unlinked
+    """
+    from app.modules.users.model import UserRole
+
+    if current_user.role == UserRole.super_admin:
+        # super_admin may operate without a restaurant context
+        return current_user.restaurant_id
+
+    if current_user.restaurant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is not linked to a restaurant.",
+        )
+
+    return current_user.restaurant_id
+
+
+def require_restaurant_user(
+    current_user=Depends(get_current_user),
+):
+    """
+    TENANT SECURITY: Ensures the caller belongs to a restaurant.
+
+    Use on all endpoints that must only be accessed by restaurant-bound staff
+    (owner, admin, steward, housekeeper). Rejects any user — including
+    super_admin — whose restaurant_id is None.
+
+    Returns the authenticated User object for use in the route handler.
+    The handler can safely read current_user.restaurant_id without a None check.
+    """
+    if current_user.restaurant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This endpoint requires a restaurant-bound account.",
+        )
+    return current_user
+
+    return _check
