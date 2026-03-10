@@ -8,8 +8,10 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    app_name: str = "hotelms"
+    app_name: str = "hotelms-backend"
     app_env: str = "development"
+    api_v1_prefix: str = "/api/v1"
+    frontend_url: str = "http://localhost:5173"
     database_url: str = "mysql+pymysql://root:@localhost:3306/hotelms"
     redis_url: str = "redis://localhost:6379"
 

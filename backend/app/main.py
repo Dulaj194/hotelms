@@ -1,25 +1,41 @@
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.api.v1.router import router as api_v1_router
+from app.api.router import router
+from app.core.config import settings
+from app.core.logging import configure_logging, get_logger
+
+configure_logging()
+logger = get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
+    logger.info("Starting %s [env=%s]", settings.app_name, settings.app_env)
+    yield
+    logger.info("Shutting down %s", settings.app_name)
+
 
 app = FastAPI(
     title=settings.app_name,
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[settings.frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(api_v1_router, prefix="/api/v1")
+app.include_router(router)
 
 
 @app.get("/", tags=["root"])
