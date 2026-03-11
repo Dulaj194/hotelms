@@ -9,6 +9,7 @@ class RestaurantResponse(BaseModel):
     email: str | None
     phone: str | None
     address: str | None
+    logo_url: str | None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -32,3 +33,8 @@ class RestaurantUpdateRequest(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=50)
     address: str | None = Field(None, max_length=500)
+
+
+class RestaurantLogoUploadResponse(BaseModel):
+    logo_url: str
+    message: str = "Logo uploaded successfully."

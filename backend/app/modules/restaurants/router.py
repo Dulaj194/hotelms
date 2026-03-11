@@ -1,9 +1,13 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_restaurant_user, require_roles
 from app.modules.restaurants import service
-from app.modules.restaurants.schemas import RestaurantMeResponse, RestaurantUpdateRequest
+from app.modules.restaurants.schemas import (
+    RestaurantLogoUploadResponse,
+    RestaurantMeResponse,
+    RestaurantUpdateRequest,
+)
 from app.modules.users.model import User
 
 router = APIRouter()
@@ -14,29 +18,44 @@ def get_my_restaurant(
     current_user: User = Depends(require_restaurant_user),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
-    """Return the authenticated tenant's restaurant profile.
+    """Return current tenant's restaurant profile.
 
-    SECURITY: restaurant_id is read from the authenticated user object
-    (backed by the verified JWT). It is never accepted from the request.
+    SECURITY: restaurant_id from authenticated user object only.
     """
-    # current_user.restaurant_id is guaranteed non-None by require_restaurant_user
     return service.get_my_restaurant(db, current_user.restaurant_id)  # type: ignore[arg-type]
 
 
 @router.patch("/me", response_model=RestaurantMeResponse)
 def update_my_restaurant(
     payload: RestaurantUpdateRequest,
-    current_user: User = Depends(require_restaurant_user),
+    current_user: User = Depends(require_roles("owner", "admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
-    """Update the authenticated tenant's restaurant profile.
+    """Update current tenant's restaurant profile. Owner/admin only.
 
-    SECURITY: restaurant_id is read from the authenticated user object.
-    The request payload (RestaurantUpdateRequest) intentionally does not
-    contain a restaurant_id field — the tenant cannot redirect the update
-    to a different restaurant.
+    SECURITY: restaurant_id from authenticated user, never from payload.
     """
-    return service.update_my_restaurant(db, current_user.restaurant_id, payload)  # type: ignore[arg-type]
+    if current_user.restaurant_id is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
+    return service.update_my_restaurant(db, current_user.restaurant_id, payload)
+
+
+@router.post("/me/logo", response_model=RestaurantLogoUploadResponse)
+async def upload_logo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles("owner", "admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantLogoUploadResponse:
+    """Upload/replace the restaurant logo. Owner/admin only.
+
+    Multipart/form-data. Allowed: jpg, jpeg, png, webp. Max: 5 MB.
+
+    SECURITY: Original filename never used. UUID path assigned server-side.
+    restaurant_id from authenticated user.
+    """
+    if current_user.restaurant_id is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
+    return await service.upload_logo(db, current_user.restaurant_id, file, current_user.id)
 
 
 @router.get("/{restaurant_id}", response_model=RestaurantMeResponse)
@@ -45,9 +64,5 @@ def get_restaurant_by_id(
     _current_user: User = Depends(require_roles("super_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
-    """Fetch any restaurant by ID. Super-admin only.
-
-    SECURITY: Enforced by require_roles("super_admin"). Tenant-bound users
-    are rejected before this handler executes.
-    """
+    """Fetch any restaurant by ID. Super-admin only."""
     return service.get_restaurant_for_super_admin(db, restaurant_id)

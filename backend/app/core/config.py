@@ -29,5 +29,9 @@ class Settings(BaseSettings):
     login_rate_limit_attempts: int = 5
     login_rate_limit_window_minutes: int = 15
 
+    # ── File uploads ─────────────────────────────────────────────────────────
+    upload_dir: str = "uploads"
+    max_upload_size_mb: int = 5
+
 
 settings = Settings()

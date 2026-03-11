@@ -4,6 +4,7 @@ export interface RestaurantResponse {
   email: string | null;
   phone: string | null;
   address: string | null;
+  logo_url: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -21,4 +22,9 @@ export interface RestaurantUpdateRequest {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+}
+
+export interface RestaurantLogoUploadResponse {
+  logo_url: string;
+  message: string;
 }

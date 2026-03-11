@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import router
 from app.core.config import settings
@@ -11,10 +13,19 @@ from app.core.logging import configure_logging, get_logger
 configure_logging()
 logger = get_logger(__name__)
 
+# Ensure upload directory exists at startup (required before StaticFiles mount)
+Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+(Path(settings.upload_dir) / "logos").mkdir(parents=True, exist_ok=True)
+
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting %s [env=%s]", settings.app_name, settings.app_env)
+
+    # Ensure upload directories exist
+    upload_root = Path(settings.upload_dir)
+    (upload_root / "logos").mkdir(parents=True, exist_ok=True)
+    logger.info("Upload directories ready at %s", upload_root.resolve())
 
     if settings.app_env == "development":
         import app.db.init_models  # noqa: F401 — registers all models with Base
@@ -43,6 +54,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve uploaded files (logos, etc.) at /uploads
+# In production replace with CDN/S3 pre-signed URL flow.
+app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 
 app.include_router(router)
 

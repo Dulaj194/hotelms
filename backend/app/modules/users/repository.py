@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
-from app.modules.users.model import User
-from app.modules.users.schemas import UserCreate
+from app.modules.users.model import User, UserRole
+from app.modules.users.schemas import StaffCreateRequest, StaffUpdateRequest, UserCreate
 
 # ─── Global access (auth flows and super_admin only) ──────────────────────────
 #
@@ -92,3 +92,109 @@ def update_last_login(db: Session, user: User) -> None:
 def update_password(db: Session, user: User, new_password_hash: str) -> None:
     user.password_hash = new_password_hash
     db.commit()
+
+
+# ─── Tenant-safe staff write operations ──────────────────────────────────────
+#
+# SECURITY: restaurant_id is a required explicit parameter on every staff write
+# method. Callers cannot accidentally skip tenant scoping — the function
+# signature enforces it. StaffCreateRequest has no restaurant_id field, so
+# the tenant boundary cannot be bypassed through the schema.
+
+
+def create_staff(db: Session, restaurant_id: int, data: StaffCreateRequest) -> User:
+    """Create a staff user scoped to a restaurant.
+
+    restaurant_id must come from authenticated context, NEVER from the request
+    body. StaffCreateRequest intentionally has no restaurant_id field.
+    """
+    user = User(
+        full_name=data.full_name,
+        email=data.email,
+        password_hash=hash_password(data.password),
+        role=data.role,
+        restaurant_id=restaurant_id,  # always from authenticated context
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_by_id(
+    db: Session,
+    user_id: int,
+    restaurant_id: int,
+    data: StaffUpdateRequest,
+) -> User | None:
+    """Update a staff member scoped to a restaurant.
+
+    Only fields included in the payload are changed (exclude_unset).
+    Password is hashed before storage if provided.
+    """
+    user = get_by_id(db, user_id, restaurant_id)
+    if not user:
+        return None
+
+    update_data = data.model_dump(exclude_unset=True)
+    if "password" in update_data:
+        update_data["password_hash"] = hash_password(update_data.pop("password"))
+
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def disable_by_id(db: Session, user_id: int, restaurant_id: int) -> User | None:
+    """Set is_active=False for a staff member in the given restaurant."""
+    user = get_by_id(db, user_id, restaurant_id)
+    if not user:
+        return None
+    user.is_active = False
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def enable_by_id(db: Session, user_id: int, restaurant_id: int) -> User | None:
+    """Set is_active=True for a staff member in the given restaurant."""
+    user = get_by_id(db, user_id, restaurant_id)
+    if not user:
+        return None
+    user.is_active = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def delete_by_id(db: Session, user_id: int, restaurant_id: int) -> bool:
+    """Hard-delete a staff member from the given restaurant.
+
+    Returns True if deleted, False if not found.
+    """
+    user = get_by_id(db, user_id, restaurant_id)
+    if not user:
+        return False
+    db.delete(user)
+    db.commit()
+    return True
+
+
+def count_active_owners(db: Session, restaurant_id: int) -> int:
+    """Count active users with the owner role for a restaurant.
+
+    Used to prevent deleting/disabling the last owner.
+    """
+    return (
+        db.query(User)
+        .filter(
+            User.restaurant_id == restaurant_id,
+            User.role == UserRole.owner,
+            User.is_active,
+        )
+        .count()
+    )

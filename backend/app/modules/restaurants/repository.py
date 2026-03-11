@@ -8,11 +8,10 @@ from app.modules.restaurants.schemas import RestaurantUpdateRequest
 # DESIGN: Repository methods for tenant-owned data explicitly require
 # restaurant_id at the call site. This forces callers (service layer) to supply
 # the authenticated tenant context rather than accepting an arbitrary ID.
-# Cross-tenant data access is structurally impossible from these entry points.
 
 
 def get_by_id(db: Session, restaurant_id: int) -> Restaurant | None:
-    """Fetch a restaurant by its own primary key.
+    """Fetch a restaurant by its primary key.
 
     restaurant_id must always come from the authenticated user context,
     never from a client-supplied request parameter.
@@ -25,12 +24,7 @@ def update_profile(
     restaurant_id: int,
     payload: RestaurantUpdateRequest,
 ) -> Restaurant | None:
-    """Update allowed profile fields on a specific restaurant.
-
-    restaurant_id must come from the authenticated context, never from the
-    request body. Only fields explicitly included in the payload are updated
-    (partial update via exclude_unset).
-    """
+    """Update allowed profile fields. Only fields in the payload are changed."""
     restaurant = get_by_id(db, restaurant_id)
     if not restaurant:
         return None
@@ -44,11 +38,26 @@ def update_profile(
     return restaurant
 
 
+def update_logo(db: Session, restaurant_id: int, logo_url: str) -> Restaurant | None:
+    """Save the logo URL path after a file upload.
+
+    logo_url is a server-generated path (UUID-based filename).
+    restaurant_id must come from authenticated context.
+    """
+    restaurant = get_by_id(db, restaurant_id)
+    if not restaurant:
+        return None
+
+    restaurant.logo_url = logo_url
+    db.commit()
+    db.refresh(restaurant)
+    return restaurant
+
+
 # ─── Super-admin access ───────────────────────────────────────────────────────
 #
-# DESIGN: These methods are intentionally separate and named to signal that
-# they bypass tenant isolation. They must ONLY be called from endpoints that
-# enforce the super_admin role via require_roles("super_admin").
+# DESIGN: Intentionally named to signal these bypass tenant isolation.
+# Must ONLY be called from endpoints enforcing the super_admin role.
 
 
 def get_by_id_for_super_admin(db: Session, restaurant_id: int) -> Restaurant | None:
