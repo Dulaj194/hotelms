@@ -33,5 +33,9 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     max_upload_size_mb: int = 5
 
+    # ── Guest table sessions + cart ──────────────────────────────────────────
+    guest_session_expire_minutes: int = 120   # 2 hours
+    cart_ttl_seconds: int = 7200              # matches session default
+
 
 settings = Settings()

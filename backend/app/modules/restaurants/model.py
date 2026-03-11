@@ -10,6 +10,8 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.modules.categories.model import Category
+    from app.modules.items.model import Item
     from app.modules.users.model import User
 
 
@@ -34,6 +36,8 @@ class Restaurant(Base):
     )
 
     # One restaurant has many users.
-    # "User" is a forward reference — SQLAlchemy resolves this at mapper config time,
-    # so no circular import occurs at runtime.
     users: Mapped[list[User]] = relationship("User", back_populates="restaurant")
+
+    # One restaurant has many categories and items.
+    categories: Mapped[list[Category]] = relationship("Category", back_populates="restaurant")
+    items: Mapped[list[Item]] = relationship("Item", back_populates="restaurant")

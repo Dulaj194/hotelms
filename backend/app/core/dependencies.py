@@ -138,4 +138,49 @@ def require_restaurant_user(
         )
     return current_user
 
-    return _check
+
+# ─── Guest session dependency ─────────────────────────────────────────────────
+#
+# DESIGN: Guest (customer) tokens are carried in the X-Guest-Session header
+# and are completely separate from staff Bearer tokens. They encode
+# session_id + restaurant_id + table_number and are signed with the same
+# secret key but carry type="guest_session" to prevent cross-use with
+# staff tokens.
+
+from fastapi import Header  # noqa: E402 — local import to avoid circular at module load
+
+
+def get_current_guest_session(
+    x_guest_session: str = Header(..., alias="X-Guest-Session"),
+    db: Session = Depends(get_db),
+):
+    """Dependency that validates the X-Guest-Session token and returns the TableSession.
+
+    Used by all cart endpoints. Validates:
+    1. Token signature and expiry (jose).
+    2. Token type is 'guest_session' (not a staff token).
+    3. Session exists in DB and is active/not-expired.
+    """
+    from app.core.security import decode_guest_session_token
+    from app.modules.table_sessions.repository import get_active_session_by_session_id
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired guest session.",
+        headers={"WWW-Authenticate": "X-Guest-Session"},
+    )
+
+    try:
+        payload = decode_guest_session_token(x_guest_session)
+    except Exception:
+        raise credentials_exception
+
+    session_id: str | None = payload.get("session_id")
+    if not session_id:
+        raise credentials_exception
+
+    session = get_active_session_by_session_id(db, session_id)
+    if session is None:
+        raise credentials_exception
+
+    return session

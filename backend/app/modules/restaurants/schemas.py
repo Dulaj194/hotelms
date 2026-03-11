@@ -35,6 +35,15 @@ class RestaurantUpdateRequest(BaseModel):
     address: str | None = Field(None, max_length=500)
 
 
+class RestaurantCreateRequest(BaseModel):
+    """Payload for super_admin to create a new restaurant tenant."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    email: EmailStr | None = None
+    phone: str | None = Field(None, max_length=50)
+    address: str | None = Field(None, max_length=500)
+
+
 class RestaurantLogoUploadResponse(BaseModel):
     logo_url: str
     message: str = "Logo uploaded successfully."

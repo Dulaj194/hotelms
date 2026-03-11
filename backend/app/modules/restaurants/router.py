@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_db, require_restaurant_user, require_roles
 from app.modules.restaurants import service
 from app.modules.restaurants.schemas import (
+    RestaurantCreateRequest,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
     RestaurantUpdateRequest,
@@ -56,6 +57,25 @@ async def upload_logo(
     if current_user.restaurant_id is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
     return await service.upload_logo(db, current_user.restaurant_id, file, current_user.id)
+
+
+@router.get("", response_model=list[RestaurantMeResponse])
+def list_restaurants(
+    _current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> list[RestaurantMeResponse]:
+    """List all restaurants. Super-admin only."""
+    return service.list_all_restaurants(db)
+
+
+@router.post("", response_model=RestaurantMeResponse, status_code=status.HTTP_201_CREATED)
+def create_restaurant(
+    payload: RestaurantCreateRequest,
+    _current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantMeResponse:
+    """Create a new restaurant tenant. Super-admin only."""
+    return service.create_restaurant(db, payload)
 
 
 @router.get("/{restaurant_id}", response_model=RestaurantMeResponse)

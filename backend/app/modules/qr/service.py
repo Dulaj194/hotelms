@@ -1,0 +1,116 @@
+import io
+from pathlib import Path
+
+import qrcode
+import qrcode.image.pil
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.modules.qr import repository
+from app.modules.qr.schemas import BulkQRCodeResponse, QRCodeResponse
+
+_QR_DIR = Path(settings.upload_dir) / "qrcodes"
+
+# Ensure the QR directory exists at import time (safe to call multiple times).
+_QR_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _build_frontend_url(restaurant_id: int, qr_type: str, target_number: str) -> str:
+    """Build the public menu URL that gets encoded into the QR image."""
+    base = settings.frontend_url.rstrip("/")
+    # /menu/{restaurant_id}/{type}/{number}
+    return f"{base}/menu/{restaurant_id}/{qr_type}/{target_number}"
+
+
+def _qr_filename(restaurant_id: int, qr_type: str, target_number: str) -> str:
+    """Deterministic filename: reuse same file if QR already generated."""
+    return f"qr_{restaurant_id}_{qr_type}_{target_number}.png"
+
+
+def _generate_qr_image(frontend_url: str, file_path: Path) -> None:
+    """Render a QR PNG to disk using the qrcode library."""
+    qr = qrcode.QRCode(
+        version=None,          # auto-size
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(frontend_url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    img.save(str(file_path))
+
+
+def _to_response(qr_record, restaurant_id: int) -> QRCodeResponse:
+    qr_image_url = f"/uploads/qrcodes/{Path(qr_record.file_path).name}"
+    return QRCodeResponse(
+        qr_type=qr_record.qr_type,
+        target_number=qr_record.target_number,
+        frontend_url=qr_record.frontend_url,
+        qr_image_url=qr_image_url,
+        restaurant_id=restaurant_id,
+    )
+
+
+def generate_qr(
+    db: Session,
+    restaurant_id: int,
+    qr_type: str,
+    target_number: str,
+) -> QRCodeResponse:
+    """Generate (or reuse) a QR code for the given target.
+
+    SECURITY: restaurant_id must come from the authenticated context.
+    It is passed explicitly by the router — never accepted from the client body.
+    """
+    if qr_type not in ("table", "room"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid QR type '{qr_type}'. Must be 'table' or 'room'.",
+        )
+
+    frontend_url = _build_frontend_url(restaurant_id, qr_type, target_number)
+    filename = _qr_filename(restaurant_id, qr_type, target_number)
+    file_path = _QR_DIR / filename
+
+    # Check DB first — if record exists, reuse (file should already be on disk)
+    existing = repository.get_qr(db, restaurant_id, qr_type, target_number)
+    if existing:
+        # Re-generate the image file if it was deleted from disk
+        if not file_path.exists():
+            _generate_qr_image(frontend_url, file_path)
+        return _to_response(existing, restaurant_id)
+
+    # New QR — generate image and persist metadata
+    _generate_qr_image(frontend_url, file_path)
+    qr_record = repository.upsert_qr(
+        db,
+        restaurant_id=restaurant_id,
+        qr_type=qr_type,
+        target_number=target_number,
+        file_path=str(file_path),
+        frontend_url=frontend_url,
+    )
+    return _to_response(qr_record, restaurant_id)
+
+
+def generate_bulk_qr(
+    db: Session,
+    restaurant_id: int,
+    qr_type: str,
+    start: int,
+    end: int,
+) -> BulkQRCodeResponse:
+    """Generate QR codes for a range of table or room numbers."""
+    if start > end or end - start > 200:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Range must be valid and contain at most 200 items.",
+        )
+
+    results = [
+        generate_qr(db, restaurant_id, qr_type, str(n))
+        for n in range(start, end + 1)
+    ]
+    return BulkQRCodeResponse(generated=results, count=len(results))

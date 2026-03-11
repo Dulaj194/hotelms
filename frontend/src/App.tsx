@@ -8,15 +8,29 @@ import Dashboard from "@/pages/Dashboard";
 import AdminRestaurantProfile from "@/pages/admin/RestaurantProfile";
 import Staff from "@/pages/admin/Staff";
 import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
+import TableMenu from "@/pages/public/TableMenu";
+import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
+
+function RootRedirect() {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  const user = getUser();
+  return <Navigate to={getRoleRedirect(user?.role ?? "")} replace />;
+}
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes */}
+        {/* Unauthenticated routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* Public guest menu (no auth required) */}
+        <Route
+          path="/menu/:restaurantId/table/:tableNumber"
+          element={<TableMenu />}
+        />
 
         {/* Protected routes */}
         <Route
@@ -54,10 +68,10 @@ function App() {
           }
         />
 
-        {/* Default redirect */}
+        {/* Default redirects */}
         <Route path="/admin" element={<Navigate to="/admin/restaurant-profile" replace />} />
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="*" element={<RootRedirect />} />
       </Routes>
     </BrowserRouter>
   );

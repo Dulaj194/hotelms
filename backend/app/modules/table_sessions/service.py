@@ -1,0 +1,72 @@
+import uuid
+from datetime import UTC, datetime, timedelta
+
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.security import create_guest_session_token
+from app.modules.restaurants.repository import get_by_id as get_restaurant
+from app.modules.table_sessions import repository
+from app.modules.table_sessions.schemas import (
+    TableSessionStartRequest,
+    TableSessionStartResponse,
+)
+
+
+def start_table_session(
+    db: Session,
+    data: TableSessionStartRequest,
+) -> TableSessionStartResponse:
+    """Create a signed guest table session.
+
+    Flow:
+    1. Validate the restaurant exists and is active.
+    2. Generate a unique session_id.
+    3. Persist session metadata to DB.
+    4. Sign a guest token (JWT-style) encoding session_id + restaurant_id + table_number.
+    5. Return token to the client — client must include it in X-Guest-Session header.
+
+    SECURITY: The returned guest_token is the authorization credential.
+    table_number and restaurant_id alone are never sufficient for cart operations.
+    """
+    restaurant = get_restaurant(db, data.restaurant_id)
+    if not restaurant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+    if not restaurant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant is not currently available.",
+        )
+
+    session_id = uuid.uuid4().hex
+    expire_minutes = settings.guest_session_expire_minutes
+    expires_at = datetime.now(UTC) + timedelta(minutes=expire_minutes)
+
+    # Persist session record — does NOT store the raw token
+    repository.create_session(
+        db,
+        session_id=session_id,
+        restaurant_id=data.restaurant_id,
+        table_number=data.table_number,
+        expires_at=expires_at,
+    )
+
+    # Create signed guest token
+    guest_token = create_guest_session_token(
+        session_id=session_id,
+        restaurant_id=data.restaurant_id,
+        table_number=data.table_number,
+        expire_minutes=expire_minutes,
+    )
+
+    return TableSessionStartResponse(
+        session_id=session_id,
+        guest_token=guest_token,
+        restaurant_id=data.restaurant_id,
+        table_number=data.table_number,
+        expires_at=expires_at,
+    )

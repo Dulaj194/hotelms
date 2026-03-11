@@ -28,3 +28,10 @@ export interface RestaurantLogoUploadResponse {
   logo_url: string;
   message: string;
 }
+
+export interface RestaurantCreateRequest {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+}

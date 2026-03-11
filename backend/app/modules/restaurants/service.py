@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.restaurants import repository
 from app.modules.restaurants.schemas import (
+    RestaurantCreateRequest,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
     RestaurantUpdateRequest,
@@ -106,4 +107,22 @@ def get_restaurant_for_super_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
+    return RestaurantMeResponse.model_validate(restaurant)
+
+
+def list_all_restaurants(db: Session) -> list[RestaurantMeResponse]:
+    """List all restaurants. Restricted to super_admin use only."""
+    restaurants = repository.list_all_for_super_admin(db)
+    return [RestaurantMeResponse.model_validate(r) for r in restaurants]
+
+
+def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> RestaurantMeResponse:
+    """Create a new restaurant tenant. Restricted to super_admin use only."""
+    restaurant = repository.create_restaurant(
+        db,
+        name=payload.name,
+        email=str(payload.email) if payload.email else None,
+        phone=payload.phone,
+        address=payload.address,
+    )
     return RestaurantMeResponse.model_validate(restaurant)

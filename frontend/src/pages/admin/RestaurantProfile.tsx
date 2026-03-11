@@ -1,15 +1,152 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
+import { getAccessToken, getUser } from "@/lib/auth";
 import DashboardLayout from "@/components/shared/DashboardLayout";
-import type { RestaurantMeResponse, RestaurantUpdateRequest } from "@/types/restaurant";
+import type {
+  RestaurantMeResponse,
+  RestaurantUpdateRequest,
+  RestaurantCreateRequest,
+} from "@/types/restaurant";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
-export default function RestaurantProfile() {
-  const [restaurant, setRestaurant] = useState<RestaurantMeResponse | null>(null);
+// ─── Super-admin view: list all restaurants + create new ─────────────────────
+
+function SuperAdminView() {
+  const [list, setList] = useState<RestaurantMeResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState<RestaurantCreateRequest>({ name: "" });
+  const [creating, setCreating] = useState(false);
+  const [createMsg, setCreateMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  function load() {
+    setLoading(true);
+    api
+      .get<RestaurantMeResponse[]>("/restaurants")
+      .then(setList)
+      .catch(() => setFetchError("Failed to load restaurants."))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setCreating(true);
+    setCreateMsg(null);
+    try {
+      const created = await api.post<RestaurantMeResponse>("/restaurants", form);
+      setList((prev) => [created, ...prev]);
+      setShowCreate(false);
+      setForm({ name: "" });
+      setCreateMsg({ type: "ok", text: `Restaurant "${created.name}" created.` });
+    } catch (err) {
+      setCreateMsg({
+        type: "err",
+        text: err instanceof Error ? err.message : "Failed to create restaurant.",
+      });
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Restaurants</h1>
+          <button
+            onClick={() => { setShowCreate(true); setCreateMsg(null); }}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            + New Restaurant
+          </button>
+        </div>
+
+        {createMsg && (
+          <p className={`text-sm ${createMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+            {createMsg.text}
+          </p>
+        )}
+
+        {showCreate && (
+          <form onSubmit={handleCreate} className="rounded-lg border bg-white p-5 space-y-3">
+            <h2 className="font-medium text-sm text-gray-500 uppercase tracking-wide">Create Restaurant</h2>
+            <FormField label="Name *" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} />
+            <FormField label="Email" type="email" value={form.email ?? ""} onChange={(v) => setForm((f) => ({ ...f, email: v || null }))} />
+            <FormField label="Phone" value={form.phone ?? ""} onChange={(v) => setForm((f) => ({ ...f, phone: v || null }))} />
+            <FormField label="Address" value={form.address ?? ""} onChange={(v) => setForm((f) => ({ ...f, address: v || null }))} />
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                disabled={creating || !form.name.trim()}
+                className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+              >
+                {creating ? "Creating…" : "Create"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className="flex-1 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        {loading ? (
+          <p className="text-muted-foreground">Loading…</p>
+        ) : fetchError ? (
+          <p className="text-red-600">{fetchError}</p>
+        ) : list.length === 0 ? (
+          <div className="rounded-lg border bg-white p-8 text-center text-gray-400">
+            No restaurants yet. Create one to get started.
+          </div>
+        ) : (
+          <div className="rounded-lg border bg-white overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-3 text-left">Name</th>
+                  <th className="px-4 py-3 text-left">Email</th>
+                  <th className="px-4 py-3 text-left">Phone</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {list.map((r) => (
+                  <tr key={r.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium">{r.name}</td>
+                    <td className="px-4 py-3 text-gray-500">{r.email ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-500">{r.phone ?? "—"}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        r.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                      }`}>
+                        {r.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
+
+// ─── Owner/Admin view: own restaurant profile ─────────────────────────────────
+
+function OwnerAdminView() {
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [restaurant, setRestaurant] = useState<RestaurantMeResponse | null>(null);
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -252,6 +389,12 @@ export default function RestaurantProfile() {
       </div>
     </DashboardLayout>
   );
+}
+
+export default function RestaurantProfile() {
+  const user = getUser();
+  if (user?.role === "super_admin") return <SuperAdminView />;
+  return <OwnerAdminView />;
 }
 
 function FormField({

@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 # Ensure upload directory exists at startup (required before StaticFiles mount)
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
 (Path(settings.upload_dir) / "logos").mkdir(parents=True, exist_ok=True)
+(Path(settings.upload_dir) / "qrcodes").mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -25,12 +26,27 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     # Ensure upload directories exist
     upload_root = Path(settings.upload_dir)
     (upload_root / "logos").mkdir(parents=True, exist_ok=True)
+    (upload_root / "qrcodes").mkdir(parents=True, exist_ok=True)
     logger.info("Upload directories ready at %s", upload_root.resolve())
 
     if settings.app_env == "development":
+        import time
         import app.db.init_models  # noqa: F401 — registers all models with Base
         from app.db.base import Base
         from app.db.session import engine
+        from sqlalchemy import text
+
+        # Retry connecting to MySQL — healthcheck passes before MySQL fully accepts connections
+        for attempt in range(1, 11):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                break
+            except Exception as exc:
+                logger.warning("DB not ready (attempt %d/10): %s", attempt, exc)
+                time.sleep(3)
+        else:
+            raise RuntimeError("Could not connect to database after 10 attempts")
 
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created / verified")

@@ -35,6 +35,7 @@ from app.modules.users.schemas import (
 # steward / housekeeper → no management rights (enforced at router level too)
 
 _MANAGEABLE_ROLES: dict[str, set[UserRole]] = {
+    "super_admin": {UserRole.owner, UserRole.admin, UserRole.steward, UserRole.housekeeper},
     "owner": {UserRole.admin, UserRole.steward, UserRole.housekeeper},
     "admin": {UserRole.steward, UserRole.housekeeper},
 }
@@ -89,7 +90,7 @@ def get_staff_member(
 
 def add_staff(
     db: Session,
-    restaurant_id: int,
+    restaurant_id: int | None,
     data: StaffCreateRequest,
     current_user: User,
 ) -> StaffDetailResponse:
@@ -97,6 +98,7 @@ def add_staff(
 
     SECURITY: restaurant_id comes from authenticated context exclusively.
     StaffCreateRequest has no restaurant_id field.
+    super_admin has restaurant_id=None — platform-level users will also get None.
     """
     _assert_can_manage_role(current_user, data.role)
 

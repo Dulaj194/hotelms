@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "@/lib/api";
-import { setAccessToken } from "@/lib/auth";
-import type { TokenResponse } from "@/types/auth";
+import { setAccessToken, setUser, getRoleRedirect } from "@/lib/auth";
+import type { TokenResponse, UserMeResponse } from "@/types/auth";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -22,7 +22,9 @@ export default function Login() {
         password,
       });
       setAccessToken(data.access_token);
-      navigate("/dashboard");
+      const me = await api.get<UserMeResponse>("/auth/me");
+      setUser(me);
+      navigate(getRoleRedirect(me.role), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please try again.");
     } finally {

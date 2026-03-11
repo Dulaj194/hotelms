@@ -67,4 +67,13 @@ def get_by_id_for_super_admin(db: Session, restaurant_id: int) -> Restaurant | N
 
 def list_all_for_super_admin(db: Session) -> list[Restaurant]:
     """List all restaurants across all tenants. Use ONLY in super_admin endpoints."""
-    return db.query(Restaurant).all()
+    return db.query(Restaurant).order_by(Restaurant.id.desc()).all()
+
+
+def create_restaurant(db: Session, name: str, email: str | None, phone: str | None, address: str | None) -> Restaurant:
+    """Create a new restaurant. Use ONLY in super_admin endpoints."""
+    restaurant = Restaurant(name=name, email=email, phone=phone, address=address)
+    db.add(restaurant)
+    db.commit()
+    db.refresh(restaurant)
+    return restaurant
