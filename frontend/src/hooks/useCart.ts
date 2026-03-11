@@ -4,6 +4,7 @@ import type {
   CartResponse,
   UpdateCartItemRequest,
 } from "@/types/cart";
+import type { PlaceOrderRequest, PlaceOrderResponse } from "@/types/order";
 import { getGuestToken } from "@/hooks/useGuestSession";
 
 const BASE_URL =
@@ -42,16 +43,19 @@ interface UseCartReturn {
   cart: CartResponse | null;
   loading: boolean;
   error: string | null;
+  placing: boolean;
   addItem: (itemId: number, quantity?: number) => Promise<void>;
   updateItem: (itemId: number, quantity: number) => Promise<void>;
   removeItem: (itemId: number) => Promise<void>;
   clearCart: () => Promise<void>;
+  placeOrder: (data?: PlaceOrderRequest) => Promise<PlaceOrderResponse>;
   refetch: () => Promise<void>;
 }
 
 export function useCart(): UseCartReturn {
   const [cart, setCart] = useState<CartResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCart = useCallback(async () => {
@@ -103,14 +107,35 @@ export function useCart(): UseCartReturn {
     setCart(null);
   }, []);
 
+  const placeOrder = useCallback(
+    async (data: PlaceOrderRequest = {}): Promise<PlaceOrderResponse> => {
+      setPlacing(true);
+      try {
+        const result = await guestRequest<PlaceOrderResponse>(
+          "POST",
+          "/orders",
+          data
+        );
+        // Cart has been cleared server-side; reflect that locally
+        setCart(null);
+        return result;
+      } finally {
+        setPlacing(false);
+      }
+    },
+    []
+  );
+
   return {
     cart,
     loading,
     error,
+    placing,
     addItem,
     updateItem,
     removeItem,
     clearCart,
+    placeOrder,
     refetch: fetchCart,
   };
 }

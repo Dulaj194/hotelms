@@ -7,6 +7,8 @@ from app.modules.cart.router import router as cart_router
 from app.modules.categories.router import router as categories_router
 from app.modules.health.router import router as health_router
 from app.modules.items.router import router as items_router
+from app.modules.orders.router import router as orders_router
+from app.modules.payments.router import router as payments_router
 from app.modules.public.router import router as public_router
 from app.modules.qr.router import router as qr_router
 from app.modules.restaurants.router import router as restaurants_router
@@ -25,4 +27,6 @@ router.include_router(public_router, prefix="/public", tags=["public"])
 router.include_router(qr_router, prefix="/qr", tags=["qr"])
 router.include_router(table_sessions_router, prefix="/table-sessions", tags=["table-sessions"])
 router.include_router(cart_router, prefix="/cart", tags=["cart"])
+router.include_router(orders_router, prefix="/orders", tags=["orders"])
+router.include_router(payments_router, prefix="/payments", tags=["payments"])
 router.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])

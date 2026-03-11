@@ -9,6 +9,7 @@ import AdminRestaurantProfile from "@/pages/admin/RestaurantProfile";
 import Staff from "@/pages/admin/Staff";
 import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
 import TableMenu from "@/pages/public/TableMenu";
+import TableOrderStatus from "@/pages/public/TableOrderStatus";
 import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
 
 function RootRedirect() {
@@ -30,6 +31,10 @@ function App() {
         <Route
           path="/menu/:restaurantId/table/:tableNumber"
           element={<TableMenu />}
+        />
+        <Route
+          path="/menu/:restaurantId/table/:tableNumber/order/:orderId"
+          element={<TableOrderStatus />}
         />
 
         {/* Protected routes */}

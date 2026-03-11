@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CartResponse } from "@/types/cart";
 
 interface CartDrawerProps {
@@ -7,6 +8,8 @@ interface CartDrawerProps {
   onUpdateItem: (itemId: number, quantity: number) => Promise<void>;
   onRemoveItem: (itemId: number) => Promise<void>;
   onClearCart: () => Promise<void>;
+  /** Called when the guest confirms the order. Returns order id on success. */
+  onPlaceOrder: () => Promise<number>;
 }
 
 export default function CartDrawer({
@@ -16,9 +19,24 @@ export default function CartDrawer({
   onUpdateItem,
   onRemoveItem,
   onClearCart,
+  onPlaceOrder,
 }: CartDrawerProps) {
+  const [placing, setPlacing] = useState(false);
+  const [placeError, setPlaceError] = useState<string | null>(null);
   const itemCount = cart?.item_count ?? 0;
   const total = cart?.total ?? 0;
+
+  const handlePlaceOrder = async () => {
+    setPlaceError(null);
+    setPlacing(true);
+    try {
+      await onPlaceOrder();
+    } catch (err) {
+      setPlaceError(err instanceof Error ? err.message : "Failed to place order.");
+    } finally {
+      setPlacing(false);
+    }
+  };
 
   return (
     <>
@@ -150,9 +168,23 @@ export default function CartDrawer({
               <span>Total</span>
               <span>${total.toFixed(2)}</span>
             </div>
+
+            {placeError && (
+              <p className="text-xs text-red-600 text-center">{placeError}</p>
+            )}
+
+            <button
+              onClick={handlePlaceOrder}
+              disabled={placing}
+              className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold text-sm hover:bg-orange-600 transition-colors disabled:opacity-60"
+            >
+              {placing ? "Placing order…" : `Place Order · $${total.toFixed(2)}`}
+            </button>
+
             <button
               onClick={onClearCart}
-              className="w-full py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+              disabled={placing}
+              className="w-full py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
             >
               Clear cart
             </button>

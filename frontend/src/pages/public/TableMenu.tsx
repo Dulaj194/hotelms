@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import CartDrawer from "@/components/shared/CartDrawer";
 import { useCart } from "@/hooks/useCart";
 import { getGuestToken, setGuestSession } from "@/hooks/useGuestSession";
@@ -31,6 +31,7 @@ export default function TableMenu() {
     restaurantId: string;
     tableNumber: string;
   }>();
+  const navigate = useNavigate();
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function TableMenu() {
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
 
-  const { cart, addItem, updateItem, removeItem, clearCart, refetch } =
+  const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, refetch } =
     useCart();
 
   // ── 1. Start (or reuse) a guest session ──────────────────────────────────
@@ -105,6 +106,14 @@ export default function TableMenu() {
     },
     [addItem]
   );
+
+  const handlePlaceOrder = useCallback(async (): Promise<number> => {
+    const result = await placeOrder({});
+    const orderId = result.order.id;
+    setCartOpen(false);
+    navigate(`/menu/${restaurantId}/table/${tableNumber}/order/${orderId}`);
+    return orderId;
+  }, [placeOrder, navigate, restaurantId, tableNumber]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (pageError) {
@@ -323,6 +332,7 @@ export default function TableMenu() {
         onUpdateItem={updateItem}
         onRemoveItem={removeItem}
         onClearCart={clearCart}
+        onPlaceOrder={handlePlaceOrder}
       />
     </div>
   );
