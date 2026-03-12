@@ -6,10 +6,13 @@ Responsibilities:
 - Calculate server-authoritative totals from DB item prices
 - Atomically create order_header, order_items, and initial payment record
 - Clear cart after successful placement
+- Publish real-time events via Redis pub/sub after placement and status changes
 - Enforce status transition rules
-- List pending / active / history orders per restaurant
+- List pending / active / history / kitchen orders per restaurant
 """
 from __future__ import annotations
+
+from datetime import UTC, datetime
 
 import redis as redis_lib
 from fastapi import HTTPException, status
@@ -21,16 +24,19 @@ from app.modules.orders import repository as order_repo
 from app.modules.orders.model import OrderStatus
 from app.modules.orders.schemas import (
     ActiveOrderListResponse,
+    KitchenOrderCard,
+    KitchenOrderItemSummary,
+    KitchenOrderListResponse,
     OrderDetailResponse,
     OrderHeaderResponse,
     OrderItemResponse,
     OrderStatusResponse,
-    PendingOrderListResponse,
     PlaceOrderRequest,
     PlaceOrderResponse,
 )
 from app.modules.payments import repository as payment_repo
 from app.modules.payments.schemas import PaymentResponse
+from app.modules.realtime import service as realtime_service
 from app.modules.table_sessions.model import TableSession
 
 
@@ -104,6 +110,35 @@ def _build_order_header(order) -> OrderHeaderResponse:
         completed_at=order.completed_at,
         rejected_at=order.rejected_at,
         paid_at=order.paid_at,
+    )
+
+
+def _build_kitchen_order_card(order) -> KitchenOrderCard:
+    """Build a kitchen-optimised order card with item summaries."""
+    return KitchenOrderCard(
+        id=order.id,
+        order_number=order.order_number,
+        table_number=order.table_number,
+        customer_name=order.customer_name,
+        status=order.status,
+        total_amount=float(order.total_amount),
+        placed_at=order.placed_at,
+        confirmed_at=order.confirmed_at,
+        processing_at=order.processing_at,
+        completed_at=order.completed_at,
+        rejected_at=order.rejected_at,
+        notes=order.notes,
+        items=[
+            KitchenOrderItemSummary(
+                id=oi.id,
+                item_id=oi.item_id,
+                item_name_snapshot=oi.item_name_snapshot,
+                quantity=oi.quantity,
+                unit_price_snapshot=float(oi.unit_price_snapshot),
+                line_total=float(oi.line_total),
+            )
+            for oi in order.items
+        ],
     )
 
 
@@ -214,6 +249,29 @@ def place_order(
         db, order.id, session.session_id, session.restaurant_id
     )
 
+    # 6. Publish real-time event so kitchen dashboard sees the order instantly
+    try:
+        realtime_service.publish_new_order(
+            r,
+            restaurant_id=session.restaurant_id,
+            order_id=placed.id,
+            order_number=placed.order_number,
+            table_number=placed.table_number,
+            total_amount=float(placed.total_amount),
+            placed_at=placed.placed_at,
+            items=[
+                {
+                    "item_name_snapshot": oi.item_name_snapshot,
+                    "quantity": oi.quantity,
+                    "line_total": float(oi.line_total),
+                }
+                for oi in placed.items
+            ],
+        )
+    except Exception:
+        # Real-time failure must never break the order placement response
+        pass
+
     return PlaceOrderResponse(order=_build_order_detail(placed))
 
 
@@ -254,10 +312,11 @@ def get_order_for_staff(
 
 def list_pending_orders(
     db: Session, restaurant_id: int
-) -> PendingOrderListResponse:
+) -> KitchenOrderListResponse:
+    """Return pending orders with item summaries for the kitchen dashboard."""
     orders = order_repo.list_pending_orders_by_restaurant(db, restaurant_id)
-    return PendingOrderListResponse(
-        orders=[_build_order_header(o) for o in orders],
+    return KitchenOrderListResponse(
+        orders=[_build_kitchen_order_card(o) for o in orders],
         total=len(orders),
     )
 
@@ -282,6 +341,28 @@ def list_history_orders(
     )
 
 
+def list_processing_orders(
+    db: Session, restaurant_id: int
+) -> KitchenOrderListResponse:
+    """Return confirmed + processing orders with item summaries for the kitchen."""
+    orders = order_repo.list_processing_orders_by_restaurant(db, restaurant_id)
+    return KitchenOrderListResponse(
+        orders=[_build_kitchen_order_card(o) for o in orders],
+        total=len(orders),
+    )
+
+
+def list_kitchen_completed_orders(
+    db: Session, restaurant_id: int
+) -> KitchenOrderListResponse:
+    """Return recently completed orders for the kitchen completed section."""
+    orders = order_repo.list_kitchen_completed_orders_by_restaurant(db, restaurant_id)
+    return KitchenOrderListResponse(
+        orders=[_build_kitchen_order_card(o) for o in orders],
+        total=len(orders),
+    )
+
+
 # ── Status update ─────────────────────────────────────────────────────────────
 
 def update_order_status(
@@ -289,10 +370,12 @@ def update_order_status(
     order_id: int,
     restaurant_id: int,
     new_status: OrderStatus,
+    r: redis_lib.Redis | None = None,
 ) -> OrderStatusResponse:
     """Update order status with transition validation.
 
     Transition rules are defined in model.ALLOWED_TRANSITIONS.
+    Publishes a real-time event via Redis pub/sub after a successful update.
     """
     order = order_repo.get_order_by_id_and_restaurant(db, order_id, restaurant_id)
     if order is None:
@@ -312,6 +395,22 @@ def update_order_status(
     updated = order_repo.update_order_status(db, order, new_status)
     db.commit()
     db.refresh(updated)
+
+    # Publish real-time event after successful commit
+    if r is not None:
+        try:
+            realtime_service.publish_order_status_updated(
+                r,
+                restaurant_id=restaurant_id,
+                order_id=updated.id,
+                order_number=updated.order_number,
+                table_number=updated.table_number,
+                status=updated.status.value,
+                updated_at=datetime.now(UTC),
+            )
+        except Exception:
+            # Real-time failure must never break the status update response
+            pass
 
     return OrderStatusResponse(
         id=updated.id,

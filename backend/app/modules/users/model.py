@@ -27,8 +27,9 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    # String(191): utf8mb4 uses 4 bytes/char; 191 × 4 = 764 bytes — safe under all MySQL/MariaDB index limits.
     email: Mapped[str] = mapped_column(
-        String(255), unique=True, nullable=False, index=True
+        String(191), unique=True, nullable=False, index=True
     )
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)

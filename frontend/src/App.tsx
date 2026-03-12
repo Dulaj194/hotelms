@@ -6,6 +6,8 @@ import Login from "@/pages/auth/Login";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import AdminRestaurantProfile from "@/pages/admin/RestaurantProfile";
+import Kitchen from "@/pages/admin/Kitchen";
+import Billing from "@/pages/admin/Billing";
 import Staff from "@/pages/admin/Staff";
 import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
 import TableMenu from "@/pages/public/TableMenu";
@@ -69,6 +71,22 @@ function App() {
           element={
             <ProtectedRoute>
               <Staff />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/kitchen"
+          element={
+            <ProtectedRoute>
+              <Kitchen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/billing"
+          element={
+            <ProtectedRoute>
+              <Billing />
             </ProtectedRoute>
           }
         />

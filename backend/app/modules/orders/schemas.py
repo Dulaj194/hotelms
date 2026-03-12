@@ -95,3 +95,44 @@ class OrderStatusResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── Kitchen-optimised schemas ─────────────────────────────────────────────────
+# Used by GET /orders/pending, /orders/processing, /orders/completed.
+# Include item summaries so the kitchen dashboard can display order contents
+# without a second round-trip per order.
+
+class KitchenOrderItemSummary(BaseModel):
+    id: int
+    item_id: int
+    item_name_snapshot: str
+    quantity: int
+    unit_price_snapshot: float
+    line_total: float
+
+    model_config = {"from_attributes": True}
+
+
+class KitchenOrderCard(BaseModel):
+    """Lightweight kitchen view of an order — includes items, excludes payments."""
+
+    id: int
+    order_number: str
+    table_number: str
+    customer_name: str | None
+    status: OrderStatus
+    total_amount: float
+    placed_at: datetime
+    confirmed_at: datetime | None
+    processing_at: datetime | None
+    completed_at: datetime | None
+    rejected_at: datetime | None
+    notes: str | None
+    items: list[KitchenOrderItemSummary]
+
+    model_config = {"from_attributes": True}
+
+
+class KitchenOrderListResponse(BaseModel):
+    orders: list[KitchenOrderCard]
+    total: int

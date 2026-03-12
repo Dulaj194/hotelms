@@ -64,3 +64,41 @@ def deactivate_session(db: Session, session_id: str) -> None:
     if session:
         session.is_active = False
         db.commit()
+
+
+def get_session_by_id_and_restaurant(
+    db: Session,
+    session_id: str,
+    restaurant_id: int,
+) -> TableSession | None:
+    """Fetch a session by its session_id scoped to a restaurant.
+
+    Unlike get_active_session_by_session_id, this does NOT filter by
+    is_active or expiry — used by billing staff who need to access any
+    session state (active, expired, or already closed).
+    """
+    return (
+        db.query(TableSession)
+        .filter(
+            TableSession.session_id == session_id,
+            TableSession.restaurant_id == restaurant_id,
+        )
+        .first()
+    )
+
+
+def close_session_by_id(
+    db: Session,
+    session_id: str,
+    restaurant_id: int,
+) -> TableSession | None:
+    """Set is_active=False for a session.
+
+    Called as part of the billing settlement transaction.
+    Uses db.flush() — the caller MUST commit.
+    """
+    session = get_session_by_id_and_restaurant(db, session_id, restaurant_id)
+    if session:
+        session.is_active = False
+        db.flush()
+    return session

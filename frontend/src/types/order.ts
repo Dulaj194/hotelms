@@ -108,3 +108,35 @@ export const ORDER_STATUS_COLOR: Record<OrderStatus, string> = {
   paid: "bg-emerald-100 text-emerald-800",
   rejected: "bg-red-100 text-red-800",
 };
+
+// ── Kitchen dashboard types ────────────────────────────────────────────────────
+
+export interface KitchenOrderItemSummary {
+  id: number;
+  item_id: number;
+  item_name_snapshot: string;
+  quantity: number;
+  unit_price_snapshot: number;
+  line_total: number;
+}
+
+export interface KitchenOrderCard {
+  id: number;
+  order_number: string;
+  table_number: string;
+  customer_name: string | null;
+  status: OrderStatus;
+  total_amount: number;
+  placed_at: string;
+  confirmed_at: string | null;
+  processing_at: string | null;
+  completed_at: string | null;
+  rejected_at: string | null;
+  notes: string | null;
+  items: KitchenOrderItemSummary[];
+}
+
+export interface KitchenOrderListResponse {
+  orders: KitchenOrderCard[];
+  total: number;
+}

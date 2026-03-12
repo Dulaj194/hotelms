@@ -17,8 +17,9 @@ class PasswordResetToken(Base):
         nullable=False,
         index=True,
     )
+    # String(128): SHA-256 hex digest is 64 chars; 128 gives headroom and 128 × 4 = 512 bytes — well within index limits.
     token_hash: Mapped[str] = mapped_column(
-        String(255), unique=True, nullable=False, index=True
+        String(128), unique=True, nullable=False, index=True
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

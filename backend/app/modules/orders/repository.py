@@ -124,6 +124,7 @@ def list_pending_orders_by_restaurant(
 ) -> list[OrderHeader]:
     return (
         db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
         .filter(
             OrderHeader.restaurant_id == restaurant_id,
             OrderHeader.status == OrderStatus.pending,
@@ -166,6 +167,42 @@ def list_history_orders_by_restaurant(
     )
 
 
+# ── Kitchen-specific queries (include items for dashboard display) ─────────────
+
+def list_processing_orders_by_restaurant(
+    db: Session, restaurant_id: int
+) -> list[OrderHeader]:
+    """Return confirmed + processing orders with items eagerly loaded."""
+    in_progress = {OrderStatus.confirmed, OrderStatus.processing}
+    return (
+        db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
+        .filter(
+            OrderHeader.restaurant_id == restaurant_id,
+            OrderHeader.status.in_(in_progress),
+        )
+        .order_by(OrderHeader.placed_at.asc())
+        .all()
+    )
+
+
+def list_kitchen_completed_orders_by_restaurant(
+    db: Session, restaurant_id: int, limit: int = 50
+) -> list[OrderHeader]:
+    """Return recently completed orders with items eagerly loaded."""
+    return (
+        db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
+        .filter(
+            OrderHeader.restaurant_id == restaurant_id,
+            OrderHeader.status == OrderStatus.completed,
+        )
+        .order_by(OrderHeader.completed_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
 # ── Update ────────────────────────────────────────────────────────────────────
 
 def update_order_status(
@@ -195,3 +232,60 @@ def update_order_status(
 def is_transition_allowed(current: OrderStatus, target: OrderStatus) -> bool:
     """Return True if the status transition is permitted."""
     return target in ALLOWED_TRANSITIONS.get(current, set())
+
+
+# ── Billing queries (session-scoped) ──────────────────────────────────────────
+
+def list_billable_orders_by_session(
+    db: Session,
+    session_id: str,
+    restaurant_id: int,
+) -> list[OrderHeader]:
+    """Return completed, not-yet-paid orders for a table session.
+
+    'Billable' == status is exactly OrderStatus.completed.
+    Orders in paid/rejected/pending/confirmed/processing states are excluded.
+    Items are eagerly loaded so the caller can build line-item breakdowns.
+    """
+    return (
+        db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
+        .filter(
+            OrderHeader.session_id == session_id,
+            OrderHeader.restaurant_id == restaurant_id,
+            OrderHeader.status == OrderStatus.completed,
+        )
+        .order_by(OrderHeader.placed_at.asc())
+        .all()
+    )
+
+
+def mark_orders_paid_by_ids(
+    db: Session,
+    *,
+    order_ids: list[int],
+    restaurant_id: int,
+    paid_at: datetime,
+) -> None:
+    """Bulk-update order statuses to paid and set paid_at.
+
+    Uses a WHERE … IN filter so only orders belonging to this restaurant
+    can ever be updated. The caller is responsible for committing.
+    """
+    if not order_ids:
+        return
+    (
+        db.query(OrderHeader)
+        .filter(
+            OrderHeader.id.in_(order_ids),
+            OrderHeader.restaurant_id == restaurant_id,
+        )
+        .update(
+            {
+                OrderHeader.status: OrderStatus.paid,
+                OrderHeader.paid_at: paid_at,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.flush()

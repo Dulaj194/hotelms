@@ -20,3 +20,9 @@ class PaymentResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class SessionPaymentHistoryResponse(BaseModel):
+    session_id: str
+    payments: list[PaymentResponse]
+    total: int

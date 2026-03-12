@@ -2,11 +2,14 @@
 
 Route groups:
   POST   /orders               — guest: place order from cart
-  GET    /orders/{order_id}    — guest: view own order (X-Guest-Session required)
-  GET    /orders/pending       — staff: list pending orders for restaurant
-  GET    /orders/active        — staff: list active orders for restaurant
-  GET    /orders/history       — staff: list completed/paid/rejected orders
-  PATCH  /orders/{order_id}/status — staff: update order status
+  GET    /orders/my/{order_id} — guest: view own order (X-Guest-Session required)
+  GET    /orders/pending       — staff: pending orders (kitchen dashboard)
+  GET    /orders/processing    — staff: confirmed + processing orders (kitchen)
+  GET    /orders/completed     — staff: recently completed orders (kitchen)
+  GET    /orders/active        — staff: all active orders
+  GET    /orders/history       — staff: completed/paid/rejected order history
+  GET    /orders/{order_id}    — staff: full order detail
+  PATCH  /orders/{order_id}/status — staff: update order status + publish event
 """
 import redis as redis_lib
 from fastapi import APIRouter, Depends
@@ -23,9 +26,9 @@ from app.modules.orders import service
 from app.modules.orders.model import OrderStatus
 from app.modules.orders.schemas import (
     ActiveOrderListResponse,
+    KitchenOrderListResponse,
     OrderDetailResponse,
     OrderStatusResponse,
-    PendingOrderListResponse,
     PlaceOrderRequest,
     PlaceOrderResponse,
     UpdateOrderStatusRequest,
@@ -68,17 +71,39 @@ def get_my_order(
     return service.get_order_for_guest(db, order_id, session)
 
 
-# ── Staff / admin endpoints ───────────────────────────────────────────────────
+# ── Kitchen dashboard endpoints ───────────────────────────────────────────────
 
-@router.get("/pending", response_model=PendingOrderListResponse)
+@router.get("/pending", response_model=KitchenOrderListResponse)
 def list_pending_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-) -> PendingOrderListResponse:
-    """List all pending orders for the authenticated user's restaurant."""
+) -> KitchenOrderListResponse:
+    """List pending orders with item summaries for the kitchen dashboard."""
     return service.list_pending_orders(db, restaurant_id)
 
+
+@router.get("/processing", response_model=KitchenOrderListResponse)
+def list_processing_orders(
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_STAFF_ROLES)),
+) -> KitchenOrderListResponse:
+    """List confirmed + processing orders with item summaries for the kitchen."""
+    return service.list_processing_orders(db, restaurant_id)
+
+
+@router.get("/completed", response_model=KitchenOrderListResponse)
+def list_completed_orders(
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_STAFF_ROLES)),
+) -> KitchenOrderListResponse:
+    """List recently completed orders for the kitchen completed section."""
+    return service.list_kitchen_completed_orders(db, restaurant_id)
+
+
+# ── Staff / admin list endpoints ──────────────────────────────────────────────
 
 @router.get("/active", response_model=ActiveOrderListResponse)
 def list_active_orders(
@@ -117,7 +142,12 @@ def update_order_status(
     payload: UpdateOrderStatusRequest,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
     _=Depends(require_roles(*_STAFF_ROLES)),
 ) -> OrderStatusResponse:
-    """Update the status of an order with transition validation."""
-    return service.update_order_status(db, order_id, restaurant_id, payload.status)
+    """Update order status with transition validation.
+
+    Publishes a real-time event to the restaurant's Redis pub/sub channel
+    so connected kitchen clients receive the update instantly.
+    """
+    return service.update_order_status(db, order_id, restaurant_id, payload.status, r)
