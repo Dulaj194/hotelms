@@ -3,28 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import CartDrawer from "@/components/shared/CartDrawer";
 import { useCart } from "@/hooks/useCart";
 import { getGuestToken, setGuestSession } from "@/hooks/useGuestSession";
+import { publicGet, publicPost } from "@/lib/publicApi";
 import type { PublicMenuResponse } from "@/types/publicMenu";
 import type { TableSessionStartResponse } from "@/types/session";
-
-const BASE_URL =
-  (import.meta as { env: Record<string, string | undefined> }).env.VITE_API_URL ??
-  "http://localhost:8000/api/v1";
-
-async function publicGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`);
-  if (!response.ok) throw new Error(`GET ${path} failed — ${response.status}`);
-  return response.json() as Promise<T>;
-}
-
-async function publicPost<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) throw new Error(`POST ${path} failed — ${response.status}`);
-  return response.json() as Promise<T>;
-}
 
 export default function TableMenu() {
   const { restaurantId, tableNumber } = useParams<{

@@ -54,6 +54,9 @@ function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
     rejected_at: null,
     notes: null,
     items,
+    order_source: data.order_source ?? "table",
+    room_id: data.room_id ?? null,
+    room_number: data.room_number ?? null,
   };
 }
 
@@ -143,8 +146,12 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
         next.set(card.id, card);
         return next;
       });
+      const locationLabel =
+        event.data.order_source === "room"
+          ? `Room ${event.data.room_number ?? "?"}`
+          : `Table ${event.data.table_number ?? "?"}`;
       showAlert(
-        `New order ${event.data.order_number} — Table ${event.data.table_number}`
+        `New order ${event.data.order_number} — ${locationLabel}`
       );
     },
     [showAlert]

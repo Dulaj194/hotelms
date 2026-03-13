@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import type {
-  AddCartItemRequest,
-  CartResponse,
-  UpdateCartItemRequest,
-} from "@/types/cart";
-import type { PlaceOrderRequest, PlaceOrderResponse } from "@/types/order";
-import { getGuestToken } from "@/hooks/useGuestSession";
+  AddRoomCartItemRequest,
+  PlaceRoomOrderRequest,
+  PlaceRoomOrderResponse,
+  RoomCartResponse,
+  UpdateRoomCartItemRequest,
+} from "@/types/roomSession";
+import { getRoomToken } from "@/hooks/useRoomSession";
 import { createSessionRequest } from "@/lib/sessionRequest";
 
-const guestRequest = createSessionRequest("X-Guest-Session", getGuestToken);
+const roomRequest = createSessionRequest("X-Room-Session", getRoomToken);
 
-interface UseCartReturn {
-  cart: CartResponse | null;
+interface UseRoomCartReturn {
+  cart: RoomCartResponse | null;
   loading: boolean;
   error: string | null;
   placing: boolean;
@@ -19,22 +20,22 @@ interface UseCartReturn {
   updateItem: (itemId: number, quantity: number) => Promise<void>;
   removeItem: (itemId: number) => Promise<void>;
   clearCart: () => Promise<void>;
-  placeOrder: (data?: PlaceOrderRequest) => Promise<PlaceOrderResponse>;
+  placeOrder: (data?: PlaceRoomOrderRequest) => Promise<PlaceRoomOrderResponse>;
   refetch: () => Promise<void>;
 }
 
-export function useCart(): UseCartReturn {
-  const [cart, setCart] = useState<CartResponse | null>(null);
+export function useRoomCart(): UseRoomCartReturn {
+  const [cart, setCart] = useState<RoomCartResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCart = useCallback(async () => {
-    if (!getGuestToken()) return;
+    if (!getRoomToken()) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await guestRequest<CartResponse>("GET", "/cart");
+      const data = await roomRequest<RoomCartResponse>("GET", "/room-cart");
       setCart(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load cart");
@@ -49,8 +50,8 @@ export function useCart(): UseCartReturn {
 
   const addItem = useCallback(
     async (itemId: number, quantity = 1) => {
-      const payload: AddCartItemRequest = { item_id: itemId, quantity };
-      await guestRequest("POST", "/cart/items", payload);
+      const payload: AddRoomCartItemRequest = { item_id: itemId, quantity };
+      await roomRequest("POST", "/room-cart/items", payload);
       await fetchCart();
     },
     [fetchCart]
@@ -58,8 +59,8 @@ export function useCart(): UseCartReturn {
 
   const updateItem = useCallback(
     async (itemId: number, quantity: number) => {
-      const payload: UpdateCartItemRequest = { quantity };
-      await guestRequest("PATCH", `/cart/items/${itemId}`, payload);
+      const payload: UpdateRoomCartItemRequest = { quantity };
+      await roomRequest("PATCH", `/room-cart/items/${itemId}`, payload);
       await fetchCart();
     },
     [fetchCart]
@@ -67,27 +68,26 @@ export function useCart(): UseCartReturn {
 
   const removeItem = useCallback(
     async (itemId: number) => {
-      await guestRequest("DELETE", `/cart/items/${itemId}`);
+      await roomRequest("DELETE", `/room-cart/items/${itemId}`);
       await fetchCart();
     },
     [fetchCart]
   );
 
   const clearCart = useCallback(async () => {
-    await guestRequest("DELETE", "/cart");
+    await roomRequest("DELETE", "/room-cart");
     setCart(null);
   }, []);
 
   const placeOrder = useCallback(
-    async (data: PlaceOrderRequest = {}): Promise<PlaceOrderResponse> => {
+    async (data: PlaceRoomOrderRequest = {}): Promise<PlaceRoomOrderResponse> => {
       setPlacing(true);
       try {
-        const result = await guestRequest<PlaceOrderResponse>(
+        const result = await roomRequest<PlaceRoomOrderResponse>(
           "POST",
-          "/orders",
+          "/room-orders",
           data
         );
-        // Cart has been cleared server-side; reflect that locally
         setCart(null);
         return result;
       } finally {

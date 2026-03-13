@@ -33,7 +33,9 @@ export default function OrderCard({ order, onAction, actionLoading }: OrderCardP
             {order.order_number}
           </p>
           <p className="text-sm text-gray-500 mt-0.5">
-            Table <span className="font-semibold text-gray-700">{order.table_number}</span>
+            {order.order_source === "room"
+              ? <>Room <span className="font-semibold text-gray-700">{order.room_number ?? "?"}</span></>
+              : <>Table <span className="font-semibold text-gray-700">{order.table_number ?? "?"}</span></>}
             {order.customer_name && (
               <span className="ml-2 text-gray-400">· {order.customer_name}</span>
             )}
