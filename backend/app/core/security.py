@@ -102,3 +102,45 @@ def decode_guest_session_token(token: str) -> dict:
     if payload.get("type") != "guest_session":
         raise ValueError("Token type is not guest_session")
     return payload
+
+
+# ─── Room session token helpers ───────────────────────────────────────────────
+#
+# Room session tokens use type="room_session" — distinct from both staff tokens
+# ("access"/"refresh") and table guest session tokens ("guest_session").
+# This prevents cross-use of any token type.
+
+
+def create_room_session_token(
+    session_id: str,
+    restaurant_id: int,
+    room_id: int,
+    room_number: str,
+    expire_minutes: int,
+) -> str:
+    """Create a signed room guest session token.
+
+    Encodes session_id, restaurant_id, room_id, room_number, and expiry.
+    The type claim is 'room_session' — cannot be used as a staff or table token.
+    """
+    payload = {
+        "type": "room_session",
+        "session_id": session_id,
+        "restaurant_id": restaurant_id,
+        "room_id": room_id,
+        "room_number": room_number,
+        "exp": datetime.now(UTC) + timedelta(minutes=expire_minutes),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
+def decode_room_session_token(token: str) -> dict:
+    """Decode and verify a room session token.
+
+    Raises jose.JWTError on invalid/expired tokens.
+    Raises ValueError if the token type is not 'room_session'.
+    """
+    payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+    if payload.get("type") != "room_session":
+        raise ValueError("Token type is not room_session")
+    return payload

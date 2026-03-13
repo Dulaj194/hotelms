@@ -184,3 +184,42 @@ def get_current_guest_session(
         raise credentials_exception
 
     return session
+
+
+def get_current_room_session(
+    x_room_session: str = Header(..., alias="X-Room-Session"),
+    db: Session = Depends(get_db),
+):
+    """Dependency that validates the X-Room-Session token and returns the RoomSession.
+
+    Used by all room cart and room order endpoints. Validates:
+    1. Token signature and expiry (jose).
+    2. Token type is 'room_session' (not a staff or table token).
+    3. Session exists in DB and is active/not-expired.
+
+    SECURITY: Plain room_number alone never authorizes room operations.
+    Only a valid signed room session token grants access.
+    """
+    from app.core.security import decode_room_session_token
+    from app.modules.room_sessions.repository import get_active_room_session_by_session_id
+
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired room session.",
+        headers={"WWW-Authenticate": "X-Room-Session"},
+    )
+
+    try:
+        payload = decode_room_session_token(x_room_session)
+    except Exception:
+        raise credentials_exception
+
+    session_id: str | None = payload.get("session_id")
+    if not session_id:
+        raise credentials_exception
+
+    session = get_active_room_session_by_session_id(db, session_id)
+    if session is None:
+        raise credentials_exception
+
+    return session
