@@ -93,6 +93,33 @@ docker-compose down
 docker-compose down -v
 ```
 
+### One-command run (Windows)
+
+Use the root scripts for quickest startup:
+
+```powershell
+cd d:\in_project\hotelms
+
+# Start all services (build + up)
+.\run.ps1
+
+# Start in background
+.\run.ps1 -Detached
+
+# Stop all services
+.\stop.ps1
+
+# Stop and wipe DB volume
+.\stop.ps1 -WipeData
+```
+
+Batch shortcuts are also available:
+
+```powershell
+.\run.bat
+.\stop.bat
+```
+
 ---
 
 ### Run Locally (without Docker)
