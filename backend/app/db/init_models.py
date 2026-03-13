@@ -12,5 +12,8 @@ from app.modules.orders.model import OrderHeader, OrderItem  # noqa: F401
 from app.modules.payments.model import Payment  # noqa: F401
 from app.modules.qr.model import QRCode  # noqa: F401
 from app.modules.restaurants.model import Restaurant  # noqa: F401
+from app.modules.housekeeping.model import HousekeepingRequest  # noqa: F401
+from app.modules.room_sessions.model import RoomSession  # noqa: F401
+from app.modules.rooms.model import Room  # noqa: F401
 from app.modules.table_sessions.model import TableSession  # noqa: F401
 from app.modules.users.model import User  # noqa: F401
