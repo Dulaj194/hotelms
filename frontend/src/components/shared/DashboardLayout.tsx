@@ -3,6 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 const navItems = [
   { path: "/admin/restaurant-profile", label: "Restaurant Profile" },
   { path: "/admin/staff", label: "Staff" },
+  { path: "/admin/rooms", label: "Rooms" },
+  { path: "/admin/housekeeping", label: "Housekeeping" },
 ];
 
 interface DashboardLayoutProps {

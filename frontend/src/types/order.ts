@@ -47,7 +47,7 @@ export interface OrderHeaderResponse {
   order_number: string;
   session_id: string;
   restaurant_id: number;
-  table_number: string;
+  table_number: string | null;
   customer_name: string | null;
   status: OrderStatus;
   subtotal_amount: number;
@@ -60,6 +60,9 @@ export interface OrderHeaderResponse {
   completed_at: string | null;
   rejected_at: string | null;
   paid_at: string | null;
+  order_source: string;
+  room_id: number | null;
+  room_number: string | null;
 }
 
 export interface OrderDetailResponse extends OrderHeaderResponse {
@@ -123,7 +126,7 @@ export interface KitchenOrderItemSummary {
 export interface KitchenOrderCard {
   id: number;
   order_number: string;
-  table_number: string;
+  table_number: string | null;
   customer_name: string | null;
   status: OrderStatus;
   total_amount: number;
@@ -134,6 +137,9 @@ export interface KitchenOrderCard {
   rejected_at: string | null;
   notes: string | null;
   items: KitchenOrderItemSummary[];
+  order_source: string;
+  room_id: number | null;
+  room_number: string | null;
 }
 
 export interface KitchenOrderListResponse {

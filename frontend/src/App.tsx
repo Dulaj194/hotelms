@@ -12,6 +12,10 @@ import Staff from "@/pages/admin/Staff";
 import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
 import TableMenu from "@/pages/public/TableMenu";
 import TableOrderStatus from "@/pages/public/TableOrderStatus";
+import RoomMenu from "@/pages/public/RoomMenu";
+import ServiceRequest from "@/pages/room/ServiceRequest";
+import Rooms from "@/pages/admin/Rooms";
+import Housekeeping from "@/pages/admin/Housekeeping";
 import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
 
 function RootRedirect() {
@@ -37,6 +41,14 @@ function App() {
         <Route
           path="/menu/:restaurantId/table/:tableNumber/order/:orderId"
           element={<TableOrderStatus />}
+        />
+        <Route
+          path="/menu/:restaurantId/room/:roomNumber"
+          element={<RoomMenu />}
+        />
+        <Route
+          path="/menu/:restaurantId/room/:roomNumber/service-request"
+          element={<ServiceRequest />}
         />
 
         {/* Protected routes */}
@@ -87,6 +99,22 @@ function App() {
           element={
             <ProtectedRoute>
               <Billing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/rooms"
+          element={
+            <ProtectedRoute>
+              <Rooms />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/housekeeping"
+          element={
+            <ProtectedRoute>
+              <Housekeeping />
             </ProtectedRoute>
           }
         />

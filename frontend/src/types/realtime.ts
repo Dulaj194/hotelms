@@ -19,11 +19,14 @@ export interface EventOrderItem {
 export interface NewOrderEventData {
   order_id: number;
   order_number: string;
-  table_number: string;
+  table_number: string | null;
   status: string;
   total_amount: number;
   placed_at: string;
   items: EventOrderItem[];
+  order_source?: string;
+  room_id?: number | null;
+  room_number?: string | null;
 }
 
 export interface NewOrderEvent {
