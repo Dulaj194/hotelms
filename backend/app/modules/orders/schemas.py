@@ -48,7 +48,10 @@ class OrderHeaderResponse(BaseModel):
     order_number: str
     session_id: str
     restaurant_id: int
-    table_number: str
+    order_source: str
+    table_number: str | None
+    room_id: int | None
+    room_number: str | None
     customer_name: str | None
     status: OrderStatus
     subtotal_amount: float
@@ -118,7 +121,10 @@ class KitchenOrderCard(BaseModel):
 
     id: int
     order_number: str
-    table_number: str
+    order_source: str
+    table_number: str | None
+    room_number: str | None
+    room_id: int | None
     customer_name: str | None
     status: OrderStatus
     total_amount: float

@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_restaurant_id, require_roles
-from app.db.session import get_db
+from app.core.dependencies import get_db
 from app.modules.billing import service as billing_service
 from app.modules.billing.schemas import (
     BillSummaryResponse,

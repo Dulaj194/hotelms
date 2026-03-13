@@ -71,7 +71,23 @@ class OrderHeader(Base):
         nullable=False,
         index=True,
     )
-    table_number: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # Order source: "table" (default) or "room"
+    order_source: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="table", server_default="table"
+    )
+
+    # Table context (null for room orders)
+    table_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # Room context (null for table orders)
+    room_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("rooms.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    room_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Optional customer info
     customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
