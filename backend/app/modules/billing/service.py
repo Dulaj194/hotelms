@@ -22,6 +22,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.billing import repository as billing_repo
@@ -213,6 +214,12 @@ def settle_session(
 
         db.commit()
 
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This session has already been settled.",
+        )
     except HTTPException:
         db.rollback()
         raise

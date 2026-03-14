@@ -54,9 +54,9 @@ function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
     rejected_at: null,
     notes: null,
     items,
-    order_source: data.order_source ?? "table",
-    room_id: data.room_id ?? null,
-    room_number: data.room_number ?? null,
+    order_source: data.order_source,
+    room_id: data.room_id,
+    room_number: data.room_number,
   };
 }
 

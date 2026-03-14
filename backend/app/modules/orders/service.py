@@ -266,6 +266,9 @@ def place_order(
             order_id=placed.id,
             order_number=placed.order_number,
             table_number=placed.table_number,
+            order_source=placed.order_source,
+            room_id=placed.room_id,
+            room_number=placed.room_number,
             total_amount=float(placed.total_amount),
             placed_at=placed.placed_at,
             items=[
@@ -414,6 +417,9 @@ def update_order_status(
                 order_id=updated.id,
                 order_number=updated.order_number,
                 table_number=updated.table_number,
+                order_source=updated.order_source,
+                room_id=updated.room_id,
+                room_number=updated.room_number,
                 status=updated.status.value,
                 updated_at=datetime.now(UTC),
             )

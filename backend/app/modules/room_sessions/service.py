@@ -426,15 +426,17 @@ def place_room_order(
         db, order.id, session.session_id, session.restaurant_id
     )
 
-    # Publish real-time event — kitchen sees "Room 203" in table_number field
-    # for backward compatibility with the existing WS event schema.
+    # Publish real-time event with explicit room metadata.
     try:
         realtime_service.publish_new_order(
             r,
             restaurant_id=session.restaurant_id,
             order_id=placed.id,
             order_number=placed.order_number,
-            table_number=f"Room {session.room_number_snapshot}",
+            table_number=None,
+            order_source="room",
+            room_id=session.room_id,
+            room_number=session.room_number_snapshot,
             total_amount=float(placed.total_amount),
             placed_at=placed.placed_at,
             items=[
@@ -449,6 +451,13 @@ def place_room_order(
     except Exception:
         # Real-time failure must never block the order placement response.
         pass
+
+    # Keep room session activity fresh after successful order placement.
+    repository.touch_room_session_activity(
+        db,
+        session_id=session.session_id,
+        restaurant_id=session.restaurant_id,
+    )
 
     return PlaceRoomOrderResponse(order=_build_room_order_detail(placed))
 

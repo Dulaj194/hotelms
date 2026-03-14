@@ -68,11 +68,19 @@ def get_room_session_by_id_and_restaurant(
     )
 
 
-def touch_room_session_activity(db: Session, session_id: str) -> None:
+def touch_room_session_activity(
+    db: Session,
+    *,
+    session_id: str,
+    restaurant_id: int,
+) -> None:
     """Update last_activity_at timestamp."""
     session = (
         db.query(RoomSession)
-        .filter(RoomSession.session_id == session_id)
+        .filter(
+            RoomSession.session_id == session_id,
+            RoomSession.restaurant_id == restaurant_id,
+        )
         .first()
     )
     if session:
@@ -80,11 +88,19 @@ def touch_room_session_activity(db: Session, session_id: str) -> None:
         db.commit()
 
 
-def deactivate_room_session(db: Session, session_id: str) -> None:
+def deactivate_room_session(
+    db: Session,
+    *,
+    session_id: str,
+    restaurant_id: int,
+) -> None:
     """Mark a room session as inactive."""
     session = (
         db.query(RoomSession)
-        .filter(RoomSession.session_id == session_id)
+        .filter(
+            RoomSession.session_id == session_id,
+            RoomSession.restaurant_id == restaurant_id,
+        )
         .first()
     )
     if session:

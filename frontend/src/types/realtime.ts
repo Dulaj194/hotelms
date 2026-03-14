@@ -20,13 +20,13 @@ export interface NewOrderEventData {
   order_id: number;
   order_number: string;
   table_number: string | null;
+  order_source: string;
+  room_id: number | null;
+  room_number: string | null;
   status: string;
   total_amount: number;
   placed_at: string;
   items: EventOrderItem[];
-  order_source?: string;
-  room_id?: number | null;
-  room_number?: string | null;
 }
 
 export interface NewOrderEvent {
@@ -40,7 +40,10 @@ export interface NewOrderEvent {
 export interface OrderStatusUpdatedEventData {
   order_id: number;
   order_number: string;
-  table_number: string;
+  table_number: string | null;
+  order_source: string;
+  room_id: number | null;
+  room_number: string | null;
   status: string;
   updated_at: string;
 }

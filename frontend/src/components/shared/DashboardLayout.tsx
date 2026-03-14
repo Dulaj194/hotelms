@@ -1,10 +1,14 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { clearAuth, getUser } from "@/lib/auth";
 
-const navItems = [
-  { path: "/admin/restaurant-profile", label: "Restaurant Profile" },
-  { path: "/admin/staff", label: "Staff" },
-  { path: "/admin/rooms", label: "Rooms" },
-  { path: "/admin/housekeeping", label: "Housekeeping" },
+const ALL_NAV_ITEMS = [
+  { path: "/dashboard", label: "🏠 Home", roles: null },
+  { path: "/admin/restaurant-profile", label: "🍽️ Restaurant", roles: ["owner", "admin", "super_admin"] },
+  { path: "/admin/staff", label: "👥 Staff", roles: ["owner", "admin"] },
+  { path: "/admin/kitchen", label: "🧑‍🍳 Kitchen", roles: ["owner", "admin", "steward"] },
+  { path: "/admin/billing", label: "💳 Billing", roles: ["owner", "admin", "steward"] },
+  { path: "/admin/rooms", label: "🛏️ Rooms", roles: ["owner", "admin"] },
+  { path: "/admin/housekeeping", label: "🛎️ Housekeeping", roles: ["owner", "admin", "housekeeper"] },
 ];
 
 interface DashboardLayoutProps {
@@ -13,6 +17,18 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const user = getUser();
+  const role = user?.role ?? "";
+
+  const navItems = ALL_NAV_ITEMS.filter(
+    (item) => item.roles === null || item.roles.includes(role)
+  );
+
+  function handleLogout() {
+    clearAuth();
+    navigate("/login", { replace: true });
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -20,6 +36,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       <aside className="w-56 bg-gray-900 text-white flex flex-col">
         <div className="px-4 py-5 border-b border-gray-700">
           <span className="text-lg font-bold tracking-tight">HotelMS</span>
+          {user && (
+            <p className="text-xs text-gray-400 mt-0.5 truncate">{user.full_name}</p>
+          )}
         </div>
         <nav className="flex-1 py-4 space-y-0.5 px-2">
           {navItems.map((item) => {
@@ -40,12 +59,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           })}
         </nav>
         <div className="px-4 py-4 border-t border-gray-700">
-          <Link
-            to="/dashboard"
-            className="block text-xs text-gray-400 hover:text-white"
+          <button
+            onClick={handleLogout}
+            className="w-full text-left text-xs text-gray-400 hover:text-red-400 transition-colors"
           >
-            ← Dashboard
-          </Link>
+            ⏻ Logout
+          </button>
         </div>
       </aside>
 
