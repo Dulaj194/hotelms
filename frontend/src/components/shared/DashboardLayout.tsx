@@ -4,6 +4,7 @@ import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 const ALL_NAV_ITEMS = [
   { path: "/dashboard", label: "🏠 Home", roles: null },
   { path: "/admin/restaurant-profile", label: "🍽️ Restaurant", roles: ["owner", "admin", "super_admin"] },
+  { path: "/admin/subscription", label: "📦 Subscription", roles: ["owner", "admin"] },
   { path: "/admin/staff", label: "👥 Staff", roles: ["owner", "admin"] },
   { path: "/admin/kitchen", label: "🧑‍🍳 Kitchen", roles: ["owner", "admin", "steward"] },
   { path: "/admin/billing", label: "💳 Billing", roles: ["owner", "admin", "steward"] },

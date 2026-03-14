@@ -38,8 +38,15 @@ export function createSessionRequest(
     });
 
     if (!response.ok) {
+      let detail = response.statusText;
+      try {
+        const payload = (await response.json()) as { detail?: string };
+        if (payload?.detail) detail = payload.detail;
+      } catch {
+        detail = response.statusText;
+      }
       throw new Error(
-        `${method} ${path} failed — ${response.status} ${response.statusText}`
+        `${method} ${path} failed — ${response.status} ${detail}`
       );
     }
 

@@ -11,6 +11,18 @@ import { getAccessToken } from "@/lib/auth";
 const BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
+export class ApiError extends Error {
+  status: number;
+  detail: string;
+
+  constructor(status: number, detail: string, method: string, path: string) {
+    super(`${method} ${path} failed — ${status} ${detail}`);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -33,7 +45,14 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    throw new Error(`${method} ${path} failed — ${response.status} ${response.statusText}`);
+    let detail = response.statusText;
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload?.detail) detail = payload.detail;
+    } catch {
+      detail = response.statusText;
+    }
+    throw new ApiError(response.status, detail, method, path);
   }
 
   return response.json() as Promise<T>;

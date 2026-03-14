@@ -20,6 +20,8 @@ from app.core.dependencies import (
     get_current_restaurant_id,
     get_current_room_session,
     get_db,
+    require_privilege,
+    require_room_session_privilege,
     require_roles,
 )
 from app.modules.housekeeping import service
@@ -44,6 +46,7 @@ _HK_ROLES = ("owner", "admin", "housekeeper")
 def submit_housekeeping_request(
     payload: HousekeepingRequestCreateRequest,
     session: RoomSession = Depends(get_current_room_session),
+    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestCreateResponse:
     """Submit a housekeeping or service request from the guest's room.
@@ -62,6 +65,7 @@ def list_request_history(
     room_number: Optional[str] = Query(None, description="Filter by room number"),
     request_type: Optional[str] = Query(None, description="Filter by request type"),
     current_user=Depends(require_roles(*_HK_ROLES)),
+    _=Depends(require_privilege("HOUSEKEEPING")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestListResponse:
@@ -77,6 +81,7 @@ def list_requests(
     room_number: Optional[str] = Query(None, description="Filter by room number"),
     request_type: Optional[str] = Query(None, description="Filter by request type"),
     current_user=Depends(require_roles(*_HK_ROLES)),
+    _=Depends(require_privilege("HOUSEKEEPING")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestListResponse:
@@ -94,6 +99,7 @@ def list_requests(
 def get_request(
     request_id: int,
     current_user=Depends(require_roles(*_HK_ROLES)),
+    _=Depends(require_privilege("HOUSEKEEPING")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestResponse:
@@ -105,6 +111,7 @@ def get_request(
 def mark_request_done(
     request_id: int,
     current_user=Depends(require_roles(*_HK_ROLES)),
+    _=Depends(require_privilege("HOUSEKEEPING")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestStatusResponse:

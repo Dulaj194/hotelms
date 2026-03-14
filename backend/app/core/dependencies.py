@@ -139,6 +139,71 @@ def require_restaurant_user(
     return current_user
 
 
+def get_current_subscription(
+    db: Session = Depends(get_db),
+    restaurant_user=Depends(require_restaurant_user),
+):
+    """Return current restaurant subscription snapshot from centralized service."""
+    from app.modules.subscriptions import service as subscription_service
+
+    return subscription_service.get_current_subscription(db, restaurant_user.restaurant_id)
+
+
+def require_active_subscription(
+    db: Session = Depends(get_db),
+    restaurant_user=Depends(require_restaurant_user),
+):
+    """Ensure restaurant has active/trial non-expired subscription."""
+    from app.modules.subscriptions import service as subscription_service
+
+    status_response = subscription_service.get_current_subscription_status(
+        db,
+        restaurant_user.restaurant_id,
+    )
+    if not status_response.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="An active subscription is required for this feature.",
+        )
+    return status_response
+
+
+def require_privilege(privilege_code: str):
+    """Dependency factory to enforce a SaaS privilege for authenticated tenant routes."""
+
+    def _check(
+        db: Session = Depends(get_db),
+        restaurant_id: int = Depends(get_current_restaurant_id),
+    ):
+        if restaurant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No restaurant context available for privilege check.",
+            )
+
+        from app.modules.subscriptions import service as subscription_service
+
+        subscription_service.assert_privilege(db, restaurant_id, privilege_code)
+        return True
+
+    return _check
+
+
+def require_room_session_privilege(privilege_code: str):
+    """Dependency factory for guest room-session routes that need privilege gates."""
+
+    def _check(
+        db: Session = Depends(get_db),
+        session=Depends(get_current_room_session),
+    ):
+        from app.modules.subscriptions import service as subscription_service
+
+        subscription_service.assert_privilege(db, session.restaurant_id, privilege_code)
+        return True
+
+    return _check
+
+
 # ─── Guest session dependency ─────────────────────────────────────────────────
 #
 # DESIGN: Guest (customer) tokens are carried in the X-Guest-Session header

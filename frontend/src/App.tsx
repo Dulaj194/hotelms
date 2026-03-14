@@ -16,6 +16,8 @@ import RoomMenu from "@/pages/public/RoomMenu";
 import ServiceRequest from "@/pages/room/ServiceRequest";
 import Rooms from "@/pages/admin/Rooms";
 import Housekeeping from "@/pages/admin/Housekeeping";
+import SubscriptionPage from "@/pages/admin/Subscription";
+import Pricing from "@/pages/public/Pricing";
 import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
 
 function RootRedirect() {
@@ -49,6 +51,7 @@ function App() {
           path="/menu/:restaurantId/room/:roomNumber/service-request"
           element={<ServiceRequest />}
         />
+        <Route path="/pricing" element={<Pricing />} />
 
         <Route
           path="/dashboard"
@@ -113,6 +116,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["owner", "admin", "housekeeper"]}>
               <Housekeeping />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/subscription"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <SubscriptionPage />
             </ProtectedRoute>
           }
         />

@@ -11,9 +11,11 @@ from app.modules.items.router import router as items_router
 from app.modules.orders.router import router as orders_router
 from app.modules.payments.router import router as payments_router
 from app.modules.public.router import router as public_router
+from app.modules.packages.router import router as packages_router
 from app.modules.qr.router import router as qr_router
 from app.modules.realtime.router import router as realtime_router
 from app.modules.restaurants.router import router as restaurants_router
+from app.modules.subscriptions.router import router as subscriptions_router
 from app.modules.room_sessions.router import (
     cart_router as room_cart_router,
     orders_router as room_orders_router,
@@ -33,6 +35,8 @@ router.include_router(restaurants_router, prefix="/restaurants", tags=["restaura
 router.include_router(categories_router, prefix="/categories", tags=["categories"])
 router.include_router(items_router, prefix="/items", tags=["items"])
 router.include_router(public_router, prefix="/public", tags=["public"])
+router.include_router(packages_router, prefix="/packages", tags=["packages"])
+router.include_router(subscriptions_router, prefix="/subscriptions", tags=["subscriptions"])
 router.include_router(qr_router, prefix="/qr", tags=["qr"])
 router.include_router(table_sessions_router, prefix="/table-sessions", tags=["table-sessions"])
 router.include_router(cart_router, prefix="/cart", tags=["cart"])

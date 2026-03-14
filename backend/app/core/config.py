@@ -37,5 +37,9 @@ class Settings(BaseSettings):
     guest_session_expire_minutes: int = 120   # 2 hours
     cart_ttl_seconds: int = 7200              # matches session default
 
+    # ── SaaS subscriptions ───────────────────────────────────────────────────
+    default_trial_days: int = 14
+    default_trial_package_code: str = "basic"
+
 
 settings = Settings()

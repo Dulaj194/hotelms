@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.restaurants import repository
+from app.modules.subscriptions import service as subscription_service
 from app.modules.restaurants.schemas import (
     RestaurantCreateRequest,
     RestaurantLogoUploadResponse,
@@ -125,4 +126,7 @@ def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> Restaura
         phone=payload.phone,
         address=payload.address,
     )
+
+    subscription_service.assign_initial_trial_subscription(db, restaurant.id)
+
     return RestaurantMeResponse.model_validate(restaurant)
