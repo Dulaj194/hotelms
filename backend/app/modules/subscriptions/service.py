@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -19,12 +19,25 @@ from app.modules.subscriptions.schemas import (
 )
 
 
+def _utcnow_naive() -> datetime:
+    return datetime.utcnow()
+
+
+def _normalize_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value
+    return value.replace(tzinfo=None)
+
+
 def _effective_status(subscription: RestaurantSubscription | None) -> str:
     if subscription is None:
         return "none"
 
-    now = datetime.now(UTC)
+    now = _utcnow_naive()
     effective_expires_at = subscription.trial_expires_at if subscription.is_trial else subscription.expires_at
+    effective_expires_at = _normalize_datetime(effective_expires_at)
 
     if subscription.status in (SubscriptionStatus.active, SubscriptionStatus.trial):
         if effective_expires_at and effective_expires_at <= now:
@@ -200,7 +213,7 @@ def assign_initial_trial_subscription(db: Session, restaurant_id: int) -> None:
             detail="Default trial package is not configured.",
         )
 
-    now = datetime.now(UTC)
+    now = _utcnow_naive()
     trial_end = now + timedelta(days=settings.default_trial_days)
 
     repository.create_subscription(
@@ -245,7 +258,7 @@ def start_trial(
             detail="Default trial package is unavailable.",
         )
 
-    now = datetime.now(UTC)
+    now = _utcnow_naive()
     trial_end = now + timedelta(days=settings.default_trial_days)
 
     repository.close_open_subscriptions(
@@ -282,7 +295,7 @@ def activate_subscription(
     packages_service.ensure_default_packages(db)
     package = _get_active_package_by_selector(db, payload)
 
-    now = datetime.now(UTC)
+    now = _utcnow_naive()
     expires_at = now + timedelta(days=package.billing_period_days)
 
     repository.close_open_subscriptions(
@@ -322,7 +335,7 @@ def cancel_subscription(
             detail="No active subscription to cancel.",
         )
 
-    now = datetime.now(UTC)
+    now = _utcnow_naive()
     current_open.status = SubscriptionStatus.cancelled
     current_open.expires_at = now
     db.commit()
