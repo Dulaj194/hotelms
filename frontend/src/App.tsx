@@ -21,19 +21,18 @@ import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
 function RootRedirect() {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
   const user = getUser();
-  return <Navigate to={getRoleRedirect(user?.role ?? "")} replace />;
+  const redirectPath = getRoleRedirect(user?.role ?? "");
+  return <Navigate to={redirectPath || "/dashboard"} replace />;
 }
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Unauthenticated routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
-        {/* Public guest menu (no auth required) */}
         <Route
           path="/menu/:restaurantId/table/:tableNumber"
           element={<TableMenu />}
@@ -51,7 +50,6 @@ function App() {
           element={<ServiceRequest />}
         />
 
-        {/* Protected routes */}
         <Route
           path="/dashboard"
           element={
@@ -60,6 +58,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/restaurant"
           element={
@@ -69,11 +68,10 @@ function App() {
           }
         />
 
-        {/* Admin area */}
         <Route
           path="/admin/restaurant-profile"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["admin"]}>
               <AdminRestaurantProfile />
             </ProtectedRoute>
           }
@@ -81,7 +79,7 @@ function App() {
         <Route
           path="/admin/staff"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["admin"]}>
               <Staff />
             </ProtectedRoute>
           }
@@ -89,7 +87,7 @@ function App() {
         <Route
           path="/admin/kitchen"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["admin"]}>
               <Kitchen />
             </ProtectedRoute>
           }
@@ -97,7 +95,7 @@ function App() {
         <Route
           path="/admin/billing"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["admin"]}>
               <Billing />
             </ProtectedRoute>
           }
@@ -105,7 +103,7 @@ function App() {
         <Route
           path="/admin/rooms"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["admin"]}>
               <Rooms />
             </ProtectedRoute>
           }
@@ -113,14 +111,16 @@ function App() {
         <Route
           path="/admin/housekeeping"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["admin"]}>
               <Housekeeping />
             </ProtectedRoute>
           }
         />
 
-        {/* Default redirects */}
-        <Route path="/admin" element={<Navigate to="/admin/restaurant-profile" replace />} />
+        <Route
+          path="/admin"
+          element={<Navigate to="/admin/restaurant-profile" replace />}
+        />
         <Route path="/" element={<RootRedirect />} />
         <Route path="*" element={<RootRedirect />} />
       </Routes>
