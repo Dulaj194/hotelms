@@ -41,5 +41,13 @@ class Settings(BaseSettings):
     default_trial_days: int = 14
     default_trial_package_code: str = "basic"
 
+    # ── Stripe billing ───────────────────────────────────────────────────────
+    stripe_secret_key: str = ""
+    stripe_publishable_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_currency: str = "usd"
+    stripe_checkout_success_url: str = "http://localhost:5173/admin/subscription/payment/success?session_id={CHECKOUT_SESSION_ID}"
+    stripe_checkout_cancel_url: str = "http://localhost:5173/admin/subscription/payment/cancel"
+
 
 settings = Settings()

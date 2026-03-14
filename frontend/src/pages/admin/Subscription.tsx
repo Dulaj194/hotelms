@@ -3,8 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
 import type {
-  ActivateSubscriptionRequest,
-  ActivateSubscriptionResponse,
+  BillingTransactionListResponse,
+  BillingTransactionResponse,
+  CheckoutSessionResponse,
+} from "@/types/payment";
+import type {
   CancelSubscriptionResponse,
   PackageListResponse,
   PackageResponse,
@@ -21,6 +24,7 @@ export default function SubscriptionPage() {
   const [subscription, setSubscription] = useState<SubscriptionResponse | null>(null);
   const [statusInfo, setStatusInfo] = useState<SubscriptionStatusResponse | null>(null);
   const [privilegesInfo, setPrivilegesInfo] = useState<SubscriptionPrivilegeResponse | null>(null);
+  const [billingHistory, setBillingHistory] = useState<BillingTransactionResponse[]>([]);
 
   const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null);
 
@@ -39,11 +43,13 @@ export default function SubscriptionPage() {
         api.get<SubscriptionStatusResponse>("/subscriptions/me/status"),
         api.get<SubscriptionPrivilegeResponse>("/subscriptions/me/privileges"),
       ]);
+      const historyRes = await api.get<BillingTransactionListResponse>("/payments/history?limit=20&offset=0");
 
       setPackages(pkgRes.items);
       setSubscription(subRes);
       setStatusInfo(statusRes);
       setPrivilegesInfo(privRes);
+      setBillingHistory(historyRes.items);
 
       if (subRes.package_id) {
         setSelectedPackageId(subRes.package_id);
@@ -87,7 +93,7 @@ export default function SubscriptionPage() {
     }
   }
 
-  async function activatePackage() {
+  async function startCheckout() {
     if (!selectedPackageId) {
       setError("Select a package first.");
       return;
@@ -97,17 +103,16 @@ export default function SubscriptionPage() {
     setMessage(null);
     setError(null);
 
-    const payload: ActivateSubscriptionRequest = { package_id: selectedPackageId };
-
     try {
-      const res = await api.post<ActivateSubscriptionResponse>("/subscriptions/activate", payload);
-      setMessage(res.message);
-      await loadAll();
+      const res = await api.post<CheckoutSessionResponse>("/payments/checkout", {
+        package_id: selectedPackageId,
+      });
+      window.location.href = res.checkout_url;
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError("Failed to activate package.");
+        setError("Failed to create checkout session.");
       }
     } finally {
       setWorking(false);
@@ -196,7 +201,7 @@ export default function SubscriptionPage() {
 
         {!loading && (
           <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="text-base font-semibold text-gray-900">Change Package</h2>
+            <h2 className="text-base font-semibold text-gray-900">Upgrade Package</h2>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
               <select
                 className="w-full rounded-md border px-3 py-2 text-sm"
@@ -213,11 +218,11 @@ export default function SubscriptionPage() {
               </select>
 
               <button
-                onClick={activatePackage}
+                onClick={startCheckout}
                 disabled={working || selectedPackageId === null}
                 className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
               >
-                Activate
+                Pay with Stripe
               </button>
               <button
                 onClick={startTrial}
@@ -233,6 +238,28 @@ export default function SubscriptionPage() {
               >
                 Cancel
               </button>
+            </div>
+          </section>
+        )}
+
+        {!loading && (
+          <section className="rounded-xl border bg-white p-6 shadow-sm">
+            <h2 className="text-base font-semibold text-gray-900">Billing History</h2>
+            <div className="mt-4 space-y-2">
+              {billingHistory.length === 0 && (
+                <p className="text-sm text-gray-500">No billing transactions yet.</p>
+              )}
+              {billingHistory.map((item) => (
+                <div key={item.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                  <div>
+                    <p className="font-medium text-gray-800">
+                      #{item.id} • {item.currency.toUpperCase()} {item.amount.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-gray-500">{formatDate(item.created_at)}</p>
+                  </div>
+                  <span className="font-medium text-gray-700">{item.status}</span>
+                </div>
+              ))}
             </div>
           </section>
         )}

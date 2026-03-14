@@ -295,6 +295,28 @@ def activate_subscription(
     packages_service.ensure_default_packages(db)
     package = _get_active_package_by_selector(db, payload)
 
+    subscription = activate_paid_subscription(db, restaurant_id=restaurant_id, package_id=package.id)
+    db.commit()
+
+    return ActivateSubscriptionResponse(
+        message="Subscription activated successfully.",
+        subscription=_to_subscription_response(subscription),
+    )
+
+
+def activate_paid_subscription(
+    db: Session,
+    *,
+    restaurant_id: int,
+    package_id: int,
+) -> RestaurantSubscription:
+    package = packages_repo.get_package_by_id(db, package_id)
+    if package is None or not package.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found or inactive.",
+        )
+
     now = _utcnow_naive()
     expires_at = now + timedelta(days=package.billing_period_days)
 
@@ -305,7 +327,7 @@ def activate_subscription(
         closed_at=now,
     )
 
-    subscription = repository.create_subscription(
+    return repository.create_subscription(
         db,
         restaurant_id=restaurant_id,
         package_id=package.id,
@@ -315,12 +337,6 @@ def activate_subscription(
         is_trial=False,
         trial_started_at=None,
         trial_expires_at=None,
-    )
-    db.commit()
-
-    return ActivateSubscriptionResponse(
-        message="Subscription activated successfully.",
-        subscription=_to_subscription_response(subscription),
     )
 
 

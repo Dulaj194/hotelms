@@ -17,6 +17,8 @@ import ServiceRequest from "@/pages/room/ServiceRequest";
 import Rooms from "@/pages/admin/Rooms";
 import Housekeeping from "@/pages/admin/Housekeeping";
 import SubscriptionPage from "@/pages/admin/Subscription";
+import SubscriptionPaymentSuccess from "@/pages/admin/SubscriptionPaymentSuccess";
+import SubscriptionPaymentCancel from "@/pages/admin/SubscriptionPaymentCancel";
 import Pricing from "@/pages/public/Pricing";
 import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
 
@@ -124,6 +126,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
               <SubscriptionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/subscription/payment/success"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <SubscriptionPaymentSuccess />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/subscription/payment/cancel"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <SubscriptionPaymentCancel />
             </ProtectedRoute>
           }
         />

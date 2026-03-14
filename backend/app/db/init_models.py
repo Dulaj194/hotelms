@@ -10,7 +10,7 @@ from app.modules.categories.model import Category  # noqa: F401
 from app.modules.items.model import Item  # noqa: F401
 from app.modules.orders.model import OrderHeader, OrderItem  # noqa: F401
 from app.modules.packages.model import Package, PackagePrivilege  # noqa: F401
-from app.modules.payments.model import Payment  # noqa: F401
+from app.modules.payments.model import BillingTransaction, Payment, ProcessedWebhookEvent  # noqa: F401
 from app.modules.qr.model import QRCode  # noqa: F401
 from app.modules.restaurants.model import Restaurant  # noqa: F401
 from app.modules.housekeeping.model import HousekeepingRequest  # noqa: F401
