@@ -8,13 +8,9 @@ from pydantic import BaseModel, Field
 class TableSessionStartRequest(BaseModel):
     """Body for POST /table-sessions/start.
 
-    SECURITY: restaurant_id is NOT accepted from the client body for
-    cart authorization. It is embedded in the signed QR URL path param
-    and validated by the backend directly.
-
-    The client sends table_number and restaurant_id only as path/context
-    because these come from the QR URL already — they are NOT used to
-    authorize cart operations. The returned signed token is the authorization.
+    SECURITY: This endpoint accepts restaurant_id + table_number to issue
+    a signed guest session token. These values alone are never used for cart
+    authorization. The returned signed token is the authorization credential.
     """
 
     restaurant_id: int

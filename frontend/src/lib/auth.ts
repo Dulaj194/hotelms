@@ -17,6 +17,12 @@ export interface StoredUser {
   restaurant_id: number | null;
 }
 
+export function normalizeRole(role: string | null | undefined): string {
+  const normalized = (role ?? "").trim().toLowerCase();
+  if (normalized === "s_admin") return "super_admin";
+  return normalized;
+}
+
 export function getAccessToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -57,7 +63,7 @@ export function isAuthenticated(): boolean {
 }
 
 export function getRoleRedirect(role: string): string {
-  switch (role) {
+  switch (normalizeRole(role)) {
     case "super_admin":
       return "/admin/restaurant-profile";
     case "owner":

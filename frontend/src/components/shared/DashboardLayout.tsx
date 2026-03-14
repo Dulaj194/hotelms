@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { clearAuth, getUser } from "@/lib/auth";
+import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 
 const ALL_NAV_ITEMS = [
   { path: "/dashboard", label: "🏠 Home", roles: null },
@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const user = getUser();
-  const role = user?.role ?? "";
+  const role = normalizeRole(user?.role);
 
   const navItems = ALL_NAV_ITEMS.filter(
     (item) => item.roles === null || item.roles.includes(role)

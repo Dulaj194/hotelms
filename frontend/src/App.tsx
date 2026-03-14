@@ -71,7 +71,7 @@ function App() {
         <Route
           path="/admin/restaurant-profile"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["owner", "admin", "super_admin", "s_admin"]}>
               <AdminRestaurantProfile />
             </ProtectedRoute>
           }
@@ -79,7 +79,7 @@ function App() {
         <Route
           path="/admin/staff"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["owner", "admin", "super_admin", "s_admin"]}>
               <Staff />
             </ProtectedRoute>
           }
@@ -87,7 +87,7 @@ function App() {
         <Route
           path="/admin/kitchen"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
               <Kitchen />
             </ProtectedRoute>
           }
@@ -95,7 +95,7 @@ function App() {
         <Route
           path="/admin/billing"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
               <Billing />
             </ProtectedRoute>
           }
@@ -103,7 +103,7 @@ function App() {
         <Route
           path="/admin/rooms"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
               <Rooms />
             </ProtectedRoute>
           }
@@ -111,7 +111,7 @@ function App() {
         <Route
           path="/admin/housekeeping"
           element={
-            <ProtectedRoute allowedRoles={["admin"]}>
+            <ProtectedRoute allowedRoles={["owner", "admin", "housekeeper"]}>
               <Housekeeping />
             </ProtectedRoute>
           }

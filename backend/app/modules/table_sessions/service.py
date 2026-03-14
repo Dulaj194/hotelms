@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.core.security import create_guest_session_token
@@ -30,6 +31,13 @@ def start_table_session(
     SECURITY: The returned guest_token is the authorization credential.
     table_number and restaurant_id alone are never sufficient for cart operations.
     """
+    table_number = data.table_number.strip()
+    if not table_number:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Table number is required.",
+        )
+
     restaurant = get_restaurant(db, data.restaurant_id)
     if not restaurant:
         raise HTTPException(
@@ -46,14 +54,27 @@ def start_table_session(
     expire_minutes = settings.guest_session_expire_minutes
     expires_at = datetime.now(UTC) + timedelta(minutes=expire_minutes)
 
-    # Persist session record — does NOT store the raw token
-    repository.create_session(
-        db,
-        session_id=session_id,
-        restaurant_id=data.restaurant_id,
-        table_number=data.table_number,
-        expires_at=expires_at,
-    )
+    try:
+        # Keep a single active session per restaurant table.
+        repository.deactivate_active_sessions_for_table(
+            db,
+            restaurant_id=data.restaurant_id,
+            table_number=table_number,
+        )
+
+        # Persist session record — does NOT store the raw token
+        repository.create_session(
+            db,
+            session_id=session_id,
+            restaurant_id=data.restaurant_id,
+            table_number=table_number,
+            expires_at=expires_at,
+        )
+
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise
 
     # Create signed guest token
     guest_token = create_guest_session_token(
@@ -67,6 +88,6 @@ def start_table_session(
         session_id=session_id,
         guest_token=guest_token,
         restaurant_id=data.restaurant_id,
-        table_number=data.table_number,
+        table_number=table_number,
         expires_at=expires_at,
     )

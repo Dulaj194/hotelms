@@ -21,9 +21,40 @@ def create_session(
         is_active=True,
     )
     db.add(session)
-    db.commit()
+    db.flush()
     db.refresh(session)
     return session
+
+
+def deactivate_active_sessions_for_table(
+    db: Session,
+    restaurant_id: int,
+    table_number: str,
+) -> int:
+    """Deactivate currently active, non-expired sessions for a table.
+
+    Returns number of sessions deactivated.
+    Uses db.flush() — caller manages commit/rollback.
+    """
+    now = datetime.now(UTC)
+    sessions = (
+        db.query(TableSession)
+        .filter(
+            TableSession.restaurant_id == restaurant_id,
+            TableSession.table_number == table_number,
+            TableSession.is_active.is_(True),
+            TableSession.expires_at > now,
+        )
+        .all()
+    )
+
+    for session in sessions:
+        session.is_active = False
+
+    if sessions:
+        db.flush()
+
+    return len(sessions)
 
 
 def get_active_session_by_session_id(
@@ -51,7 +82,7 @@ def touch_session_activity(db: Session, session_id: str) -> None:
     )
     if session:
         session.last_activity_at = datetime.now(UTC)
-        db.commit()
+        db.flush()
 
 
 def deactivate_session(db: Session, session_id: str) -> None:
@@ -63,7 +94,7 @@ def deactivate_session(db: Session, session_id: str) -> None:
     )
     if session:
         session.is_active = False
-        db.commit()
+        db.flush()
 
 
 def get_session_by_id_and_restaurant(

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { getAccessToken, getUser } from "@/lib/auth";
+import { getAccessToken, getUser, normalizeRole } from "@/lib/auth";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import type {
   RestaurantMeResponse,
@@ -393,7 +393,7 @@ function OwnerAdminView() {
 
 export default function RestaurantProfile() {
   const user = getUser();
-  if (user?.role === "super_admin") return <SuperAdminView />;
+  if (normalizeRole(user?.role) === "super_admin") return <SuperAdminView />;
   return <OwnerAdminView />;
 }
 

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
-import { getRoleRedirect, getUser, isAuthenticated } from "@/lib/auth";
+import { getRoleRedirect, getUser, isAuthenticated, normalizeRole } from "@/lib/auth";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -15,9 +15,10 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
 
   if (allowedRoles?.length) {
     const user = getUser();
-    const role = user?.role ?? "";
+    const role = normalizeRole(user?.role);
+    const normalizedAllowedRoles = allowedRoles.map((r) => normalizeRole(r));
 
-    if (!allowedRoles.includes(role)) {
+    if (!normalizedAllowedRoles.includes(role)) {
       return <Navigate to={getRoleRedirect(role)} replace />;
     }
   }
