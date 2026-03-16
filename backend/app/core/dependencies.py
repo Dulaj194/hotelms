@@ -1,7 +1,7 @@
 from collections.abc import Generator
 
 import redis as redis_lib
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
@@ -29,6 +29,7 @@ def get_redis() -> redis_lib.Redis:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
     db: Session = Depends(get_db),
+    request: Request = None,
 ):
     """FastAPI dependency that validates the bearer access token and returns the User."""
     from app.core.security import decode_token
@@ -63,6 +64,19 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive.",
         )
+
+    if user.must_change_password:
+        allowed_paths = {
+            "/api/v1/auth/me",
+            "/api/v1/auth/logout",
+            "/api/v1/auth/change-initial-password",
+            "/api/v1/auth/refresh",
+        }
+        if request.url.path not in allowed_paths:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Password change required before accessing this resource.",
+            )
 
     return user
 

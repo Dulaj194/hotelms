@@ -33,6 +33,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         import time
         import app.db.init_models  # noqa: F401 — registers all models with Base
         from app.db.base import Base
+        from app.db.schema_sync import ensure_development_schema_compatibility
         from app.db.session import engine
         from sqlalchemy import text
 
@@ -49,6 +50,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
             raise RuntimeError("Could not connect to database after 10 attempts")
 
         Base.metadata.create_all(bind=engine)
+        ensure_development_schema_compatibility(engine, logger)
         logger.info("Database tables created / verified")
 
     yield

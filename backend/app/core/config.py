@@ -49,5 +49,15 @@ class Settings(BaseSettings):
     stripe_checkout_success_url: str = "http://localhost:5173/admin/subscription/payment/success?session_id={CHECKOUT_SESSION_ID}"
     stripe_checkout_cancel_url: str = "http://localhost:5173/admin/subscription/payment/cancel"
 
+    # ── Email / onboarding notifications ─────────────────────────────────────
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    smtp_from_email: str = ""
+    smtp_from_name: str = "HotelMS"
+    frontend_login_url: str = "http://localhost:5173/login"
+
 
 settings = Settings()
