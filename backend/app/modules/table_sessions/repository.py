@@ -118,6 +118,27 @@ def get_session_by_id_and_restaurant(
     )
 
 
+def get_latest_session_by_table_number(
+    db: Session,
+    restaurant_id: int,
+    table_number: str,
+) -> TableSession | None:
+    """Return the most recent session for a table in a restaurant.
+
+    Useful for staff billing flows where operators may enter table number
+    instead of a full session_id.
+    """
+    return (
+        db.query(TableSession)
+        .filter(
+            TableSession.restaurant_id == restaurant_id,
+            TableSession.table_number == table_number,
+        )
+        .order_by(TableSession.created_at.desc(), TableSession.id.desc())
+        .first()
+    )
+
+
 def close_session_by_id(
     db: Session,
     session_id: str,

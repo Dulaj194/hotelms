@@ -51,6 +51,10 @@ class StaffCreateRequest(BaseModel):
         ...,
         description="Must be one of: owner, admin, steward, housekeeper",
     )
+    restaurant_id: int | None = Field(
+        default=None,
+        description="Required for super_admin; ignored for owner/admin requests.",
+    )
 
 
 class StaffUpdateRequest(BaseModel):

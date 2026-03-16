@@ -102,7 +102,13 @@ def update_password(db: Session, user: User, new_password_hash: str) -> None:
 # the tenant boundary cannot be bypassed through the schema.
 
 
-def create_staff(db: Session, restaurant_id: int, data: StaffCreateRequest) -> User:
+def create_staff(
+    db: Session,
+    restaurant_id: int,
+    data: StaffCreateRequest,
+    *,
+    must_change_password: bool = False,
+) -> User:
     """Create a staff user scoped to a restaurant.
 
     restaurant_id must come from authenticated context, NEVER from the request
@@ -115,6 +121,7 @@ def create_staff(db: Session, restaurant_id: int, data: StaffCreateRequest) -> U
         role=data.role,
         restaurant_id=restaurant_id,  # always from authenticated context
         is_active=True,
+        must_change_password=must_change_password,
     )
     db.add(user)
     db.commit()

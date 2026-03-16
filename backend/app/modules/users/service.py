@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.modules.audit_logs.service import write_audit_log
+from app.modules.restaurants import repository as restaurant_repository
 from app.modules.users.model import User, UserRole
 from app.modules.users.repository import (
     count_active_owners,
@@ -102,6 +103,26 @@ def add_staff(
     """
     _assert_can_manage_role(current_user, data.role)
 
+    target_restaurant_id = restaurant_id
+    if current_user.role == UserRole.super_admin:
+        if data.restaurant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="restaurant_id is required when super_admin creates staff.",
+            )
+        target_restaurant = restaurant_repository.get_by_id(db, data.restaurant_id)
+        if target_restaurant is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Target restaurant not found.",
+            )
+        target_restaurant_id = data.restaurant_id
+    elif target_restaurant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No restaurant context.",
+        )
+
     # Check email uniqueness globally (email is unique across all tenants)
     if get_user_by_email(db, data.email):
         raise HTTPException(
@@ -109,13 +130,24 @@ def add_staff(
             detail="A user with this email already exists.",
         )
 
-    user = create_staff(db, restaurant_id, data)
+    require_password_change = current_user.role == UserRole.super_admin
+    user = create_staff(
+        db,
+        target_restaurant_id,
+        data,
+        must_change_password=require_password_change,
+    )
 
     write_audit_log(
         db,
         event_type="staff_created",
         user_id=current_user.id,
-        metadata={"created_user_id": user.id, "role": data.role.value},
+        metadata={
+            "created_user_id": user.id,
+            "role": data.role.value,
+            "restaurant_id": target_restaurant_id,
+            "must_change_password": require_password_change,
+        },
     )
 
     return StaffDetailResponse.model_validate(user)
