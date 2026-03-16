@@ -66,3 +66,14 @@ export interface CancelSubscriptionResponse {
   message: string;
   status: "cancelled";
 }
+
+export interface SuperAdminSubscriptionUpdateRequest {
+  status?: string;
+  expires_at?: string;
+  package_id?: number;
+}
+
+export interface ExpireOverdueResponse {
+  message: string;
+  expired_count: number;
+}

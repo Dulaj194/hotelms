@@ -360,3 +360,91 @@ def cancel_subscription(
         message="Subscription cancelled successfully.",
         status="cancelled",
     )
+
+
+# ─── Super-admin operations ───────────────────────────────────────────────────
+
+
+def expire_overdue_subscriptions(db: Session) -> int:
+    """Persist expired status for all active/trial subscriptions past their expiry.
+
+    Called by the background worker and the manual super_admin trigger endpoint.
+    Returns the number of subscriptions that were updated.
+    """
+    overdue = repository.get_overdue_open_subscriptions(db)
+    for sub in overdue:
+        sub.status = SubscriptionStatus.expired
+    if overdue:
+        db.commit()
+    return len(overdue)
+
+
+def get_subscription_for_super_admin(
+    db: Session, restaurant_id: int
+) -> SubscriptionResponse:
+    """Return the current subscription for any restaurant (super_admin only)."""
+    subscription = repository.get_latest_subscription_by_restaurant(db, restaurant_id)
+    response = _to_subscription_response(subscription)
+    if response.id is None:
+        response.restaurant_id = restaurant_id
+    return response
+
+
+def update_subscription_for_super_admin(
+    db: Session,
+    restaurant_id: int,
+    payload: "SuperAdminSubscriptionUpdateRequest",
+) -> SubscriptionResponse:
+    """Allow super_admin to update status / expiry / package for any restaurant.
+
+    When updating expires_at on a trial subscription, trial_expires_at is
+    updated too so that _effective_status() stays consistent.
+    """
+    from app.modules.subscriptions.schemas import SuperAdminSubscriptionUpdateRequest  # noqa: F401
+
+    subscription = repository.get_latest_subscription_by_restaurant(db, restaurant_id)
+    if subscription is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No subscription found for this restaurant.",
+        )
+
+    update_data: dict = {}
+
+    if payload.status is not None:
+        try:
+            update_data["status"] = SubscriptionStatus(payload.status)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid status value '{payload.status}'. "
+                f"Allowed: trial, active, expired, cancelled.",
+            ) from None
+
+    if payload.expires_at is not None:
+        naive_expiry = (
+            payload.expires_at.replace(tzinfo=None)
+            if payload.expires_at.tzinfo
+            else payload.expires_at
+        )
+        update_data["expires_at"] = naive_expiry
+        # Keep trial_expires_at in sync for trial subscriptions.
+        if subscription.is_trial:
+            update_data["trial_expires_at"] = naive_expiry
+
+    if payload.package_id is not None:
+        package = packages_repo.get_package_by_id(db, payload.package_id)
+        if package is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Package not found.",
+            )
+        update_data["package_id"] = payload.package_id
+
+    updated = repository.update_subscription_by_id(db, subscription.id, update_data)
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Subscription not found.",
+        )
+    return _to_subscription_response(updated)

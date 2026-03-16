@@ -21,6 +21,7 @@ import SubscriptionPage from "@/pages/admin/Subscription";
 import SubscriptionPaymentSuccess from "@/pages/admin/SubscriptionPaymentSuccess";
 import SubscriptionPaymentCancel from "@/pages/admin/SubscriptionPaymentCancel";
 import Pricing from "@/pages/public/Pricing";
+import SuperAdminRestaurants from "@/pages/super-admin/Restaurants";
 import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
 
 function RootRedirect() {
@@ -88,7 +89,7 @@ function App() {
         <Route
           path="/admin/restaurant-profile"
           element={
-            <ProtectedRoute allowedRoles={["owner", "admin", "super_admin", "s_admin"]}>
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
               <AdminRestaurantProfile />
             </ProtectedRoute>
           }
@@ -96,7 +97,7 @@ function App() {
         <Route
           path="/admin/staff"
           element={
-            <ProtectedRoute allowedRoles={["owner", "admin", "super_admin", "s_admin"]}>
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
               <Staff />
             </ProtectedRoute>
           }
@@ -156,6 +157,20 @@ function App() {
               <SubscriptionPaymentCancel />
             </ProtectedRoute>
           }
+        />
+
+        {/* ─── Super-admin routes: blocked for all other roles ─────────── */}
+        <Route
+          path="/super-admin/restaurants"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminRestaurants />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin"
+          element={<Navigate to="/super-admin/restaurants" replace />}
         />
 
         <Route

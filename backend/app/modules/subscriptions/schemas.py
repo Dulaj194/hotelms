@@ -61,3 +61,38 @@ class CancelSubscriptionResponse(BaseModel):
 
 class GenericMessageResponse(BaseModel):
     message: str
+
+
+# ─── Super-admin schemas ──────────────────────────────────────────────────────
+
+
+class SuperAdminSubscriptionUpdateRequest(BaseModel):
+    """Payload for super_admin to update any restaurant's subscription.
+
+    At least one field must be supplied.  Omitted fields are left unchanged.
+    """
+
+    status: str | None = Field(
+        None, description="One of: trial, active, expired, cancelled"
+    )
+    expires_at: datetime | None = None
+    package_id: int | None = None
+
+    @model_validator(mode="after")
+    def at_least_one_field(
+        self,
+    ) -> "SuperAdminSubscriptionUpdateRequest":
+        if (
+            self.status is None
+            and self.expires_at is None
+            and self.package_id is None
+        ):
+            raise ValueError(
+                "At least one field (status, expires_at, package_id) must be provided."
+            )
+        return self
+
+
+class ExpireOverdueResponse(BaseModel):
+    message: str
+    expired_count: int
