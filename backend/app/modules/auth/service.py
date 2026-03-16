@@ -96,11 +96,17 @@ def _set_refresh_cookie(response: Response, token_value: str) -> None:
     )
 
 
-def _build_access_payload(user_id: int, role: str, restaurant_id: int | None) -> dict:
+def _build_access_payload(
+    user_id: int,
+    role: str,
+    restaurant_id: int | None,
+    must_change_password: bool,
+) -> dict:
     return {
         "sub": str(user_id),
         "role": role,
         "restaurant_id": restaurant_id,
+        "must_change_password": must_change_password,
     }
 
 
@@ -141,7 +147,7 @@ def login(
 
     session_id = str(uuid.uuid4())
     access_token = create_access_token(
-        _build_access_payload(user.id, user.role.value, user.restaurant_id)
+        _build_access_payload(user.id, user.role.value, user.restaurant_id, user.must_change_password)
     )
     refresh_token_value = create_refresh_token(user.id, session_id)
 
@@ -164,7 +170,7 @@ def login(
         user_agent=user_agent,
     )
 
-    return TokenResponse(access_token=access_token)
+    return TokenResponse(access_token=access_token, must_change_password=user.must_change_password)
 
 
 def refresh(
@@ -238,7 +244,7 @@ def refresh(
     _set_refresh_cookie(response, new_refresh_token)
 
     new_access_token = create_access_token(
-        _build_access_payload(user.id, user.role.value, user.restaurant_id)
+        _build_access_payload(user.id, user.role.value, user.restaurant_id, user.must_change_password)
     )
 
     write_audit_log(
@@ -355,7 +361,7 @@ def reset_password(
             detail="Reset token has expired. Please request a new password reset.",
         )
 
-    user = get_user_by_id(db, record.user_id)
+    user = get_by_id_global(db, record.user_id)
     if not user:
         raise _invalid
 
@@ -371,3 +377,40 @@ def reset_password(
     )
 
     return {"message": "Password has been reset successfully. Please log in with your new password."}
+
+
+def change_initial_password(
+    db: Session,
+    current_user,
+    payload,
+) -> dict:
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="New password and confirm password do not match.",
+        )
+
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect.",
+        )
+
+    if verify_password(payload.new_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password.",
+        )
+
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.must_change_password = False
+    current_user.password_changed_at = datetime.now(UTC)
+    db.commit()
+
+    write_audit_log(
+        db,
+        event_type="initial_password_changed",
+        user_id=current_user.id,
+    )
+
+    return {"message": "Password changed successfully."}

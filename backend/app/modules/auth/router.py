@@ -8,6 +8,7 @@ from app.modules.auth.schemas import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     GenericMessageResponse,
+    InitialPasswordChangeRequest,
     LoginRequest,
     ResetPasswordRequest,
     TokenResponse,
@@ -100,6 +101,15 @@ def reset_password(
         db, payload.token, payload.new_password,
         _client_ip(request), _user_agent(request),
     )
+
+
+@router.post("/change-initial-password", response_model=GenericMessageResponse)
+def change_initial_password(
+    payload: InitialPasswordChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return service.change_initial_password(db, current_user, payload)
 
 
 @router.get("/me", response_model=UserMeResponse)

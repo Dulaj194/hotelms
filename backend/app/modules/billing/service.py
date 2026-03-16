@@ -47,6 +47,20 @@ from app.modules.table_sessions import repository as session_repo
 def _load_session_or_404(db: Session, session_id: str, restaurant_id: int):
     """Load a session scoped to the restaurant — raises 404 if not found."""
     session = session_repo.get_session_by_id_and_restaurant(db, session_id, restaurant_id)
+
+    if session is None:
+        # Staff may enter table number in the billing search field.
+        # Fallback to latest session for that table when session_id lookup fails.
+        table_number_candidate = session_id.strip()
+        if table_number_candidate:
+            fallback = session_repo.get_latest_session_by_table_number(
+                db,
+                restaurant_id=restaurant_id,
+                table_number=table_number_candidate,
+            )
+            if fallback is not None:
+                return fallback
+
     if session is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -87,14 +101,15 @@ def get_bill_summary(
     Tax and discount are 0.0 in this phase (no engine implemented).
     """
     session = _load_session_or_404(db, session_id, restaurant_id)
+    effective_session_id = session.session_id
 
     # Check if already settled
-    existing_bill = billing_repo.get_bill_by_session(db, session_id, restaurant_id)
+    existing_bill = billing_repo.get_bill_by_session(db, effective_session_id, restaurant_id)
     is_settled = existing_bill is not None and existing_bill.payment_status == BillStatus.paid
 
     # Load billable orders (completed + not yet paid status)
     billable_orders = order_repo.list_billable_orders_by_session(
-        db, session_id, restaurant_id
+        db, effective_session_id, restaurant_id
     )
 
     subtotal = sum(float(o.total_amount) for o in billable_orders)
@@ -103,7 +118,7 @@ def get_bill_summary(
     grand_total = subtotal + tax_amount - discount_amount
 
     return BillSummaryResponse(
-        session_id=session_id,
+        session_id=effective_session_id,
         restaurant_id=restaurant_id,
         table_number=session.table_number,
         orders=[_build_bill_order_response(o) for o in billable_orders],
@@ -141,9 +156,10 @@ def settle_session(
     Totals are computed server-side from persisted order data.
     """
     session = _load_session_or_404(db, session_id, restaurant_id)
+    effective_session_id = session.session_id
 
     # ── Guard: duplicate settlement ──────────────────────────────────────
-    existing_bill = billing_repo.get_bill_by_session(db, session_id, restaurant_id)
+    existing_bill = billing_repo.get_bill_by_session(db, effective_session_id, restaurant_id)
     if existing_bill is not None and existing_bill.payment_status == BillStatus.paid:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -152,7 +168,7 @@ def settle_session(
 
     # ── Load billable orders ─────────────────────────────────────────────
     billable_orders = order_repo.list_billable_orders_by_session(
-        db, session_id, restaurant_id
+        db, effective_session_id, restaurant_id
     )
     if not billable_orders:
         raise HTTPException(
@@ -176,7 +192,7 @@ def settle_session(
         bill = billing_repo.create_bill(
             db,
             restaurant_id=restaurant_id,
-            session_id=session_id,
+            session_id=effective_session_id,
             table_number=session.table_number,
             subtotal_amount=subtotal,
             tax_amount=tax_amount,
@@ -210,7 +226,7 @@ def settle_session(
         billing_repo.mark_bill_paid(db, bill, settled_at)
 
         # 5. Close the table session
-        session_repo.close_session_by_id(db, session_id, restaurant_id)
+        session_repo.close_session_by_id(db, effective_session_id, restaurant_id)
 
         db.commit()
 
@@ -233,7 +249,7 @@ def settle_session(
     return SettleSessionResponse(
         bill_id=bill.id,
         bill_number=bill.bill_number,
-        session_id=session_id,
+        session_id=effective_session_id,
         table_number=session.table_number,
         order_count=len(order_ids),
         total_amount=round(total_amount, 2),
@@ -251,17 +267,18 @@ def get_session_billing_status(
 ) -> SessionBillingStatusResponse:
     """Return a quick billing status snapshot for a session."""
     session = _load_session_or_404(db, session_id, restaurant_id)
+    effective_session_id = session.session_id
 
-    existing_bill = billing_repo.get_bill_by_session(db, session_id, restaurant_id)
+    existing_bill = billing_repo.get_bill_by_session(db, effective_session_id, restaurant_id)
     is_settled = existing_bill is not None and existing_bill.payment_status == BillStatus.paid
 
     billable_orders = order_repo.list_billable_orders_by_session(
-        db, session_id, restaurant_id
+        db, effective_session_id, restaurant_id
     )
     grand_total = sum(float(o.total_amount) for o in billable_orders)
 
     return SessionBillingStatusResponse(
-        session_id=session_id,
+        session_id=effective_session_id,
         table_number=session.table_number,
         is_active=session.is_active,
         is_settled=is_settled,
@@ -276,12 +293,13 @@ def list_session_payments(
     restaurant_id: int,
 ) -> SessionPaymentHistoryResponse:
     """Return all payment records associated with a table session."""
-    _load_session_or_404(db, session_id, restaurant_id)
+    session = _load_session_or_404(db, session_id, restaurant_id)
+    effective_session_id = session.session_id
 
-    payments = payment_repo.list_payments_by_session(db, session_id, restaurant_id)
+    payments = payment_repo.list_payments_by_session(db, effective_session_id, restaurant_id)
 
     return SessionPaymentHistoryResponse(
-        session_id=session_id,
+        session_id=effective_session_id,
         payments=[
             PaymentResponse(
                 id=p.id,

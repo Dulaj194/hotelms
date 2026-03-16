@@ -1,13 +1,19 @@
 import uuid
 from pathlib import Path
+import secrets
+import string
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.notifications import send_onboarding_email
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.restaurants import repository
 from app.modules.subscriptions import service as subscription_service
+from app.modules.users.model import UserRole
+from app.modules.users.repository import create_staff, get_user_by_email
+from app.modules.users.schemas import StaffCreateRequest
 from app.modules.restaurants.schemas import (
     RestaurantCreateRequest,
     RestaurantLogoUploadResponse,
@@ -119,6 +125,12 @@ def list_all_restaurants(db: Session) -> list[RestaurantMeResponse]:
 
 def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> RestaurantMeResponse:
     """Create a new restaurant tenant. Restricted to super_admin use only."""
+    if payload.email and get_user_by_email(db, str(payload.email)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this restaurant email already exists.",
+        )
+
     restaurant = repository.create_restaurant(
         db,
         name=payload.name,
@@ -129,4 +141,41 @@ def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> Restaura
 
     subscription_service.assign_initial_trial_subscription(db, restaurant.id)
 
+    if restaurant.email:
+        temporary_password = _generate_temporary_password()
+        admin_user = create_staff(
+            db,
+            restaurant.id,
+            StaffCreateRequest(
+                full_name=f"{restaurant.name} Admin",
+                email=restaurant.email,
+                password=temporary_password,
+                role=UserRole.admin,
+                restaurant_id=restaurant.id,
+            ),
+            must_change_password=True,
+        )
+
+        sent = send_onboarding_email(
+            recipient_email=admin_user.email,
+            recipient_name=admin_user.full_name,
+            restaurant_name=restaurant.name,
+            temporary_password=temporary_password,
+        )
+
+        write_audit_log(
+            db,
+            event_type="restaurant_admin_onboarding_created",
+            user_id=admin_user.id,
+            metadata={
+                "restaurant_id": restaurant.id,
+                "email_sent": sent,
+            },
+        )
+
     return RestaurantMeResponse.model_validate(restaurant)
+
+
+def _generate_temporary_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits + "@#$%!"
+    return "".join(secrets.choice(alphabet) for _ in range(length))

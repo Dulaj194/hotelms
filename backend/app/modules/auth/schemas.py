@@ -9,6 +9,7 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    must_change_password: bool = False
 
 
 class UserMeResponse(BaseModel):
@@ -18,6 +19,7 @@ class UserMeResponse(BaseModel):
     role: str
     restaurant_id: int | None
     is_active: bool
+    must_change_password: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -34,6 +36,12 @@ class ForgotPasswordResponse(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8, description="Minimum 8 characters")
+
+
+class InitialPasswordChangeRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
+    confirm_password: str = Field(..., min_length=8)
 
 
 class GenericMessageResponse(BaseModel):

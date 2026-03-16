@@ -64,6 +64,9 @@ def _validate_ws_token(token: str, restaurant_id: int) -> dict | None:
     if role not in _KITCHEN_ROLES:
         return None
 
+    if payload.get("must_change_password") is True:
+        return None
+
     token_restaurant_id = payload.get("restaurant_id")
     if token_restaurant_id != restaurant_id:
         # Cross-tenant connection attempt — reject
