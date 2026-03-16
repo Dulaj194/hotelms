@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
-import type { Category, Item } from "@/types/menu";
+import type { Category, Item, Subcategory } from "@/types/menu";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -14,6 +14,7 @@ interface FormData {
   description: string;
   price: string;
   category_id: number | "";
+  subcategory_id: number | "";
   is_available: boolean;
 }
 
@@ -22,12 +23,14 @@ const EMPTY_FORM: FormData = {
   description: "",
   price: "",
   category_id: "",
+  subcategory_id: "",
   is_available: true,
 };
 
 export default function MenuItems() {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,12 +55,14 @@ export default function MenuItems() {
     setLoading(true);
     setError(null);
     try {
-      const [itemsRes, catsRes] = await Promise.all([
+      const [itemsRes, catsRes, subcatsRes] = await Promise.all([
         api.get<Item[]>("/items"),
         api.get<Category[]>("/categories"),
+        api.get<Subcategory[]>("/subcategories"),
       ]);
-      setItems(itemsRes.data);
-      setCategories(catsRes.data);
+      setItems(itemsRes);
+      setCategories(catsRes);
+      setSubcategories(subcatsRes);
     } catch {
       setError("Failed to load data.");
     } finally {
@@ -78,6 +83,16 @@ export default function MenuItems() {
     return categories.find((c) => c.id === categoryId)?.name ?? "—";
   }
 
+  function subcategoryName(subcategoryId: number | null): string {
+    if (!subcategoryId) return "—";
+    return subcategories.find((s) => s.id === subcategoryId)?.name ?? "—";
+  }
+
+  const filteredSubcategories =
+    formData.category_id === ""
+      ? []
+      : subcategories.filter((s) => s.category_id === formData.category_id);
+
   function openCreate() {
     setEditingItem(null);
     setFormData(EMPTY_FORM);
@@ -92,6 +107,7 @@ export default function MenuItems() {
       description: item.description ?? "",
       price: String(item.price),
       category_id: item.category_id,
+      subcategory_id: item.subcategory_id ?? "",
       is_available: item.is_available,
     });
     setFormError(null);
@@ -120,6 +136,7 @@ export default function MenuItems() {
         description: formData.description.trim() || null,
         price: priceNum,
         category_id: formData.category_id,
+        subcategory_id: formData.subcategory_id === "" ? null : formData.subcategory_id,
         is_available: formData.is_available,
       };
       if (editingItem) {
@@ -176,9 +193,7 @@ export default function MenuItems() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      await api.post(`/items/${uploadTarget.id}/image`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await api.post(`/items/${uploadTarget.id}/image`, fd);
       await loadData();
     } catch {
       await loadData();
@@ -282,6 +297,7 @@ export default function MenuItems() {
                 )}
                 <p className="text-xs text-gray-400 mb-3">
                   {categoryName(item.category_id)}
+                  {item.subcategory_id ? ` → ${subcategoryName(item.subcategory_id)}` : ""}
                 </p>
 
                 <div className="flex gap-2">
@@ -394,6 +410,7 @@ export default function MenuItems() {
                       ...f,
                       category_id:
                         e.target.value === "" ? "" : parseInt(e.target.value),
+                      subcategory_id: "",
                     }))
                   }
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
@@ -402,6 +419,31 @@ export default function MenuItems() {
                   {categories.map((cat) => (
                     <option key={cat.id} value={cat.id}>
                       {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Subcategory (optional)
+                </label>
+                <select
+                  value={formData.subcategory_id}
+                  onChange={(e) =>
+                    setFormData((f) => ({
+                      ...f,
+                      subcategory_id:
+                        e.target.value === "" ? "" : parseInt(e.target.value),
+                    }))
+                  }
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  disabled={formData.category_id === ""}
+                >
+                  <option value="">No subcategory</option>
+                  {filteredSubcategories.map((subcat) => (
+                    <option key={subcat.id} value={subcat.id}>
+                      {subcat.name}
                     </option>
                   ))}
                 </select>

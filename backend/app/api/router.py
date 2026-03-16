@@ -8,6 +8,7 @@ from app.modules.cart.router import router as cart_router
 from app.modules.categories.router import router as categories_router
 from app.modules.health.router import router as health_router
 from app.modules.items.router import router as items_router
+from app.modules.menus.router import router as menus_router
 from app.modules.orders.router import router as orders_router
 from app.modules.payments.router import router as payments_router
 from app.modules.public.router import router as public_router
@@ -15,6 +16,7 @@ from app.modules.packages.router import router as packages_router
 from app.modules.qr.router import router as qr_router
 from app.modules.realtime.router import router as realtime_router
 from app.modules.restaurants.router import router as restaurants_router
+from app.modules.subcategories.router import router as subcategories_router
 from app.modules.subscriptions.router import router as subscriptions_router
 from app.modules.room_sessions.router import (
     cart_router as room_cart_router,
@@ -32,7 +34,9 @@ router.include_router(health_router, prefix="/health", tags=["health"])
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
 router.include_router(users_router, prefix="/users", tags=["users"])
 router.include_router(restaurants_router, prefix="/restaurants", tags=["restaurants"])
+router.include_router(menus_router, prefix="/menus", tags=["menus"])
 router.include_router(categories_router, prefix="/categories", tags=["categories"])
+router.include_router(subcategories_router, prefix="/subcategories", tags=["subcategories"])
 router.include_router(items_router, prefix="/items", tags=["items"])
 router.include_router(public_router, prefix="/public", tags=["public"])
 router.include_router(packages_router, prefix="/packages", tags=["packages"])

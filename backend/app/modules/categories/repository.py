@@ -22,6 +22,26 @@ def list_by_restaurant(db: Session, restaurant_id: int) -> list[Category]:
     )
 
 
+def list_by_menu(db: Session, menu_id: int, restaurant_id: int) -> list[Category]:
+    return (
+        db.query(Category)
+        .filter(Category.menu_id == menu_id, Category.restaurant_id == restaurant_id)
+        .order_by(Category.sort_order.asc(), Category.id.asc())
+        .all()
+    )
+
+
+def menu_belongs_to_restaurant(db: Session, menu_id: int, restaurant_id: int) -> bool:
+    """Verify a menu belongs to the given restaurant before linking a category to it."""
+    from app.modules.menus.model import Menu
+
+    return (
+        db.query(Menu)
+        .filter(Menu.id == menu_id, Menu.restaurant_id == restaurant_id)
+        .first()
+    ) is not None
+
+
 def create(db: Session, restaurant_id: int, data: CategoryCreateRequest) -> Category:
     """Create a category. restaurant_id must come from authenticated context."""
     category = Category(
@@ -30,6 +50,7 @@ def create(db: Session, restaurant_id: int, data: CategoryCreateRequest) -> Cate
         image_path=data.image_path,
         sort_order=data.sort_order,
         is_active=data.is_active,
+        menu_id=data.menu_id,
         restaurant_id=restaurant_id,
     )
     db.add(category)

@@ -32,6 +32,12 @@ def get_category(db: Session, category_id: int, restaurant_id: int) -> CategoryR
 def add_category(
     db: Session, restaurant_id: int, data: CategoryCreateRequest
 ) -> CategoryResponse:
+    if data.menu_id is not None:
+        if not repository.menu_belongs_to_restaurant(db, data.menu_id, restaurant_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Menu not found or does not belong to your restaurant.",
+            )
     category = repository.create(db, restaurant_id, data)
     return CategoryResponse.model_validate(category)
 

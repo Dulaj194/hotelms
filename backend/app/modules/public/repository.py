@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from app.modules.categories.model import Category
 from app.modules.items.model import Item
 from app.modules.restaurants.model import Restaurant
+from app.modules.menus.model import Menu
+from app.modules.subcategories.model import Subcategory
 
 
 def get_public_restaurant_info(db: Session, restaurant_id: int) -> Restaurant | None:
@@ -53,5 +55,27 @@ def list_public_items_by_category(
         db.query(Item)
         .filter(Item.category_id == category_id, Item.restaurant_id == restaurant_id)
         .order_by(Item.name.asc())
+        .all()
+    )
+
+
+def list_public_menus_by_restaurant(db: Session, restaurant_id: int) -> list[Menu]:
+    """Return active menus for a restaurant, ordered by sort_order."""
+    return (
+        db.query(Menu)
+        .filter(Menu.restaurant_id == restaurant_id, Menu.is_active.is_(True))
+        .order_by(Menu.sort_order.asc(), Menu.id.asc())
+        .all()
+    )
+
+
+def list_public_subcategories_by_restaurant(
+    db: Session, restaurant_id: int
+) -> list[Subcategory]:
+    """Return active subcategories for a restaurant."""
+    return (
+        db.query(Subcategory)
+        .filter(Subcategory.restaurant_id == restaurant_id, Subcategory.is_active.is_(True))
+        .order_by(Subcategory.sort_order.asc(), Subcategory.id.asc())
         .all()
     )

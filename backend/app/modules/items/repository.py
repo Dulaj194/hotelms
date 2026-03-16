@@ -32,6 +32,20 @@ def list_by_category(db: Session, category_id: int, restaurant_id: int) -> list[
     )
 
 
+def list_by_subcategory(
+    db: Session, subcategory_id: int, restaurant_id: int
+) -> list[Item]:
+    return (
+        db.query(Item)
+        .filter(
+            Item.subcategory_id == subcategory_id,
+            Item.restaurant_id == restaurant_id,
+        )
+        .order_by(Item.name.asc())
+        .all()
+    )
+
+
 def category_belongs_to_restaurant(
     db: Session, category_id: int, restaurant_id: int
 ) -> bool:
@@ -39,6 +53,22 @@ def category_belongs_to_restaurant(
     return (
         db.query(Category)
         .filter(Category.id == category_id, Category.restaurant_id == restaurant_id)
+        .first()
+    ) is not None
+
+
+def subcategory_belongs_to_restaurant(
+    db: Session, subcategory_id: int, restaurant_id: int
+) -> bool:
+    """Verify a subcategory belongs to the given restaurant before linking an item to it."""
+    from app.modules.subcategories.model import Subcategory
+
+    return (
+        db.query(Subcategory)
+        .filter(
+            Subcategory.id == subcategory_id,
+            Subcategory.restaurant_id == restaurant_id,
+        )
         .first()
     ) is not None
 
@@ -52,6 +82,7 @@ def create(db: Session, restaurant_id: int, data: ItemCreateRequest) -> Item:
         image_path=data.image_path,
         is_available=data.is_available,
         category_id=data.category_id,
+        subcategory_id=data.subcategory_id,
         restaurant_id=restaurant_id,
     )
     db.add(item)

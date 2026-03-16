@@ -12,6 +12,7 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.modules.categories.model import Category
     from app.modules.restaurants.model import Restaurant
+    from app.modules.subcategories.model import Subcategory
 
 
 class Item(Base):
@@ -29,6 +30,10 @@ class Item(Base):
     category_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # Optional subcategory — nullable so existing items without a subcategory still work.
+    subcategory_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("subcategories.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     restaurant_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -45,4 +50,5 @@ class Item(Base):
 
     # Relationships
     category: Mapped[Category] = relationship("Category", back_populates="items")
+    subcategory: Mapped[Subcategory | None] = relationship("Subcategory", back_populates="items")
     restaurant: Mapped[Restaurant] = relationship("Restaurant", back_populates="items")

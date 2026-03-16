@@ -34,9 +34,11 @@ async function request<T>(
   retryOnAuth = true,
 ): Promise<T> {
   const token = getAccessToken();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const isFormData = body instanceof FormData;
+  const headers: Record<string, string> = {};
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -46,7 +48,7 @@ async function request<T>(
     headers,
     // Include HttpOnly cookies (refresh_token) on same-origin requests
     credentials: "include",
-    ...(body !== undefined && { body: JSON.stringify(body) }),
+    ...(body !== undefined && { body: isFormData ? (body as FormData) : JSON.stringify(body) }),
   });
 
   if (response.status === 401 && retryOnAuth && path !== REFRESH_PATH) {

@@ -3,38 +3,33 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-class CategoryCreateRequest(BaseModel):
+class MenuCreateRequest(BaseModel):
     """SECURITY: restaurant_id intentionally absent — assigned from authenticated context."""
 
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
-    image_path: str | None = None
     sort_order: int = 0
     is_active: bool = True
-    menu_id: int | None = None
 
 
-class CategoryUpdateRequest(BaseModel):
+class MenuUpdateRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
-    image_path: str | None = None
     sort_order: int | None = None
     is_active: bool | None = None
-    menu_id: int | None = None
 
 
-class CategoryImageUploadResponse(BaseModel):
+class MenuImageUploadResponse(BaseModel):
     image_path: str
 
 
-class CategoryResponse(BaseModel):
+class MenuResponse(BaseModel):
     id: int
     name: str
     description: str | None
     image_path: str | None
     sort_order: int
     is_active: bool
-    menu_id: int | None
     restaurant_id: int
     created_at: datetime
     updated_at: datetime

@@ -8,12 +8,14 @@ from app.modules.auth.model import PasswordResetToken  # noqa: F401
 from app.modules.billing.model import Bill  # noqa: F401
 from app.modules.categories.model import Category  # noqa: F401
 from app.modules.items.model import Item  # noqa: F401
+from app.modules.menus.model import Menu  # noqa: F401
 from app.modules.orders.model import OrderHeader, OrderItem  # noqa: F401
 from app.modules.packages.model import Package, PackagePrivilege  # noqa: F401
 from app.modules.payments.model import BillingTransaction, Payment, ProcessedWebhookEvent  # noqa: F401
 from app.modules.qr.model import QRCode  # noqa: F401
 from app.modules.restaurants.model import Restaurant  # noqa: F401
 from app.modules.housekeeping.model import HousekeepingRequest  # noqa: F401
+from app.modules.subcategories.model import Subcategory  # noqa: F401
 from app.modules.subscriptions.model import RestaurantSubscription  # noqa: F401
 from app.modules.room_sessions.model import RoomSession  # noqa: F401
 from app.modules.rooms.model import Room  # noqa: F401

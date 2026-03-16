@@ -9,6 +9,10 @@ from app.modules.public.schemas import (
     PublicMenuResponse,
     PublicRestaurantInfoResponse,
 )
+from app.modules.public.schemas import (
+    PublicMenuSectionResponse,
+    PublicSubcategoryResponse,
+)
 
 
 def _assert_restaurant_active(restaurant_id: int, db: Session) -> PublicRestaurantInfoResponse:
@@ -29,31 +33,84 @@ def get_public_restaurant_info(
 
 
 def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
-    """Build the full public menu tree: restaurant info + categories + items."""
+    """Build the full public menu tree: restaurant → menus → categories → subcategories → items."""
     restaurant_info = _assert_restaurant_active(restaurant_id, db)
 
     categories = repository.list_public_categories_by_restaurant(db, restaurant_id)
     all_items = repository.list_public_items_by_restaurant(db, restaurant_id)
 
-    # Group items by category_id for O(1) lookup when building the tree
-    items_by_category: dict[int, list[PublicItemSummaryResponse]] = {}
+    menus = repository.list_public_menus_by_restaurant(db, restaurant_id)
+    all_subcats = repository.list_public_subcategories_by_restaurant(db, restaurant_id)
+
+    # Index items: by subcategory_id (if set), else by category_id
+    items_by_subcat: dict[int, list[PublicItemSummaryResponse]] = {}
+    items_by_category_direct: dict[int, list[PublicItemSummaryResponse]] = {}
     for item in all_items:
         summary = PublicItemSummaryResponse.model_validate(item)
-        items_by_category.setdefault(item.category_id, []).append(summary)
+        if item.subcategory_id is not None:
+            items_by_subcat.setdefault(item.subcategory_id, []).append(summary)
+        else:
+            items_by_category_direct.setdefault(item.category_id, []).append(summary)
 
-    category_responses = [
-        PublicCategoryResponse(
+    # Index subcategories by category_id
+    subcats_by_category: dict[int, list[PublicSubcategoryResponse]] = {}
+    for subcat in all_subcats:
+        subcat_response = PublicSubcategoryResponse(
+            id=subcat.id,
+            name=subcat.name,
+            description=subcat.description,
+            image_path=subcat.image_path,
+            sort_order=subcat.sort_order,
+            items=items_by_subcat.get(subcat.id, []),
+        )
+        subcats_by_category.setdefault(subcat.category_id, []).append(subcat_response)
+
+    def _build_category(cat) -> PublicCategoryResponse:
+        return PublicCategoryResponse(
             id=cat.id,
             name=cat.name,
             description=cat.description,
             image_path=cat.image_path,
             sort_order=cat.sort_order,
-            items=items_by_category.get(cat.id, []),
+            menu_id=cat.menu_id,
+            items=items_by_category_direct.get(cat.id, []),
+            subcategories=subcats_by_category.get(cat.id, []),
         )
-        for cat in categories
+
+    # Index categories by menu_id
+    cats_by_menu: dict[int, list[PublicCategoryResponse]] = {}
+    uncategorized: list[PublicCategoryResponse] = []
+    for cat in categories:
+        cat_resp = _build_category(cat)
+        if cat.menu_id is not None:
+            cats_by_menu.setdefault(cat.menu_id, []).append(cat_resp)
+        else:
+            uncategorized.append(cat_resp)
+
+    menu_sections = [
+        PublicMenuSectionResponse(
+            id=m.id,
+            name=m.name,
+            description=m.description,
+            image_path=m.image_path,
+            sort_order=m.sort_order,
+            categories=cats_by_menu.get(m.id, []),
+        )
+        for m in menus
     ]
 
-    return PublicMenuResponse(restaurant=restaurant_info, categories=category_responses)
+    flat_categories: list[PublicCategoryResponse] = [
+        category
+        for section in menu_sections
+        for category in section.categories
+    ] + uncategorized
+
+    return PublicMenuResponse(
+        restaurant=restaurant_info,
+        menus=menu_sections,
+        uncategorized_categories=uncategorized,
+        categories=flat_categories,
+    )
 
 
 def get_public_item_detail(
@@ -77,6 +134,7 @@ def get_public_item_detail(
         image_path=item.image_path,
         is_available=item.is_available,
         category_id=item.category_id,
+        subcategory_id=item.subcategory_id,
         category_name=item.category.name if item.category else None,
     )
 

@@ -10,14 +10,13 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.modules.categories.model import Category
     from app.modules.items.model import Item
-    from app.modules.menus.model import Menu
     from app.modules.restaurants.model import Restaurant
-    from app.modules.subcategories.model import Subcategory
 
 
-class Category(Base):
-    __tablename__ = "categories"
+class Subcategory(Base):
+    __tablename__ = "subcategories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -26,13 +25,13 @@ class Category(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # Optional parent menu — nullable so existing categories without a menu still work.
-    menu_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("menus.id", ondelete="SET NULL"), nullable=True, index=True
+    # Parent category FK
+    category_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
-    # Tenant scope — every category belongs to exactly one restaurant.
-    # restaurant_id must come from authenticated context, never from client payload.
+    # Tenant scope — direct restaurant_id for O(1) tenant filtering without joins.
+    # Must come from authenticated context, never from client payload.
     restaurant_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -48,11 +47,8 @@ class Category(Base):
     )
 
     # Relationships
-    menu: Mapped[Menu | None] = relationship("Menu", back_populates="categories")
-    restaurant: Mapped[Restaurant] = relationship("Restaurant", back_populates="categories")
+    category: Mapped[Category] = relationship("Category", back_populates="subcategories")
+    restaurant: Mapped[Restaurant] = relationship("Restaurant", back_populates="subcategories")
     items: Mapped[list[Item]] = relationship(
-        "Item", back_populates="category", cascade="all, delete-orphan"
-    )
-    subcategories: Mapped[list[Subcategory]] = relationship(
-        "Subcategory", back_populates="category", cascade="all, delete-orphan"
+        "Item", back_populates="subcategory", cascade="all, delete-orphan"
     )

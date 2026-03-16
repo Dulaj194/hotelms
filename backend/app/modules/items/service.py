@@ -32,14 +32,20 @@ def get_item(db: Session, item_id: int, restaurant_id: int) -> ItemResponse:
 def add_item(db: Session, restaurant_id: int, data: ItemCreateRequest) -> ItemResponse:
     """Create item under the current restaurant.
 
-    Validates that the target category also belongs to this restaurant
-    to prevent cross-tenant category injection.
+    Validates that the target category and optional subcategory also belong to this
+    restaurant to prevent cross-tenant injection.
     """
     if not repository.category_belongs_to_restaurant(db, data.category_id, restaurant_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Category not found in your restaurant.",
         )
+    if data.subcategory_id is not None:
+        if not repository.subcategory_belongs_to_restaurant(db, data.subcategory_id, restaurant_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subcategory not found or does not belong to your restaurant.",
+            )
     item = repository.create(db, restaurant_id, data)
     return ItemResponse.model_validate(item)
 
@@ -53,6 +59,13 @@ def update_item(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Category not found in your restaurant.",
+            )
+    # If changing subcategory, verify it belongs to this restaurant
+    if data.subcategory_id is not None:
+        if not repository.subcategory_belongs_to_restaurant(db, data.subcategory_id, restaurant_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Subcategory not found or does not belong to your restaurant.",
             )
     item = repository.update_by_id(db, item_id, restaurant_id, data)
     if not item:
