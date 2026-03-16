@@ -12,10 +12,12 @@ from app.modules.subscriptions.schemas import (
     ActivateSubscriptionRequest,
     ActivateSubscriptionResponse,
     CancelSubscriptionResponse,
+    ExpireOverdueResponse,
     StartTrialResponse,
     SubscriptionPrivilegeResponse,
     SubscriptionResponse,
     SubscriptionStatusResponse,
+    SuperAdminSubscriptionUpdateRequest,
 )
 
 router = APIRouter()
@@ -71,3 +73,40 @@ def cancel_subscription(
     _=Depends(require_roles("owner", "admin")),
 ) -> CancelSubscriptionResponse:
     return service.cancel_subscription(db, restaurant_id)
+
+
+# ─── Super-admin endpoints ────────────────────────────────────────────────────
+
+
+@router.post("/admin/expire-overdue", response_model=ExpireOverdueResponse)
+def expire_overdue_subscriptions(
+    _: object = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> ExpireOverdueResponse:
+    """Manually trigger the expiry check that the background worker also runs."""
+    count = service.expire_overdue_subscriptions(db)
+    return ExpireOverdueResponse(
+        message=f"Expired {count} overdue subscription(s).",
+        expired_count=count,
+    )
+
+
+@router.get("/admin/{restaurant_id}", response_model=SubscriptionResponse)
+def get_subscription_for_hotel(
+    restaurant_id: int,
+    _: object = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> SubscriptionResponse:
+    """Return the current subscription for any restaurant (super_admin only)."""
+    return service.get_subscription_for_super_admin(db, restaurant_id)
+
+
+@router.patch("/admin/{restaurant_id}", response_model=SubscriptionResponse)
+def update_subscription_for_hotel(
+    restaurant_id: int,
+    payload: SuperAdminSubscriptionUpdateRequest,
+    _: object = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> SubscriptionResponse:
+    """Update status, expiry, or package for any restaurant (super_admin only)."""
+    return service.update_subscription_for_super_admin(db, restaurant_id, payload)

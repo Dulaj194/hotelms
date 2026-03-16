@@ -11,7 +11,15 @@ from app.modules.restaurants.schemas import (
     RestaurantMeResponse,
     RestaurantUpdateRequest,
 )
+from app.modules.users import service as users_service
 from app.modules.users.model import User
+from app.modules.users.schemas import (
+    GenericMessageResponse,
+    StaffCreateRequest,
+    StaffDetailResponse,
+    StaffListItemResponse,
+    StaffStatusResponse,
+)
 
 router = APIRouter()
 
@@ -109,3 +117,99 @@ def delete_restaurant_by_id(
 ) -> RestaurantDeleteResponse:
     """Delete any restaurant by ID. Super-admin only."""
     return service.delete_restaurant_for_super_admin(db, restaurant_id)
+
+
+# ─── Super-admin: hotel logo ──────────────────────────────────────────────────
+
+
+@router.post(
+    "/{restaurant_id}/logo",
+    response_model=RestaurantLogoUploadResponse,
+)
+async def upload_logo_for_restaurant(
+    restaurant_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantLogoUploadResponse:
+    """Upload / replace the logo for any restaurant.  Super-admin only."""
+    return await service.upload_logo(db, restaurant_id, file, current_user.id)
+
+
+# ─── Super-admin: hotel staff management ─────────────────────────────────────
+
+
+@router.get(
+    "/{restaurant_id}/users",
+    response_model=list[StaffListItemResponse],
+)
+def list_restaurant_staff(
+    restaurant_id: int,
+    _current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> list[StaffListItemResponse]:
+    """List all staff for a specific hotel.  Super-admin only."""
+    service.get_restaurant_for_super_admin(db, restaurant_id)  # 404 guard
+    return users_service.list_staff(db, restaurant_id)
+
+
+@router.post(
+    "/{restaurant_id}/users",
+    response_model=StaffDetailResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_restaurant_staff(
+    restaurant_id: int,
+    payload: StaffCreateRequest,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> StaffDetailResponse:
+    """Add a staff member to a specific hotel.  Super-admin only.
+
+    SECURITY: restaurant_id is taken from the URL path, not the payload.
+    The payload's restaurant_id field is overridden with the path value.
+    """
+    payload_for_hotel = payload.model_copy(update={"restaurant_id": restaurant_id})
+    return users_service.add_staff(db, None, payload_for_hotel, current_user)
+
+
+@router.delete(
+    "/{restaurant_id}/users/{user_id}",
+    response_model=GenericMessageResponse,
+)
+def delete_restaurant_staff(
+    restaurant_id: int,
+    user_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> GenericMessageResponse:
+    """Permanently remove a staff member from a hotel.  Super-admin only."""
+    return users_service.delete_staff(db, user_id, restaurant_id, current_user)
+
+
+@router.patch(
+    "/{restaurant_id}/users/{user_id}/disable",
+    response_model=StaffStatusResponse,
+)
+def disable_restaurant_staff(
+    restaurant_id: int,
+    user_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> StaffStatusResponse:
+    """Deactivate a staff member in a hotel.  Super-admin only."""
+    return users_service.disable_staff(db, user_id, restaurant_id, current_user)
+
+
+@router.patch(
+    "/{restaurant_id}/users/{user_id}/enable",
+    response_model=StaffStatusResponse,
+)
+def enable_restaurant_staff(
+    restaurant_id: int,
+    user_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> StaffStatusResponse:
+    """Re-activate a staff member in a hotel.  Super-admin only."""
+    return users_service.enable_staff(db, user_id, restaurant_id, current_user)

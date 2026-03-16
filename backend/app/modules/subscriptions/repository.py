@@ -105,3 +105,43 @@ def list_package_privilege_codes(db: Session, package_id: int) -> Sequence[str]:
         .all()
     )
     return [row[0] for row in rows]
+
+
+# ─── Super-admin bulk operations ──────────────────────────────────────────────
+
+
+def get_overdue_open_subscriptions(
+    db: Session,
+) -> list[RestaurantSubscription]:
+    """Return all active/trial subscriptions whose expiry has passed."""
+    now = datetime.utcnow()
+    return (
+        db.query(RestaurantSubscription)
+        .filter(
+            RestaurantSubscription.status.in_(
+                [SubscriptionStatus.active, SubscriptionStatus.trial]
+            ),
+            RestaurantSubscription.expires_at <= now,
+        )
+        .all()
+    )
+
+
+def update_subscription_by_id(
+    db: Session,
+    subscription_id: int,
+    update_data: dict,
+) -> RestaurantSubscription | None:
+    """Update arbitrary fields on a subscription. For super_admin use only."""
+    sub = (
+        db.query(RestaurantSubscription)
+        .filter(RestaurantSubscription.id == subscription_id)
+        .first()
+    )
+    if not sub:
+        return None
+    for key, value in update_data.items():
+        setattr(sub, key, value)
+    db.commit()
+    db.refresh(sub)
+    return sub

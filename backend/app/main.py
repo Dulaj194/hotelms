@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+import asyncio
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
@@ -9,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.router import router
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
+from app.workers.subscription_expiry import run_subscription_expiry_loop
 
 configure_logging()
 logger = get_logger(__name__)
@@ -53,7 +55,16 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         ensure_development_schema_compatibility(engine, logger)
         logger.info("Database tables created / verified")
 
+    # Start background worker: mark overdue subscriptions as expired hourly.
+    expiry_task = asyncio.create_task(run_subscription_expiry_loop())
+
     yield
+
+    expiry_task.cancel()
+    try:
+        await expiry_task
+    except asyncio.CancelledError:
+        pass
     logger.info("Shutting down %s", settings.app_name)
 
 
