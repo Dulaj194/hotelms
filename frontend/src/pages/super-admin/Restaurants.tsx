@@ -5,7 +5,6 @@ import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import type {
   RestaurantAdminUpdateRequest,
   RestaurantMeResponse,
-  RestaurantUpdateRequest,
   RestaurantCreateRequest,
   RestaurantDeleteResponse,
 } from "@/types/restaurant";
@@ -67,6 +66,11 @@ export default function SuperAdminRestaurants() {
   // ─── Create-hotel logo ─────────────────────────────────────────────────────
   const [createLogoFile, setCreateLogoFile] = useState<File | null>(null);
   const createLogoRef = useRef<HTMLInputElement>(null);
+
+  // ─── Edit-hotel logo ───────────────────────────────────────────────────────
+  const [uploadingEditLogo, setUploadingEditLogo] = useState(false);
+  const [editLogoMsg, setEditLogoMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const editLogoRef = useRef<HTMLInputElement>(null);
 
   function load() {
     setLoading(true);
@@ -162,6 +166,7 @@ export default function SuperAdminRestaurants() {
     setSelectedError(null);
     setActionMsg(null);
     setEditingId(null);
+    setEditLogoMsg(null);
     try {
       const data = await api.get<RestaurantMeResponse>(`/restaurants/${restaurantId}`);
       setSelected(data);
@@ -177,6 +182,7 @@ export default function SuperAdminRestaurants() {
     setSelectedLoading(true);
     setSelectedError(null);
     setActionMsg(null);
+    setEditLogoMsg(null);
     try {
       const data = await api.get<RestaurantMeResponse>(`/restaurants/${restaurantId}`);
       setSelected(data);
@@ -193,6 +199,36 @@ export default function SuperAdminRestaurants() {
       setSelectedError("Failed to load hotel for editing.");
     } finally {
       setSelectedLoading(false);
+    }
+  }
+
+  async function handleEditLogoUpload(file: File) {
+    if (!selected) return;
+    setUploadingEditLogo(true);
+    setEditLogoMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const token = getAccessToken();
+      const res = await fetch(`${API_BASE}/restaurants/${selected.id}/logo`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
+        body: fd,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.detail ?? `Upload failed (${res.status})`);
+      }
+      const data = await res.json();
+      setSelected((prev) => prev ? { ...prev, logo_url: data.logo_url } : prev);
+      setList((prev) => prev.map((r) => r.id === selected.id ? { ...r, logo_url: data.logo_url } : r));
+      setEditLogoMsg({ type: "ok", text: "Logo updated." });
+    } catch (err) {
+      setEditLogoMsg({ type: "err", text: err instanceof Error ? err.message : "Upload failed." });
+    } finally {
+      setUploadingEditLogo(false);
+      if (editLogoRef.current) editLogoRef.current.value = "";
     }
   }
 
@@ -512,7 +548,7 @@ export default function SuperAdminRestaurants() {
                 </h2>
                 {selected && (
                   <button type="button"
-                    onClick={() => { setSelected(null); setEditingId(null); }}
+                    onClick={() => { setSelected(null); setEditingId(null); setEditLogoMsg(null); }}
                     className="text-xs text-gray-400 hover:text-gray-600">
                     ✕ Close
                   </button>
@@ -526,6 +562,38 @@ export default function SuperAdminRestaurants() {
               ) : selected ? (
                 editingId === selected.id ? (
                   <div className="space-y-3">
+                    {/* ── Logo upload in edit mode ── */}
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">Logo</label>
+                      <div className="flex items-center gap-3">
+                        {selected.logo_url && (
+                          <img
+                            src={`${import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"}${selected.logo_url}`}
+                            alt="Current logo"
+                            className="h-14 w-14 rounded-md object-cover border"
+                          />
+                        )}
+                        <label className="cursor-pointer rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-gray-50">
+                          {uploadingEditLogo ? "Uploading…" : selected.logo_url ? "Change Logo" : "Upload Logo"}
+                          <input
+                            ref={editLogoRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            disabled={uploadingEditLogo}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleEditLogoUpload(f);
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {editLogoMsg && (
+                        <p className={`text-xs ${editLogoMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+                          {editLogoMsg.text}
+                        </p>
+                      )}
+                    </div>
                     <FormField label="Name *" value={editForm.name ?? ""} onChange={(v) => setEditForm((p) => ({ ...p, name: v }))} />
                     <FormField label="Email" type="email" value={editForm.email ?? ""} onChange={(v) => setEditForm((p) => ({ ...p, email: v || null }))} />
                     <FormField label="Phone" value={editForm.phone ?? ""} onChange={(v) => setEditForm((p) => ({ ...p, phone: v || null }))} />
@@ -549,22 +617,34 @@ export default function SuperAdminRestaurants() {
                         className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                         {saving ? "Saving…" : "Save Changes"}
                       </button>
-                      <button type="button" onClick={() => { setEditingId(null); setSelectedError(null); }}
+                      <button type="button" onClick={() => { setEditingId(null); setSelectedError(null); setEditLogoMsg(null); }}
                         className="flex-1 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50">
                         Cancel
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <dl className="grid grid-cols-2 gap-4">
-                    <InfoItem label="Name" value={selected.name} />
-                    <InfoItem label="Email" value={selected.email} />
-                    <InfoItem label="Phone" value={selected.phone} />
-                    <InfoItem label="Status" value={selected.is_active ? "Active" : "Inactive"} />
-                    <div className="col-span-2"><InfoItem label="Address" value={selected.address} /></div>
-                    <InfoItem label="Registered" value={new Date(selected.created_at).toLocaleDateString()} />
-                    <InfoItem label="Last Updated" value={new Date(selected.updated_at).toLocaleDateString()} />
-                  </dl>
+                  <div className="space-y-4">
+                    {selected.logo_url && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 mb-1">Logo</p>
+                        <img
+                          src={`${import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"}${selected.logo_url}`}
+                          alt="Hotel logo"
+                          className="h-20 w-20 rounded-md object-cover border"
+                        />
+                      </div>
+                    )}
+                    <dl className="grid grid-cols-2 gap-4">
+                      <InfoItem label="Name" value={selected.name} />
+                      <InfoItem label="Email" value={selected.email} />
+                      <InfoItem label="Phone" value={selected.phone} />
+                      <InfoItem label="Status" value={selected.is_active ? "Active" : "Inactive"} />
+                      <div className="col-span-2"><InfoItem label="Address" value={selected.address} /></div>
+                      <InfoItem label="Registered" value={new Date(selected.created_at).toLocaleDateString()} />
+                      <InfoItem label="Last Updated" value={new Date(selected.updated_at).toLocaleDateString()} />
+                    </dl>
+                  </div>
                 )
               ) : null}
             </div>
