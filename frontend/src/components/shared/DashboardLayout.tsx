@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 
 const ALL_NAV_ITEMS = [
@@ -6,14 +7,16 @@ const ALL_NAV_ITEMS = [
   { path: "/admin/restaurant-profile", label: "🍽️ Restaurant", roles: ["owner", "admin"] },
   { path: "/admin/subscription", label: "📦 Subscription", roles: ["owner", "admin"] },
   { path: "/admin/staff", label: "👥 Staff", roles: ["owner", "admin"] },
-  { path: "/admin/tables", label: "🪑 Tables", roles: ["owner", "admin"] },
+  { path: "/admin/tables", label: "🪑 Tables", roles: ["owner", "admin"], privilege: "QR_MENU" },
+  { path: "/admin/offers", label: "🎁 Offers", roles: ["owner", "admin"], privilege: "OFFERS" },
   { path: "/admin/menu/menus", label: "📚 Menus", roles: ["owner", "admin"] },
   { path: "/admin/menu/categories", label: "📋 Categories", roles: ["owner", "admin"] },
   { path: "/admin/menu/subcategories", label: "🧩 Subcategories", roles: ["owner", "admin"] },
   { path: "/admin/menu/items", label: "🥘 Menu Items", roles: ["owner", "admin"] },
-  { path: "/admin/steward", label: "👨‍💼 Steward", roles: ["owner", "admin", "steward"] },
-  { path: "/admin/kitchen", label: "🧑‍🍳 Kitchen", roles: ["owner", "admin", "steward"] },
-  { path: "/admin/billing", label: "💳 Billing", roles: ["owner", "admin", "steward"] },
+  { path: "/admin/steward", label: "👨‍💼 Steward", roles: ["owner", "admin", "steward"], privilege: "QR_MENU" },
+  { path: "/admin/kitchen", label: "🧑‍🍳 Kitchen", roles: ["owner", "admin", "steward"], privilege: "QR_MENU" },
+  { path: "/admin/reports", label: "📈 Reports", roles: ["owner", "admin", "steward"], privilege: "QR_MENU" },
+  { path: "/admin/billing", label: "💳 Billing", roles: ["owner", "admin", "steward"], privilege: "QR_MENU" },
   { path: "/admin/rooms", label: "🛏️ Rooms", roles: ["owner", "admin"] },
   { path: "/admin/housekeeping", label: "🛎️ Housekeeping", roles: ["owner", "admin", "housekeeper"] },
 ];
@@ -27,9 +30,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const user = getUser();
   const role = normalizeRole(user?.role);
+  const { loading: privilegesLoading, hasPrivilege } = useSubscriptionPrivileges();
 
   const navItems = ALL_NAV_ITEMS.filter(
-    (item) => item.roles === null || item.roles.includes(role)
+    (item) =>
+      (item.roles === null || item.roles.includes(role)) &&
+      (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
   );
 
   function handleLogout() {

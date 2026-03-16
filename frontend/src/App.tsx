@@ -10,6 +10,8 @@ import AdminRestaurantProfile from "@/pages/admin/RestaurantProfile";
 import Kitchen from "@/pages/admin/Kitchen";
 import Steward from "@/pages/admin/Steward";
 import Billing from "@/pages/admin/Billing";
+import Offers from "@/pages/admin/Offers";
+import Reports from "@/pages/admin/Reports";
 import Staff from "@/pages/admin/Staff";
 import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
 import TableMenu from "@/pages/public/TableMenu";
@@ -109,10 +111,26 @@ function App() {
           }
         />
         <Route
+          path="/admin/offers"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Offers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/steward"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
               <Steward />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
+              <Reports />
             </ProtectedRoute>
           }
         />

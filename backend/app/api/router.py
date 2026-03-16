@@ -10,11 +10,13 @@ from app.modules.health.router import router as health_router
 from app.modules.items.router import router as items_router
 from app.modules.menus.router import router as menus_router
 from app.modules.orders.router import router as orders_router
+from app.modules.offers.router import router as offers_router
 from app.modules.payments.router import router as payments_router
 from app.modules.public.router import router as public_router
 from app.modules.packages.router import router as packages_router
 from app.modules.qr.router import router as qr_router
 from app.modules.realtime.router import router as realtime_router
+from app.modules.reports.router import router as reports_router
 from app.modules.restaurants.router import router as restaurants_router
 from app.modules.subcategories.router import router as subcategories_router
 from app.modules.subscriptions.router import router as subscriptions_router
@@ -45,7 +47,9 @@ router.include_router(qr_router, prefix="/qr", tags=["qr"])
 router.include_router(table_sessions_router, prefix="/table-sessions", tags=["table-sessions"])
 router.include_router(cart_router, prefix="/cart", tags=["cart"])
 router.include_router(orders_router, prefix="/orders", tags=["orders"])
+router.include_router(offers_router, prefix="/offers", tags=["offers"])
 router.include_router(payments_router, prefix="/payments", tags=["payments"])
+router.include_router(reports_router, prefix="/reports", tags=["reports"])
 router.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
 router.include_router(realtime_router, prefix="/ws", tags=["websocket"])
 router.include_router(billing_router, prefix="/billing", tags=["billing"])

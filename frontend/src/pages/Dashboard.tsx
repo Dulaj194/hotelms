@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/shared/DashboardLayout";
+import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { getUser } from "@/lib/auth";
 
 interface Tile {
@@ -8,6 +9,7 @@ interface Tile {
   path: string;
   color: string;
   roles?: string[];
+  privilege?: string;
 }
 
 const TILES: Tile[] = [
@@ -31,6 +33,23 @@ const TILES: Tile[] = [
     path: "/admin/tables",
     color: "bg-rose-50 border-rose-200 hover:bg-rose-100",
     roles: ["owner", "admin"],
+    privilege: "QR_MENU",
+  },
+  {
+    title: "Offers",
+    description: "Promotions for menus and items",
+    path: "/admin/offers",
+    color: "bg-pink-50 border-pink-200 hover:bg-pink-100",
+    roles: ["owner", "admin"],
+    privilege: "OFFERS",
+  },
+  {
+    title: "Reports",
+    description: "Paid sales insights and exports",
+    path: "/admin/reports",
+    color: "bg-indigo-50 border-indigo-200 hover:bg-indigo-100",
+    roles: ["owner", "admin", "steward"],
+    privilege: "QR_MENU",
   },
   {
     title: "Kitchen",
@@ -38,6 +57,7 @@ const TILES: Tile[] = [
     path: "/admin/kitchen",
     color: "bg-orange-50 border-orange-200 hover:bg-orange-100",
     roles: ["owner", "admin", "steward"],
+    privilege: "QR_MENU",
   },
   {
     title: "Billing",
@@ -45,6 +65,7 @@ const TILES: Tile[] = [
     path: "/admin/billing",
     color: "bg-green-50 border-green-200 hover:bg-green-100",
     roles: ["owner", "admin", "steward"],
+    privilege: "QR_MENU",
   },
   {
     title: "Rooms",
@@ -74,9 +95,12 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const user = getUser();
   const role = user?.role ?? "";
+  const { loading: privilegesLoading, hasPrivilege } = useSubscriptionPrivileges();
 
   const visibleTiles = TILES.filter(
-    (t) => !t.roles || t.roles.includes(role)
+    (t) =>
+      (!t.roles || t.roles.includes(role)) &&
+      (!t.privilege || (!privilegesLoading && hasPrivilege(t.privilege)))
   );
 
   return (
