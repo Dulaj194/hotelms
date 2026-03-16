@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
 import { getRoleRedirect, getUser, isAuthenticated, normalizeRole } from "@/lib/auth";
 
@@ -9,12 +9,18 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+  const location = useLocation();
+
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
 
+  const user = getUser();
+  if (user?.must_change_password && location.pathname !== "/first-time-password") {
+    return <Navigate to="/first-time-password" replace />;
+  }
+
   if (allowedRoles?.length) {
-    const user = getUser();
     const role = normalizeRole(user?.role);
     const normalizedAllowedRoles = allowedRoles.map((r) => normalizeRole(r));
 

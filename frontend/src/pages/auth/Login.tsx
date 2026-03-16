@@ -24,6 +24,10 @@ export default function Login() {
       setAccessToken(data.access_token);
       const me = await api.get<UserMeResponse>("/auth/me");
       setUser(me);
+      if (me.must_change_password) {
+        navigate("/first-time-password", { replace: true });
+        return;
+      }
       navigate(getRoleRedirect(me.role), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please try again.");

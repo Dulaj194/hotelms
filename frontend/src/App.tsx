@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import ForgotPassword from "@/pages/auth/ForgotPassword";
 import Login from "@/pages/auth/Login";
+import FirstTimePasswordChange from "@/pages/auth/FirstTimePasswordChange";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import AdminRestaurantProfile from "@/pages/admin/RestaurantProfile";
@@ -25,6 +26,9 @@ import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
 function RootRedirect() {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
   const user = getUser();
+  if (user?.must_change_password) {
+    return <Navigate to="/first-time-password" replace />;
+  }
   const redirectPath = getRoleRedirect(user?.role ?? "");
   return <Navigate to={redirectPath || "/dashboard"} replace />;
 }
@@ -34,6 +38,14 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route
+          path="/first-time-password"
+          element={
+            <ProtectedRoute>
+              <FirstTimePasswordChange />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 

@@ -7,9 +7,13 @@
  */
 
 import { getAccessToken } from "@/lib/auth";
+import { clearAuth, setAccessToken } from "@/lib/auth";
 
 const BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+const REFRESH_PATH = "/auth/refresh";
+
+let refreshPromise: Promise<string | null> | null = null;
 
 export class ApiError extends Error {
   status: number;
@@ -26,7 +30,8 @@ export class ApiError extends Error {
 async function request<T>(
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
+  retryOnAuth = true,
 ): Promise<T> {
   const token = getAccessToken();
   const headers: Record<string, string> = {
@@ -44,6 +49,13 @@ async function request<T>(
     ...(body !== undefined && { body: JSON.stringify(body) }),
   });
 
+  if (response.status === 401 && retryOnAuth && path !== REFRESH_PATH) {
+    const nextToken = await refreshAccessToken();
+    if (nextToken) {
+      return request<T>(method, path, body, false);
+    }
+  }
+
   if (!response.ok) {
     let detail = response.statusText;
     try {
@@ -56,6 +68,44 @@ async function request<T>(
   }
 
   return response.json() as Promise<T>;
+}
+
+export async function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${BASE_URL}${REFRESH_PATH}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        clearAuth();
+        return null;
+      }
+
+      const payload = (await response.json()) as { access_token?: string };
+      if (!payload.access_token) {
+        clearAuth();
+        return null;
+      }
+
+      setAccessToken(payload.access_token);
+      return payload.access_token;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 export const api = {

@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import {
   REQUEST_TYPE_LABELS,
@@ -86,8 +86,12 @@ function HousekeepingDashboard() {
           : prev.map((r) => r.id === id ? { ...r, status: "done" as const } : r)
       );
       setTotal((t) => (tab === "pending" ? t - 1 : t));
-    } catch {
-      setActionError("Failed to mark request as done. Please try again.");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setActionError(err.detail || "Failed to mark request as done.");
+      } else {
+        setActionError("Failed to mark request as done. Please try again.");
+      }
     } finally {
       setMarkingId(null);
     }
@@ -113,8 +117,12 @@ function HousekeepingDashboard() {
         );
         setRequests(data.requests);
         setTotal(data.total);
-      } catch {
-        setLoadError("Failed to load requests. Please refresh.");
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setLoadError(err.detail || "Failed to load requests.");
+        } else {
+          setLoadError("Failed to load requests. Please refresh.");
+        }
       } finally {
         setLoading(false);
       }

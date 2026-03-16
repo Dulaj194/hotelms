@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import KitchenOrderSection from "@/components/shared/KitchenOrderSection";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import type { NewOrderEvent, OrderStatusUpdatedEvent } from "@/types/realtime";
@@ -120,8 +120,12 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
         for (const o of completedRes.orders) map.set(o.id, o);
 
         setOrders(map);
-      } catch {
-        setLoadError("Failed to load orders. Please refresh.");
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setLoadError(err.detail || "Failed to load orders.");
+        } else {
+          setLoadError("Failed to load orders. Please refresh.");
+        }
       } finally {
         setLoading(false);
       }
@@ -228,8 +232,12 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
           }
           return next;
         });
-      } catch {
-        setActionError("Failed to update order. Please try again.");
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setActionError(err.detail || "Failed to update order.");
+        } else {
+          setActionError("Failed to update order. Please try again.");
+        }
       } finally {
         setActionLoadingId(null);
       }

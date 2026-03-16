@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { getAccessToken } from "@/lib/auth";
+import { refreshAccessToken } from "@/lib/api";
 import type {
   KitchenEvent,
   NewOrderEvent,
@@ -70,12 +71,15 @@ export function useKitchenSocket({
     isMountedRef.current = true;
     reconnectAttemptRef.current = 0;
 
-    function connect() {
+    async function connect() {
       if (!isMountedRef.current) return;
 
-      const token = getAccessToken();
+      let token = getAccessToken();
       if (!token) {
-        setConnectionError("No authentication token available.");
+        token = await refreshAccessToken();
+      }
+      if (!token) {
+        setConnectionError("Session expired. Please log in again.");
         return;
       }
 
@@ -111,9 +115,18 @@ export function useKitchenSocket({
         setIsConnected(false);
         wsRef.current = null;
 
-        // Auth failure — do not reconnect
+        // Auth failure — try one silent token refresh and reconnect
         if (ev.code === WS_CODE_UNAUTHORIZED) {
-          setConnectionError("Kitchen access denied. Check your account role.");
+          void refreshAccessToken().then((nextToken) => {
+            if (!isMountedRef.current) return;
+            if (!nextToken) {
+              setConnectionError("Kitchen access denied or session expired. Please log in again.");
+              return;
+            }
+            reconnectAttemptRef.current = 0;
+            setConnectionError("Reconnecting kitchen stream…");
+            void connect();
+          });
           return;
         }
 
@@ -135,7 +148,7 @@ export function useKitchenSocket({
       };
     }
 
-    connect();
+    void connect();
 
     return () => {
       isMountedRef.current = false;

@@ -9,12 +9,34 @@
 const TOKEN_KEY = "hotelms_access_token";
 const USER_KEY = "hotelms_user";
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const payloadJson = atob(padded);
+    return JSON.parse(payloadJson) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpired(token: string): boolean {
+  const payload = decodeJwtPayload(token);
+  const expRaw = payload?.exp;
+  if (typeof expRaw !== "number") return false;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  return expRaw <= nowSeconds;
+}
+
 export interface StoredUser {
   id: number;
   full_name: string;
   email: string;
   role: string;
   restaurant_id: number | null;
+  must_change_password: boolean;
 }
 
 export function normalizeRole(role: string | null | undefined): string {
@@ -24,7 +46,15 @@ export function normalizeRole(role: string | null | undefined): string {
 }
 
 export function getAccessToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+
+  if (isTokenExpired(token)) {
+    clearAuth();
+    return null;
+  }
+
+  return token;
 }
 
 export function setAccessToken(token: string): void {
@@ -59,7 +89,7 @@ export function clearAuth(): void {
 }
 
 export function isAuthenticated(): boolean {
-  return !!getAccessToken();
+  return getAccessToken() !== null;
 }
 
 export function getRoleRedirect(role: string): string {
