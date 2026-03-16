@@ -10,7 +10,7 @@
  * Staff actions (confirm / reject / start / complete) call the HTTP API,
  * with an optimistic update so the UI responds immediately.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import KitchenOrderSection from "@/components/shared/KitchenOrderSection";
@@ -96,9 +96,8 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // New-order alert state
+  // Alert for operator awareness (set by WS handlers)
   const [alert, setAlert] = useState<string | null>(null);
-  const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Initial data load ──────────────────────────────────────────────────
   useEffect(() => {
@@ -134,31 +133,19 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
     void load();
   }, [restaurantId]);
 
-  // ── New order alert helper ─────────────────────────────────────────────
-  const showAlert = useCallback((message: string) => {
-    if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
-    setAlert(message);
-    alertTimerRef.current = setTimeout(() => setAlert(null), 6000);
-  }, []);
-
   // ── WebSocket event handlers ───────────────────────────────────────────
   const handleNewOrder = useCallback(
     (event: NewOrderEvent) => {
+      // Add to internal map so status-update deltas work once steward confirms.
+      // Kitchen does NOT display pending orders — that is the Steward's job.
       const card = orderCardFromEvent(event.data);
       setOrders((prev) => {
         const next = new Map(prev);
         next.set(card.id, card);
         return next;
       });
-      const locationLabel =
-        event.data.order_source === "room"
-          ? `Room ${event.data.room_number ?? "?"}`
-          : `Table ${event.data.table_number ?? "?"}`;
-      showAlert(
-        `New order ${event.data.order_number} — ${locationLabel}`
-      );
     },
-    [showAlert]
+    []
   );
 
   const handleStatusUpdate = useCallback((event: OrderStatusUpdatedEvent) => {
@@ -253,11 +240,6 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
           new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
       ),
     [orders]
-  );
-
-  const pendingOrders = useMemo(
-    () => sorted.filter((o) => o.status === "pending"),
-    [sorted]
   );
 
   const processingOrders = useMemo(
@@ -367,15 +349,7 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <KitchenOrderSection
-              title="Pending"
-              orders={pendingOrders}
-              headerColor="bg-yellow-500"
-              emptyMessage="No pending orders"
-              onAction={handleAction}
-              actionLoadingId={actionLoadingId}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <KitchenOrderSection
               title="In Progress"
               orders={processingOrders}

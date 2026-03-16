@@ -8,6 +8,7 @@ import ResetPassword from "@/pages/auth/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import AdminRestaurantProfile from "@/pages/admin/RestaurantProfile";
 import Kitchen from "@/pages/admin/Kitchen";
+import Steward from "@/pages/admin/Steward";
 import Billing from "@/pages/admin/Billing";
 import Staff from "@/pages/admin/Staff";
 import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
@@ -103,6 +104,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
               <Staff />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/steward"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
+              <Steward />
             </ProtectedRoute>
           }
         />

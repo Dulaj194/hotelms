@@ -10,6 +10,7 @@ const ALL_NAV_ITEMS = [
   { path: "/admin/menu/categories", label: "📋 Categories", roles: ["owner", "admin"] },
   { path: "/admin/menu/subcategories", label: "🧩 Subcategories", roles: ["owner", "admin"] },
   { path: "/admin/menu/items", label: "🥘 Menu Items", roles: ["owner", "admin"] },
+  { path: "/admin/steward", label: "👨‍💼 Steward", roles: ["owner", "admin", "steward"] },
   { path: "/admin/kitchen", label: "🧑‍🍳 Kitchen", roles: ["owner", "admin", "steward"] },
   { path: "/admin/billing", label: "💳 Billing", roles: ["owner", "admin", "steward"] },
   { path: "/admin/rooms", label: "🛏️ Rooms", roles: ["owner", "admin"] },
