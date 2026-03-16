@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_db, require_restaurant_user, require_roles
 from app.modules.restaurants import service
 from app.modules.restaurants.schemas import (
+    RestaurantAdminUpdateRequest,
     RestaurantCreateRequest,
+    RestaurantDeleteResponse,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
     RestaurantUpdateRequest,
@@ -86,3 +88,24 @@ def get_restaurant_by_id(
 ) -> RestaurantMeResponse:
     """Fetch any restaurant by ID. Super-admin only."""
     return service.get_restaurant_for_super_admin(db, restaurant_id)
+
+
+@router.patch("/{restaurant_id}", response_model=RestaurantMeResponse)
+def update_restaurant_by_id(
+    restaurant_id: int,
+    payload: RestaurantAdminUpdateRequest,
+    _current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantMeResponse:
+    """Update any restaurant by ID. Super-admin only."""
+    return service.update_restaurant_for_super_admin(db, restaurant_id, payload)
+
+
+@router.delete("/{restaurant_id}", response_model=RestaurantDeleteResponse)
+def delete_restaurant_by_id(
+    restaurant_id: int,
+    _current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantDeleteResponse:
+    """Delete any restaurant by ID. Super-admin only."""
+    return service.delete_restaurant_for_super_admin(db, restaurant_id)

@@ -35,3 +35,16 @@ export interface RestaurantCreateRequest {
   phone?: string | null;
   address?: string | null;
 }
+
+export interface RestaurantAdminUpdateRequest {
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  is_active?: boolean;
+}
+
+export interface RestaurantDeleteResponse {
+  message: string;
+  restaurant_id: number;
+}

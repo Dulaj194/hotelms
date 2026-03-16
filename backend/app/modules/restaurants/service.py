@@ -5,6 +5,7 @@ import string
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.notifications import send_onboarding_email
@@ -15,7 +16,9 @@ from app.modules.users.model import UserRole
 from app.modules.users.repository import create_staff, get_user_by_email
 from app.modules.users.schemas import StaffCreateRequest
 from app.modules.restaurants.schemas import (
+    RestaurantAdminUpdateRequest,
     RestaurantCreateRequest,
+    RestaurantDeleteResponse,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
     RestaurantUpdateRequest,
@@ -174,6 +177,48 @@ def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> Restaura
         )
 
     return RestaurantMeResponse.model_validate(restaurant)
+
+
+def update_restaurant_for_super_admin(
+    db: Session,
+    restaurant_id: int,
+    payload: RestaurantAdminUpdateRequest,
+) -> RestaurantMeResponse:
+    """Update any restaurant by ID. Restricted to super_admin use only."""
+    update_data = payload.model_dump(exclude_unset=True)
+    restaurant = repository.update_for_super_admin(db, restaurant_id, update_data)
+    if not restaurant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+    return RestaurantMeResponse.model_validate(restaurant)
+
+
+def delete_restaurant_for_super_admin(
+    db: Session,
+    restaurant_id: int,
+) -> RestaurantDeleteResponse:
+    """Delete any restaurant by ID. Restricted to super_admin use only."""
+    try:
+        deleted = repository.delete_for_super_admin(db, restaurant_id)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Restaurant cannot be deleted due to related records.",
+        ) from exc
+
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    return RestaurantDeleteResponse(
+        message="Restaurant deleted successfully.",
+        restaurant_id=restaurant_id,
+    )
 
 
 def _generate_temporary_password(length: int = 12) -> str:

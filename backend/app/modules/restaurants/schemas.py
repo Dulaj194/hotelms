@@ -44,6 +44,21 @@ class RestaurantCreateRequest(BaseModel):
     address: str | None = Field(None, max_length=500)
 
 
+class RestaurantAdminUpdateRequest(BaseModel):
+    """Payload for super_admin to update any restaurant tenant."""
+
+    name: str | None = Field(None, min_length=1, max_length=255)
+    email: EmailStr | None = None
+    phone: str | None = Field(None, max_length=50)
+    address: str | None = Field(None, max_length=500)
+    is_active: bool | None = None
+
+
+class RestaurantDeleteResponse(BaseModel):
+    message: str
+    restaurant_id: int
+
+
 class RestaurantLogoUploadResponse(BaseModel):
     logo_url: str
     message: str = "Logo uploaded successfully."

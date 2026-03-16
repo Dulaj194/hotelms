@@ -3,9 +3,11 @@ import { api } from "@/lib/api";
 import { getAccessToken, getUser, normalizeRole } from "@/lib/auth";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import type {
+  RestaurantAdminUpdateRequest,
   RestaurantMeResponse,
   RestaurantUpdateRequest,
   RestaurantCreateRequest,
+  RestaurantDeleteResponse,
 } from "@/types/restaurant";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
@@ -21,6 +23,17 @@ function SuperAdminView() {
   const [form, setForm] = useState<RestaurantCreateRequest>({ name: "" });
   const [creating, setCreating] = useState(false);
   const [createMsg, setCreateMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const [selected, setSelected] = useState<RestaurantMeResponse | null>(null);
+  const [selectedLoading, setSelectedLoading] = useState(false);
+  const [selectedError, setSelectedError] = useState<string | null>(null);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<RestaurantAdminUpdateRequest>({});
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const [actionMsg, setActionMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   function load() {
     setLoading(true);
@@ -53,6 +66,89 @@ function SuperAdminView() {
     }
   }
 
+  async function handleView(restaurantId: number) {
+    setSelectedLoading(true);
+    setSelectedError(null);
+    setActionMsg(null);
+    setEditingId(null);
+    try {
+      const data = await api.get<RestaurantMeResponse>(`/restaurants/${restaurantId}`);
+      setSelected(data);
+    } catch {
+      setSelectedError("Failed to load restaurant profile.");
+    } finally {
+      setSelectedLoading(false);
+    }
+  }
+
+  async function handleStartEdit(restaurantId: number) {
+    setSelectedLoading(true);
+    setSelectedError(null);
+    setActionMsg(null);
+    try {
+      const data = await api.get<RestaurantMeResponse>(`/restaurants/${restaurantId}`);
+      setSelected(data);
+      setEditingId(restaurantId);
+      setEditForm({
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        is_active: data.is_active,
+      });
+    } catch {
+      setSelectedError("Failed to load restaurant for editing.");
+    } finally {
+      setSelectedLoading(false);
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (editingId === null) return;
+    setSaving(true);
+    setActionMsg(null);
+    try {
+      const updated = await api.patch<RestaurantMeResponse>(`/restaurants/${editingId}`, editForm);
+      setList((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      setSelected(updated);
+      setEditingId(null);
+      setActionMsg({ type: "ok", text: `Restaurant "${updated.name}" updated.` });
+    } catch (err) {
+      setActionMsg({
+        type: "err",
+        text: err instanceof Error ? err.message : "Failed to update restaurant.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(restaurantId: number, restaurantName: string) {
+    const confirmed = window.confirm(
+      `Delete "${restaurantName}"? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(restaurantId);
+    setActionMsg(null);
+    try {
+      const result = await api.delete<RestaurantDeleteResponse>(`/restaurants/${restaurantId}`);
+      setList((prev) => prev.filter((item) => item.id !== restaurantId));
+      if (selected?.id === restaurantId) {
+        setSelected(null);
+        setEditingId(null);
+      }
+      setActionMsg({ type: "ok", text: result.message });
+    } catch (err) {
+      setActionMsg({
+        type: "err",
+        text: err instanceof Error ? err.message : "Failed to delete restaurant.",
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -69,6 +165,12 @@ function SuperAdminView() {
         {createMsg && (
           <p className={`text-sm ${createMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
             {createMsg.text}
+          </p>
+        )}
+
+        {actionMsg && (
+          <p className={`text-sm ${actionMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+            {actionMsg.text}
           </p>
         )}
 
@@ -115,6 +217,7 @@ function SuperAdminView() {
                   <th className="px-4 py-3 text-left">Email</th>
                   <th className="px-4 py-3 text-left">Phone</th>
                   <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -130,10 +233,129 @@ function SuperAdminView() {
                         {r.is_active ? "Active" : "Inactive"}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleView(r.id)}
+                          className="rounded border px-2.5 py-1 text-xs font-medium hover:bg-gray-50"
+                        >
+                          View
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(r.id)}
+                          className="rounded border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(r.id, r.name)}
+                          disabled={deletingId === r.id}
+                          className="rounded border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {deletingId === r.id ? "Deleting…" : "Delete"}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {(selectedLoading || selectedError || selected) && (
+          <div className="rounded-lg border bg-white p-5 space-y-4">
+            <h2 className="font-medium text-sm text-gray-500 uppercase tracking-wide">
+              Hotel Profile
+            </h2>
+
+            {selectedLoading ? (
+              <p className="text-sm text-gray-500">Loading profile…</p>
+            ) : selectedError ? (
+              <p className="text-sm text-red-600">{selectedError}</p>
+            ) : selected ? (
+              editingId === selected.id ? (
+                <div className="space-y-3">
+                  <FormField
+                    label="Name *"
+                    value={editForm.name ?? ""}
+                    onChange={(v) => setEditForm((prev) => ({ ...prev, name: v }))}
+                  />
+                  <FormField
+                    label="Email"
+                    type="email"
+                    value={editForm.email ?? ""}
+                    onChange={(v) =>
+                      setEditForm((prev) => ({ ...prev, email: v ? v : null }))
+                    }
+                  />
+                  <FormField
+                    label="Phone"
+                    value={editForm.phone ?? ""}
+                    onChange={(v) =>
+                      setEditForm((prev) => ({ ...prev, phone: v ? v : null }))
+                    }
+                  />
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Address</label>
+                    <textarea
+                      className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      rows={3}
+                      value={editForm.address ?? ""}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({
+                          ...prev,
+                          address: e.target.value ? e.target.value : null,
+                        }))
+                      }
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(editForm.is_active)}
+                      onChange={(e) =>
+                        setEditForm((prev) => ({ ...prev, is_active: e.target.checked }))
+                      }
+                    />
+                    Active hotel
+                  </label>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleSaveEdit}
+                      disabled={saving || !(editForm.name ?? "").trim()}
+                      className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {saving ? "Saving…" : "Save changes"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(null);
+                        setSelectedError(null);
+                      }}
+                      className="flex-1 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <dl className="grid grid-cols-2 gap-4">
+                  <InfoItem label="Name" value={selected.name} />
+                  <InfoItem label="Email" value={selected.email} />
+                  <InfoItem label="Phone" value={selected.phone} />
+                  <InfoItem label="Status" value={selected.is_active ? "Active" : "Inactive"} />
+                  <div className="col-span-2">
+                    <InfoItem label="Address" value={selected.address} />
+                  </div>
+                </dl>
+              )
+            ) : null}
           </div>
         )}
       </div>

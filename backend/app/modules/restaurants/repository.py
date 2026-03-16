@@ -77,3 +77,32 @@ def create_restaurant(db: Session, name: str, email: str | None, phone: str | No
     db.commit()
     db.refresh(restaurant)
     return restaurant
+
+
+def update_for_super_admin(
+    db: Session,
+    restaurant_id: int,
+    update_data: dict,
+) -> Restaurant | None:
+    """Update any restaurant by ID. Use ONLY in super_admin endpoints."""
+    restaurant = get_by_id_for_super_admin(db, restaurant_id)
+    if not restaurant:
+        return None
+
+    for field, value in update_data.items():
+        setattr(restaurant, field, value)
+
+    db.commit()
+    db.refresh(restaurant)
+    return restaurant
+
+
+def delete_for_super_admin(db: Session, restaurant_id: int) -> bool:
+    """Delete any restaurant by ID. Use ONLY in super_admin endpoints."""
+    restaurant = get_by_id_for_super_admin(db, restaurant_id)
+    if not restaurant:
+        return False
+
+    db.delete(restaurant)
+    db.commit()
+    return True
