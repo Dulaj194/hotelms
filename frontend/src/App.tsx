@@ -22,6 +22,7 @@ import Menus from "@/pages/admin/Menus";
 import MenuCategories from "@/pages/admin/MenuCategories";
 import MenuItems from "@/pages/admin/MenuItems";
 import Subcategories from "@/pages/admin/Subcategories";
+import Tables from "@/pages/admin/Tables";
 import SubscriptionPage from "@/pages/admin/Subscription";
 import SubscriptionPaymentSuccess from "@/pages/admin/SubscriptionPaymentSuccess";
 import SubscriptionPaymentCancel from "@/pages/admin/SubscriptionPaymentCancel";
@@ -136,6 +137,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
               <Rooms />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tables"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Tables />
             </ProtectedRoute>
           }
         />

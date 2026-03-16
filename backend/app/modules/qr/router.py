@@ -3,7 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_privilege, require_roles
 from app.modules.qr import service
-from app.modules.qr.schemas import BulkQRCodeResponse, BulkQRRequest, QRCodeResponse
+from app.modules.qr.schemas import (
+    BulkQRCodeResponse,
+    BulkQRRequest,
+    QRCodeResponse,
+    RoomBulkQRRequest,
+)
 from app.modules.users.model import User
 
 router = APIRouter()
@@ -57,18 +62,18 @@ def bulk_table_qr(
     if current_user.restaurant_id is None:
         from fastapi import HTTPException, status
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return service.generate_bulk_qr(db, current_user.restaurant_id, "table", payload.start, payload.end)
+    return service.generate_bulk_table_qr(db, current_user.restaurant_id, payload.start, payload.end)
 
 
 @router.post("/rooms/bulk", response_model=BulkQRCodeResponse)
 def bulk_room_qr(
-    payload: BulkQRRequest,
+    payload: RoomBulkQRRequest,
     current_user: User = Depends(require_roles("owner", "admin")),
     _=Depends(require_privilege("QR_MENU")),
     db: Session = Depends(get_db),
 ) -> BulkQRCodeResponse:
-    """Generate QR codes for a range of rooms (start–end inclusive). Owner/admin only."""
+    """Generate QR codes for an explicit list of existing rooms. Owner/admin only."""
     if current_user.restaurant_id is None:
         from fastapi import HTTPException, status
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return service.generate_bulk_qr(db, current_user.restaurant_id, "room", payload.start, payload.end)
+    return service.generate_bulk_room_qr(db, current_user.restaurant_id, payload.room_numbers)

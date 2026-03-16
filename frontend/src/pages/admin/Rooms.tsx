@@ -12,7 +12,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { RoomCreateRequest, RoomResponse, RoomUpdateRequest } from "@/types/room";
-import type { QRCodeResponse } from "@/types/publicMenu";
+import type { BulkQRCodeResponse, QRCodeResponse } from "@/types/publicMenu";
+import type { SubscriptionPrivilegeResponse } from "@/types/subscription";
+
+const API_ORIGIN =
+  import.meta.env.VITE_BACKEND_URL ??
+  (import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1").replace(/\/api\/v1\/?$/, "");
 
 // ── Local types ──────────────────────────────────────────────────────────────
 
@@ -62,6 +67,10 @@ export default function Rooms() {
   // QR preview
   const [qrResult, setQrResult] = useState<QRCodeResponse | null>(null);
   const [qrLoading, setQrLoading] = useState<string | null>(null); // room_number being fetched
+  const [bulkQrResult, setBulkQrResult] = useState<BulkQRCodeResponse | null>(null);
+  const [bulkQrLoading, setBulkQrLoading] = useState(false);
+  const [qrEnabled, setQrEnabled] = useState(false);
+  const [privilegesLoading, setPrivilegesLoading] = useState(true);
 
   // ── Data loading ────────────────────────────────────────────────────────────
 
@@ -81,6 +90,25 @@ export default function Rooms() {
   useEffect(() => {
     void loadRooms();
   }, [loadRooms]);
+
+  useEffect(() => {
+    async function loadPrivileges() {
+      setPrivilegesLoading(true);
+      try {
+        const data = await api.get<SubscriptionPrivilegeResponse>(
+          "/subscriptions/me/privileges"
+        );
+        const privileges = new Set(data.privileges.map((item) => item.toUpperCase()));
+        setQrEnabled(privileges.has("QR_MENU"));
+      } catch {
+        setError("Failed to load subscription privileges.");
+      } finally {
+        setPrivilegesLoading(false);
+      }
+    }
+
+    void loadPrivileges();
+  }, []);
 
   // ── Create / edit modal ─────────────────────────────────────────────────────
 
@@ -165,6 +193,10 @@ export default function Rooms() {
   // ── QR generation ───────────────────────────────────────────────────────────
 
   const handleGenerateQR = async (room: RoomResponse) => {
+    if (!qrEnabled) {
+      setError("Your subscription does not include QR Menu access.");
+      return;
+    }
     setQrLoading(room.room_number);
     setQrResult(null);
     try {
@@ -176,6 +208,25 @@ export default function Rooms() {
       setError("Failed to generate QR code.");
     } finally {
       setQrLoading(null);
+    }
+  };
+
+  const handleGenerateAllRoomQR = async () => {
+    if (!qrEnabled) {
+      setError("Your subscription does not include QR Menu access.");
+      return;
+    }
+    setBulkQrLoading(true);
+    setBulkQrResult(null);
+    try {
+      const result = await api.post<BulkQRCodeResponse>("/qr/rooms/bulk", {
+        room_numbers: rooms.map((room) => room.room_number),
+      });
+      setBulkQrResult(result);
+    } catch {
+      setError("Failed to generate room QR codes.");
+    } finally {
+      setBulkQrLoading(false);
     }
   };
 
@@ -217,7 +268,7 @@ export default function Rooms() {
       {qrResult && (
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-4">
           <img
-            src={`http://localhost:8000${qrResult.qr_image_url}`}
+            src={`${API_ORIGIN}${qrResult.qr_image_url}`}
             alt={`QR for Room ${qrResult.target_number}`}
             className="w-24 h-24 border rounded"
           />
@@ -226,6 +277,23 @@ export default function Rooms() {
               Room {qrResult.target_number} QR Code
             </p>
             <p className="text-blue-600 mt-1 break-all">{qrResult.frontend_url}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <a
+                href={`${API_ORIGIN}${qrResult.qr_image_url}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs px-2 py-1 border rounded hover:bg-white transition-colors"
+              >
+                Open
+              </a>
+              <a
+                href={`${API_ORIGIN}${qrResult.qr_image_url}`}
+                download
+                className="text-xs px-2 py-1 bg-blue-700 text-white rounded hover:bg-blue-800 transition-colors"
+              >
+                Download
+              </a>
+            </div>
             <button
               onClick={() => setQrResult(null)}
               className="mt-2 text-xs text-blue-500 hover:text-blue-700"
@@ -233,6 +301,73 @@ export default function Rooms() {
               Close
             </button>
           </div>
+        </div>
+      )}
+
+      {!privilegesLoading && !qrEnabled && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          QR generation is locked for this restaurant because the current subscription does not include the QR Menu privilege.
+        </div>
+      )}
+
+      {!privilegesLoading && qrEnabled && rooms.length > 0 && (
+        <div className="mb-4 p-4 bg-white border rounded-lg flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Bulk Room QR Generation</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Generate or reuse QR codes for all current rooms in one action.
+              </p>
+            </div>
+            <button
+              onClick={handleGenerateAllRoomQR}
+              disabled={bulkQrLoading}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors"
+            >
+              {bulkQrLoading ? "Generating…" : "Generate All Room QRs"}
+            </button>
+          </div>
+
+          {bulkQrResult && (
+            <p className="text-sm text-gray-600">
+              {bulkQrResult.count} room QR code{bulkQrResult.count !== 1 ? "s" : ""} ready.
+            </p>
+          )}
+        </div>
+      )}
+
+      {bulkQrResult && (
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {bulkQrResult.generated.map((qr) => (
+            <div key={`${qr.qr_type}-${qr.target_number}`} className="p-4 bg-gray-50 border rounded-lg">
+              <img
+                src={`${API_ORIGIN}${qr.qr_image_url}`}
+                alt={`QR for Room ${qr.target_number}`}
+                className="w-32 h-32 mx-auto border rounded bg-white"
+              />
+              <div className="mt-3 text-sm space-y-2">
+                <p className="font-semibold text-gray-900">Room {qr.target_number}</p>
+                <p className="text-xs text-gray-500 break-all">{qr.frontend_url}</p>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`${API_ORIGIN}${qr.qr_image_url}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-1.5 text-xs border rounded hover:bg-white transition-colors"
+                  >
+                    Open
+                  </a>
+                  <a
+                    href={`${API_ORIGIN}${qr.qr_image_url}`}
+                    download
+                    className="px-3 py-1.5 text-xs bg-gray-900 text-white rounded hover:bg-black transition-colors"
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -272,7 +407,7 @@ export default function Rooms() {
                       {/* QR */}
                       <button
                         onClick={() => handleGenerateQR(room)}
-                        disabled={qrLoading === room.room_number}
+                        disabled={qrLoading === room.room_number || privilegesLoading || !qrEnabled}
                         className="px-2 py-1 text-xs border rounded hover:bg-gray-100 transition-colors
                                    disabled:opacity-50"
                         title="Generate QR"

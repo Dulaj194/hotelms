@@ -14,6 +14,10 @@ class BulkQRRequest(BaseModel):
     end: int
 
 
+class RoomBulkQRRequest(BaseModel):
+    room_numbers: list[str]
+
+
 class BulkQRCodeResponse(BaseModel):
     generated: list[QRCodeResponse]
     count: int

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.modules.qr import repository
 from app.modules.qr.schemas import BulkQRCodeResponse, QRCodeResponse
+from app.modules.rooms.repository import get_room_by_number_and_restaurant
 
 _QR_DIR = Path(settings.upload_dir) / "qrcodes"
 
@@ -70,6 +71,27 @@ def generate_qr(
             detail=f"Invalid QR type '{qr_type}'. Must be 'table' or 'room'.",
         )
 
+    target_number = target_number.strip()
+    if not target_number:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Target number is required.",
+        )
+
+    if qr_type == "room":
+        room = get_room_by_number_and_restaurant(db, target_number, restaurant_id)
+        if not room:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Room '{target_number}' not found.",
+            )
+        if not room.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Room '{target_number}' is not currently active.",
+            )
+        target_number = room.room_number
+
     frontend_url = _build_frontend_url(restaurant_id, qr_type, target_number)
     filename = _qr_filename(restaurant_id, qr_type, target_number)
     file_path = _QR_DIR / filename
@@ -95,14 +117,13 @@ def generate_qr(
     return _to_response(qr_record, restaurant_id)
 
 
-def generate_bulk_qr(
+def generate_bulk_table_qr(
     db: Session,
     restaurant_id: int,
-    qr_type: str,
     start: int,
     end: int,
 ) -> BulkQRCodeResponse:
-    """Generate QR codes for a range of table or room numbers."""
+    """Generate QR codes for a range of table numbers."""
     if start > end or end - start > 200:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -110,7 +131,42 @@ def generate_bulk_qr(
         )
 
     results = [
-        generate_qr(db, restaurant_id, qr_type, str(n))
+        generate_qr(db, restaurant_id, "table", str(n))
         for n in range(start, end + 1)
+    ]
+    return BulkQRCodeResponse(generated=results, count=len(results))
+
+
+def generate_bulk_room_qr(
+    db: Session,
+    restaurant_id: int,
+    room_numbers: list[str],
+) -> BulkQRCodeResponse:
+    """Generate QR codes for an explicit list of existing room numbers."""
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    for raw_number in room_numbers:
+        room_number = raw_number.strip()
+        if not room_number or room_number in seen:
+            continue
+        normalized.append(room_number)
+        seen.add(room_number)
+
+    if not normalized:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one room number is required.",
+        )
+
+    if len(normalized) > 200:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can generate at most 200 room QR codes at once.",
+        )
+
+    results = [
+        generate_qr(db, restaurant_id, "room", room_number)
+        for room_number in normalized
     ]
     return BulkQRCodeResponse(generated=results, count=len(results))

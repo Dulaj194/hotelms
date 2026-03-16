@@ -26,6 +26,13 @@ const TILES: Tile[] = [
     roles: ["owner", "admin"],
   },
   {
+    title: "Tables",
+    description: "Generate dine-in QR codes",
+    path: "/admin/tables",
+    color: "bg-rose-50 border-rose-200 hover:bg-rose-100",
+    roles: ["owner", "admin"],
+  },
+  {
     title: "Kitchen",
     description: "Live order board & status updates",
     path: "/admin/kitchen",
