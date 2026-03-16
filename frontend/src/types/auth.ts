@@ -6,6 +6,7 @@ export interface LoginRequest {
 export interface TokenResponse {
   access_token: string;
   token_type: string;
+  must_change_password?: boolean;
 }
 
 export interface UserMeResponse {
@@ -15,6 +16,7 @@ export interface UserMeResponse {
   role: string;
   restaurant_id: number | null;
   is_active: boolean;
+  must_change_password: boolean;
 }
 
 export interface ForgotPasswordRequest {
