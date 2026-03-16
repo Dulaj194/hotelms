@@ -51,6 +51,18 @@ def update_by_id(
     return category
 
 
+def update_image_path(
+    db: Session, category_id: int, restaurant_id: int, image_path: str
+) -> Category | None:
+    category = get_by_id(db, category_id, restaurant_id)
+    if not category:
+        return None
+    category.image_path = image_path
+    db.commit()
+    db.refresh(category)
+    return category
+
+
 def delete_by_id(db: Session, category_id: int, restaurant_id: int) -> bool:
     category = get_by_id(db, category_id, restaurant_id)
     if not category:

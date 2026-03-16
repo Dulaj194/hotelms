@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
 from app.modules.categories import service
 from app.modules.categories.schemas import (
     CategoryCreateRequest,
+    CategoryImageUploadResponse,
     CategoryResponse,
     CategoryUpdateRequest,
 )
@@ -59,3 +60,22 @@ def delete_category(
     db: Session = Depends(get_db),
 ) -> dict:
     return service.delete_category(db, category_id, current_user.restaurant_id)  # type: ignore[arg-type]
+
+
+@router.post("/{category_id}/image", response_model=CategoryImageUploadResponse)
+async def upload_category_image(
+    category_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles("owner", "admin")),
+    db: Session = Depends(get_db),
+) -> CategoryImageUploadResponse:
+    """Upload/replace category image. Owner/admin only.
+
+    Multipart/form-data. Allowed: jpg, png, webp. Max: settings.max_upload_size_mb.
+    SECURITY: filename is UUID-generated server-side; restaurant_id from token.
+    """
+    if current_user.restaurant_id is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
+    return await service.upload_category_image(
+        db, category_id, current_user.restaurant_id, file
+    )

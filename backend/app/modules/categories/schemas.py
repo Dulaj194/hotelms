@@ -21,6 +21,10 @@ class CategoryUpdateRequest(BaseModel):
     is_active: bool | None = None
 
 
+class CategoryImageUploadResponse(BaseModel):
+    image_path: str
+
+
 class CategoryResponse(BaseModel):
     id: int
     name: str

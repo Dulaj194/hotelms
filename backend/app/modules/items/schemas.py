@@ -23,6 +23,10 @@ class ItemUpdateRequest(BaseModel):
     category_id: int | None = None
 
 
+class ItemImageUploadResponse(BaseModel):
+    image_path: str
+
+
 class ItemResponse(BaseModel):
     id: int
     name: str

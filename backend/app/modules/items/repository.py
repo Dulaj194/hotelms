@@ -80,3 +80,15 @@ def delete_by_id(db: Session, item_id: int, restaurant_id: int) -> bool:
     db.delete(item)
     db.commit()
     return True
+
+
+def update_image_path(
+    db: Session, item_id: int, restaurant_id: int, image_path: str
+) -> Item | None:
+    item = get_by_id(db, item_id, restaurant_id)
+    if not item:
+        return None
+    item.image_path = image_path
+    db.commit()
+    db.refresh(item)
+    return item

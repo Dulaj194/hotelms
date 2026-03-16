@@ -17,6 +17,8 @@ import RoomMenu from "@/pages/public/RoomMenu";
 import ServiceRequest from "@/pages/room/ServiceRequest";
 import Rooms from "@/pages/admin/Rooms";
 import Housekeeping from "@/pages/admin/Housekeeping";
+import MenuCategories from "@/pages/admin/MenuCategories";
+import MenuItems from "@/pages/admin/MenuItems";
 import SubscriptionPage from "@/pages/admin/Subscription";
 import SubscriptionPaymentSuccess from "@/pages/admin/SubscriptionPaymentSuccess";
 import SubscriptionPaymentCancel from "@/pages/admin/SubscriptionPaymentCancel";
@@ -131,6 +133,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["owner", "admin", "housekeeper"]}>
               <Housekeeping />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/menu/categories"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <MenuCategories />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/menu/items"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <MenuItems />
             </ProtectedRoute>
           }
         />

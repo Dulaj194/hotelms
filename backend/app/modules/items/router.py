@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
 from app.modules.items import service
-from app.modules.items.schemas import ItemCreateRequest, ItemResponse, ItemUpdateRequest
+from app.modules.items.schemas import (
+    ItemCreateRequest,
+    ItemImageUploadResponse,
+    ItemResponse,
+    ItemUpdateRequest,
+)
 from app.modules.users.model import User
 
 router = APIRouter()
@@ -55,3 +60,22 @@ def delete_item(
     db: Session = Depends(get_db),
 ) -> dict:
     return service.delete_item(db, item_id, current_user.restaurant_id)  # type: ignore[arg-type]
+
+
+@router.post("/{item_id}/image", response_model=ItemImageUploadResponse)
+async def upload_item_image(
+    item_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles("owner", "admin")),
+    db: Session = Depends(get_db),
+) -> ItemImageUploadResponse:
+    """Upload/replace item image. Owner/admin only.
+
+    Multipart/form-data. Allowed: jpg, png, webp. Max: settings.max_upload_size_mb.
+    SECURITY: filename is UUID-generated server-side; restaurant_id from token.
+    """
+    if current_user.restaurant_id is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
+    return await service.upload_item_image(
+        db, item_id, current_user.restaurant_id, file
+    )
