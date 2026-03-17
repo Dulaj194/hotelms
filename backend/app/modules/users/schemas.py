@@ -31,8 +31,10 @@ class UserResponse(BaseModel):
 
 # ─── Staff management schemas ─────────────────────────────────────────
 #
-# SECURITY: StaffCreateRequest intentionally does not contain restaurant_id.
-# The backend assigns restaurant_id from the authenticated context only.
+# SECURITY:
+# - Owner/admin routes must not send restaurant_id; backend derives tenant context
+#   from the authenticated user.
+# - Super-admin hotel-scoped routes may populate restaurant_id internally.
 
 
 _STAFF_ROLES = {
@@ -53,7 +55,10 @@ class StaffCreateRequest(BaseModel):
     )
     restaurant_id: int | None = Field(
         default=None,
-        description="Required for super_admin; ignored for owner/admin requests.",
+        description=(
+            "Used by super_admin hotel-scoped flows; must be omitted for owner/admin "
+            "tenant-scoped requests."
+        ),
     )
 
 

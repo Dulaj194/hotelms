@@ -18,7 +18,7 @@ const TILES: Tile[] = [
     description: "Update info, address, logo",
     path: "/admin/restaurant-profile",
     color: "bg-blue-50 border-blue-200 hover:bg-blue-100",
-    roles: ["owner", "admin", "super_admin"],
+    roles: ["owner", "admin"],
   },
   {
     title: "Staff",

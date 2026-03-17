@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import type {
   RestaurantAdminUpdateRequest,
   RestaurantMeResponse,
   RestaurantCreateRequest,
   RestaurantDeleteResponse,
+  RestaurantLogoUploadResponse,
 } from "@/types/restaurant";
 import type {
   SubscriptionResponse,
@@ -15,10 +15,9 @@ import type {
 } from "@/types/subscription";
 import type { StaffListItemResponse, StaffDetailResponse } from "@/types/user";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
-
 export default function SuperAdminRestaurants() {
   const [list, setList] = useState<RestaurantMeResponse[]>([]);
+  const [subscriptionStatusByHotel, setSubscriptionStatusByHotel] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -72,17 +71,34 @@ export default function SuperAdminRestaurants() {
   const [editLogoMsg, setEditLogoMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const editLogoRef = useRef<HTMLInputElement>(null);
 
-  function load() {
+  async function load() {
     setLoading(true);
-    api
-      .get<RestaurantMeResponse[]>("/restaurants")
-      .then(setList)
-      .catch(() => setFetchError("Failed to load restaurants."))
-      .finally(() => setLoading(false));
+    try {
+      const restaurants = await api.get<RestaurantMeResponse[]>("/restaurants");
+      setList(restaurants);
+      setFetchError(null);
+
+      const statusEntries = await Promise.all(
+        restaurants.map(async (restaurant) => {
+          try {
+            const sub = await api.get<SubscriptionResponse>(`/subscriptions/admin/${restaurant.id}`);
+            return [restaurant.id, sub.status] as const;
+          } catch {
+            return [restaurant.id, "none"] as const;
+          }
+        }),
+      );
+
+      setSubscriptionStatusByHotel(Object.fromEntries(statusEntries));
+    } catch {
+      setFetchError("Failed to load restaurants.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
-    load();
+    void load();
     api
       .get<PackageListResponse>("/packages")
       .then((r) => setPackages(r.items))
@@ -132,20 +148,15 @@ export default function SuperAdminRestaurants() {
         try {
           const fd = new FormData();
           fd.append("file", createLogoFile);
-          const token = getAccessToken();
-          const res = await fetch(`${API_BASE}/restaurants/${created.id}/logo`, {
-            method: "POST",
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-            credentials: "include",
-            body: fd,
-          });
-          if (res.ok) {
-            const logoData = await res.json();
-            created.logo_url = logoData.logo_url;
-          }
+          const logoData = await api.post<RestaurantLogoUploadResponse>(
+            `/restaurants/${created.id}/logo`,
+            fd,
+          );
+          created.logo_url = logoData.logo_url;
         } catch { /* logo upload failure is non-fatal */ }
       }
       setList((prev) => [created, ...prev]);
+      setSubscriptionStatusByHotel((prev) => ({ ...prev, [created.id]: "trial" }));
       setShowCreate(false);
       setForm({ name: "" });
       setCreateLogoFile(null);
@@ -209,18 +220,10 @@ export default function SuperAdminRestaurants() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const token = getAccessToken();
-      const res = await fetch(`${API_BASE}/restaurants/${selected.id}/logo`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        credentials: "include",
-        body: fd,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.detail ?? `Upload failed (${res.status})`);
-      }
-      const data = await res.json();
+      const data = await api.post<RestaurantLogoUploadResponse>(
+        `/restaurants/${selected.id}/logo`,
+        fd,
+      );
       setSelected((prev) => prev ? { ...prev, logo_url: data.logo_url } : prev);
       setList((prev) => prev.map((r) => r.id === selected.id ? { ...r, logo_url: data.logo_url } : r));
       setEditLogoMsg({ type: "ok", text: "Logo updated." });
@@ -259,6 +262,11 @@ export default function SuperAdminRestaurants() {
     try {
       const result = await api.delete<RestaurantDeleteResponse>(`/restaurants/${restaurantId}`);
       setList((prev) => prev.filter((item) => item.id !== restaurantId));
+      setSubscriptionStatusByHotel((prev) => {
+        const next = { ...prev };
+        delete next[restaurantId];
+        return next;
+      });
       if (selected?.id === restaurantId) { setSelected(null); setEditingId(null); }
       setActionMsg({ type: "ok", text: result.message });
     } catch (err) {
@@ -289,6 +297,7 @@ export default function SuperAdminRestaurants() {
         payload,
       );
       setSelectedSub(updated);
+      setSubscriptionStatusByHotel((prev) => ({ ...prev, [selected.id]: updated.status }));
       setEditingSub(false);
       setSubMsg({ type: "ok", text: "Subscription updated successfully." });
     } catch (err) {
@@ -329,7 +338,7 @@ export default function SuperAdminRestaurants() {
     try {
       const newUser = await api.post<StaffDetailResponse>(
         `/restaurants/${selected.id}/users`,
-        { ...addUserForm, restaurant_id: selected.id },
+        { ...addUserForm },
       );
       setHotelUsers((prev) => [
         {
@@ -495,7 +504,8 @@ export default function SuperAdminRestaurants() {
                   <th className="px-4 py-3 text-left">Hotel Name</th>
                   <th className="px-4 py-3 text-left">Email</th>
                   <th className="px-4 py-3 text-left">Phone</th>
-                  <th className="px-4 py-3 text-left">Status</th>
+                  <th className="px-4 py-3 text-left">Hotel Status</th>
+                  <th className="px-4 py-3 text-left">Subscription Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -506,10 +516,15 @@ export default function SuperAdminRestaurants() {
                     <td className="px-4 py-3 text-gray-500">{r.email ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-500">{r.phone ?? "—"}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        r.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                      }`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBooleanStatusBadgeClass(r.is_active)}`}>
                         {r.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${getSubscriptionStatusBadgeClass(subscriptionStatusByHotel[r.id])}`}
+                      >
+                        {formatSubscriptionStatusLabel(subscriptionStatusByHotel[r.id])}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -639,7 +654,7 @@ export default function SuperAdminRestaurants() {
                       <InfoItem label="Name" value={selected.name} />
                       <InfoItem label="Email" value={selected.email} />
                       <InfoItem label="Phone" value={selected.phone} />
-                      <InfoItem label="Status" value={selected.is_active ? "Active" : "Inactive"} />
+                      <InfoItem label="Hotel Status" value={selected.is_active ? "Active" : "Inactive"} />
                       <div className="col-span-2"><InfoItem label="Address" value={selected.address} /></div>
                       <InfoItem label="Registered" value={new Date(selected.created_at).toLocaleDateString()} />
                       <InfoItem label="Last Updated" value={new Date(selected.updated_at).toLocaleDateString()} />
@@ -673,7 +688,7 @@ export default function SuperAdminRestaurants() {
                 ) : editingSub ? (
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <label className="text-sm font-medium">Status</label>
+                      <label className="text-sm font-medium">Subscription Status</label>
                       <select className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         value={subForm.status}
                         onChange={(e) => setSubForm((f) => ({ ...f, status: e.target.value }))}>
@@ -718,7 +733,7 @@ export default function SuperAdminRestaurants() {
                 ) : (
                   <dl className="grid grid-cols-2 gap-3">
                     <div>
-                      <dt className="text-xs font-medium text-gray-500">Status</dt>
+                      <dt className="text-xs font-medium text-gray-500">Subscription Status</dt>
                       <dd className="mt-0.5">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
                           selectedSub.status === "active"  ? "bg-green-100 text-green-700" :
@@ -793,7 +808,7 @@ export default function SuperAdminRestaurants() {
                           <th className="px-3 py-2 text-left">Name</th>
                           <th className="px-3 py-2 text-left">Email</th>
                           <th className="px-3 py-2 text-left">Role</th>
-                          <th className="px-3 py-2 text-left">Status</th>
+                          <th className="px-3 py-2 text-left">Staff Status</th>
                           <th className="px-3 py-2 text-right">Actions</th>
                         </tr>
                       </thead>
@@ -806,7 +821,7 @@ export default function SuperAdminRestaurants() {
                               <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium capitalize">{u.role}</span>
                             </td>
                             <td className="px-3 py-2">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBooleanStatusBadgeClass(u.is_active)}`}>
                                 {u.is_active ? "Active" : "Inactive"}
                               </span>
                             </td>
@@ -875,4 +890,28 @@ function InfoItem({ label, value }: { label: string; value: string | null | unde
       <dd className="mt-0.5 text-sm text-gray-900">{value ?? "—"}</dd>
     </div>
   );
+}
+
+function getBooleanStatusBadgeClass(isActive: boolean): string {
+  return isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700";
+}
+
+function getSubscriptionStatusBadgeClass(status: string | undefined): string {
+  switch (status) {
+    case "active":
+      return "bg-green-100 text-green-700";
+    case "trial":
+      return "bg-blue-100 text-blue-700";
+    case "expired":
+      return "bg-red-100 text-red-700";
+    case "cancelled":
+      return "bg-gray-100 text-gray-600";
+    default:
+      return "bg-amber-100 text-amber-700";
+  }
+}
+
+function formatSubscriptionStatusLabel(status: string | undefined): string {
+  if (!status || status === "none") return "No Subscription";
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }

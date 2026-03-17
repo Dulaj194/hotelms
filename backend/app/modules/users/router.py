@@ -22,20 +22,20 @@ router = APIRouter()
 
 @router.get("", response_model=list[StaffListItemResponse])
 def list_staff(
-    current_user: User = Depends(require_roles("owner", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("owner", "admin")),
     db: Session = Depends(get_db),
 ) -> list[StaffListItemResponse]:
-    """List all staff for the current restaurant. Owner/admin/super_admin only."""
+    """List all staff for the current restaurant. Owner/admin only."""
     return service.list_staff(db, current_user.restaurant_id)  # type: ignore[arg-type]
 
 
 @router.post("", response_model=StaffDetailResponse, status_code=status.HTTP_201_CREATED)
 def add_staff(
     payload: StaffCreateRequest,
-    current_user: User = Depends(require_roles("owner", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("owner", "admin")),
     db: Session = Depends(get_db),
 ) -> StaffDetailResponse:
-    """Add a new staff member to the current restaurant. Owner/admin/super_admin only.
+    """Add a new staff member to the current restaurant. Owner/admin only.
 
     SECURITY: restaurant_id comes from authenticated user context, not the request.
     StaffCreateRequest has no restaurant_id field.
@@ -46,7 +46,7 @@ def add_staff(
 @router.get("/{user_id}", response_model=StaffDetailResponse)
 def get_staff(
     user_id: int,
-    current_user: User = Depends(require_roles("owner", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("owner", "admin")),
     db: Session = Depends(get_db),
 ) -> StaffDetailResponse:
     """Get a single staff member from the current restaurant."""
@@ -57,7 +57,7 @@ def get_staff(
 def update_staff(
     user_id: int,
     payload: StaffUpdateRequest,
-    current_user: User = Depends(require_roles("owner", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("owner", "admin")),
     db: Session = Depends(get_db),
 ) -> StaffDetailResponse:
     """Update a staff member in the current restaurant."""
@@ -67,7 +67,7 @@ def update_staff(
 @router.patch("/{user_id}/disable", response_model=StaffStatusResponse)
 def disable_staff(
     user_id: int,
-    current_user: User = Depends(require_roles("owner", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("owner", "admin")),
     db: Session = Depends(get_db),
 ) -> StaffStatusResponse:
     """Disable (deactivate) a staff member in the current restaurant."""
@@ -77,7 +77,7 @@ def disable_staff(
 @router.patch("/{user_id}/enable", response_model=StaffStatusResponse)
 def enable_staff(
     user_id: int,
-    current_user: User = Depends(require_roles("owner", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("owner", "admin")),
     db: Session = Depends(get_db),
 ) -> StaffStatusResponse:
     """Re-enable a previously disabled staff member."""
@@ -87,7 +87,7 @@ def enable_staff(
 @router.delete("/{user_id}", response_model=GenericMessageResponse)
 def delete_staff(
     user_id: int,
-    current_user: User = Depends(require_roles("owner", "admin", "super_admin")),
+    current_user: User = Depends(require_roles("owner", "admin")),
     db: Session = Depends(get_db),
 ) -> GenericMessageResponse:
     """Permanently delete a staff member from the current restaurant."""

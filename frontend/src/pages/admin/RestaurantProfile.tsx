@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
 import DashboardLayout from "@/components/shared/DashboardLayout";
-import type { RestaurantMeResponse, RestaurantUpdateRequest } from "@/types/restaurant";
-
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+import type {
+  RestaurantLogoUploadResponse,
+  RestaurantMeResponse,
+  RestaurantUpdateRequest,
+} from "@/types/restaurant";
 
 export default function RestaurantProfile() {
   const [loading, setLoading] = useState(true);
@@ -68,21 +69,10 @@ export default function RestaurantProfile() {
       const formData = new FormData();
       formData.append("file", file);
 
-      // Multipart upload — cannot use regular api.post (JSON-only)
-      const token = getAccessToken();
-      const res = await fetch(`${API_BASE}/restaurants/me/logo`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        credentials: "include",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.detail ?? `Upload failed (${res.status})`);
-      }
-
-      const data = await res.json();
+      const data = await api.post<RestaurantLogoUploadResponse>(
+        "/restaurants/me/logo",
+        formData,
+      );
       setRestaurant((prev) => prev ? { ...prev, logo_url: data.logo_url } : prev);
       setUploadMsg({ type: "ok", text: "Logo uploaded successfully." });
     } catch (err: unknown) {
