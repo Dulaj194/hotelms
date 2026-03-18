@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
@@ -21,13 +22,15 @@ const EMPTY_FORM: FormData = {
 };
 
 export default function Subcategories() {
+  const [searchParams] = useSearchParams();
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialCategoryId = searchParams.get("categoryId");
 
   const [filterCategoryId, setFilterCategoryId] = useState<number | "all">(
-    "all"
+    initialCategoryId ? parseInt(initialCategoryId) : "all"
   );
 
   const [modalOpen, setModalOpen] = useState(false);

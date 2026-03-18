@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
@@ -19,6 +20,7 @@ const EMPTY_FORM: FormData = {
 };
 
 export default function Menus() {
+  const navigate = useNavigate();
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -253,6 +255,12 @@ export default function Menus() {
                 </div>
 
                 <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => navigate(`/admin/menu/categories?menuId=${menu.id}`)}
+                    className="flex-1 text-xs py-1.5 border border-blue-200 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                  >
+                    Categories
+                  </button>
                   <button
                     onClick={() => openUpload(menu)}
                     disabled={uploading && uploadTarget?.id === menu.id}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
@@ -21,10 +22,16 @@ const EMPTY_FORM: FormData = {
 };
 
 export default function MenuCategories() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialMenuId = searchParams.get("menuId");
+  const [filterMenuId, setFilterMenuId] = useState<number | "all">(
+    initialMenuId ? parseInt(initialMenuId) : "all"
+  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -59,6 +66,21 @@ export default function MenuCategories() {
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
+
+  const visibleCategories =
+    filterMenuId === "all"
+      ? categories
+      : categories.filter((c) => c.menu_id === filterMenuId);
+
+  function handleFilterMenuChange(value: number | "all") {
+    setFilterMenuId(value);
+    if (value === "all") {
+      searchParams.delete("menuId");
+      setSearchParams(searchParams);
+      return;
+    }
+    setSearchParams({ menuId: String(value) });
+  }
 
   function openCreate() {
     setEditingCategory(null);
@@ -154,12 +176,30 @@ export default function MenuCategories() {
     <DashboardLayout>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Menu Categories</h1>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
-        >
-          + Add Category
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={filterMenuId}
+            onChange={(e) =>
+              handleFilterMenuChange(
+                e.target.value === "all" ? "all" : parseInt(e.target.value)
+              )
+            }
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
+          >
+            <option value="all">All Menus</option>
+            {menus.map((menu) => (
+              <option key={menu.id} value={menu.id}>
+                {menu.name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={openCreate}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
+          >
+            + Add Category
+          </button>
+        </div>
       </div>
 
       {/* Hidden file input for image upload */}
@@ -174,15 +214,15 @@ export default function MenuCategories() {
       {loading && <p className="text-gray-500 text-sm">Loading...</p>}
       {error && <p className="text-red-500 text-sm">{error}</p>}
 
-      {!loading && !error && categories.length === 0 && (
+      {!loading && !error && visibleCategories.length === 0 && (
         <p className="text-gray-400 text-sm">
-          No categories yet. Add your first category to build the menu.
+          No categories found for the current menu filter.
         </p>
       )}
 
-      {!loading && categories.length > 0 && (
+      {!loading && visibleCategories.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((cat) => (
+          {visibleCategories.map((cat) => (
             <div
               key={cat.id}
               className="bg-white rounded-xl border border-gray-200 overflow-hidden"
@@ -212,6 +252,9 @@ export default function MenuCategories() {
                     <p className="text-xs text-gray-400 mt-1">
                       Order: {cat.sort_order}
                     </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Menu: {menus.find((m) => m.id === cat.menu_id)?.name ?? "Uncategorized"}
+                    </p>
                   </div>
                   <span
                     className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -225,6 +268,12 @@ export default function MenuCategories() {
                 </div>
 
                 <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => navigate(`/admin/menu/subcategories?categoryId=${cat.id}`)}
+                    className="flex-1 text-xs py-1.5 border border-blue-200 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                  >
+                    Subcategories
+                  </button>
                   <button
                     onClick={() => openUpload(cat)}
                     disabled={uploading && uploadTarget?.id === cat.id}

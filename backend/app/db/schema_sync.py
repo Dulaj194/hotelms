@@ -76,6 +76,13 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
         ),
     )
 
+    category_column_patches: Sequence[tuple[str, str]] = (
+        (
+            "menu_id",
+            "ALTER TABLE categories ADD COLUMN menu_id INT NULL",
+        ),
+    )
+
     with engine.begin() as conn:
         for column_name, alter_sql in order_header_column_patches:
             if _column_exists(conn, "order_headers", column_name):
@@ -101,5 +108,14 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             conn.execute(text(alter_sql))
             logger.warning(
                 "Applied development schema patch: restaurants.%s was missing and has been added.",
+                column_name,
+            )
+
+        for column_name, alter_sql in category_column_patches:
+            if _column_exists(conn, "categories", column_name):
+                continue
+            conn.execute(text(alter_sql))
+            logger.warning(
+                "Applied development schema patch: categories.%s was missing and has been added.",
                 column_name,
             )
