@@ -140,6 +140,8 @@ def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> Restaura
         email=str(payload.email) if payload.email else None,
         phone=payload.phone,
         address=payload.address,
+        country=payload.country,
+        currency=payload.currency,
     )
 
     subscription_service.assign_initial_trial_subscription(db, restaurant.id)

@@ -65,6 +65,17 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
         ),
     )
 
+    restaurant_column_patches: Sequence[tuple[str, str]] = (
+        (
+            "country",
+            "ALTER TABLE restaurants ADD COLUMN country VARCHAR(120) NULL",
+        ),
+        (
+            "currency",
+            "ALTER TABLE restaurants ADD COLUMN currency VARCHAR(12) NULL",
+        ),
+    )
+
     with engine.begin() as conn:
         for column_name, alter_sql in order_header_column_patches:
             if _column_exists(conn, "order_headers", column_name):
@@ -81,5 +92,14 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             conn.execute(text(alter_sql))
             logger.warning(
                 "Applied development schema patch: users.%s was missing and has been added.",
+                column_name,
+            )
+
+        for column_name, alter_sql in restaurant_column_patches:
+            if _column_exists(conn, "restaurants", column_name):
+                continue
+            conn.execute(text(alter_sql))
+            logger.warning(
+                "Applied development schema patch: restaurants.%s was missing and has been added.",
                 column_name,
             )

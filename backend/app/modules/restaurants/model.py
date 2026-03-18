@@ -26,6 +26,8 @@ class Restaurant(Base):
     email: Mapped[str | None] = mapped_column(String(191), unique=True, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    currency: Mapped[str | None] = mapped_column(String(12), nullable=True)
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

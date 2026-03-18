@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import type {
@@ -7,11 +8,23 @@ import type {
   RestaurantUpdateRequest,
 } from "@/types/restaurant";
 
+const COUNTRY_OPTIONS = [
+  "Sri Lanka",
+  "India",
+  "United Arab Emirates",
+  "United Kingdom",
+  "United States",
+  "Australia",
+  "Singapore",
+  "Maldives",
+];
+
+const CURRENCY_OPTIONS = ["LKR", "INR", "AED", "GBP", "USD", "AUD", "SGD", "MVR"];
 export default function RestaurantProfile() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [restaurant, setRestaurant] = useState<RestaurantMeResponse | null>(null);
-
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -19,14 +32,25 @@ export default function RestaurantProfile() {
 
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [setupModalOpen, setSetupModalOpen] = useState(false);
+  const [setupCountry, setSetupCountry] = useState("");
+  const [setupCurrency, setSetupCurrency] = useState("");
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   useEffect(() => {
     api
       .get<RestaurantMeResponse>("/restaurants/me")
       .then((data) => {
         setRestaurant(data);
         resetForm(data);
+        const countryMissing = !data.country || !data.country.trim();
+        const currencyMissing = !data.currency || !data.currency.trim();
+        if (countryMissing || currencyMissing) {
+          setSetupCountry(data.country ?? "");
+          setSetupCurrency(data.currency ?? "");
+          setSetupModalOpen(true);
+        }
       })
       .catch(() => setFetchError("Failed to load restaurant profile."))
       .finally(() => setLoading(false));
@@ -38,7 +62,33 @@ export default function RestaurantProfile() {
       email: data.email ?? undefined,
       phone: data.phone ?? undefined,
       address: data.address ?? undefined,
+      country: data.country ?? undefined,
+      currency: data.currency ?? undefined,
     });
+  }
+
+  async function handleSetupSave() {
+    if (!setupCountry || !setupCurrency) {
+      setSetupError("Please select both country and currency.");
+      return;
+    }
+
+    setSetupSaving(true);
+    setSetupError(null);
+    try {
+      const updated = await api.patch<RestaurantMeResponse>("/restaurants/me", {
+        country: setupCountry,
+        currency: setupCurrency,
+      });
+      setRestaurant(updated);
+      resetForm(updated);
+      setSetupModalOpen(false);
+      setSaveMsg({ type: "ok", text: "Country and currency saved successfully." });
+    } catch {
+      setSetupError("Failed to save country and currency.");
+    } finally {
+      setSetupSaving(false);
+    }
   }
 
   async function handleSave() {
@@ -109,8 +159,14 @@ export default function RestaurantProfile() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">Restaurant Profile</h1>
+          <button
+            onClick={() => navigate("/admin/menu/menus")}
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Go to Admin Dashboard
+          </button>
         </div>
 
         {/* Logo section */}
@@ -196,6 +252,16 @@ export default function RestaurantProfile() {
                 value={form.phone ?? ""}
                 onChange={(v) => setForm((f) => ({ ...f, phone: v || null }))}
               />
+              <FormField
+                label="Country"
+                value={form.country ?? ""}
+                onChange={(v) => setForm((f) => ({ ...f, country: v || null }))}
+              />
+              <FormField
+                label="Currency"
+                value={form.currency ?? ""}
+                onChange={(v) => setForm((f) => ({ ...f, currency: v.toUpperCase() || null }))}
+              />
               <div className="space-y-1">
                 <label className="text-sm font-medium">Address</label>
                 <textarea
@@ -232,6 +298,8 @@ export default function RestaurantProfile() {
               <InfoItem label="Name" value={restaurant.name} />
               <InfoItem label="Email" value={restaurant.email} />
               <InfoItem label="Phone" value={restaurant.phone} />
+              <InfoItem label="Country" value={restaurant.country ?? "Unknown Country"} />
+              <InfoItem label="Currency" value={restaurant.currency ?? "Unknown Currency"} />
               <InfoItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
               <div className="col-span-2">
                 <InfoItem label="Address" value={restaurant.address} />
@@ -240,6 +308,60 @@ export default function RestaurantProfile() {
           )}
         </div>
       </div>
+
+      {setupModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-4xl font-semibold text-center text-gray-700">Add Country and Currency</h2>
+
+            <div className="mt-6 space-y-5">
+              <div className="space-y-2">
+                <label className="block text-3xl font-semibold text-center">Country</label>
+                <select
+                  value={setupCountry}
+                  onChange={(e) => setSetupCountry(e.target.value)}
+                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Country</option>
+                  {COUNTRY_OPTIONS.map((country) => (
+                    <option key={country} value={country}>
+                      {country}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-3xl font-semibold text-center">Currency</label>
+                <select
+                  value={setupCurrency}
+                  onChange={(e) => setSetupCurrency(e.target.value)}
+                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Currency</option>
+                  {CURRENCY_OPTIONS.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {setupError && <p className="text-sm text-red-600">{setupError}</p>}
+
+              <div className="pt-1 text-center">
+                <button
+                  onClick={handleSetupSave}
+                  disabled={setupSaving}
+                  className="rounded-md bg-blue-600 px-6 py-2 text-base font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {setupSaving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

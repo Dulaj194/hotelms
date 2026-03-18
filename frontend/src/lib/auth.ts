@@ -98,7 +98,7 @@ export function getRoleRedirect(role: string): string {
       return "/super-admin/restaurants";
     case "owner":
     case "admin":
-      return "/admin/restaurant-profile";
+      return "/admin/menu/menus";
     case "steward":
       return "/admin/kitchen";
     case "housekeeper":

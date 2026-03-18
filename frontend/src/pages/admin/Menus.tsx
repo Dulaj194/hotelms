@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
+import { toAssetUrl } from "@/lib/assets";
 import type { Menu } from "@/types/menu";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
-
-function imgSrc(path: string | null): string | undefined {
-  return path ? `${API_BASE}${path}` : undefined;
-}
 
 interface FormData {
   name: string;
@@ -31,6 +26,7 @@ export default function Menus() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMenu, setEditingMenu] = useState<Menu | null>(null);
   const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -61,6 +57,7 @@ export default function Menus() {
   function openCreate() {
     setEditingMenu(null);
     setFormData(EMPTY_FORM);
+    setSelectedImageFile(null);
     setFormError(null);
     setModalOpen(true);
   }
@@ -73,6 +70,7 @@ export default function Menus() {
       sort_order: menu.sort_order,
       is_active: menu.is_active,
     });
+    setSelectedImageFile(null);
     setFormError(null);
     setModalOpen(true);
   }
@@ -91,12 +89,23 @@ export default function Menus() {
         sort_order: formData.sort_order,
         is_active: formData.is_active,
       };
+      let savedMenuId: number;
       if (editingMenu) {
-        await api.patch(`/menus/${editingMenu.id}`, payload);
+        const updated = await api.patch<Menu>(`/menus/${editingMenu.id}`, payload);
+        savedMenuId = updated.id;
       } else {
-        await api.post("/menus", payload);
+        const created = await api.post<Menu>("/menus", payload);
+        savedMenuId = created.id;
       }
+
+      if (selectedImageFile) {
+        const fd = new FormData();
+        fd.append("file", selectedImageFile);
+        await api.post(`/menus/${savedMenuId}/image`, fd);
+      }
+
       setModalOpen(false);
+      setSelectedImageFile(null);
       await loadMenus();
     } catch (err: unknown) {
       const msg =
@@ -106,6 +115,32 @@ export default function Menus() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleModalImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    if (!file) {
+      setSelectedImageFile(null);
+      return;
+    }
+
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    const maxBytes = 5 * 1024 * 1024;
+
+    if (!validTypes.includes(file.type)) {
+      setFormError("Invalid image format. Allowed: JPG, PNG, WebP.");
+      setSelectedImageFile(null);
+      return;
+    }
+
+    if (file.size > maxBytes) {
+      setFormError("Image exceeds 5MB limit.");
+      setSelectedImageFile(null);
+      return;
+    }
+
+    setFormError(null);
+    setSelectedImageFile(file);
   }
 
   async function handleConfirmDelete() {
@@ -184,7 +219,7 @@ export default function Menus() {
               <div className="h-36 bg-gray-100 flex items-center justify-center overflow-hidden">
                 {menu.image_path ? (
                   <img
-                    src={imgSrc(menu.image_path)}
+                    src={toAssetUrl(menu.image_path)}
                     alt={menu.name}
                     className="w-full h-full object-cover"
                   />
@@ -288,6 +323,22 @@ export default function Menus() {
 
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Image (optional)
+                </label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleModalImageChange}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  Max file size 5MB (JPG, PNG, WebP)
+                  {selectedImageFile ? ` · Selected: ${selectedImageFile.name}` : ""}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
                   Sort Order
                 </label>
                 <input
@@ -326,7 +377,10 @@ export default function Menus() {
 
             <div className="flex gap-2 mt-5">
               <button
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false);
+                  setSelectedImageFile(null);
+                }}
                 className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 Cancel

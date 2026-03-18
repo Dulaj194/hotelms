@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
+import { toAssetUrl } from "@/lib/assets";
 import type { Category, Item, Subcategory } from "@/types/menu";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
-
-function imgSrc(path: string | null): string | undefined {
-  return path ? `${API_BASE}${path}` : undefined;
-}
 
 interface FormData {
   name: string;
@@ -272,7 +267,7 @@ export default function MenuItems() {
               <div className="h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
                 {item.image_path ? (
                   <img
-                    src={imgSrc(item.image_path)}
+                    src={toAssetUrl(item.image_path)}
                     alt={item.name}
                     className="w-full h-full object-cover"
                   />

@@ -4,6 +4,8 @@ export interface RestaurantResponse {
   email: string | null;
   phone: string | null;
   address: string | null;
+  country: string | null;
+  currency: string | null;
   logo_url: string | null;
   is_active: boolean;
   created_at: string;
@@ -22,6 +24,8 @@ export interface RestaurantUpdateRequest {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  country?: string | null;
+  currency?: string | null;
 }
 
 export interface RestaurantLogoUploadResponse {
@@ -34,6 +38,8 @@ export interface RestaurantCreateRequest {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  country?: string | null;
+  currency?: string | null;
 }
 
 export interface RestaurantAdminUpdateRequest {
@@ -41,6 +47,8 @@ export interface RestaurantAdminUpdateRequest {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  country?: string | null;
+  currency?: string | null;
   is_active?: boolean;
 }
 

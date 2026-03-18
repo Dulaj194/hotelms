@@ -70,9 +70,24 @@ def list_all_for_super_admin(db: Session) -> list[Restaurant]:
     return db.query(Restaurant).order_by(Restaurant.id.desc()).all()
 
 
-def create_restaurant(db: Session, name: str, email: str | None, phone: str | None, address: str | None) -> Restaurant:
+def create_restaurant(
+    db: Session,
+    name: str,
+    email: str | None,
+    phone: str | None,
+    address: str | None,
+    country: str | None,
+    currency: str | None,
+) -> Restaurant:
     """Create a new restaurant. Use ONLY in super_admin endpoints."""
-    restaurant = Restaurant(name=name, email=email, phone=phone, address=address)
+    restaurant = Restaurant(
+        name=name,
+        email=email,
+        phone=phone,
+        address=address,
+        country=country,
+        currency=currency,
+    )
     db.add(restaurant)
     db.commit()
     db.refresh(restaurant)
