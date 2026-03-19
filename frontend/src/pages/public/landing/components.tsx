@@ -338,7 +338,7 @@ export function BlogCard({ item }: { item: BlogCardData }) {
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
       <p className="mt-3 text-sm leading-6 text-slate-600">{item.excerpt}</p>
-      <a href="#" className="mt-4 inline-flex text-sm font-semibold text-emerald-700">
+      <a href="#contact" className="mt-4 inline-flex text-sm font-semibold text-emerald-700">
         Read more
       </a>
     </article>

@@ -112,7 +112,7 @@ export default function Landing() {
           </FooterColumn>
 
           <FooterColumn title="Company">
-            <a href="#" className="block">About</a>
+            <a href="#benefits" className="block">About</a>
             <a href="#blog" className="block">Blog</a>
             <a href="#contact" className="block">Contact</a>
           </FooterColumn>
