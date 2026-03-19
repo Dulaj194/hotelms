@@ -17,6 +17,7 @@ import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
 import TableMenu from "@/pages/public/TableMenu";
 import TableOrderStatus from "@/pages/public/TableOrderStatus";
 import RoomMenu from "@/pages/public/RoomMenu";
+import Landing from "@/pages/public/Landing";
 import ServiceRequest from "@/pages/room/ServiceRequest";
 import Rooms from "@/pages/admin/Rooms";
 import Housekeeping from "@/pages/admin/Housekeeping";
@@ -249,7 +250,7 @@ function App() {
           path="/admin"
           element={<Navigate to="/admin/menu/menus" replace />}
         />
-        <Route path="/" element={<RootRedirect />} />
+        <Route path="/" element={<Landing />} />
         <Route path="*" element={<RootRedirect />} />
       </Routes>
     </BrowserRouter>
