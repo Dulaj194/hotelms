@@ -26,6 +26,11 @@ export type BlogCardData = {
   excerpt: string;
 };
 
+export type MockupData = {
+  title: string;
+  imageUrl: string;
+};
+
 export const heroContent = {
   productName: "R.Luminuous",
   whatItDoes: "All-in-one QR Ordering & Hospitality Management",
@@ -122,6 +127,34 @@ export const blogs: BlogCardData[] = [
     title: "Launching Contactless Service in 7 Days",
     excerpt:
       "A simple rollout plan for restaurants and hotels moving to QR-based workflows.",
+  },
+];
+
+export const mockups: MockupData[] = [
+  {
+    title: "Menu on phone",
+    imageUrl:
+      "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Kitchen dashboard",
+    imageUrl:
+      "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Staff workflow",
+    imageUrl:
+      "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Room ordering",
+    imageUrl:
+      "https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Analytics dashboard",
+    imageUrl:
+      "https://images.unsplash.com/photo-1551281044-8b9a4e7f4f7c?auto=format&fit=crop&w=900&q=80",
   },
 ];
 

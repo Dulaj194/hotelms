@@ -6,6 +6,7 @@ import type {
   BenefitCardData,
   BlogCardData,
   FeatureCardData,
+  MockupData,
   Stat,
 } from "./content";
 
@@ -201,7 +202,12 @@ export function HeroBlock({
   whyItMatters: string;
 }) {
   return (
-    <section id="home" className="border-b border-slate-200">
+    <section
+      id="home"
+      className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50"
+    >
+      <div className="pointer-events-none absolute -left-20 top-16 h-56 w-56 rounded-full bg-emerald-200/40 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 top-24 h-64 w-64 rounded-full bg-sky-200/30 blur-3xl" />
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-20">
         <div className="flex flex-col justify-center">
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
@@ -225,7 +231,7 @@ export function HeroBlock({
           </div>
         </div>
 
-        <div className="order-last rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:order-none">
+        <div className="order-last rounded-3xl border border-slate-200/80 bg-white/95 p-5 shadow-sm lg:order-none">
           <div className="relative overflow-hidden rounded-2xl bg-emerald-900 p-4">
             <img
               src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80"
@@ -247,7 +253,7 @@ export function HeroBlock({
 
 export function StatCard({ item }: { item: Stat }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
       <p className="text-3xl font-extrabold text-emerald-700">{item.value}</p>
       <p className="mt-2 text-sm font-medium text-slate-600">{item.label}</p>
     </div>
@@ -256,7 +262,7 @@ export function StatCard({ item }: { item: Stat }) {
 
 export function BenefitCard({ item }: { item: BenefitCardData }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
       <h3 className="text-lg font-bold">{item.title}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-600">
         <span className="font-semibold text-slate-800">Pain: </span>
@@ -273,14 +279,46 @@ export function BenefitCard({ item }: { item: BenefitCardData }) {
 export function FeatureCard({ item }: { item: FeatureCardData }) {
   const Icon = item.icon;
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5">
-      <Icon className="h-7 w-7 text-emerald-700" />
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-100">
+        <Icon className="h-6 w-6 text-emerald-700" />
+      </div>
       <h3 className="mt-4 text-lg font-bold">{item.capability}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-600">{item.explanation}</p>
       <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-emerald-700">
         {item.visualHint}
       </p>
     </article>
+  );
+}
+
+export function MockupStrip({ items }: { items: MockupData[] }) {
+  return (
+    <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Product Views
+          </p>
+          <p className="text-xs text-slate-500">Hospitality workflow snapshots</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {items.map((item) => (
+            <article
+              key={item.title}
+              className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
+            >
+              <img
+                src={item.imageUrl}
+                alt={item.title}
+                className="h-28 w-full object-cover"
+              />
+              <p className="px-3 py-2 text-xs font-semibold text-slate-700">{item.title}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -297,7 +335,7 @@ export function StepCard({ step, index }: { step: string; index: number }) {
 
 export function BlogCard({ item }: { item: BlogCardData }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5">
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
       <p className="mt-3 text-sm leading-6 text-slate-600">{item.excerpt}</p>
       <a href="#" className="mt-4 inline-flex text-sm font-semibold text-emerald-700">

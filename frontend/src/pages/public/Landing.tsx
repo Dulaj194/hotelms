@@ -8,6 +8,7 @@ import {
   features,
   footerContent,
   heroContent,
+  mockups,
   stats,
   steps,
 } from "./landing/content";
@@ -18,6 +19,7 @@ import {
   FeatureCard,
   FooterColumn,
   HeroBlock,
+  MockupStrip,
   Navbar,
   SectionHeader,
   StatCard,
@@ -26,10 +28,11 @@ import {
 
 export default function Landing() {
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900">
       <Navbar />
 
       <HeroBlock {...heroContent} />
+      <MockupStrip items={mockups} />
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
