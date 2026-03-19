@@ -13,6 +13,14 @@ import {
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+const heroContent = {
+  productName: "R.Luminuous",
+  whatItDoes: "All-in-one QR Ordering & Hospitality Management",
+  whoItHelps: "Built for restaurants, cafés, and hotels",
+  whyItMatters:
+    "Reduce service delays, improve team coordination, and deliver faster guest experiences.",
+};
+
 const stats = [
   { value: "500+", label: "Restaurants" },
   { value: "1M+", label: "Orders" },
@@ -21,51 +29,59 @@ const stats = [
 
 const benefitCards = [
   {
-    title: "Run Smoothly",
-    description:
-      "Handle ordering and service flow with fewer manual steps and less staff pressure.",
+    title: "Short-staffed shifts",
+    pain: "Teams lose time taking manual orders and moving between tables.",
+    outcome:
+      "QR ordering reduces repetitive tasks so staff can focus on food quality and guest care.",
   },
   {
-    title: "Turn Tables Faster",
-    description:
-      "Reduce waiting time from menu to billing with instant QR-driven ordering.",
+    title: "Slow table turnover",
+    pain: "Guests wait too long for menus, confirmations, and bill handling.",
+    outcome:
+      "Guests order faster from their phones, helping you serve more tables per shift.",
   },
   {
-    title: "Real-Time Decisions",
-    description:
-      "Use live sales and item performance data to optimize your menu quickly.",
+    title: "No clear visibility",
+    pain: "Managers struggle to see what items sell best and when demand peaks.",
+    outcome:
+      "Live analytics highlight top items and peak windows for smarter decisions.",
   },
   {
-    title: "No App Downloads",
-    description:
-      "Guests scan a QR and use the web menu directly from any modern phone browser.",
+    title: "Customer friction",
+    pain: "App downloads and complicated flows reduce ordering completion.",
+    outcome:
+      "A quick QR scan opens the menu instantly in browser with no install needed.",
   },
 ];
 
 const features = [
   {
-    title: "QR Ordering",
-    description:
+    capability: "QR Ordering",
+    explanation:
       "Guests scan and order instantly without app downloads or paper menus.",
     icon: QrCode,
+    visualHint: "Scan → Browse → Order",
   },
   {
-    title: "Kitchen Workflow",
-    description:
+    capability: "Kitchen Workflow",
+    explanation:
       "Orders route to kitchen dashboards in real time with clear status updates.",
     icon: ChefHat,
+    visualHint: "Order queue with live status",
   },
   {
-    title: "Sales Insights",
-    description:
+    capability: "Sales Insights",
+    explanation:
       "Track top items, peak hours, and performance with live analytics.",
     icon: BarChart3,
+    visualHint: "Daily/weekly trend snapshots",
   },
   {
-    title: "Secure Platform",
-    description:
+    capability: "Secure Platform",
+    explanation:
       "Role-based access and stable infrastructure for daily operations.",
     icon: ShieldCheck,
+    visualHint: "Role-based access controls",
   },
 ];
 
@@ -95,6 +111,20 @@ const blogs = [
       "A simple rollout plan for restaurants and hotels moving to QR-based workflows.",
   },
 ];
+
+const ctaContent = {
+  title: "Start your free trial with R.Luminuous",
+  message:
+    "No setup friction. Launch your QR menu flow quickly and onboard your team in days.",
+  actionLabel: "Start Free Trial",
+  actionTo: "/pricing",
+};
+
+const footerContent = {
+  trustInfo:
+    "Trusted by hospitality teams with stable uptime, secure access, and operational support.",
+  contactPoints: ["info@rluminuous.com", "+94 77 754 7239", "Sri Lanka"],
+};
 
 export default function Landing() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -216,14 +246,13 @@ export default function Landing() {
             </span>
 
             <h1 className="mt-6 text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">
-              <span className="block text-emerald-700">R.Luminuous</span>
+              <span className="block text-emerald-700">{heroContent.productName}</span>
               <br />
-              All-in-one QR Ordering & Hospitality Management
+              {heroContent.whatItDoes}
             </h1>
 
             <p className="mt-5 max-w-xl text-lg text-slate-600">
-              Manage menus, orders, staff flow, and guest experience from one
-              clean platform designed for modern hospitality teams.
+              {heroContent.whoItHelps}. {heroContent.whyItMatters}
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -285,7 +314,14 @@ export default function Landing() {
                 className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
               >
                 <h3 className="text-lg font-bold">{card.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{card.description}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <span className="font-semibold text-slate-800">Pain: </span>
+                  {card.pain}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-emerald-700">
+                  <span className="font-semibold">Outcome: </span>
+                  {card.outcome}
+                </p>
               </article>
             ))}
           </div>
@@ -306,13 +342,16 @@ export default function Landing() {
             const Icon = card.icon;
             return (
               <article
-                key={card.title}
+                key={card.capability}
                 className="rounded-2xl border border-slate-200 bg-white p-5"
               >
                 <Icon className="h-7 w-7 text-emerald-700" />
-                <h3 className="mt-4 text-lg font-bold">{card.title}</h3>
+                <h3 className="mt-4 text-lg font-bold">{card.capability}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {card.description}
+                  {card.explanation}
+                </p>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  {card.visualHint}
                 </p>
               </article>
             );
@@ -364,23 +403,16 @@ export default function Landing() {
 
       <section id="contact" className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="rounded-3xl bg-slate-900 p-8 text-white sm:p-10">
-          <h2 className="text-3xl font-extrabold">Ready to launch with R.Luminuous?</h2>
+          <h2 className="text-3xl font-extrabold">{ctaContent.title}</h2>
           <p className="mt-3 max-w-2xl text-slate-300">
-            Start with a free trial or contact our team for onboarding support
-            and custom setup.
+            {ctaContent.message}
           </p>
-          <div className="mt-7 flex flex-wrap gap-3">
+          <div className="mt-7">
             <Link
-              to="/pricing"
+              to={ctaContent.actionTo}
               className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-bold text-white hover:bg-emerald-400"
             >
-              View Pricing <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              to="/login"
-              className="inline-flex items-center rounded-full border border-slate-500 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800"
-            >
-              Restaurant Login
+              {ctaContent.actionLabel} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="mt-6 flex items-center gap-2 text-sm text-emerald-300">
@@ -395,7 +427,7 @@ export default function Landing() {
           <div>
             <p className="text-lg font-bold text-emerald-700">R.Luminuous</p>
             <p className="mt-3 text-sm text-slate-600">
-              QR-powered hospitality platform for restaurants and hotels.
+              {footerContent.trustInfo}
             </p>
           </div>
           <div>
@@ -423,9 +455,9 @@ export default function Landing() {
               Contact
             </h3>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              <li>info@rluminuous.com</li>
-              <li>+94 77 754 7239</li>
-              <li>Sri Lanka</li>
+              {footerContent.contactPoints.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
             </ul>
           </div>
         </div>
