@@ -3,11 +3,14 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import type {
+  AudienceCardData,
   BenefitCardData,
   BlogCardData,
   FeatureCardData,
   MockupData,
   Stat,
+  TestimonialData,
+  UseCaseCardData,
 } from "./content";
 
 type NavLinkItem = {
@@ -18,9 +21,12 @@ type NavLinkItem = {
 
 const navLinks: NavLinkItem[] = [
   { label: "Home", href: "#home" },
+  { label: "Who it is for", href: "#who-its-for" },
   { label: "Benefits", href: "#benefits" },
-  { label: "Features", href: "#features" },
   { label: "How it works", href: "#how-it-works" },
+  { label: "Features", href: "#features" },
+  { label: "Use cases", href: "#use-cases" },
+  { label: "Trust", href: "#trust" },
   { label: "Blog", href: "#blog" },
   { label: "Contact", href: "#contact" },
   { label: "Pricing", to: "/pricing" },
@@ -253,16 +259,25 @@ export function HeroBlock({
 
 export function StatCard({ item }: { item: Stat }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+    <div className="h-full rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
       <p className="text-3xl font-extrabold text-emerald-700">{item.value}</p>
       <p className="mt-2 text-sm font-medium text-slate-600">{item.label}</p>
     </div>
   );
 }
 
+export function AudienceCard({ item }: { item: AudienceCardData }) {
+  return (
+    <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{item.message}</p>
+    </article>
+  );
+}
+
 export function BenefitCard({ item }: { item: BenefitCardData }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+    <article className="h-full rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
       <h3 className="text-lg font-bold">{item.title}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-600">
         <span className="font-semibold text-slate-800">Pain: </span>
@@ -279,7 +294,7 @@ export function BenefitCard({ item }: { item: BenefitCardData }) {
 export function FeatureCard({ item }: { item: FeatureCardData }) {
   const Icon = item.icon;
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-100">
         <Icon className="h-6 w-6 text-emerald-700" />
       </div>
@@ -335,13 +350,37 @@ export function StepCard({ step, index }: { step: string; index: number }) {
 
 export function BlogCard({ item }: { item: BlogCardData }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
       <p className="mt-3 text-sm leading-6 text-slate-600">{item.excerpt}</p>
       <a href="#contact" className="mt-4 inline-flex text-sm font-semibold text-emerald-700">
         Read more
       </a>
     </article>
+  );
+}
+
+export function UseCaseCard({ item }: { item: UseCaseCardData }) {
+  return (
+    <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{item.details}</p>
+    </article>
+  );
+}
+
+export function TestimonialBlock({ item }: { item: TestimonialData }) {
+  return (
+    <section id="trust" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-8 sm:p-10">
+        <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Trusted Results</p>
+        <blockquote className="mt-3 text-xl font-semibold leading-8 text-slate-900 sm:text-2xl">
+          “{item.quote}”
+        </blockquote>
+        <p className="mt-5 text-sm font-semibold text-slate-800">{item.author}</p>
+        <p className="text-sm text-slate-600">{item.role}</p>
+      </div>
+    </section>
   );
 }
 

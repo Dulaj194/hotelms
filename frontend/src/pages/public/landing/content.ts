@@ -31,18 +31,54 @@ export type MockupData = {
   imageUrl: string;
 };
 
+export type AudienceCardData = {
+  title: string;
+  message: string;
+};
+
+export type UseCaseCardData = {
+  title: string;
+  details: string;
+};
+
+export type TestimonialData = {
+  quote: string;
+  author: string;
+  role: string;
+};
+
 export const heroContent = {
   productName: "R.Luminuous",
   whatItDoes: "All-in-one QR Ordering & Hospitality Management",
-  whoItHelps: "Built for restaurants, cafés, and hotels",
+  whoItHelps: "Built for restaurant and hotel teams in one unified platform",
   whyItMatters:
-    "Reduce service delays, improve team coordination, and deliver faster guest experiences.",
+    "Handle guest ordering, staff workflow, and analytics from one place to improve service speed and business control.",
 };
 
 export const stats: Stat[] = [
   { value: "500+", label: "Restaurants" },
+  { value: "120+", label: "Hotels" },
   { value: "1M+", label: "Orders" },
-  { value: "99.9%", label: "Uptime" },
+  { value: "99.9%", label: "Platform uptime" },
+];
+
+export const audiences: AudienceCardData[] = [
+  {
+    title: "Hotel Owners",
+    message: "Manage room ordering and service requests with better visibility across operations.",
+  },
+  {
+    title: "Restaurant Owners",
+    message: "Increase table turnover and reduce manual ordering workload during peak hours.",
+  },
+  {
+    title: "Managers",
+    message: "Track kitchen flow, sales performance, and staff coordination in real time.",
+  },
+  {
+    title: "Operations Admins",
+    message: "Keep menus, pricing, and daily workflows consistent across teams and shifts.",
+  },
 ];
 
 export const benefitCards: BenefitCardData[] = [
@@ -129,6 +165,32 @@ export const blogs: BlogCardData[] = [
       "A simple rollout plan for restaurants and hotels moving to QR-based workflows.",
   },
 ];
+
+export const useCases: UseCaseCardData[] = [
+  {
+    title: "Table QR Ordering",
+    details: "Guests scan and place orders instantly without waiting for printed menus.",
+  },
+  {
+    title: "Room Service Requests",
+    details: "Hotel guests request food or housekeeping directly from room QR flows.",
+  },
+  {
+    title: "Kitchen Coordination",
+    details: "Confirmed orders move to kitchen dashboards with clear preparation status.",
+  },
+  {
+    title: "Revenue Analytics",
+    details: "Managers view sales trends and high-margin items for faster business decisions.",
+  },
+];
+
+export const testimonial: TestimonialData = {
+  quote:
+    "R.Luminuous helped us cut ordering delays and improve coordination between floor and kitchen teams in just two weeks.",
+  author: "Nadeesha Perera",
+  role: "Operations Manager, Coastal Bay Hotel & Bistro",
+};
 
 export const mockups: MockupData[] = [
   {
