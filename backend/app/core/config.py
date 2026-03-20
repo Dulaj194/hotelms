@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
     reset_token_expire_minutes: int = 30
+    session_idle_timeout_minutes: int = 60
+    session_absolute_timeout_hours: int = 24
 
     # ── Rate limiting ────────────────────────────────────────────────────────
     login_rate_limit_attempts: int = 5

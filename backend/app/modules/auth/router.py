@@ -38,11 +38,13 @@ def login(
     response: Response,
     db: Session = Depends(get_db),
     redis_client: redis_lib.Redis = Depends(get_redis),
+    refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
     return service.login(
         db, redis_client, response,
         payload.email, payload.password,
         _client_ip(request), _user_agent(request),
+        refresh_token,
     )
 
 

@@ -39,6 +39,7 @@ from app.modules.users.repository import (
 logger = get_logger(__name__)
 
 REFRESH_COOKIE_NAME = "refresh_token"
+GENERIC_AUTH_ERROR_DETAIL = "Invalid email or password."
 _ALLOWED_LOGO_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 _LOGO_EXT_MAP = {
     "image/jpeg": ".jpg",
@@ -62,6 +63,10 @@ def _registration_idempotency_key(owner_email: str, idempotency_key: str) -> str
     normalized_email = owner_email.strip().lower()
     normalized_key = idempotency_key.strip()
     return f"idempotency:register:{normalized_email}:{normalized_key}"
+
+
+def _normalize_login_email(email: str) -> str:
+    return email.strip().lower()
 
 
 # ─── Rate limiting ────────────────────────────────────────────────────────────
@@ -112,6 +117,60 @@ def _set_refresh_cookie(response: Response, token_value: str) -> None:
         samesite="lax",
         secure=settings.app_env == "production",
     )
+
+
+def _session_timeout_seconds() -> tuple[int, int]:
+    idle_seconds = settings.session_idle_timeout_minutes * 60
+    absolute_seconds = settings.session_absolute_timeout_hours * 3600
+    return idle_seconds, absolute_seconds
+
+
+def _build_session_state(*, created_at: int, last_seen: int) -> str:
+    return json.dumps({"created_at": created_at, "last_seen": last_seen})
+
+
+def _parse_session_state(raw: str | bytes | None) -> tuple[int, int] | None:
+    if raw is None:
+        return None
+
+    decoded = raw.decode() if isinstance(raw, bytes) else raw
+    if decoded == "valid":
+        now_ts = int(datetime.now(UTC).timestamp())
+        return now_ts, now_ts
+
+    try:
+        payload = json.loads(decoded)
+        created_at = int(payload["created_at"])
+        last_seen = int(payload["last_seen"])
+        return created_at, last_seen
+    except Exception:
+        return None
+
+
+def _session_is_expired(created_at: int, last_seen: int) -> bool:
+    now_ts = int(datetime.now(UTC).timestamp())
+    idle_seconds, absolute_seconds = _session_timeout_seconds()
+    idle_expired = (now_ts - last_seen) > idle_seconds
+    absolute_expired = (now_ts - created_at) > absolute_seconds
+    return idle_expired or absolute_expired
+
+
+def _revoke_presented_refresh_session(
+    redis_client: redis_lib.Redis,
+    refresh_token: str | None,
+) -> None:
+    if not refresh_token:
+        return
+    try:
+        payload = decode_token(refresh_token)
+        if payload.get("type") != "refresh":
+            return
+        session_id = payload.get("session_id")
+        user_id = int(payload.get("sub", 0))
+        if session_id and user_id:
+            redis_client.delete(_refresh_redis_key(user_id, session_id))
+    except Exception:
+        return
 
 
 def _build_access_payload(
@@ -366,10 +425,13 @@ def login(
     password: str,
     ip: str,
     user_agent: str,
+    existing_refresh_token: str | None = None,
 ) -> TokenResponse:
     _check_rate_limit(redis_client, ip)
 
-    user = get_user_by_email(db, email)
+    normalized_email = _normalize_login_email(email)
+
+    user = get_user_by_email(db, normalized_email)
 
     if not user or not verify_password(password, user.password_hash):
         _increment_rate_limit(redis_client, ip)
@@ -382,14 +444,24 @@ def login(
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password.",
+            detail=GENERIC_AUTH_ERROR_DETAIL,
         )
 
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive. Contact your administrator.",
+        write_audit_log(
+            db,
+            event_type="login_failed",
+            user_id=user.id,
+            ip_address=ip,
+            user_agent=user_agent,
+            metadata={"reason": "inactive_account"},
         )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=GENERIC_AUTH_ERROR_DETAIL,
+        )
+
+    _revoke_presented_refresh_session(redis_client, existing_refresh_token)
 
     session_id = str(uuid.uuid4())
     access_token = create_access_token(
@@ -398,10 +470,11 @@ def login(
     refresh_token_value = create_refresh_token(user.id, session_id)
 
     try:
+        now_ts = int(datetime.now(UTC).timestamp())
         redis_client.setex(
             _refresh_redis_key(user.id, session_id),
             settings.refresh_token_expire_days * 86400,
-            "valid",
+            _build_session_state(created_at=now_ts, last_seen=now_ts),
         )
         _set_refresh_cookie(response, refresh_token_value)
     except Exception:
@@ -449,13 +522,31 @@ def refresh(
 
     try:
         redis_key = _refresh_redis_key(user_id, session_id)
-        if not redis_client.exists(redis_key):
+        raw_session_state = redis_client.get(redis_key)
+        session_state = _parse_session_state(raw_session_state)
+        if session_state is None:
             write_audit_log(
                 db,
                 event_type="refresh_token_failed",
                 user_id=user_id,
                 ip_address=ip,
                 user_agent=user_agent,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired or revoked. Please log in again.",
+            )
+
+        created_at, last_seen = session_state
+        if _session_is_expired(created_at, last_seen):
+            redis_client.delete(redis_key)
+            write_audit_log(
+                db,
+                event_type="refresh_token_failed",
+                user_id=user_id,
+                ip_address=ip,
+                user_agent=user_agent,
+                metadata={"reason": "session_timeout"},
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -482,10 +573,11 @@ def refresh(
     redis_client.delete(redis_key)
     new_session_id = str(uuid.uuid4())
     new_refresh_token = create_refresh_token(user.id, new_session_id)
+    now_ts = int(datetime.now(UTC).timestamp())
     redis_client.setex(
         _refresh_redis_key(user.id, new_session_id),
         settings.refresh_token_expire_days * 86400,
-        "valid",
+        _build_session_state(created_at=created_at, last_seen=now_ts),
     )
     _set_refresh_cookie(response, new_refresh_token)
 

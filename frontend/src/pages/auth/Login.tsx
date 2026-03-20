@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { setAccessToken, setUser, getRoleRedirect } from "@/lib/auth";
 import type { TokenResponse, UserMeResponse } from "@/types/auth";
 
@@ -28,10 +28,17 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
+      setError("Invalid email or password.");
+      return;
+    }
+
     setLoading(true);
     try {
       const data = await api.post<TokenResponse>("/auth/login", {
-        email,
+        email: normalizedEmail,
         password,
       });
       setAccessToken(data.access_token);
@@ -43,7 +50,11 @@ export default function Login() {
       }
       navigate(getRoleRedirect(me.role), { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
+      if (err instanceof ApiError && [401, 403].includes(err.status)) {
+        setError("Invalid email or password.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
