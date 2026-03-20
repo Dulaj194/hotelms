@@ -43,6 +43,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     let active = true;
+    let navigationTimer: NodeJS.Timeout;
 
     async function loadOverview() {
       setOverviewLoading(true);
@@ -59,6 +60,19 @@ export default function Dashboard() {
         for (const item of visibleAlerts) {
           void api.post(`/dashboard/alerts/${encodeURIComponent(item.key)}/shown`, {});
         }
+
+        // Auto-navigate to default module after brief delay (decision tree)
+        // Shows dashboard for 800ms before auto-navigating (better UX)
+        if (data.default_module && data.default_module !== "dashboard") {
+          const defaultLane = data.module_lanes.find((lane) => lane.key === data.default_module);
+          if (defaultLane?.visible) {
+            navigationTimer = setTimeout(() => {
+              if (active) {
+                navigate(defaultLane.path);
+              }
+            }, 800);
+          }
+        }
       } catch (err) {
         if (active) {
           setOverviewError(err instanceof Error ? err.message : "Failed to load dashboard data.");
@@ -73,8 +87,9 @@ export default function Dashboard() {
     loadOverview();
     return () => {
       active = false;
+      if (navigationTimer) clearTimeout(navigationTimer);
     };
-  }, []);
+  }, [navigate]);
 
   const visibleAlerts = useMemo(() => {
     if (!overview) return [];

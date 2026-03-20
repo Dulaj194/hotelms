@@ -103,4 +103,5 @@ export interface AdminDashboardOverviewResponse {
   module_lanes: DashboardModuleLane[];
   privilege_map: DashboardPrivilegeMap;
   sla_priority_model: string[];
+  default_module: string;
 }

@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.modules.dashboard import repository
-from app.modules.dashboard.rules import EXPIRY_THRESHOLD_RULES, MODULE_LANES, SETUP_REQUIREMENT_MATRIX, SLA_PRIORITY_MODEL
+from app.modules.dashboard.rules import EXPIRY_THRESHOLD_RULES, MODULE_LANES, SETUP_REQUIREMENT_MATRIX, SLA_PRIORITY_MODEL, get_default_module
 from app.modules.dashboard.schemas import (
     AdminDashboardOverviewResponse,
     DashboardAdminUser,
@@ -227,6 +227,7 @@ def get_admin_dashboard_overview(
     metrics = _build_metrics(db, restaurant_id=restaurant_id)
 
     module_lanes = _build_module_lanes(role=role, privileges=privileges_response.privileges)
+    default_module = get_default_module(privileges_response.privileges, role)
 
     return AdminDashboardOverviewResponse(
         restaurant=DashboardRestaurantSummary(
@@ -281,4 +282,5 @@ def get_admin_dashboard_overview(
         module_lanes=module_lanes,
         privilege_map=DashboardPrivilegeMap(role=role, privileges=privileges_response.privileges),
         sla_priority_model=SLA_PRIORITY_MODEL,
+        default_module=default_module,
     )
