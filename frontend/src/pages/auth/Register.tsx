@@ -112,7 +112,8 @@ export default function Register() {
       );
 
       setSuccess(response.message);
-      setTimeout(() => navigate("/login", { replace: true }), 1200);
+      const noticeKey = response.message_key ?? "registration_success";
+      setTimeout(() => navigate(`/login?notice=${encodeURIComponent(noticeKey)}`, { replace: true }), 1200);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.detail || "Registration failed. Please try again.");

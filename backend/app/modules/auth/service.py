@@ -167,14 +167,14 @@ async def register_restaurant(
     if get_user_by_email(db, normalized_email):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="An account with this email already exists.",
+            detail="An account with this email already exists. Existing trial data is unchanged.",
         )
 
     existing_restaurant_email = registration_repository.get_restaurant_by_email(db, normalized_email)
     if existing_restaurant_email:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Restaurant email already in use.",
+            detail="Restaurant email already in use. Existing trial data is unchanged.",
         )
 
     logger.info(

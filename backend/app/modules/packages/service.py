@@ -41,7 +41,7 @@ _DEFAULT_PACKAGE_DEFINITIONS = [
 ]
 
 
-def ensure_default_packages(db: Session) -> None:
+def ensure_default_packages(db: Session, *, commit: bool = True) -> None:
     has_changes = False
 
     for package_data in _DEFAULT_PACKAGE_DEFINITIONS:
@@ -64,7 +64,7 @@ def ensure_default_packages(db: Session) -> None:
                 repository.add_package_privilege(db, package.id, privilege)
                 has_changes = True
 
-    if has_changes:
+    if has_changes and commit:
         db.commit()
 
 

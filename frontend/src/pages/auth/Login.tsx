@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { api } from "@/lib/api";
 import { setAccessToken, setUser, getRoleRedirect } from "@/lib/auth";
@@ -7,10 +7,23 @@ import type { TokenResponse, UserMeResponse } from "@/types/auth";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const noticeKey = searchParams.get("notice");
+    if (!noticeKey) return;
+
+    if (noticeKey === "registration_success") {
+      setNotice("Registration successful! Please sign in to continue.");
+    }
+
+    navigate("/login", { replace: true });
+  }, [navigate, searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,6 +99,10 @@ export default function Login() {
               className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
             />
           </div>
+
+          {notice && (
+            <p className="text-sm text-primary font-medium">{notice}</p>
+          )}
 
           {error && (
             <p className="text-sm text-destructive font-medium">{error}</p>

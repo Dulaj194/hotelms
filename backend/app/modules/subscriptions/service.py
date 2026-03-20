@@ -210,7 +210,7 @@ def assign_initial_trial_subscription(
     if existing is not None:
         return
 
-    packages_service.ensure_default_packages(db)
+    packages_service.ensure_default_packages(db, commit=False)
     trial_package = packages_repo.get_package_by_code(db, settings.default_trial_package_code)
     if trial_package is None:
         raise HTTPException(
