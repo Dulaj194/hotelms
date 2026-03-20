@@ -75,6 +75,14 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             "ALTER TABLE restaurants ADD COLUMN currency VARCHAR(12) NULL",
         ),
         (
+            "billing_email",
+            "ALTER TABLE restaurants ADD COLUMN billing_email VARCHAR(191) NULL",
+        ),
+        (
+            "tax_id",
+            "ALTER TABLE restaurants ADD COLUMN tax_id VARCHAR(100) NULL",
+        ),
+        (
             "opening_time",
             "ALTER TABLE restaurants ADD COLUMN opening_time VARCHAR(8) NULL",
         ),

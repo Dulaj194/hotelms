@@ -64,6 +64,10 @@ export default function RestaurantProfile() {
       address: data.address ?? undefined,
       country: data.country ?? undefined,
       currency: data.currency ?? undefined,
+      billing_email: data.billing_email ?? undefined,
+      tax_id: data.tax_id ?? undefined,
+      opening_time: data.opening_time ?? undefined,
+      closing_time: data.closing_time ?? undefined,
     });
   }
 
@@ -262,6 +266,29 @@ export default function RestaurantProfile() {
                 value={form.currency ?? ""}
                 onChange={(v) => setForm((f) => ({ ...f, currency: v.toUpperCase() || null }))}
               />
+              <FormField
+                label="Billing Email"
+                type="email"
+                value={form.billing_email ?? ""}
+                onChange={(v) => setForm((f) => ({ ...f, billing_email: v || null }))}
+              />
+              <FormField
+                label="Tax ID"
+                value={form.tax_id ?? ""}
+                onChange={(v) => setForm((f) => ({ ...f, tax_id: v || null }))}
+              />
+              <FormField
+                label="Opening Time"
+                type="time"
+                value={form.opening_time ?? ""}
+                onChange={(v) => setForm((f) => ({ ...f, opening_time: v || null }))}
+              />
+              <FormField
+                label="Closing Time"
+                type="time"
+                value={form.closing_time ?? ""}
+                onChange={(v) => setForm((f) => ({ ...f, closing_time: v || null }))}
+              />
               <div className="space-y-1">
                 <label className="text-sm font-medium">Address</label>
                 <textarea
@@ -300,6 +327,10 @@ export default function RestaurantProfile() {
               <InfoItem label="Phone" value={restaurant.phone} />
               <InfoItem label="Country" value={restaurant.country ?? "Unknown Country"} />
               <InfoItem label="Currency" value={restaurant.currency ?? "Unknown Currency"} />
+              <InfoItem label="Billing Email" value={restaurant.billing_email} />
+              <InfoItem label="Tax ID" value={restaurant.tax_id} />
+              <InfoItem label="Opening Time" value={restaurant.opening_time} />
+              <InfoItem label="Closing Time" value={restaurant.closing_time} />
               <InfoItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
               <div className="col-span-2">
                 <InfoItem label="Address" value={restaurant.address} />

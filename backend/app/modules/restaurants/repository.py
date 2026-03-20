@@ -78,6 +78,8 @@ def create_restaurant(
     address: str | None,
     country: str | None,
     currency: str | None,
+    billing_email: str | None,
+    tax_id: str | None,
     opening_time: str | None,
     closing_time: str | None,
 ) -> Restaurant:
@@ -89,6 +91,8 @@ def create_restaurant(
         address=address,
         country=country,
         currency=currency,
+        billing_email=billing_email,
+        tax_id=tax_id,
         opening_time=opening_time,
         closing_time=closing_time,
     )

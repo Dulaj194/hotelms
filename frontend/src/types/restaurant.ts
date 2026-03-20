@@ -6,6 +6,10 @@ export interface RestaurantResponse {
   address: string | null;
   country: string | null;
   currency: string | null;
+  billing_email: string | null;
+  tax_id: string | null;
+  opening_time: string | null;
+  closing_time: string | null;
   logo_url: string | null;
   is_active: boolean;
   created_at: string;
@@ -26,6 +30,10 @@ export interface RestaurantUpdateRequest {
   address?: string | null;
   country?: string | null;
   currency?: string | null;
+  billing_email?: string | null;
+  tax_id?: string | null;
+  opening_time?: string | null;
+  closing_time?: string | null;
 }
 
 export interface RestaurantLogoUploadResponse {
@@ -40,6 +48,10 @@ export interface RestaurantCreateRequest {
   address?: string | null;
   country?: string | null;
   currency?: string | null;
+  billing_email?: string | null;
+  tax_id?: string | null;
+  opening_time?: string | null;
+  closing_time?: string | null;
 }
 
 export interface RestaurantAdminUpdateRequest {
@@ -49,6 +61,10 @@ export interface RestaurantAdminUpdateRequest {
   address?: string | null;
   country?: string | null;
   currency?: string | null;
+  billing_email?: string | null;
+  tax_id?: string | null;
+  opening_time?: string | null;
+  closing_time?: string | null;
   is_active?: boolean;
 }
 

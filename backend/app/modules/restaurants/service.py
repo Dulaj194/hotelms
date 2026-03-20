@@ -142,6 +142,8 @@ def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> Restaura
         address=payload.address,
         country=payload.country,
         currency=payload.currency,
+        billing_email=str(payload.billing_email) if payload.billing_email else None,
+        tax_id=payload.tax_id,
         opening_time=payload.opening_time,
         closing_time=payload.closing_time,
     )
