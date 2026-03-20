@@ -87,6 +87,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/dashnord" element={<Navigate to="/dashboard" replace />} />
 
         <Route
           path="/restaurant"

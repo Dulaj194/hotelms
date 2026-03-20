@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import type {
   AdminDashboardOverviewResponse,
@@ -43,31 +43,20 @@ export default function Dashboard() {
 
   useEffect(() => {
     let active = true;
-    let navigationTimer: NodeJS.Timeout;
+    let navigationTimer: ReturnType<typeof setTimeout> | undefined;
 
     async function loadOverview() {
       setOverviewLoading(true);
       setOverviewError(null);
-      console.log("[📊 Dashboard] Bootstrap initiated...");
       try {
         const data = await api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview");
         if (!active) return;
-
-        console.log("[📊 Dashboard] ✅ Bootstrap complete:", {
-          restaurant: data.restaurant.name,
-          role: data.admins[0]?.role || "unknown",
-          privileges: data.privilege_map.privileges,
-          alerts_count: data.alerts.length,
-          setup_complete: data.setup_wizard.completed_keys.length > 0,
-          modules: data.module_lanes.map(m => ({ key: m.key, visible: m.visible })),
-        });
 
         setOverview(data);
         setWizardStep(data.setup_wizard.current_step || 1);
         setWizardOpen(data.setup_wizard.should_show);
 
         const visibleAlerts = data.alerts.filter((item) => item.should_show);
-        console.log(`[📊 Dashboard] Recording ${visibleAlerts.length} alert impressions...`);
         for (const item of visibleAlerts) {
           void api.post(`/dashboard/alerts/${encodeURIComponent(item.key)}/shown`, {});
         }
@@ -77,20 +66,20 @@ export default function Dashboard() {
         if (data.default_module && data.default_module !== "dashboard") {
           const defaultLane = data.module_lanes.find((lane) => lane.key === data.default_module);
           if (defaultLane?.visible) {
-            console.log(`[📊 Dashboard] Default module selected: ${data.default_module}, navigating to ${defaultLane.path}`);
             navigationTimer = setTimeout(() => {
               if (active) {
                 navigate(defaultLane.path);
               }
             }, 800);
-          } else {
-            console.warn(`[📊 Dashboard] Default module ${data.default_module} not visible for user role`);
           }
         }
       } catch (err) {
         if (active) {
-          const errorMsg = err instanceof Error ? err.message : "Failed to load dashboard data.";
-          console.error("[📊 Dashboard] ❌ Bootstrap failed:", errorMsg, err);
+          const errorMsg = err instanceof ApiError
+            ? err.detail
+            : err instanceof Error
+              ? err.message
+              : "Failed to load dashboard data.";
           setOverviewError(errorMsg);
         }
       } finally {
