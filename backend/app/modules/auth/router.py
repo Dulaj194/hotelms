@@ -1,5 +1,5 @@
 import redis as redis_lib
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Cookie, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db, get_redis
@@ -120,24 +120,46 @@ def get_me(current_user: User = Depends(get_current_user)) -> User:
 
 
 @router.post("/register-restaurant", response_model=RegisterRestaurantResponse)
-def register_restaurant(
-    payload: RegisterRestaurantRequest,
+async def register_restaurant(
+    restaurant_name: str = Form(..., min_length=1, max_length=255),
+    owner_full_name: str = Form(..., min_length=1, max_length=255),
+    owner_email: str = Form(...),
+    address: str = Form(..., min_length=1, max_length=500),
+    contact_number: str = Form(..., pattern=r"^[0-9]{10}$"),
+    password: str = Form(..., min_length=8),
+    confirm_password: str = Form(..., min_length=8),
+    opening_time: str = Form(..., pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$"),
+    closing_time: str = Form(..., pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$"),
+    logo: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> RegisterRestaurantResponse:
-    restaurant_id, owner_email = service.register_restaurant(
+    payload = RegisterRestaurantRequest(
+        restaurant_name=restaurant_name,
+        owner_full_name=owner_full_name,
+        owner_email=owner_email,
+        address=address,
+        contact_number=contact_number,
+        password=password,
+        confirm_password=confirm_password,
+        opening_time=opening_time,
+        closing_time=closing_time,
+    )
+
+    restaurant_id, saved_owner_email = await service.register_restaurant(
         db,
         restaurant_name=payload.restaurant_name,
         owner_full_name=payload.owner_full_name,
         owner_email=str(payload.owner_email),
+        address=payload.address,
+        contact_number=payload.contact_number,
         password=payload.password,
         confirm_password=payload.confirm_password,
-        phone=payload.phone,
-        address=payload.address,
-        country=payload.country,
-        currency=payload.currency,
+        opening_time=payload.opening_time,
+        closing_time=payload.closing_time,
+        logo=logo,
     )
     return RegisterRestaurantResponse(
         message="Restaurant registered successfully. You can now sign in.",
         restaurant_id=restaurant_id,
-        owner_email=owner_email,
+        owner_email=saved_owner_email,
     )

@@ -7,33 +7,31 @@ import type {
   RegisterRestaurantResponse,
 } from "@/types/auth";
 
-const CURRENCY_OPTIONS = ["USD", "EUR", "GBP", "LKR", "INR"];
-
-function normalizeOptional(value: string): string | undefined {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+interface RegisterFormState extends RegisterRestaurantRequest {
+  logo: File | null;
 }
 
 export default function Register() {
   const navigate = useNavigate();
-  const [form, setForm] = useState<RegisterRestaurantRequest>({
+  const [form, setForm] = useState<RegisterFormState>({
     restaurant_name: "",
     owner_full_name: "",
     owner_email: "",
+    address: "",
+    contact_number: "",
     password: "",
     confirm_password: "",
-    phone: "",
-    address: "",
-    country: "",
-    currency: "USD",
+    opening_time: "",
+    closing_time: "",
+    logo: null,
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function updateField<K extends keyof RegisterRestaurantRequest>(
+  function updateField<K extends keyof RegisterFormState>(
     key: K,
-    value: RegisterRestaurantRequest[K],
+    value: RegisterFormState[K],
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -48,19 +46,29 @@ export default function Register() {
       return;
     }
 
+    if (!/^[0-9]{10}$/.test(form.contact_number.trim())) {
+      setError("Contact number must be exactly 10 digits.");
+      return;
+    }
+
+    if (!form.logo) {
+      setError("Logo image is required.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload: RegisterRestaurantRequest = {
-        restaurant_name: form.restaurant_name.trim(),
-        owner_full_name: form.owner_full_name.trim(),
-        owner_email: form.owner_email.trim(),
-        password: form.password,
-        confirm_password: form.confirm_password,
-        phone: normalizeOptional(form.phone ?? ""),
-        address: normalizeOptional(form.address ?? ""),
-        country: normalizeOptional(form.country ?? ""),
-        currency: normalizeOptional(form.currency ?? ""),
-      };
+      const payload = new FormData();
+      payload.append("restaurant_name", form.restaurant_name.trim());
+      payload.append("owner_full_name", form.owner_full_name.trim());
+      payload.append("owner_email", form.owner_email.trim());
+      payload.append("address", form.address.trim());
+      payload.append("contact_number", form.contact_number.trim());
+      payload.append("password", form.password);
+      payload.append("confirm_password", form.confirm_password);
+      payload.append("opening_time", form.opening_time);
+      payload.append("closing_time", form.closing_time);
+      payload.append("logo", form.logo);
 
       const response = await api.post<RegisterRestaurantResponse>(
         "/auth/register-restaurant",
@@ -108,7 +116,53 @@ export default function Register() {
               />
             </div>
 
+            <div className="space-y-1 md:col-span-2">
+              <label htmlFor="address" className="text-sm font-medium text-foreground">
+                Address
+              </label>
+              <input
+                id="address"
+                required
+                value={form.address}
+                onChange={(e) => updateField("address", e.target.value)}
+                placeholder="No 10, Main Street"
+                className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+              />
+            </div>
+
             <div className="space-y-1">
+              <label htmlFor="contact_number" className="text-sm font-medium text-foreground">
+                Contact Number
+              </label>
+              <input
+                id="contact_number"
+                required
+                pattern="[0-9]{10}"
+                maxLength={10}
+                value={form.contact_number}
+                onChange={(e) => updateField("contact_number", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                placeholder="0771234567"
+                className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="owner_email" className="text-sm font-medium text-foreground">
+                Email
+              </label>
+              <input
+                id="owner_email"
+                type="email"
+                autoComplete="email"
+                required
+                value={form.owner_email}
+                onChange={(e) => updateField("owner_email", e.target.value)}
+                placeholder="owner@example.com"
+                className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
               <label htmlFor="owner_full_name" className="text-sm font-medium text-foreground">
                 Owner Full Name
               </label>
@@ -123,76 +177,31 @@ export default function Register() {
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="owner_email" className="text-sm font-medium text-foreground">
-                Owner Email
+              <label htmlFor="opening_time" className="text-sm font-medium text-foreground">
+                Opening Time
               </label>
               <input
-                id="owner_email"
-                type="email"
-                autoComplete="email"
+                id="opening_time"
+                type="time"
                 required
-                value={form.owner_email}
-                onChange={(e) => updateField("owner_email", e.target.value)}
-                placeholder="owner@example.com"
-                className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="phone" className="text-sm font-medium text-foreground">
-                Phone (optional)
-              </label>
-              <input
-                id="phone"
-                value={form.phone}
-                onChange={(e) => updateField("phone", e.target.value)}
-                placeholder="+94 77 123 4567"
-                className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="country" className="text-sm font-medium text-foreground">
-                Country (optional)
-              </label>
-              <input
-                id="country"
-                value={form.country}
-                onChange={(e) => updateField("country", e.target.value)}
-                placeholder="Sri Lanka"
-                className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="space-y-1 md:col-span-2">
-              <label htmlFor="address" className="text-sm font-medium text-foreground">
-                Address (optional)
-              </label>
-              <input
-                id="address"
-                value={form.address}
-                onChange={(e) => updateField("address", e.target.value)}
-                placeholder="No 10, Main Street"
-                className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="currency" className="text-sm font-medium text-foreground">
-                Currency
-              </label>
-              <select
-                id="currency"
-                value={form.currency}
-                onChange={(e) => updateField("currency", e.target.value)}
+                value={form.opening_time}
+                onChange={(e) => updateField("opening_time", e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {CURRENCY_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="closing_time" className="text-sm font-medium text-foreground">
+                Closing Time
+              </label>
+              <input
+                id="closing_time"
+                type="time"
+                required
+                value={form.closing_time}
+                onChange={(e) => updateField("closing_time", e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+              />
             </div>
 
             <div className="space-y-1">
@@ -212,7 +221,7 @@ export default function Register() {
               />
             </div>
 
-            <div className="space-y-1 md:col-span-2">
+            <div className="space-y-1">
               <label htmlFor="confirm_password" className="text-sm font-medium text-foreground">
                 Confirm Password
               </label>
@@ -226,6 +235,20 @@ export default function Register() {
                 onChange={(e) => updateField("confirm_password", e.target.value)}
                 placeholder="Re-enter password"
                 className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+              />
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <label htmlFor="logo" className="text-sm font-medium text-foreground">
+                Logo Image
+              </label>
+              <input
+                id="logo"
+                type="file"
+                accept="image/*"
+                required
+                onChange={(e) => updateField("logo", e.target.files?.[0] ?? null)}
+                className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1 file:text-primary-foreground"
               />
             </div>
           </div>

@@ -1,8 +1,9 @@
 import uuid
 from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
 
 import redis as redis_lib
-from fastapi import HTTPException, Response, status
+from fastapi import HTTPException, Response, UploadFile, status
 from jose import JWTError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -38,6 +39,13 @@ from app.modules.users.repository import (
 logger = get_logger(__name__)
 
 REFRESH_COOKIE_NAME = "refresh_token"
+_ALLOWED_LOGO_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+_LOGO_EXT_MAP = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
 
 
 # ─── Redis key helpers ────────────────────────────────────────────────────────
@@ -114,7 +122,36 @@ def _build_access_payload(
     }
 
 
-def register_restaurant(
+async def _save_logo_file(file: UploadFile) -> str:
+    if file.content_type not in _ALLOWED_LOGO_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid logo file type. Allowed: jpg, png, webp, gif.",
+        )
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Logo file is required.",
+        )
+
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Logo exceeds the {settings.max_upload_size_mb} MB size limit.",
+        )
+
+    ext = _LOGO_EXT_MAP[file.content_type]
+    filename = f"{uuid.uuid4().hex}{ext}"
+    upload_path = Path(settings.upload_dir) / "logos"
+    upload_path.mkdir(parents=True, exist_ok=True)
+    (upload_path / filename).write_bytes(content)
+    return f"/uploads/logos/{filename}"
+
+
+async def register_restaurant(
     db: Session,
     *,
     restaurant_name: str,
@@ -122,10 +159,11 @@ def register_restaurant(
     owner_email: str,
     password: str,
     confirm_password: str,
-    phone: str | None,
-    address: str | None,
-    country: str | None,
-    currency: str | None,
+    address: str,
+    contact_number: str,
+    opening_time: str,
+    closing_time: str,
+    logo: UploadFile,
 ) -> tuple[int, str]:
     if password != confirm_password:
         raise HTTPException(
@@ -150,14 +188,17 @@ def register_restaurant(
             detail="Restaurant email already in use.",
         )
 
+    logo_url = await _save_logo_file(logo)
+
     try:
         restaurant = Restaurant(
             name=restaurant_name,
             email=owner_email,
-            phone=phone,
+            phone=contact_number,
             address=address,
-            country=country,
-            currency=currency,
+            opening_time=opening_time,
+            closing_time=closing_time,
+            logo_url=logo_url,
         )
         db.add(restaurant)
         db.flush()

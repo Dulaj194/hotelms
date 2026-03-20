@@ -54,10 +54,10 @@ class RegisterRestaurantRequest(BaseModel):
     owner_email: EmailStr
     password: str = Field(..., min_length=8, description="Minimum 8 characters")
     confirm_password: str = Field(..., min_length=8)
-    phone: str | None = Field(None, max_length=50)
-    address: str | None = Field(None, max_length=500)
-    country: str | None = Field(None, max_length=120)
-    currency: str | None = Field(None, max_length=12)
+    address: str = Field(..., min_length=1, max_length=500)
+    contact_number: str = Field(..., pattern=r"^[0-9]{10}$")
+    opening_time: str = Field(..., pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    closing_time: str = Field(..., pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 
 
 class RegisterRestaurantResponse(BaseModel):

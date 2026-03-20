@@ -142,6 +142,8 @@ def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> Restaura
         address=payload.address,
         country=payload.country,
         currency=payload.currency,
+        opening_time=payload.opening_time,
+        closing_time=payload.closing_time,
     )
 
     subscription_service.assign_initial_trial_subscription(db, restaurant.id)

@@ -74,6 +74,14 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             "currency",
             "ALTER TABLE restaurants ADD COLUMN currency VARCHAR(12) NULL",
         ),
+        (
+            "opening_time",
+            "ALTER TABLE restaurants ADD COLUMN opening_time VARCHAR(8) NULL",
+        ),
+        (
+            "closing_time",
+            "ALTER TABLE restaurants ADD COLUMN closing_time VARCHAR(8) NULL",
+        ),
     )
 
     category_column_patches: Sequence[tuple[str, str]] = (

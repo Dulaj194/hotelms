@@ -78,6 +78,8 @@ def create_restaurant(
     address: str | None,
     country: str | None,
     currency: str | None,
+    opening_time: str | None,
+    closing_time: str | None,
 ) -> Restaurant:
     """Create a new restaurant. Use ONLY in super_admin endpoints."""
     restaurant = Restaurant(
@@ -87,6 +89,8 @@ def create_restaurant(
         address=address,
         country=country,
         currency=currency,
+        opening_time=opening_time,
+        closing_time=closing_time,
     )
     db.add(restaurant)
     db.commit()

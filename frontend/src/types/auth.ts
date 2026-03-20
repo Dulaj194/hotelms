@@ -41,12 +41,12 @@ export interface RegisterRestaurantRequest {
   restaurant_name: string;
   owner_full_name: string;
   owner_email: string;
+  address: string;
+  contact_number: string;
   password: string;
   confirm_password: string;
-  phone?: string;
-  address?: string;
-  country?: string;
-  currency?: string;
+  opening_time: string;
+  closing_time: string;
 }
 
 export interface RegisterRestaurantResponse {
