@@ -10,6 +10,8 @@ from app.modules.auth.schemas import (
     GenericMessageResponse,
     InitialPasswordChangeRequest,
     LoginRequest,
+    RegisterRestaurantRequest,
+    RegisterRestaurantResponse,
     ResetPasswordRequest,
     TokenResponse,
     UserMeResponse,
@@ -115,3 +117,27 @@ def change_initial_password(
 @router.get("/me", response_model=UserMeResponse)
 def get_me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.post("/register-restaurant", response_model=RegisterRestaurantResponse)
+def register_restaurant(
+    payload: RegisterRestaurantRequest,
+    db: Session = Depends(get_db),
+) -> RegisterRestaurantResponse:
+    restaurant_id, owner_email = service.register_restaurant(
+        db,
+        restaurant_name=payload.restaurant_name,
+        owner_full_name=payload.owner_full_name,
+        owner_email=str(payload.owner_email),
+        password=payload.password,
+        confirm_password=payload.confirm_password,
+        phone=payload.phone,
+        address=payload.address,
+        country=payload.country,
+        currency=payload.currency,
+    )
+    return RegisterRestaurantResponse(
+        message="Restaurant registered successfully. You can now sign in.",
+        restaurant_id=restaurant_id,
+        owner_email=owner_email,
+    )

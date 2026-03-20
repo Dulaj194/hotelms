@@ -200,7 +200,12 @@ def _get_active_package_by_selector(
     return package
 
 
-def assign_initial_trial_subscription(db: Session, restaurant_id: int) -> None:
+def assign_initial_trial_subscription(
+    db: Session,
+    restaurant_id: int,
+    *,
+    commit: bool = True,
+) -> None:
     existing = repository.get_latest_subscription_by_restaurant(db, restaurant_id)
     if existing is not None:
         return
@@ -227,7 +232,8 @@ def assign_initial_trial_subscription(db: Session, restaurant_id: int) -> None:
         trial_started_at=now,
         trial_expires_at=trial_end,
     )
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def start_trial(

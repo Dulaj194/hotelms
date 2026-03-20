@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta, timezone
 import redis as redis_lib
 from fastapi import HTTPException, Response, status
 from jose import JWTError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -24,6 +25,9 @@ from app.modules.auth.repository import (
     mark_token_used,
 )
 from app.modules.auth.schemas import ForgotPasswordResponse, TokenResponse
+from app.modules.restaurants.model import Restaurant
+from app.modules.subscriptions import service as subscription_service
+from app.modules.users.model import User, UserRole
 from app.modules.users.repository import (
     get_by_id_global,
     get_user_by_email,
@@ -108,6 +112,91 @@ def _build_access_payload(
         "restaurant_id": restaurant_id,
         "must_change_password": must_change_password,
     }
+
+
+def register_restaurant(
+    db: Session,
+    *,
+    restaurant_name: str,
+    owner_full_name: str,
+    owner_email: str,
+    password: str,
+    confirm_password: str,
+    phone: str | None,
+    address: str | None,
+    country: str | None,
+    currency: str | None,
+) -> tuple[int, str]:
+    if password != confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password and confirm password do not match.",
+        )
+
+    if get_user_by_email(db, owner_email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists.",
+        )
+
+    existing_restaurant_email = (
+        db.query(Restaurant)
+        .filter(Restaurant.email == owner_email)
+        .first()
+    )
+    if existing_restaurant_email:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Restaurant email already in use.",
+        )
+
+    try:
+        restaurant = Restaurant(
+            name=restaurant_name,
+            email=owner_email,
+            phone=phone,
+            address=address,
+            country=country,
+            currency=currency,
+        )
+        db.add(restaurant)
+        db.flush()
+
+        owner = User(
+            full_name=owner_full_name,
+            email=owner_email,
+            password_hash=hash_password(password),
+            role=UserRole.owner,
+            restaurant_id=restaurant.id,
+            is_active=True,
+            must_change_password=False,
+        )
+        db.add(owner)
+
+        subscription_service.assign_initial_trial_subscription(
+            db,
+            restaurant.id,
+            commit=False,
+        )
+
+        db.commit()
+        return restaurant.id, owner.email
+    except HTTPException:
+        db.rollback()
+        raise
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Registration failed because the email already exists.",
+        ) from exc
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Restaurant self-registration failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to complete registration at the moment.",
+        ) from exc
 
 
 # ─── Auth operations ──────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { ArrowRight, ChevronDown, Menu, Sparkles, X } from "lucide-react";
+import { ArrowRight, ChevronDown, Lock, Menu, Sparkles, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -21,15 +21,11 @@ type NavLinkItem = {
 
 const navLinks: NavLinkItem[] = [
   { label: "Home", href: "#home" },
-  { label: "Who it is for", href: "#who-its-for" },
-  { label: "Benefits", href: "#benefits" },
-  { label: "How it works", href: "#how-it-works" },
   { label: "Features", href: "#features" },
-  { label: "Use cases", href: "#use-cases" },
-  { label: "Trust", href: "#trust" },
-  { label: "Blog", href: "#blog" },
+  { label: "Services", href: "#use-cases" },
+  { label: "About", href: "#benefits" },
+  { label: "Blogs", href: "#blog" },
   { label: "Contact", href: "#contact" },
-  { label: "Pricing", to: "/pricing" },
 ];
 
 export function NavLink({ item, onClick }: { item: NavLinkItem; onClick?: () => void }) {
@@ -110,10 +106,10 @@ export function Navbar() {
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-600 text-sm font-bold text-white">
             R
           </div>
-          <p className="text-sm font-semibold tracking-wide text-emerald-700">R.Luminuous</p>
+          <p className="text-sm font-extrabold tracking-[0.16em] text-emerald-900">R.LUMINUOUS</p>
         </div>
 
-        <nav className="hidden items-center gap-2 text-sm font-medium text-slate-600 lg:flex">
+        <nav className="hidden items-center gap-2 text-[17px] font-semibold text-slate-600 lg:flex">
           {navLinks.map((item) => (
             <NavLink key={item.label} item={item} />
           ))}
@@ -129,12 +125,31 @@ export function Navbar() {
               <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
                 Super Admin
               </Link>
+              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
+                Steward Login
+              </Link>
+              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
+                HouseKeeper Login
+              </Link>
             </div>
           </div>
         </nav>
 
-        <div className="hidden lg:block">
-          <CTAButton label="Login" to="/login" variant="dark" />
+        <div className="hidden items-center gap-3 lg:flex">
+          <Link
+            to="/register"
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-base font-semibold text-slate-700 hover:bg-slate-100"
+          >
+            Register Restaurant
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+          <Link
+            to="/login"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-5 py-3 text-base font-bold text-teal-700 hover:bg-slate-200"
+          >
+            Restaurant Login
+            <Lock className="h-4 w-4" />
+          </Link>
         </div>
 
         <button
@@ -185,10 +200,40 @@ export function Navbar() {
                 >
                   Super Admin
                 </Link>
+                <Link
+                  to="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                >
+                  Steward Login
+                </Link>
+                <Link
+                  to="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                >
+                  HouseKeeper Login
+                </Link>
               </div>
             )}
 
-            <CTAButton label="Login" to="/login" variant="dark" />
+            <Link
+              to="/register"
+              onClick={() => setMobileOpen(false)}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+            >
+              Register Restaurant
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+
+            <Link
+              to="/login"
+              onClick={() => setMobileOpen(false)}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Restaurant Login
+              <Lock className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       )}
@@ -232,7 +277,7 @@ export function HeroBlock({
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <CTAButton label="Start Free Trial" to="/pricing" variant="primary" />
+            <CTAButton label="Start Free Trial" to="/register" variant="primary" />
             <CTAButton label="Request a Demo" href="#contact" variant="secondary" />
           </div>
         </div>

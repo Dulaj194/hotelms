@@ -46,3 +46,21 @@ class InitialPasswordChangeRequest(BaseModel):
 
 class GenericMessageResponse(BaseModel):
     message: str
+
+
+class RegisterRestaurantRequest(BaseModel):
+    restaurant_name: str = Field(..., min_length=1, max_length=255)
+    owner_full_name: str = Field(..., min_length=1, max_length=255)
+    owner_email: EmailStr
+    password: str = Field(..., min_length=8, description="Minimum 8 characters")
+    confirm_password: str = Field(..., min_length=8)
+    phone: str | None = Field(None, max_length=50)
+    address: str | None = Field(None, max_length=500)
+    country: str | None = Field(None, max_length=120)
+    currency: str | None = Field(None, max_length=12)
+
+
+class RegisterRestaurantResponse(BaseModel):
+    message: str
+    restaurant_id: int
+    owner_email: EmailStr

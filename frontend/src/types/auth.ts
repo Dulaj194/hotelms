@@ -36,3 +36,21 @@ export interface ResetPasswordRequest {
 export interface GenericMessageResponse {
   message: string;
 }
+
+export interface RegisterRestaurantRequest {
+  restaurant_name: string;
+  owner_full_name: string;
+  owner_email: string;
+  password: string;
+  confirm_password: string;
+  phone?: string;
+  address?: string;
+  country?: string;
+  currency?: string;
+}
+
+export interface RegisterRestaurantResponse {
+  message: string;
+  restaurant_id: number;
+  owner_email: string;
+}
