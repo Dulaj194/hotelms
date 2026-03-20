@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Clock3, Star } from "lucide-react";
 import { api } from "@/lib/api";
 import DashboardLayout from "@/components/shared/DashboardLayout";
+import type { DashboardSubscriptionSummary, AdminDashboardOverviewResponse } from "@/types/dashboard";
 import type {
   RestaurantLogoUploadResponse,
   RestaurantMeResponse,
@@ -37,18 +39,22 @@ export default function RestaurantProfile() {
   const [setupCurrency, setSetupCurrency] = useState("");
   const [setupSaving, setSetupSaving] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
+  const [subscriptionSummary, setSubscriptionSummary] = useState<DashboardSubscriptionSummary | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    api
-      .get<RestaurantMeResponse>("/restaurants/me")
-      .then((data) => {
-        setRestaurant(data);
-        resetForm(data);
-        const countryMissing = !data.country || !data.country.trim();
-        const currencyMissing = !data.currency || !data.currency.trim();
+    Promise.all([
+      api.get<RestaurantMeResponse>("/restaurants/me"),
+      api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview"),
+    ])
+      .then(([restaurantData, overviewData]) => {
+        setRestaurant(restaurantData);
+        setSubscriptionSummary(overviewData.subscription);
+        resetForm(restaurantData);
+        const countryMissing = !restaurantData.country || !restaurantData.country.trim();
+        const currencyMissing = !restaurantData.currency || !restaurantData.currency.trim();
         if (countryMissing || currencyMissing) {
-          setSetupCountry(data.country ?? "");
-          setSetupCurrency(data.currency ?? "");
+          setSetupCountry(restaurantData.country ?? "");
+          setSetupCurrency(restaurantData.currency ?? "");
           setSetupModalOpen(true);
         }
       })
@@ -160,9 +166,39 @@ export default function RestaurantProfile() {
     ? `${import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"}${restaurant.logo_url}`
     : null;
 
+  const trialDaysRemaining = subscriptionSummary?.days_remaining ?? null;
+  const showTrialBanner = subscriptionSummary?.is_trial && (trialDaysRemaining === null || trialDaysRemaining >= 0);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {showTrialBanner && (
+          <section className="rounded-lg border-l-4 border-yellow-400 bg-yellow-50 p-5">
+            <h2 className="flex items-center gap-2 text-4xl font-semibold text-slate-900">
+              <Star className="h-8 w-8 fill-slate-900 text-slate-900" />
+              30 days Free Trial
+            </h2>
+            <p className="mt-2 text-xl text-slate-800">
+              You are currently using our free trial. Enjoy all features for {trialDaysRemaining ?? 0} more days!
+            </p>
+            <p className="mt-4 flex items-center gap-2 text-2xl font-bold text-orange-600">
+              <Clock3 className="h-6 w-6" />
+              {trialDaysRemaining ?? 0} days remaining
+            </p>
+            <div className="mt-4 rounded-md bg-sky-100 p-4">
+              <p className="text-lg text-slate-800">
+                Upgrade now to continue using our service without interruption after your trial ends.
+              </p>
+              <button
+                onClick={() => navigate("/admin/subscription")}
+                className="mt-4 rounded-md bg-green-600 px-6 py-2 text-base font-medium text-white hover:bg-green-700"
+              >
+                Upgrade Now
+              </button>
+            </div>
+          </section>
+        )}
+
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">Restaurant Profile</h1>
           <button
