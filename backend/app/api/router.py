@@ -6,6 +6,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.billing.router import router as billing_router
 from app.modules.cart.router import router as cart_router
 from app.modules.categories.router import router as categories_router
+from app.modules.dashboard.router import router as dashboard_router
 from app.modules.health.router import router as health_router
 from app.modules.items.router import router as items_router
 from app.modules.menus.router import router as menus_router
@@ -34,6 +35,7 @@ router = APIRouter(prefix=settings.api_v1_prefix)
 
 router.include_router(health_router, prefix="/health", tags=["health"])
 router.include_router(auth_router, prefix="/auth", tags=["auth"])
+router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 router.include_router(users_router, prefix="/users", tags=["users"])
 router.include_router(restaurants_router, prefix="/restaurants", tags=["restaurants"])
 router.include_router(menus_router, prefix="/menus", tags=["menus"])
