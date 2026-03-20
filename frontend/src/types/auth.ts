@@ -53,4 +53,5 @@ export interface RegisterRestaurantResponse {
   message: string;
   restaurant_id: number;
   owner_email: string;
+  correlation_id?: string;
 }

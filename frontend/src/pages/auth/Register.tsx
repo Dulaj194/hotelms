@@ -11,6 +11,17 @@ interface RegisterFormState extends RegisterRestaurantRequest {
   logo: File | null;
 }
 
+const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const MAX_LOGO_SIZE_MB = 5;
+
+function validatePasswordPolicy(password: string): string | null {
+  if (password.length < 8) return "Password must be at least 8 characters.";
+  if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter.";
+  if (!/[a-z]/.test(password)) return "Password must contain at least one lowercase letter.";
+  if (!/\d/.test(password)) return "Password must contain at least one number.";
+  return null;
+}
+
 export default function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState<RegisterFormState>({
@@ -46,6 +57,12 @@ export default function Register() {
       return;
     }
 
+    const passwordPolicyError = validatePasswordPolicy(form.password);
+    if (passwordPolicyError) {
+      setError(passwordPolicyError);
+      return;
+    }
+
     if (!/^[0-9]{10}$/.test(form.contact_number.trim())) {
       setError("Contact number must be exactly 10 digits.");
       return;
@@ -53,6 +70,16 @@ export default function Register() {
 
     if (!form.logo) {
       setError("Logo image is required.");
+      return;
+    }
+
+    if (!ALLOWED_LOGO_TYPES.includes(form.logo.type)) {
+      setError("Logo must be jpg, png, webp, or gif.");
+      return;
+    }
+
+    if (form.logo.size > MAX_LOGO_SIZE_MB * 1024 * 1024) {
+      setError(`Logo size must be less than ${MAX_LOGO_SIZE_MB} MB.`);
       return;
     }
 
@@ -70,9 +97,18 @@ export default function Register() {
       payload.append("closing_time", form.closing_time);
       payload.append("logo", form.logo);
 
+      const correlationId = crypto.randomUUID();
+      const idempotencyKey = crypto.randomUUID();
+
       const response = await api.post<RegisterRestaurantResponse>(
         "/auth/register-restaurant",
         payload,
+        {
+          headers: {
+            "X-Correlation-ID": correlationId,
+            "X-Idempotency-Key": idempotencyKey,
+          },
+        },
       );
 
       setSuccess(response.message);

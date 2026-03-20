@@ -1,4 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field
+import re
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class LoginRequest(BaseModel):
@@ -59,8 +61,22 @@ class RegisterRestaurantRequest(BaseModel):
     opening_time: str = Field(..., pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
     closing_time: str = Field(..., pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
 
+    @field_validator("password")
+    @classmethod
+    def validate_password_policy(cls, value: str) -> str:
+        if len(value) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        if not re.search(r"[A-Z]", value):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not re.search(r"[a-z]", value):
+            raise ValueError("Password must contain at least one lowercase letter.")
+        if not re.search(r"\d", value):
+            raise ValueError("Password must contain at least one number.")
+        return value
+
 
 class RegisterRestaurantResponse(BaseModel):
     message: str
     restaurant_id: int
     owner_email: EmailStr
+    correlation_id: str | None = None

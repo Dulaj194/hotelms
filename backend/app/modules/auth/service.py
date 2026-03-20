@@ -1,6 +1,6 @@
 import uuid
+import json
 from datetime import UTC, datetime, timedelta, timezone
-from pathlib import Path
 
 import redis as redis_lib
 from fastapi import HTTPException, Response, UploadFile, status
@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.file_storage import delete_uploaded_file, save_upload_file
 from app.core.logging import get_logger
 from app.core.security import (
     create_access_token,
@@ -25,10 +26,9 @@ from app.modules.auth.repository import (
     get_reset_token_by_hash,
     mark_token_used,
 )
+from app.modules.auth import registration_repository
 from app.modules.auth.schemas import ForgotPasswordResponse, TokenResponse
-from app.modules.restaurants.model import Restaurant
 from app.modules.subscriptions import service as subscription_service
-from app.modules.users.model import User, UserRole
 from app.modules.users.repository import (
     get_by_id_global,
     get_user_by_email,
@@ -56,6 +56,12 @@ def _refresh_redis_key(user_id: int, session_id: str) -> str:
 
 def _rate_limit_key(ip: str) -> str:
     return f"rate_limit:login:{ip}"
+
+
+def _registration_idempotency_key(owner_email: str, idempotency_key: str) -> str:
+    normalized_email = owner_email.strip().lower()
+    normalized_key = idempotency_key.strip()
+    return f"idempotency:register:{normalized_email}:{normalized_key}"
 
 
 # ─── Rate limiting ────────────────────────────────────────────────────────────
@@ -123,32 +129,14 @@ def _build_access_payload(
 
 
 async def _save_logo_file(file: UploadFile) -> str:
-    if file.content_type not in _ALLOWED_LOGO_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid logo file type. Allowed: jpg, png, webp, gif.",
-        )
-
-    content = await file.read()
-    if not content:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Logo file is required.",
-        )
-
-    max_bytes = settings.max_upload_size_mb * 1024 * 1024
-    if len(content) > max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Logo exceeds the {settings.max_upload_size_mb} MB size limit.",
-        )
-
-    ext = _LOGO_EXT_MAP[file.content_type]
-    filename = f"{uuid.uuid4().hex}{ext}"
-    upload_path = Path(settings.upload_dir) / "logos"
-    upload_path.mkdir(parents=True, exist_ok=True)
-    (upload_path / filename).write_bytes(content)
-    return f"/uploads/logos/{filename}"
+    return await save_upload_file(
+        file=file,
+        upload_root=settings.upload_dir,
+        subdir="logos",
+        allowed_content_types=_ALLOWED_LOGO_CONTENT_TYPES,
+        ext_map=_LOGO_EXT_MAP,
+        max_size_mb=settings.max_upload_size_mb,
+    )
 
 
 async def register_restaurant(
@@ -164,6 +152,9 @@ async def register_restaurant(
     opening_time: str,
     closing_time: str,
     logo: UploadFile,
+    correlation_id: str | None,
+    ip: str,
+    user_agent: str,
 ) -> tuple[int, str]:
     if password != confirm_password:
         raise HTTPException(
@@ -171,48 +162,55 @@ async def register_restaurant(
             detail="Password and confirm password do not match.",
         )
 
-    if get_user_by_email(db, owner_email):
+    normalized_email = owner_email.strip().lower()
+
+    if get_user_by_email(db, normalized_email):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists.",
         )
 
-    existing_restaurant_email = (
-        db.query(Restaurant)
-        .filter(Restaurant.email == owner_email)
-        .first()
-    )
+    existing_restaurant_email = registration_repository.get_restaurant_by_email(db, normalized_email)
     if existing_restaurant_email:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Restaurant email already in use.",
         )
 
+    logger.info(
+        "event=registration_attempt correlation_id=%s owner_email=%s",
+        correlation_id,
+        normalized_email,
+    )
+    write_audit_log(
+        db,
+        event_type="restaurant_registration_attempt",
+        ip_address=ip,
+        user_agent=user_agent,
+        metadata={"correlation_id": correlation_id, "owner_email": normalized_email},
+    )
+
     logo_url = await _save_logo_file(logo)
 
     try:
-        restaurant = Restaurant(
-            name=restaurant_name,
-            email=owner_email,
-            phone=contact_number,
-            address=address,
+        restaurant = registration_repository.create_restaurant(
+            db,
+            name=restaurant_name.strip(),
+            email=normalized_email,
+            contact_number=contact_number,
+            address=address.strip(),
             opening_time=opening_time,
             closing_time=closing_time,
             logo_url=logo_url,
         )
-        db.add(restaurant)
-        db.flush()
 
-        owner = User(
-            full_name=owner_full_name,
-            email=owner_email,
+        owner = registration_repository.create_linked_admin(
+            db,
+            full_name=owner_full_name.strip(),
+            email=normalized_email,
             password_hash=hash_password(password),
-            role=UserRole.owner,
             restaurant_id=restaurant.id,
-            is_active=True,
-            must_change_password=False,
         )
-        db.add(owner)
 
         subscription_service.assign_initial_trial_subscription(
             db,
@@ -221,23 +219,141 @@ async def register_restaurant(
         )
 
         db.commit()
+        write_audit_log(
+            db,
+            event_type="restaurant_registration_success",
+            user_id=owner.id,
+            ip_address=ip,
+            user_agent=user_agent,
+            metadata={"correlation_id": correlation_id, "restaurant_id": restaurant.id},
+        )
+        logger.info(
+            "event=registration_success correlation_id=%s restaurant_id=%s owner_email=%s",
+            correlation_id,
+            restaurant.id,
+            normalized_email,
+        )
         return restaurant.id, owner.email
     except HTTPException:
         db.rollback()
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=logo_url)
         raise
     except IntegrityError as exc:
         db.rollback()
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=logo_url)
+        write_audit_log(
+            db,
+            event_type="restaurant_registration_failed",
+            ip_address=ip,
+            user_agent=user_agent,
+            metadata={"correlation_id": correlation_id, "reason": "integrity_error"},
+        )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Registration failed because the email already exists.",
+            detail="Registration could not be completed with the provided details.",
         ) from exc
     except Exception as exc:
         db.rollback()
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=logo_url)
+        write_audit_log(
+            db,
+            event_type="restaurant_registration_failed",
+            ip_address=ip,
+            user_agent=user_agent,
+            metadata={"correlation_id": correlation_id, "reason": "unexpected_error"},
+        )
         logger.exception("Restaurant self-registration failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to complete registration at the moment.",
         ) from exc
+
+
+async def register_restaurant_idempotent(
+    db: Session,
+    redis_client: redis_lib.Redis,
+    *,
+    restaurant_name: str,
+    owner_full_name: str,
+    owner_email: str,
+    password: str,
+    confirm_password: str,
+    address: str,
+    contact_number: str,
+    opening_time: str,
+    closing_time: str,
+    logo: UploadFile,
+    idempotency_key: str,
+    correlation_id: str | None,
+    ip: str,
+    user_agent: str,
+) -> tuple[int, str]:
+    redis_key = _registration_idempotency_key(owner_email, idempotency_key)
+    claimed = False
+
+    try:
+        existing = redis_client.get(redis_key)
+        if existing:
+            payload = json.loads(existing)
+            if payload.get("state") == "success":
+                return int(payload["restaurant_id"]), str(payload["owner_email"])
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Registration request is already being processed.",
+            )
+
+        claimed = bool(
+            redis_client.set(
+                redis_key,
+                json.dumps({"state": "processing"}),
+                ex=600,
+                nx=True,
+            )
+        )
+        if not claimed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Duplicate registration request detected. Please retry shortly.",
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.warning("Registration idempotency skipped — Redis unavailable")
+
+    restaurant_id, saved_owner_email = await register_restaurant(
+        db,
+        restaurant_name=restaurant_name,
+        owner_full_name=owner_full_name,
+        owner_email=owner_email,
+        password=password,
+        confirm_password=confirm_password,
+        address=address,
+        contact_number=contact_number,
+        opening_time=opening_time,
+        closing_time=closing_time,
+        logo=logo,
+        correlation_id=correlation_id,
+        ip=ip,
+        user_agent=user_agent,
+    )
+
+    if claimed:
+        try:
+            redis_client.set(
+                redis_key,
+                json.dumps(
+                    {
+                        "state": "success",
+                        "restaurant_id": restaurant_id,
+                        "owner_email": saved_owner_email,
+                    }
+                ),
+                ex=3600,
+            )
+        except Exception:
+            logger.warning("Unable to persist idempotent registration result")
+
+    return restaurant_id, saved_owner_email
 
 
 # ─── Auth operations ──────────────────────────────────────────────────────────

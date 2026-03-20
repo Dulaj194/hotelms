@@ -15,6 +15,10 @@ const REFRESH_PATH = "/auth/refresh";
 
 let refreshPromise: Promise<string | null> | null = null;
 
+export interface ApiRequestOptions {
+  headers?: Record<string, string>;
+}
+
 export class ApiError extends Error {
   status: number;
   detail: string;
@@ -31,6 +35,7 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
+  options?: ApiRequestOptions,
   retryOnAuth = true,
 ): Promise<T> {
   const token = getAccessToken();
@@ -41,6 +46,9 @@ async function request<T>(
   }
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (options?.headers) {
+    Object.assign(headers, options.headers);
   }
 
   const response = await fetch(`${BASE_URL}${path}`, {
@@ -54,7 +62,7 @@ async function request<T>(
   if (response.status === 401 && retryOnAuth && path !== REFRESH_PATH) {
     const nextToken = await refreshAccessToken();
     if (nextToken) {
-      return request<T>(method, path, body, false);
+      return request<T>(method, path, body, options, false);
     }
   }
 
@@ -111,10 +119,10 @@ export async function refreshAccessToken(): Promise<string | null> {
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>("GET", path),
-  post: <T>(path: string, body: unknown) => request<T>("POST", path, body),
-  put: <T>(path: string, body: unknown) => request<T>("PUT", path, body),
-  patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
-  delete: <T>(path: string) => request<T>("DELETE", path),
+  get: <T>(path: string, options?: ApiRequestOptions) => request<T>("GET", path, undefined, options),
+  post: <T>(path: string, body: unknown, options?: ApiRequestOptions) => request<T>("POST", path, body, options),
+  put: <T>(path: string, body: unknown, options?: ApiRequestOptions) => request<T>("PUT", path, body, options),
+  patch: <T>(path: string, body: unknown, options?: ApiRequestOptions) => request<T>("PATCH", path, body, options),
+  delete: <T>(path: string, options?: ApiRequestOptions) => request<T>("DELETE", path, undefined, options),
 };
 

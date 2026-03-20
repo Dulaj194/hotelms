@@ -1,5 +1,7 @@
 import redis as redis_lib
-from fastapi import APIRouter, Cookie, Depends, File, Form, HTTPException, Request, Response, UploadFile, status
+import uuid
+
+from fastapi import APIRouter, Cookie, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db, get_redis
@@ -121,6 +123,7 @@ def get_me(current_user: User = Depends(get_current_user)) -> User:
 
 @router.post("/register-restaurant", response_model=RegisterRestaurantResponse)
 async def register_restaurant(
+    request: Request,
     restaurant_name: str = Form(..., min_length=1, max_length=255),
     owner_full_name: str = Form(..., min_length=1, max_length=255),
     owner_email: str = Form(...),
@@ -131,8 +134,13 @@ async def register_restaurant(
     opening_time: str = Form(..., pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$"),
     closing_time: str = Form(..., pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$"),
     logo: UploadFile = File(...),
+    idempotency_key: str = Header(..., alias="X-Idempotency-Key"),
+    correlation_id: str | None = Header(default=None, alias="X-Correlation-ID"),
     db: Session = Depends(get_db),
+    redis_client: redis_lib.Redis = Depends(get_redis),
 ) -> RegisterRestaurantResponse:
+    final_correlation_id = correlation_id or str(uuid.uuid4())
+
     payload = RegisterRestaurantRequest(
         restaurant_name=restaurant_name,
         owner_full_name=owner_full_name,
@@ -145,8 +153,9 @@ async def register_restaurant(
         closing_time=closing_time,
     )
 
-    restaurant_id, saved_owner_email = await service.register_restaurant(
+    restaurant_id, saved_owner_email = await service.register_restaurant_idempotent(
         db,
+        redis_client,
         restaurant_name=payload.restaurant_name,
         owner_full_name=payload.owner_full_name,
         owner_email=str(payload.owner_email),
@@ -157,9 +166,14 @@ async def register_restaurant(
         opening_time=payload.opening_time,
         closing_time=payload.closing_time,
         logo=logo,
+        idempotency_key=idempotency_key,
+        correlation_id=final_correlation_id,
+        ip=_client_ip(request),
+        user_agent=_user_agent(request),
     )
     return RegisterRestaurantResponse(
         message="Restaurant registered successfully. You can now sign in.",
         restaurant_id=restaurant_id,
         owner_email=saved_owner_email,
+        correlation_id=final_correlation_id,
     )
