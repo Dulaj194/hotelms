@@ -42,11 +42,17 @@ export default function Menus() {
   const loadMenus = useCallback(async () => {
     setLoading(true);
     setError(null);
+    console.log("[🍽️ Menus] Loading started...");
     try {
       const res = await api.get<Menu[]>("/menus");
+      console.log(`[🍽️ Menus] ✅ Loaded ${res.length} menus`, res);
       setMenus(res);
-    } catch {
-      setError("Failed to load menus.");
+    } catch (err: unknown) {
+      const errMsg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail ?? "Failed to load menus";
+      console.error("[🍽️ Menus] ❌ API Error:", errMsg, err);
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
