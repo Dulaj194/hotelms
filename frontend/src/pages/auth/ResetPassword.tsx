@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { api } from "@/lib/api";
 import type { GenericMessageResponse } from "@/types/auth";
@@ -144,12 +144,12 @@ export default function ResetPassword() {
         </form>
 
         <p className="text-center text-sm text-muted-foreground">
-          <a
-            href="/login"
+          <Link
+            to="/login"
             className="underline underline-offset-4 hover:text-foreground transition-colors"
           >
             Back to sign in
-          </a>
+          </Link>
         </p>
       </div>
     </div>

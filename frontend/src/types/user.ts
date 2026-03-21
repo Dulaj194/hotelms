@@ -1,19 +1,28 @@
 export type UserRole = "owner" | "admin" | "steward" | "housekeeper" | "super_admin";
+export type AssignedArea = "kitchen" | "housekeeping" | "steward";
 
 export interface StaffListItemResponse {
   id: number;
   full_name: string;
   email: string;
+  username: string | null;
+  phone: string | null;
   role: UserRole;
+  assigned_area: AssignedArea | null;
   is_active: boolean;
   last_login_at: string | null;
+  pending_tasks_count: number;
+  load_per_staff: number;
 }
 
 export interface StaffDetailResponse {
   id: number;
   full_name: string;
   email: string;
+  username: string | null;
+  phone: string | null;
   role: UserRole;
+  assigned_area: AssignedArea | null;
   is_active: boolean;
   restaurant_id: number | null;
   created_at: string;
@@ -28,15 +37,23 @@ export interface StaffDetailResponse {
 export interface StaffCreateRequest {
   full_name: string;
   email: string;
+  username: string;
+  phone: string;
   password: string;
   role: UserRole;
+  assigned_area: AssignedArea | null;
+  is_active: boolean;
 }
 
 export interface StaffUpdateRequest {
   full_name?: string;
   email?: string;
+  username?: string;
+  phone?: string;
   password?: string;
   role?: UserRole;
+  assigned_area?: AssignedArea | null;
+  is_active?: boolean;
 }
 
 export interface StaffStatusResponse {
@@ -57,4 +74,12 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   steward: "Steward",
   housekeeper: "Housekeeper",
   super_admin: "Super Admin",
+};
+
+export const ASSIGNED_AREAS: AssignedArea[] = ["kitchen", "housekeeping", "steward"];
+
+export const ASSIGNED_AREA_LABELS: Record<AssignedArea, string> = {
+  kitchen: "Kitchen",
+  housekeeping: "Housekeeping",
+  steward: "Steward",
 };

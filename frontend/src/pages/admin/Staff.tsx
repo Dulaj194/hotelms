@@ -1,24 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import type {
+  AssignedArea,
   StaffListItemResponse,
   StaffCreateRequest,
   StaffUpdateRequest,
   UserRole,
 } from "@/types/user";
-import { ROLE_LABELS, STAFF_ROLES } from "@/types/user";
+import {
+  ASSIGNED_AREAS,
+  ASSIGNED_AREA_LABELS,
+  ROLE_LABELS,
+  STAFF_ROLES,
+} from "@/types/user";
+import { ApiError } from "@/lib/api";
+import { getUser, normalizeRole } from "@/lib/auth";
 
 type DialogMode = { type: "add" } | { type: "edit"; staff: StaffListItemResponse } | null;
 
 const EMPTY_CREATE: StaffCreateRequest = {
   full_name: "",
   email: "",
+  username: "",
+  phone: "",
   password: "",
   role: "steward",
+  assigned_area: "steward",
+  is_active: true,
 };
 
 export default function Staff() {
+  const currentUserRole = normalizeRole(getUser()?.role);
+
+  function canManageRole(targetRole: UserRole): boolean {
+    if (currentUserRole === "owner") return targetRole !== "owner";
+    if (currentUserRole === "admin") return targetRole === "steward" || targetRole === "housekeeper";
+    return false;
+  }
+
   const [staffList, setStaffList] = useState<StaffListItemResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -27,32 +47,65 @@ export default function Staff() {
   const [formData, setFormData] = useState<StaffCreateRequest>(EMPTY_CREATE);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   const [pageMsg, setPageMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
+  const allowedRoles = useMemo<UserRole[]>(() => {
+    if (currentUserRole === "owner") {
+      return STAFF_ROLES.filter((role) => role !== "owner");
+    }
+    if (currentUserRole === "admin") {
+      return ["steward", "housekeeper"];
+    }
+    return ["steward", "housekeeper"];
+  }, [currentUserRole]);
+
   function loadStaff() {
     setLoading(true);
+    setFetchError(null);
     api
       .get<StaffListItemResponse[]>("/users")
       .then(setStaffList)
-      .catch(() => setFetchError("Failed to load staff list."))
+      .catch((err: unknown) => {
+        const msg =
+          err instanceof ApiError
+            ? err.detail
+            : err instanceof Error
+              ? err.message
+              : "Failed to load staff list.";
+        setFetchError(msg);
+      })
       .finally(() => setLoading(false));
   }
 
   useEffect(() => { loadStaff(); }, []);
 
   function openAdd() {
-    setFormData(EMPTY_CREATE);
+    setFormData({
+      ...EMPTY_CREATE,
+      role: allowedRoles[0] ?? "steward",
+      assigned_area: "steward",
+    });
     setFormError(null);
     setDialog({ type: "add" });
   }
 
   function openEdit(s: StaffListItemResponse) {
+    if (!canManageRole(s.role)) {
+      setPageMsg({ type: "err", text: "You are not allowed to edit this role." });
+      return;
+    }
     setFormData({
       full_name: s.full_name,
       email: s.email,
+      username: s.username ?? "",
+      phone: s.phone ?? "",
       password: "",
       role: s.role,
+      assigned_area: s.assigned_area,
+      is_active: s.is_active,
     });
     setFormError(null);
     setDialog({ type: "edit", staff: s });
@@ -65,6 +118,36 @@ export default function Staff() {
 
   async function handleSubmit() {
     if (!dialog) return;
+
+    if (!formData.full_name.trim() || !formData.email.trim() || !formData.username.trim() || !formData.phone.trim()) {
+      setFormError("Name, email, username, and contact are required.");
+      return;
+    }
+    if (dialog.type === "add" && !formData.password.trim()) {
+      setFormError("Password is required for new staff accounts.");
+      return;
+    }
+
+    const duplicate = staffList.find((staff) => {
+      if (dialog.type === "edit" && staff.id === dialog.staff.id) return false;
+      return (
+        staff.email.toLowerCase() === formData.email.trim().toLowerCase() ||
+        (staff.username ?? "").toLowerCase() === formData.username.trim().toLowerCase() ||
+        (staff.phone ?? "") === formData.phone.trim()
+      );
+    });
+
+    if (duplicate) {
+      setFormError("Duplicate account detected: email, username, or contact already exists.");
+      return;
+    }
+
+    const confirmationText =
+      dialog.type === "add"
+        ? `Create staff account for ${formData.full_name.trim()}?`
+        : `Save updates for ${dialog.staff.full_name}?`;
+    if (!window.confirm(confirmationText)) return;
+
     setSubmitting(true);
     setFormError(null);
 
@@ -72,23 +155,31 @@ export default function Staff() {
       if (dialog.type === "add") {
         // SECURITY: No restaurant_id sent — backend derives it from token
         await api.post<StaffListItemResponse>("/users", formData);
-        setPageMsg({ type: "ok", text: "Staff member added." });
+        setPageMsg({ type: "ok", text: "Staff member added successfully." });
       } else {
         // Only send changed fields for edit; skip empty password
         const payload: StaffUpdateRequest = {
           full_name: formData.full_name || undefined,
           email: formData.email || undefined,
+          username: formData.username || undefined,
+          phone: formData.phone || undefined,
           role: formData.role,
+          assigned_area: formData.assigned_area,
+          is_active: formData.is_active,
         };
         if (formData.password) payload.password = formData.password;
         await api.patch<StaffListItemResponse>(`/users/${dialog.staff.id}`, payload);
-        setPageMsg({ type: "ok", text: "Staff member updated." });
+        setPageMsg({ type: "ok", text: "Staff member updated successfully." });
       }
       closeDialog();
       loadStaff();
     } catch (err: unknown) {
       const msg =
-        err instanceof Error ? err.message : "An error occurred.";
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "An error occurred.";
       setFormError(msg);
     } finally {
       setSubmitting(false);
@@ -96,38 +187,72 @@ export default function Staff() {
   }
 
   async function handleDisable(id: number) {
+    if (!window.confirm("Deactivate this staff account now?")) return;
     setPageMsg(null);
     try {
       await api.patch(`/users/${id}/disable`, {});
       setPageMsg({ type: "ok", text: "Staff member disabled." });
       loadStaff();
     } catch (err: unknown) {
-      setPageMsg({ type: "err", text: err instanceof Error ? err.message : "Failed to disable." });
+      setPageMsg({
+        type: "err",
+        text: err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Failed to disable.",
+      });
     }
   }
 
   async function handleEnable(id: number) {
+    if (!window.confirm("Reactivate this staff account?")) return;
     setPageMsg(null);
     try {
       await api.patch(`/users/${id}/enable`, {});
       setPageMsg({ type: "ok", text: "Staff member enabled." });
       loadStaff();
     } catch (err: unknown) {
-      setPageMsg({ type: "err", text: err instanceof Error ? err.message : "Failed to enable." });
+      setPageMsg({
+        type: "err",
+        text: err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Failed to enable.",
+      });
     }
   }
 
   async function handleDelete(id: number, name: string) {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete "${name}" permanently? (Deactivate first recommended)`)) return;
     setPageMsg(null);
     try {
       await api.delete(`/users/${id}`);
       setPageMsg({ type: "ok", text: "Staff member deleted." });
       loadStaff();
     } catch (err: unknown) {
-      setPageMsg({ type: "err", text: err instanceof Error ? err.message : "Failed to delete." });
+      setPageMsg({
+        type: "err",
+        text: err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Failed to delete.",
+      });
     }
   }
+
+  const filteredStaff = useMemo(() => {
+    return staffList.filter((staff) => {
+      const roleMatched = roleFilter === "all" || staff.role === roleFilter;
+      const statusMatched =
+        statusFilter === "all" ||
+        (statusFilter === "active" ? staff.is_active : !staff.is_active);
+      return roleMatched && statusMatched;
+    });
+  }, [roleFilter, statusFilter, staffList]);
+
+  const activeCount = staffList.filter((staff) => staff.is_active).length;
+  const inactiveCount = staffList.length - activeCount;
+  const activeStewards = staffList.filter(
+    (staff) => staff.role === "steward" && staff.is_active
+  ).length;
+  const activeHousekeepers = staffList.filter(
+    (staff) => staff.role === "housekeeper" && staff.is_active
+  ).length;
+  const kitchenPending =
+    staffList.find((staff) => staff.role === "steward")?.pending_tasks_count ?? 0;
+  const housekeepingPending =
+    staffList.find((staff) => staff.role === "housekeeper")?.pending_tasks_count ?? 0;
 
   return (
     <DashboardLayout>
@@ -152,11 +277,55 @@ export default function Staff() {
           </p>
         )}
 
+        <div className="grid gap-3 md:grid-cols-4">
+          <Metric title="Active Staff" value={activeCount} />
+          <Metric title="Inactive Staff" value={inactiveCount} />
+          <Metric
+            title="Kitchen Load"
+            value={`${kitchenPending} pending / ${activeStewards || 1} active`}
+          />
+          <Metric
+            title="Housekeeping Load"
+            value={`${housekeepingPending} pending / ${activeHousekeepers || 1} active`}
+          />
+        </div>
+
+        <div className="rounded-lg border bg-white p-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex gap-2 items-center">
+            <label className="text-sm text-gray-600">Role</label>
+            <select
+              className="rounded-md border px-3 py-1.5 text-sm"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value as UserRole | "all")}
+            >
+              <option value="all">All roles</option>
+              {STAFF_ROLES.map((role) => (
+                <option key={role} value={role}>
+                  {ROLE_LABELS[role]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex gap-2 items-center">
+            <label className="text-sm text-gray-600">Status</label>
+            <select
+              className="rounded-md border px-3 py-1.5 text-sm"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+
         {loading ? (
           <p className="text-gray-500 text-sm">Loading…</p>
         ) : fetchError ? (
           <p className="text-red-600 text-sm">{fetchError}</p>
-        ) : staffList.length === 0 ? (
+        ) : filteredStaff.length === 0 ? (
           <p className="text-gray-400 text-sm">No staff found. Add the first member.</p>
         ) : (
           <div className="rounded-lg border bg-white overflow-hidden">
@@ -164,21 +333,35 @@ export default function Staff() {
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Username</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Contact</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Area</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Load</th>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
                   <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {staffList.map((s) => (
+                {filteredStaff.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">{s.full_name}</td>
+                    <td className="px-4 py-3 text-gray-600">{s.username ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-600">{s.phone ?? "—"}</td>
                     <td className="px-4 py-3 text-gray-500">{s.email}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
                         {ROLE_LABELS[s.role]}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {s.pending_tasks_count > 0
+                        ? `${s.pending_tasks_count} / ${s.load_per_staff.toFixed(2)}`
+                        : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -193,33 +376,39 @@ export default function Staff() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => openEdit(s)}
-                          className="text-xs font-medium text-blue-600 hover:underline"
-                        >
-                          Edit
-                        </button>
-                        {s.is_active ? (
-                          <button
-                            onClick={() => handleDisable(s.id)}
-                            className="text-xs font-medium text-amber-600 hover:underline"
-                          >
-                            Disable
-                          </button>
+                        {canManageRole(s.role) ? (
+                          <>
+                            <button
+                              onClick={() => openEdit(s)}
+                              className="text-xs font-medium text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </button>
+                            {s.is_active ? (
+                              <button
+                                onClick={() => handleDisable(s.id)}
+                                className="text-xs font-medium text-amber-600 hover:underline"
+                              >
+                                Disable
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleEnable(s.id)}
+                                className="text-xs font-medium text-green-600 hover:underline"
+                              >
+                                Enable
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDelete(s.id, s.full_name)}
+                              className="text-xs font-medium text-red-600 hover:underline"
+                            >
+                              Delete
+                            </button>
+                          </>
                         ) : (
-                          <button
-                            onClick={() => handleEnable(s.id)}
-                            className="text-xs font-medium text-green-600 hover:underline"
-                          >
-                            Enable
-                          </button>
+                          <span className="text-xs text-gray-400">Restricted</span>
                         )}
-                        <button
-                          onClick={() => handleDelete(s.id, s.full_name)}
-                          className="text-xs font-medium text-red-600 hover:underline"
-                        >
-                          Delete
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -250,6 +439,18 @@ export default function Staff() {
               onChange={(v) => setFormData((f) => ({ ...f, email: v }))}
             />
             <StaffFormField
+              label="Username *"
+              value={formData.username}
+              onChange={(v) =>
+                setFormData((f) => ({ ...f, username: v.toLowerCase().replace(/\s+/g, "") }))
+              }
+            />
+            <StaffFormField
+              label="Contact Number *"
+              value={formData.phone}
+              onChange={(v) => setFormData((f) => ({ ...f, phone: v }))}
+            />
+            <StaffFormField
               label={dialog.type === "add" ? "Password *" : "New password (leave blank to keep)"}
               type="password"
               value={formData.password}
@@ -264,13 +465,43 @@ export default function Staff() {
                   setFormData((f) => ({ ...f, role: e.target.value as UserRole }))
                 }
               >
-                {STAFF_ROLES.map((r) => (
+                {allowedRoles.map((r) => (
                   <option key={r} value={r}>
                     {ROLE_LABELS[r]}
                   </option>
                 ))}
               </select>
             </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Assigned Area</label>
+              <select
+                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={formData.assigned_area ?? ""}
+                onChange={(e) =>
+                  setFormData((f) => ({
+                    ...f,
+                    assigned_area: (e.target.value || null) as AssignedArea | null,
+                  }))
+                }
+              >
+                <option value="">Not assigned</option>
+                {ASSIGNED_AREAS.map((area) => (
+                  <option key={area} value={area}>
+                    {ASSIGNED_AREA_LABELS[area]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={formData.is_active}
+                onChange={(e) => setFormData((f) => ({ ...f, is_active: e.target.checked }))}
+              />
+              Active status
+            </label>
 
             {formError && <p className="text-sm text-red-600">{formError}</p>}
 
@@ -293,6 +524,15 @@ export default function Staff() {
         </div>
       )}
     </DashboardLayout>
+  );
+}
+
+function Metric({ title, value }: { title: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border bg-white p-3">
+      <p className="text-xs text-gray-500">{title}</p>
+      <p className="mt-1 text-lg font-semibold text-gray-900">{value}</p>
+    </div>
   );
 }
 

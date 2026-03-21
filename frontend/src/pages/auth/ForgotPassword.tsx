@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { api } from "@/lib/api";
 import type { ForgotPasswordResponse } from "@/types/auth";
@@ -93,24 +94,24 @@ export default function ForgotPassword() {
                 <p className="text-xs text-yellow-700 break-all font-mono">
                   {devToken}
                 </p>
-                <a
-                  href={`/reset-password?token=${devToken}`}
+                <Link
+                  to={`/reset-password?token=${encodeURIComponent(devToken)}`}
                   className="text-xs text-yellow-800 underline"
                 >
                   Open reset page →
-                </a>
+                </Link>
               </div>
             )}
           </div>
         )}
 
         <p className="text-center text-sm text-muted-foreground">
-          <a
-            href="/login"
+          <Link
+            to="/login"
             className="underline underline-offset-4 hover:text-foreground transition-colors"
           >
             Back to sign in
-          </a>
+          </Link>
         </p>
       </div>
     </div>

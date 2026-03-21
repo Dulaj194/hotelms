@@ -24,6 +24,7 @@ export default function Menus() {
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMenu, setEditingMenu] = useState<Menu | null>(null);
@@ -71,16 +72,7 @@ export default function Menus() {
   }
 
   function openEdit(menu: Menu) {
-    setEditingMenu(menu);
-    setFormData({
-      name: menu.name,
-      description: menu.description ?? "",
-      sort_order: menu.sort_order,
-      is_active: menu.is_active,
-    });
-    setSelectedImageFile(null);
-    setFormError(null);
-    setModalOpen(true);
+    navigate(`/admin/menu/menus/edit/${menu.id}`);
   }
 
   async function handleSave() {
@@ -154,11 +146,19 @@ export default function Menus() {
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
+    setError(null);
+    setSuccessMessage(null);
     try {
+      const targetName = deleteTarget.name;
       await api.delete(`/menus/${deleteTarget.id}`);
       setDeleteTarget(null);
       await loadMenus();
-    } catch {
+      setSuccessMessage(`Menu \"${targetName}\" deleted successfully.`);
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data
+          ?.detail ?? "Failed to delete menu.";
+      setError(msg);
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
@@ -210,6 +210,7 @@ export default function Menus() {
 
       {loading && <p className="text-gray-500 text-sm">Loading...</p>}
       {error && <p className="text-red-500 text-sm">{error}</p>}
+      {successMessage && <p className="text-green-600 text-sm">{successMessage}</p>}
 
       {!loading && !error && menus.length === 0 && (
         <p className="text-gray-400 text-sm">

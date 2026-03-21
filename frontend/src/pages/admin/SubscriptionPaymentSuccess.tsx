@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
@@ -50,12 +50,12 @@ export default function SubscriptionPaymentSuccess() {
         {sessionId && <p className="mt-2 text-xs text-gray-500">Session: {sessionId}</p>}
         <p className="mt-4 text-sm text-gray-700">{message}</p>
         {!loading && (
-          <a
-            href="/admin/subscription"
+          <Link
+            to="/admin/subscription"
             className="mt-6 inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
           >
             Back to Subscription
-          </a>
+          </Link>
         )}
       </div>
     </DashboardLayout>

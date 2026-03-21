@@ -56,6 +56,18 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
 
     user_column_patches: Sequence[tuple[str, str]] = (
         (
+            "username",
+            "ALTER TABLE users ADD COLUMN username VARCHAR(64) NULL UNIQUE",
+        ),
+        (
+            "phone",
+            "ALTER TABLE users ADD COLUMN phone VARCHAR(32) NULL UNIQUE",
+        ),
+        (
+            "assigned_area",
+            "ALTER TABLE users ADD COLUMN assigned_area VARCHAR(32) NULL",
+        ),
+        (
             "must_change_password",
             "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE",
         ),

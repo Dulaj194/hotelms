@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { ApiError, api } from "@/lib/api";
 import { setAccessToken, setUser, getRoleRedirect } from "@/lib/auth";
@@ -129,12 +129,12 @@ export default function Login() {
         </form>
 
         <p className="text-center text-sm text-muted-foreground">
-          <a
-            href="/forgot-password"
+          <Link
+            to="/forgot-password"
             className="underline underline-offset-4 hover:text-foreground transition-colors"
           >
             Forgot your password?
-          </a>
+          </Link>
         </p>
       </div>
     </div>

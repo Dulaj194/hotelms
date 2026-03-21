@@ -1,7 +1,10 @@
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.modules.audit_logs.service import write_audit_log
+from app.modules.housekeeping.model import HousekeepingRequest
+from app.modules.orders.model import OrderHeader, OrderStatus
 from app.modules.restaurants import repository as restaurant_repository
 from app.modules.users.model import User, UserRole
 from app.modules.users.repository import (
@@ -14,6 +17,8 @@ from app.modules.users.repository import (
     get_by_id,
     get_by_id_global,
     get_user_by_email,
+    get_user_by_phone,
+    get_user_by_username,
     list_by_restaurant,
     update_by_id,
 )
@@ -70,8 +75,68 @@ def create_user(db: Session, data: UserCreate) -> UserResponse:
 
 def list_staff(db: Session, restaurant_id: int) -> list[StaffListItemResponse]:
     """List all staff for the current tenant restaurant."""
-    users = list_by_restaurant(db, restaurant_id)
-    return [StaffListItemResponse.model_validate(u) for u in users]
+    return list_staff_filtered(db, restaurant_id)
+
+
+def list_staff_filtered(
+    db: Session,
+    restaurant_id: int,
+    role: UserRole | None = None,
+    is_active: bool | None = None,
+) -> list[StaffListItemResponse]:
+    users = list_by_restaurant(db, restaurant_id, role=role, is_active=is_active)
+
+    pending_kitchen = int(
+        db.query(func.count(OrderHeader.id))
+        .filter(
+            OrderHeader.restaurant_id == restaurant_id,
+            OrderHeader.status.in_(
+                [OrderStatus.pending, OrderStatus.confirmed, OrderStatus.processing]
+            ),
+        )
+        .scalar()
+        or 0
+    )
+    pending_housekeeping = int(
+        db.query(func.count(HousekeepingRequest.id))
+        .filter(
+            HousekeepingRequest.restaurant_id == restaurant_id,
+            HousekeepingRequest.status == "pending",
+        )
+        .scalar()
+        or 0
+    )
+
+    active_stewards = sum(1 for user in users if user.role == UserRole.steward and user.is_active)
+    active_housekeepers = sum(
+        1 for user in users if user.role == UserRole.housekeeper and user.is_active
+    )
+
+    result: list[StaffListItemResponse] = []
+    for user in users:
+        item = StaffListItemResponse.model_validate(user)
+        if user.role == UserRole.steward:
+            setattr(item, "pending_tasks_count", pending_kitchen)
+            setattr(
+                item,
+                "load_per_staff",
+                round(pending_kitchen / active_stewards, 2) if active_stewards else float(pending_kitchen),
+            )
+        elif user.role == UserRole.housekeeper:
+            setattr(item, "pending_tasks_count", pending_housekeeping)
+            setattr(
+                item,
+                "load_per_staff",
+                round(pending_housekeeping / active_housekeepers, 2)
+                if active_housekeepers
+                else float(pending_housekeeping),
+            )
+        else:
+            setattr(item, "pending_tasks_count", 0)
+            setattr(item, "load_per_staff", 0.0)
+        result.append(item)
+
+    return result
 
 
 # ─── Staff CRUD ───────────────────────────────────────────────────────────────
@@ -123,6 +188,11 @@ def add_staff(
             detail="No restaurant context.",
         )
 
+    normalized_username = data.username.strip().lower() if data.username else None
+    normalized_phone = data.phone.strip() if data.phone else None
+    data.username = normalized_username
+    data.phone = normalized_phone
+
     # Check email uniqueness globally (email is unique across all tenants)
     if get_user_by_email(db, data.email):
         raise HTTPException(
@@ -130,7 +200,19 @@ def add_staff(
             detail="A user with this email already exists.",
         )
 
-    require_password_change = current_user.role == UserRole.super_admin
+    if normalized_username and get_user_by_username(db, normalized_username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this username already exists.",
+        )
+
+    if normalized_phone and get_user_by_phone(db, normalized_phone):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this contact number already exists.",
+        )
+
+    require_password_change = True
     user = create_staff(
         db,
         target_restaurant_id,
@@ -181,6 +263,26 @@ def update_staff(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A user with this email already exists.",
             )
+
+    if data.username is not None:
+        normalized_username = data.username.strip().lower()
+        if normalized_username != (existing.username or ""):
+            if get_user_by_username(db, normalized_username):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A user with this username already exists.",
+                )
+        data.username = normalized_username
+
+    if data.phone is not None:
+        normalized_phone = data.phone.strip()
+        if normalized_phone != (existing.phone or ""):
+            if get_user_by_phone(db, normalized_phone):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A user with this contact number already exists.",
+                )
+        data.phone = normalized_phone
 
     updated = update_by_id(db, user_id, restaurant_id, data)
     if not updated:
@@ -252,6 +354,13 @@ def enable_staff(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff member not found.")
 
+    write_audit_log(
+        db,
+        event_type="staff_enabled",
+        user_id=current_user.id,
+        metadata={"enabled_user_id": user_id},
+    )
+
     return StaffStatusResponse(id=user.id, is_active=True, message="Staff member enabled.")
 
 
@@ -279,6 +388,12 @@ def delete_staff(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot delete the last active owner of the restaurant.",
+        )
+
+    if existing.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Deactivate the staff account before deleting it.",
         )
 
     deleted = delete_by_id(db, user_id, restaurant_id)

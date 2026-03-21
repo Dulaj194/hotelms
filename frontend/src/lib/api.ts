@@ -15,6 +15,12 @@ const REFRESH_PATH = "/auth/refresh";
 
 let refreshPromise: Promise<string | null> | null = null;
 
+function redirectToLoginIfNeeded(): void {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === "/login") return;
+  window.location.replace("/login");
+}
+
 export interface ApiRequestOptions {
   headers?: Record<string, string>;
 }
@@ -97,18 +103,22 @@ export async function refreshAccessToken(): Promise<string | null> {
 
       if (!response.ok) {
         clearAuth();
+        redirectToLoginIfNeeded();
         return null;
       }
 
       const payload = (await response.json()) as { access_token?: string };
       if (!payload.access_token) {
         clearAuth();
+        redirectToLoginIfNeeded();
         return null;
       }
 
       setAccessToken(payload.access_token);
       return payload.access_token;
     } catch {
+      clearAuth();
+      redirectToLoginIfNeeded();
       return null;
     } finally {
       refreshPromise = null;

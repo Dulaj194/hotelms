@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
 from app.modules.users import service
 from app.modules.users.model import User
+from app.modules.users.model import UserRole
 from app.modules.users.schemas import (
     GenericMessageResponse,
     StaffCreateRequest,
@@ -22,11 +23,18 @@ router = APIRouter()
 
 @router.get("", response_model=list[StaffListItemResponse])
 def list_staff(
+    role: UserRole | None = Query(default=None),
+    is_active: bool | None = Query(default=None),
     current_user: User = Depends(require_roles("owner", "admin")),
     db: Session = Depends(get_db),
 ) -> list[StaffListItemResponse]:
     """List all staff for the current restaurant. Owner/admin only."""
-    return service.list_staff(db, current_user.restaurant_id)  # type: ignore[arg-type]
+    return service.list_staff_filtered(  # type: ignore[arg-type]
+        db,
+        current_user.restaurant_id,
+        role=role,
+        is_active=is_active,
+    )
 
 
 @router.post("", response_model=StaffDetailResponse, status_code=status.HTTP_201_CREATED)

@@ -5,6 +5,7 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.file_storage import delete_uploaded_file
 from app.modules.menus import repository
 from app.modules.menus.schemas import (
     MenuCreateRequest,
@@ -44,10 +45,19 @@ def update_menu(
 
 
 def delete_menu(db: Session, menu_id: int, restaurant_id: int) -> dict:
+    menu = repository.get_by_id(db, menu_id, restaurant_id)
+    if not menu:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu not found.")
+
+    image_path = menu.image_path
     deleted = repository.delete_by_id(db, menu_id, restaurant_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu not found.")
-    return {"message": "Menu deleted."}
+
+    if image_path:
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
+
+    return {"message": "Menu deleted.", "menu_id": menu_id}
 
 
 async def upload_menu_image(

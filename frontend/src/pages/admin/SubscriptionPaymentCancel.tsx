@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 import DashboardLayout from "@/components/shared/DashboardLayout";
 
 export default function SubscriptionPaymentCancel() {
@@ -8,12 +10,12 @@ export default function SubscriptionPaymentCancel() {
         <p className="mt-4 text-sm text-gray-700">
           The checkout was cancelled. You can select a package and try again.
         </p>
-        <a
-          href="/admin/subscription"
+        <Link
+          to="/admin/subscription"
           className="mt-6 inline-flex rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
         >
           Back to Subscription
-        </a>
+        </Link>
       </div>
     </DashboardLayout>
   );

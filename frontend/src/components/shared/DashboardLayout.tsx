@@ -1,7 +1,9 @@
+import { useMemo, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   BedDouble,
+  ChevronDown,
   ClipboardList,
   CookingPot,
   HandPlatter,
@@ -27,6 +29,12 @@ interface NavItem {
   icon: ComponentType<{ className?: string }>;
   roles: string[] | null;
   privilege?: string;
+}
+
+interface MenuSubItem {
+  path: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -129,9 +137,25 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const user = getUser();
   const role = normalizeRole(user?.role);
   const { loading: privilegesLoading, hasPrivilege } = useSubscriptionPrivileges();
+  const [menusOpen, setMenusOpen] = useState(true);
+
+  const menuSubItems: MenuSubItem[] = useMemo(
+    () => [
+      { path: "/admin/menu/menus", label: "Add Menu", icon: SquareMenu },
+      { path: "/admin/menu/categories", label: "Add Category", icon: ClipboardList },
+      { path: "/admin/menu/subcategories", label: "Add Subcategories", icon: Tags },
+      { path: "/admin/menu/items", label: "Add Food Items", icon: HandPlatter },
+    ],
+    []
+  );
+
+  const menuPaths = useMemo(() => menuSubItems.map((item) => item.path), [menuSubItems]);
+  const isMenuGroupVisible = role === "owner" || role === "admin";
+  const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
 
   const navItems = ALL_NAV_ITEMS.filter(
     (item) =>
+      !menuPaths.includes(item.path) &&
       (item.roles === null || item.roles.includes(role)) &&
       (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
   );
@@ -152,6 +176,51 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
         </div>
         <nav className="flex-1 py-4 space-y-0.5 px-2">
+          {isMenuGroupVisible && (
+            <div className="mb-1">
+              <button
+                type="button"
+                onClick={() => setMenusOpen((prev) => !prev)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  isMenuGroupActive
+                    ? "bg-slate-700 text-white"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                <span className="flex items-center">
+                  <SquareMenu className="h-4 w-4 mr-2 shrink-0" />
+                  Menus
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${menusOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {menusOpen && (
+                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                  {menuSubItems.map((subItem) => {
+                    const subActive = location.pathname === subItem.path;
+                    const SubIcon = subItem.icon;
+                    return (
+                      <Link
+                        key={subItem.path}
+                        to={subItem.path}
+                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          subActive
+                            ? "bg-blue-950 text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        }`}
+                      >
+                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        {subItem.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {navItems.map((item) => {
             const active = location.pathname === item.path;
             const Icon = item.icon;

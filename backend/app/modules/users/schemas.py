@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -44,15 +45,21 @@ _STAFF_ROLES = {
     UserRole.housekeeper,
 }
 
+AssignedArea = Literal["kitchen", "housekeeping", "steward"]
+
 
 class StaffCreateRequest(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255)
     email: EmailStr
+    username: str | None = Field(None, min_length=3, max_length=64)
+    phone: str | None = Field(None, min_length=7, max_length=32)
     password: str = Field(..., min_length=8)
     role: UserRole = Field(
         ...,
         description="Must be one of: owner, admin, steward, housekeeper",
     )
+    assigned_area: AssignedArea | None = None
+    is_active: bool = True
     restaurant_id: int | None = Field(
         default=None,
         description=(
@@ -65,17 +72,26 @@ class StaffCreateRequest(BaseModel):
 class StaffUpdateRequest(BaseModel):
     full_name: str | None = Field(None, min_length=1, max_length=255)
     email: EmailStr | None = None
+    username: str | None = Field(None, min_length=3, max_length=64)
+    phone: str | None = Field(None, min_length=7, max_length=32)
     password: str | None = Field(None, min_length=8, description="Leave blank to keep current")
     role: UserRole | None = None
+    assigned_area: AssignedArea | None = None
+    is_active: bool | None = None
 
 
 class StaffListItemResponse(BaseModel):
     id: int
     full_name: str
     email: str
+    username: str | None
+    phone: str | None
     role: str
+    assigned_area: str | None
     is_active: bool
     last_login_at: datetime | None
+    pending_tasks_count: int = 0
+    load_per_staff: float = 0.0
 
     model_config = {"from_attributes": True}
 
@@ -84,7 +100,10 @@ class StaffDetailResponse(BaseModel):
     id: int
     full_name: str
     email: str
+    username: str | None
+    phone: str | None
     role: str
+    assigned_area: str | None
     is_active: bool
     restaurant_id: int | None
     created_at: datetime

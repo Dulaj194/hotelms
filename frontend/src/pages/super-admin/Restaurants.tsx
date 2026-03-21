@@ -13,7 +13,7 @@ import type {
   PackageResponse,
   PackageListResponse,
 } from "@/types/subscription";
-import type { StaffListItemResponse, StaffDetailResponse } from "@/types/user";
+import type { StaffDetailResponse } from "@/types/user";
 
 export default function SuperAdminRestaurants() {
   const [list, setList] = useState<RestaurantMeResponse[]>([]);
@@ -51,7 +51,7 @@ export default function SuperAdminRestaurants() {
   const [expireMsg, setExpireMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   // ─── Hotel staff state ─────────────────────────────────────────────────────
-  const [hotelUsers, setHotelUsers] = useState<StaffListItemResponse[]>([]);
+  const [hotelUsers, setHotelUsers] = useState<StaffDetailResponse[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [showAddUser, setShowAddUser] = useState(false);
   const [addUserForm, setAddUserForm] = useState({
@@ -117,7 +117,7 @@ export default function SuperAdminRestaurants() {
 
     const [subResult, usersResult] = await Promise.allSettled([
       api.get<SubscriptionResponse>(`/subscriptions/admin/${restaurantId}`),
-      api.get<StaffListItemResponse[]>(`/restaurants/${restaurantId}/users`),
+      api.get<StaffDetailResponse[]>(`/restaurants/${restaurantId}/users`),
     ]);
 
     if (subResult.status === "fulfilled") {
@@ -340,17 +340,7 @@ export default function SuperAdminRestaurants() {
         `/restaurants/${selected.id}/users`,
         { ...addUserForm },
       );
-      setHotelUsers((prev) => [
-        {
-          id: newUser.id,
-          full_name: newUser.full_name,
-          email: newUser.email,
-          role: newUser.role,
-          is_active: newUser.is_active,
-          last_login_at: newUser.last_login_at,
-        },
-        ...prev,
-      ]);
+      setHotelUsers((prev) => [newUser, ...prev]);
       setShowAddUser(false);
       setAddUserForm({ full_name: "", email: "", password: "", role: "admin" });
       setAddUserMsg({ type: "ok", text: `"${newUser.full_name}" added successfully.` });

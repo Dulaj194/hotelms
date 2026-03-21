@@ -34,6 +34,14 @@ def get_user_by_email(db: Session, email: str) -> User | None:
     return db.query(User).filter(User.email == email).first()
 
 
+def get_user_by_username(db: Session, username: str) -> User | None:
+    return db.query(User).filter(User.username == username).first()
+
+
+def get_user_by_phone(db: Session, phone: str) -> User | None:
+    return db.query(User).filter(User.phone == phone).first()
+
+
 def list_all_for_super_admin(db: Session) -> list[User]:
     """List all users across all tenants. Use ONLY in super_admin endpoints."""
     return db.query(User).all()
@@ -59,12 +67,23 @@ def get_by_id(db: Session, user_id: int, restaurant_id: int) -> User | None:
     )
 
 
-def list_by_restaurant(db: Session, restaurant_id: int) -> list[User]:
+def list_by_restaurant(
+    db: Session,
+    restaurant_id: int,
+    *,
+    role: UserRole | None = None,
+    is_active: bool | None = None,
+) -> list[User]:
     """List all users belonging to a specific restaurant.
 
     restaurant_id must come from the authenticated context.
     """
-    return db.query(User).filter(User.restaurant_id == restaurant_id).all()
+    query = db.query(User).filter(User.restaurant_id == restaurant_id)
+    if role is not None:
+        query = query.filter(User.role == role)
+    if is_active is not None:
+        query = query.filter(User.is_active == is_active)
+    return query.order_by(User.created_at.desc()).all()
 
 
 # ─── Write operations ─────────────────────────────────────────────────────────
@@ -117,10 +136,13 @@ def create_staff(
     user = User(
         full_name=data.full_name,
         email=data.email,
+        username=data.username,
+        phone=data.phone,
         password_hash=hash_password(data.password),
         role=data.role,
+        assigned_area=data.assigned_area,
         restaurant_id=restaurant_id,  # always from authenticated context
-        is_active=True,
+        is_active=data.is_active,
         must_change_password=must_change_password,
     )
     db.add(user)
