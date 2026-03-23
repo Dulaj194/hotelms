@@ -2,10 +2,13 @@
 
 Route groups:
   POST   /housekeeping             — guest: submit request (X-Room-Session)
+  GET    /housekeeping/my-requests — guest: list own session requests
+  PATCH  /housekeeping/{id}/cancel — guest: cancel own pending request
   GET    /housekeeping             — staff: list requests (Bearer, admin/housekeeper)
   GET    /housekeeping/history     — staff: list done requests (Bearer, admin/housekeeper)
   GET    /housekeeping/{id}        — staff: get request detail (Bearer, admin/housekeeper)
   PATCH  /housekeeping/{id}/done   — staff: mark as done (Bearer, admin/housekeeper)
+  DELETE /housekeeping/{id}        — staff: delete request
 
 IMPORTANT: /history is registered before /{request_id} to avoid path shadowing.
 """
@@ -26,6 +29,7 @@ from app.core.dependencies import (
 )
 from app.modules.housekeeping import service
 from app.modules.housekeeping.schemas import (
+    GenericMessageResponse,
     HousekeepingRequestCreateRequest,
     HousekeepingRequestCreateResponse,
     HousekeepingRequestListResponse,
@@ -58,6 +62,27 @@ def submit_housekeeping_request(
     return service.submit_request(db, session, payload)
 
 
+@router.get("/my-requests", response_model=HousekeepingRequestListResponse)
+def list_my_requests(
+    session: RoomSession = Depends(get_current_room_session),
+    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
+    db: Session = Depends(get_db),
+) -> HousekeepingRequestListResponse:
+    """List housekeeping requests created from the current room session."""
+    return service.list_my_requests(db, session)
+
+
+@router.patch("/{request_id}/cancel", response_model=HousekeepingRequestStatusResponse)
+def cancel_my_request(
+    request_id: int,
+    session: RoomSession = Depends(get_current_room_session),
+    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
+    db: Session = Depends(get_db),
+) -> HousekeepingRequestStatusResponse:
+    """Cancel a pending housekeeping request from the current room session."""
+    return service.cancel_my_request(db, request_id=request_id, room_session=session)
+
+
 # ── Staff / admin — /history MUST come before /{request_id} ──────────────────
 
 @router.get("/history", response_model=HousekeepingRequestListResponse)
@@ -77,7 +102,7 @@ def list_request_history(
 
 @router.get("", response_model=HousekeepingRequestListResponse)
 def list_requests(
-    status: Optional[str] = Query(None, pattern="^(pending|done)$"),
+    status: Optional[str] = Query(None, pattern="^(pending|done|cancelled)$"),
     room_number: Optional[str] = Query(None, description="Filter by room number"),
     request_type: Optional[str] = Query(None, description="Filter by request type"),
     current_user=Depends(require_roles(*_HK_ROLES)),
@@ -117,3 +142,16 @@ def mark_request_done(
 ) -> HousekeepingRequestStatusResponse:
     """Mark a housekeeping request as done. Sets done_at timestamp."""
     return service.mark_done(db, request_id, restaurant_id)
+
+
+@router.delete("/{request_id}", response_model=GenericMessageResponse)
+def delete_request(
+    request_id: int,
+    _=Depends(require_roles(*_HK_ROLES)),
+    __=Depends(require_privilege("HOUSEKEEPING")),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+) -> GenericMessageResponse:
+    """Delete a housekeeping request (admin/housekeeper)."""
+    service.delete_request(db, request_id=request_id, restaurant_id=restaurant_id)
+    return GenericMessageResponse(message="Housekeeping request deleted.")

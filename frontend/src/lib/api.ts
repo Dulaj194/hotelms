@@ -57,13 +57,23 @@ async function request<T>(
     Object.assign(headers, options.headers);
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    // Include HttpOnly cookies (refresh_token) on same-origin requests
-    credentials: "include",
-    ...(body !== undefined && { body: isFormData ? (body as FormData) : JSON.stringify(body) }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      // Include HttpOnly cookies (refresh_token) on same-origin requests
+      credentials: "include",
+      ...(body !== undefined && { body: isFormData ? (body as FormData) : JSON.stringify(body) }),
+    });
+  } catch {
+    throw new ApiError(
+      0,
+      "Unable to connect to the server. Please check backend service and try again.",
+      method,
+      path,
+    );
+  }
 
   if (response.status === 401 && retryOnAuth && path !== REFRESH_PATH) {
     const nextToken = await refreshAccessToken();

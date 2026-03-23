@@ -3,6 +3,7 @@
 export interface RoomSessionStartRequest {
   restaurant_id: number;
   room_number: string;
+  qr_access_key: string;
 }
 
 export interface RoomSessionStartResponse {

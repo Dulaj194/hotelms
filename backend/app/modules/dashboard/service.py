@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -194,7 +195,10 @@ def get_admin_dashboard_overview(
 ) -> AdminDashboardOverviewResponse:
     restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
     if restaurant is None:
-        raise ValueError("Restaurant not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant profile not found for this account.",
+        )
 
     current_subscription = subscriptions_service.get_current_subscription(db, restaurant_id)
     privileges_response = subscriptions_service.get_effective_privileges(db, restaurant_id)

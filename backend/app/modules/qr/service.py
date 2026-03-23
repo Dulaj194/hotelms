@@ -1,5 +1,6 @@
 import io
 from pathlib import Path
+from urllib.parse import quote, urlencode
 
 import qrcode
 import qrcode.image.pil
@@ -7,6 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.security import create_room_qr_access_token
 from app.modules.qr import repository
 from app.modules.qr.schemas import BulkQRCodeResponse, QRCodeResponse
 from app.modules.rooms.repository import get_room_by_number_and_restaurant
@@ -20,8 +22,16 @@ _QR_DIR.mkdir(parents=True, exist_ok=True)
 def _build_frontend_url(restaurant_id: int, qr_type: str, target_number: str) -> str:
     """Build the public menu URL that gets encoded into the QR image."""
     base = settings.frontend_url.rstrip("/")
+    safe_target = quote(target_number, safe="")
+    if qr_type == "room":
+        qr_access_key = create_room_qr_access_token(
+            restaurant_id=restaurant_id,
+            room_number=target_number,
+            expire_days=settings.room_qr_key_expire_days,
+        )
+        return f"{base}/menu/{restaurant_id}/{qr_type}/{safe_target}?{urlencode({'k': qr_access_key})}"
     # /menu/{restaurant_id}/{type}/{number}
-    return f"{base}/menu/{restaurant_id}/{qr_type}/{target_number}"
+    return f"{base}/menu/{restaurant_id}/{qr_type}/{safe_target}"
 
 
 def _qr_filename(restaurant_id: int, qr_type: str, target_number: str) -> str:
@@ -99,9 +109,18 @@ def generate_qr(
     # Check DB first — if record exists, reuse (file should already be on disk)
     existing = repository.get_qr(db, restaurant_id, qr_type, target_number)
     if existing:
-        # Re-generate the image file if it was deleted from disk
-        if not file_path.exists():
+        has_secure_room_key = qr_type != "room" or "k=" in (existing.frontend_url or "")
+        # Re-generate if file is missing or if this is a legacy room QR without secure key.
+        if not file_path.exists() or not has_secure_room_key:
             _generate_qr_image(frontend_url, file_path)
+            existing = repository.upsert_qr(
+                db,
+                restaurant_id=restaurant_id,
+                qr_type=qr_type,
+                target_number=target_number,
+                file_path=str(file_path),
+                frontend_url=frontend_url,
+            )
         return _to_response(existing, restaurant_id)
 
     # New QR — generate image and persist metadata

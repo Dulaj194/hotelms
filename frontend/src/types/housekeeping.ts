@@ -7,7 +7,7 @@ export type HousekeepingRequestType =
   | "maintenance"
   | "other";
 
-export type HousekeepingRequestStatus = "pending" | "done";
+export type HousekeepingRequestStatus = "pending" | "done" | "cancelled";
 
 export const REQUEST_TYPE_LABELS: Record<HousekeepingRequestType, string> = {
   cleaning: "Room Cleaning",
@@ -31,6 +31,9 @@ export interface HousekeepingRequestCreateRequest {
   request_type: HousekeepingRequestType;
   message: string;
   guest_name?: string;
+  request_date?: string;
+  request_time?: string;
+  audio_url?: string;
 }
 
 export interface HousekeepingRequestCreateResponse {
@@ -38,6 +41,8 @@ export interface HousekeepingRequestCreateResponse {
   room_number: string;
   request_type: string;
   message: string;
+  requested_for_at: string | null;
+  audio_url: string | null;
   status: string;
   submitted_at: string;
 }
@@ -51,9 +56,12 @@ export interface HousekeepingRequestResponse {
   guest_name: string | null;
   request_type: string;
   message: string;
+  requested_for_at: string | null;
+  audio_url: string | null;
   status: HousekeepingRequestStatus;
   submitted_at: string;
   done_at: string | null;
+  cancelled_at: string | null;
 }
 
 export interface HousekeepingRequestListResponse {
@@ -63,6 +71,7 @@ export interface HousekeepingRequestListResponse {
 
 export interface HousekeepingRequestStatusResponse {
   id: number;
-  status: string;
+  status: HousekeepingRequestStatus;
   done_at: string | null;
+  cancelled_at: string | null;
 }

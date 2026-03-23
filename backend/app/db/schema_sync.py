@@ -150,6 +150,21 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
         ),
     )
 
+    housekeeping_column_patches: Sequence[tuple[str, str]] = (
+        (
+            "requested_for_at",
+            "ALTER TABLE housekeeping_requests ADD COLUMN requested_for_at DATETIME NULL",
+        ),
+        (
+            "audio_url",
+            "ALTER TABLE housekeeping_requests ADD COLUMN audio_url VARCHAR(500) NULL",
+        ),
+        (
+            "cancelled_at",
+            "ALTER TABLE housekeeping_requests ADD COLUMN cancelled_at DATETIME NULL",
+        ),
+    )
+
     with engine.begin() as conn:
         for column_name, alter_sql in order_header_column_patches:
             if _column_exists(conn, "order_headers", column_name):
@@ -193,5 +208,14 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             conn.execute(text(alter_sql))
             logger.warning(
                 "Applied development schema patch: items.%s was missing and has been added.",
+                column_name,
+            )
+
+        for column_name, alter_sql in housekeeping_column_patches:
+            if _column_exists(conn, "housekeeping_requests", column_name):
+                continue
+            conn.execute(text(alter_sql))
+            logger.warning(
+                "Applied development schema patch: housekeeping_requests.%s was missing and has been added.",
                 column_name,
             )

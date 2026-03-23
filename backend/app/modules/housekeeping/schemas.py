@@ -1,7 +1,7 @@
 """Pydantic schemas for the housekeeping module."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -20,6 +20,9 @@ class HousekeepingRequestCreateRequest(BaseModel):
     request_type: RequestTypeLiteral
     message: str = Field(..., min_length=1, max_length=1000)
     guest_name: Optional[str] = Field(None, max_length=255)
+    request_date: date | None = None
+    request_time: str | None = Field(None, pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
+    audio_url: Optional[str] = Field(None, max_length=500)
 
 
 class HousekeepingRequestCreateResponse(BaseModel):
@@ -27,6 +30,8 @@ class HousekeepingRequestCreateResponse(BaseModel):
     room_number: str
     request_type: str
     message: str
+    requested_for_at: datetime | None
+    audio_url: str | None
     status: str
     submitted_at: datetime
 
@@ -42,9 +47,12 @@ class HousekeepingRequestResponse(BaseModel):
     guest_name: Optional[str]
     request_type: str
     message: str
+    requested_for_at: datetime | None
+    audio_url: str | None
     status: str
     submitted_at: datetime
     done_at: Optional[datetime]
+    cancelled_at: Optional[datetime]
 
     model_config = {"from_attributes": True}
 
@@ -58,6 +66,7 @@ class HousekeepingRequestStatusResponse(BaseModel):
     id: int
     status: str
     done_at: Optional[datetime]
+    cancelled_at: Optional[datetime]
 
     model_config = {"from_attributes": True}
 

@@ -18,6 +18,7 @@ class RoomSessionStartRequest(BaseModel):
 
     restaurant_id: int
     room_number: str = Field(..., min_length=1, max_length=50)
+    qr_access_key: str = Field(..., min_length=16, max_length=2000)
 
 
 class RoomSessionStartResponse(BaseModel):

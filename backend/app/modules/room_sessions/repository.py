@@ -4,7 +4,7 @@ All methods are tenant-scoped where restaurant context is needed.
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -33,6 +33,54 @@ def create_room_session(
     db.commit()
     db.refresh(session)
     return session
+
+
+def deactivate_active_sessions_for_room(
+    db: Session,
+    *,
+    restaurant_id: int,
+    room_id: int,
+) -> int:
+    """Deactivate all currently active sessions for the given room."""
+    sessions = (
+        db.query(RoomSession)
+        .filter(
+            RoomSession.restaurant_id == restaurant_id,
+            RoomSession.room_id == room_id,
+            RoomSession.is_active.is_(True),
+        )
+        .all()
+    )
+    for session in sessions:
+        session.is_active = False
+
+    if sessions:
+        db.commit()
+    return len(sessions)
+
+
+def cleanup_stale_room_sessions(
+    db: Session,
+    *,
+    idle_timeout_minutes: int,
+) -> int:
+    """Deactivate active sessions that are expired or idle beyond the timeout."""
+    now = datetime.now(UTC)
+    idle_cutoff = now - timedelta(minutes=max(idle_timeout_minutes, 1))
+    sessions = (
+        db.query(RoomSession)
+        .filter(
+            RoomSession.is_active.is_(True),
+            (RoomSession.expires_at <= now) | (RoomSession.last_activity_at < idle_cutoff),
+        )
+        .all()
+    )
+    for session in sessions:
+        session.is_active = False
+
+    if sessions:
+        db.commit()
+    return len(sessions)
 
 
 def get_active_room_session_by_session_id(

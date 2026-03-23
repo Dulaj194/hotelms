@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Clock3, Star } from "lucide-react";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import type { DashboardSubscriptionSummary, AdminDashboardOverviewResponse } from "@/types/dashboard";
 import type {
@@ -42,13 +42,17 @@ export default function RestaurantProfile() {
   const [subscriptionSummary, setSubscriptionSummary] = useState<DashboardSubscriptionSummary | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    Promise.all([
-      api.get<RestaurantMeResponse>("/restaurants/me"),
-      api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview"),
-    ])
-      .then(([restaurantData, overviewData]) => {
+    let active = true;
+
+    async function loadProfile() {
+      setLoading(true);
+      setFetchError(null);
+
+      try {
+        const restaurantData = await api.get<RestaurantMeResponse>("/restaurants/me");
+        if (!active) return;
+
         setRestaurant(restaurantData);
-        setSubscriptionSummary(overviewData.subscription);
         resetForm(restaurantData);
         const countryMissing = !restaurantData.country || !restaurantData.country.trim();
         const currencyMissing = !restaurantData.currency || !restaurantData.currency.trim();
@@ -57,9 +61,35 @@ export default function RestaurantProfile() {
           setSetupCurrency(restaurantData.currency ?? "");
           setSetupModalOpen(true);
         }
-      })
-      .catch(() => setFetchError("Failed to load restaurant profile."))
-      .finally(() => setLoading(false));
+      } catch (err) {
+        if (!active) return;
+        const message =
+          err instanceof ApiError
+            ? err.detail
+            : err instanceof Error
+              ? err.message
+              : "Failed to load restaurant profile.";
+        setFetchError(message || "Failed to load restaurant profile.");
+        return;
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+
+      try {
+        const overviewData = await api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview");
+        if (!active) return;
+        setSubscriptionSummary(overviewData.subscription);
+      } catch {
+        // Non-blocking: profile page should remain usable even if overview fails.
+      }
+    }
+
+    void loadProfile();
+    return () => {
+      active = false;
+    };
   }, []);
 
   function resetForm(data: RestaurantMeResponse) {

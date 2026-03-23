@@ -144,3 +144,31 @@ def decode_room_session_token(token: str) -> dict:
     if payload.get("type") != "room_session":
         raise ValueError("Token type is not room_session")
     return payload
+
+
+def create_room_qr_access_token(
+    *,
+    restaurant_id: int,
+    room_number: str,
+    expire_days: int,
+) -> str:
+    """Create a signed credential embedded inside room QR URLs.
+
+    This token is not a session token. It only proves that the QR context
+    (restaurant + room number) is authentic when starting a room session.
+    """
+    payload = {
+        "type": "room_qr_access",
+        "restaurant_id": restaurant_id,
+        "room_number": room_number,
+        "exp": datetime.now(UTC) + timedelta(days=expire_days),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
+def decode_room_qr_access_token(token: str) -> dict:
+    """Decode and verify a room QR access token."""
+    payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+    if payload.get("type") != "room_qr_access":
+        raise ValueError("Token type is not room_qr_access")
+    return payload

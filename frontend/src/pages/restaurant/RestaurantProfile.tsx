@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import type { RestaurantMeResponse, RestaurantUpdateRequest } from "@/types/restaurant";
 
 export default function RestaurantProfile() {
@@ -23,7 +23,15 @@ export default function RestaurantProfile() {
           address: data.address ?? undefined,
         });
       })
-      .catch(() => setError("Failed to load restaurant profile."))
+      .catch((err: unknown) => {
+        const message =
+          err instanceof ApiError
+            ? err.detail
+            : err instanceof Error
+              ? err.message
+              : "Failed to load restaurant profile.";
+        setError(message || "Failed to load restaurant profile.");
+      })
       .finally(() => setLoading(false));
   }, []);
 

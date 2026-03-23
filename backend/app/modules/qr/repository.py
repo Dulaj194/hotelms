@@ -55,5 +55,10 @@ def upsert_qr(
     """
     existing = get_qr(db, restaurant_id, qr_type, target_number)
     if existing:
+        if existing.frontend_url != frontend_url or existing.file_path != file_path:
+            existing.frontend_url = frontend_url
+            existing.file_path = file_path
+            db.commit()
+            db.refresh(existing)
         return existing
     return create_qr(db, restaurant_id, qr_type, target_number, file_path, frontend_url)

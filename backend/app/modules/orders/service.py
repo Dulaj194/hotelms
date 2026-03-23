@@ -269,6 +269,7 @@ def place_order(
             order_source=placed.order_source,
             room_id=placed.room_id,
             room_number=placed.room_number,
+            status=placed.status.value,
             total_amount=float(placed.total_amount),
             placed_at=placed.placed_at,
             items=[

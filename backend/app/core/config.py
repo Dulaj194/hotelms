@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     # ── Guest table sessions + cart ──────────────────────────────────────────
     guest_session_expire_minutes: int = 120   # 2 hours
     cart_ttl_seconds: int = 7200              # matches session default
+    room_session_idle_timeout_minutes: int = 30
+    room_qr_key_expire_days: int = 365
 
     # ── SaaS subscriptions ───────────────────────────────────────────────────
     default_trial_days: int = 14

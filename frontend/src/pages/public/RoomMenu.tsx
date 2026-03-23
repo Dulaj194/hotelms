@@ -12,8 +12,8 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { getRoomToken, setRoomSession } from "@/hooks/useRoomSession";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { setRoomSession } from "@/hooks/useRoomSession";
 import { useRoomCart } from "@/hooks/useRoomCart";
 import { publicGet, publicPost } from "@/lib/publicApi";
 import type { PublicMenuResponse } from "@/types/publicMenu";
@@ -258,10 +258,12 @@ function RoomCartDrawer({
 // ── Main page component ───────────────────────────────────────────────────────
 
 export default function RoomMenu() {
+  const [searchParams] = useSearchParams();
   const { restaurantId, roomNumber } = useParams<{
     restaurantId: string;
     roomNumber: string;
   }>();
+  const qrAccessKey = searchParams.get("k")?.trim() ?? "";
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -279,17 +281,20 @@ export default function RoomMenu() {
     if (!restaurantId || !roomNumber) return;
 
     const init = async () => {
+      if (!qrAccessKey) {
+        setPageError("Invalid room QR link. Please scan the room QR code again.");
+        return;
+      }
       try {
-        if (!getRoomToken()) {
-          const session = await publicPost<RoomSessionStartResponse>(
-            "/room-sessions/start",
-            {
-              restaurant_id: Number(restaurantId),
-              room_number: roomNumber,
-            }
-          );
-          setRoomSession(session);
-        }
+        const session = await publicPost<RoomSessionStartResponse>(
+          "/room-sessions/start",
+          {
+            restaurant_id: Number(restaurantId),
+            room_number: roomNumber,
+            qr_access_key: qrAccessKey,
+          }
+        );
+        setRoomSession(session);
         setSessionReady(true);
       } catch {
         setPageError(
@@ -299,7 +304,7 @@ export default function RoomMenu() {
     };
 
     void init();
-  }, [restaurantId, roomNumber]);
+  }, [restaurantId, roomNumber, qrAccessKey]);
 
   // ── 2. Fetch public menu ─────────────────────────────────────────────────────
   useEffect(() => {

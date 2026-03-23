@@ -90,7 +90,9 @@ export default function Dashboard() {
 
         const message =
           err instanceof ApiError
-            ? err.detail
+            ? err.status === 0
+              ? "Unable to connect to the server. Please start backend and refresh this page."
+              : err.detail
             : err instanceof Error
               ? err.message
               : "Failed to load dashboard data.";

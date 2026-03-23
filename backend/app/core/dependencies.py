@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 
 import redis as redis_lib
 from fastapi import Depends, HTTPException, Request, status
@@ -6,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.redis import get_redis_client
 from app.db.session import SessionLocal
 
@@ -300,5 +302,28 @@ def get_current_room_session(
     session = get_active_room_session_by_session_id(db, session_id)
     if session is None:
         raise credentials_exception
+
+    idle_timeout_minutes = max(settings.room_session_idle_timeout_minutes, 1)
+    last_activity_at = session.last_activity_at
+    if last_activity_at.tzinfo is None:
+        last_activity_at = last_activity_at.replace(tzinfo=UTC)
+
+    if last_activity_at + timedelta(minutes=idle_timeout_minutes) <= datetime.now(UTC):
+        from app.modules.room_sessions.repository import deactivate_room_session
+
+        deactivate_room_session(
+            db,
+            session_id=session.session_id,
+            restaurant_id=session.restaurant_id,
+        )
+        raise credentials_exception
+
+    from app.modules.room_sessions.repository import touch_room_session_activity
+
+    touch_room_session_activity(
+        db,
+        session_id=session.session_id,
+        restaurant_id=session.restaurant_id,
+    )
 
     return session

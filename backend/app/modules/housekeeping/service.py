@@ -8,7 +8,7 @@ Responsibilities:
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -35,10 +35,36 @@ def _to_response(req: HousekeepingRequest) -> HousekeepingRequestResponse:
         guest_name=req.guest_name,
         request_type=req.request_type,
         message=req.message,
+        requested_for_at=req.requested_for_at,
+        audio_url=req.audio_url,
         status=req.status,
         submitted_at=req.submitted_at,
         done_at=req.done_at,
+        cancelled_at=req.cancelled_at,
     )
+
+
+def _resolve_requested_for_at(payload: HousekeepingRequestCreateRequest) -> datetime | None:
+    date_value = payload.request_date
+    time_value = payload.request_time
+
+    if (date_value is None) != (time_value is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Both request_date and request_time are required together.",
+        )
+
+    if date_value is None or time_value is None:
+        return None
+
+    scheduled_time = time.fromisoformat(time_value)
+    requested_for_at = datetime.combine(date_value, scheduled_time, tzinfo=UTC)
+    if requested_for_at < datetime.now(UTC):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Requested date/time cannot be in the past.",
+        )
+    return requested_for_at
 
 
 # ── Guest submission ──────────────────────────────────────────────────────────
@@ -53,6 +79,7 @@ def submit_request(
     SECURITY: restaurant_id, room_id, and room_number all come from the
     validated room session object — not from the request body.
     """
+    requested_for_at = _resolve_requested_for_at(payload)
     req = repository.create_housekeeping_request(
         db,
         restaurant_id=room_session.restaurant_id,
@@ -62,14 +89,76 @@ def submit_request(
         guest_name=payload.guest_name,
         request_type=payload.request_type,
         message=payload.message,
+        requested_for_at=requested_for_at,
+        audio_url=payload.audio_url,
     )
     return HousekeepingRequestCreateResponse(
         id=req.id,
         room_number=req.room_number_snapshot,
         request_type=req.request_type,
         message=req.message,
+        requested_for_at=req.requested_for_at,
+        audio_url=req.audio_url,
         status=req.status,
         submitted_at=req.submitted_at,
+    )
+
+
+def list_my_requests(
+    db: Session,
+    room_session: RoomSession,
+) -> HousekeepingRequestListResponse:
+    reqs = repository.list_requests_by_session(
+        db,
+        restaurant_id=room_session.restaurant_id,
+        room_session_id=room_session.session_id,
+    )
+    return HousekeepingRequestListResponse(
+        requests=[_to_response(r) for r in reqs],
+        total=len(reqs),
+    )
+
+
+def cancel_my_request(
+    db: Session,
+    *,
+    request_id: int,
+    room_session: RoomSession,
+) -> HousekeepingRequestStatusResponse:
+    req = repository.get_request_by_id_and_session(
+        db,
+        request_id=request_id,
+        restaurant_id=room_session.restaurant_id,
+        room_session_id=room_session.session_id,
+    )
+    if req is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Housekeeping request not found.",
+        )
+    if req.status != "pending":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only pending requests can be cancelled (current: {req.status}).",
+        )
+
+    updated = repository.cancel_request_by_session(
+        db,
+        request_id=request_id,
+        restaurant_id=room_session.restaurant_id,
+        room_session_id=room_session.session_id,
+        cancelled_at=datetime.now(UTC),
+    )
+    if updated is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Housekeeping request not found.",
+        )
+    return HousekeepingRequestStatusResponse(
+        id=updated.id,
+        status=updated.status,
+        done_at=updated.done_at,
+        cancelled_at=updated.cancelled_at,
     )
 
 
@@ -120,10 +209,10 @@ def mark_done(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Housekeeping request not found.",
         )
-    if req.status == "done":
+    if req.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Request is already marked as done.",
+            detail=f"Only pending requests can be marked done (current: {req.status}).",
         )
     done_at = datetime.now(UTC)
     updated = repository.mark_request_done(db, request_id, restaurant_id, done_at)
@@ -131,4 +220,23 @@ def mark_done(
         id=updated.id,
         status=updated.status,
         done_at=updated.done_at,
+        cancelled_at=updated.cancelled_at,
     )
+
+
+def delete_request(
+    db: Session,
+    *,
+    request_id: int,
+    restaurant_id: int,
+) -> None:
+    deleted = repository.delete_request_by_restaurant(
+        db,
+        request_id=request_id,
+        restaurant_id=restaurant_id,
+    )
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Housekeeping request not found.",
+        )

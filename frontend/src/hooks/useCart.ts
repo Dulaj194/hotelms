@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useState } from "react";
 import type {
   AddCartItemRequest,
   CartResponse,
@@ -6,107 +5,32 @@ import type {
 } from "@/types/cart";
 import type { PlaceOrderRequest, PlaceOrderResponse } from "@/types/order";
 import { getGuestToken } from "@/hooks/useGuestSession";
-import { createSessionRequest } from "@/lib/sessionRequest";
+import { useSessionCart, type UseSessionCartReturn } from "@/hooks/useSessionCart";
 
-const guestRequest = createSessionRequest("X-Guest-Session", getGuestToken);
+type UseCartReturn = UseSessionCartReturn<CartResponse, PlaceOrderRequest, PlaceOrderResponse>;
 
-interface UseCartReturn {
-  cart: CartResponse | null;
-  loading: boolean;
-  error: string | null;
-  placing: boolean;
-  addItem: (itemId: number, quantity?: number) => Promise<void>;
-  updateItem: (itemId: number, quantity: number) => Promise<void>;
-  removeItem: (itemId: number) => Promise<void>;
-  clearCart: () => Promise<void>;
-  placeOrder: (data?: PlaceOrderRequest) => Promise<PlaceOrderResponse>;
-  refetch: () => Promise<void>;
+function buildGuestAddPayload(itemId: number, quantity: number): AddCartItemRequest {
+  return { item_id: itemId, quantity };
+}
+
+function buildGuestUpdatePayload(quantity: number): UpdateCartItemRequest {
+  return { quantity };
 }
 
 export function useCart(): UseCartReturn {
-  const [cart, setCart] = useState<CartResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [placing, setPlacing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchCart = useCallback(async () => {
-    if (!getGuestToken()) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await guestRequest<CartResponse>("GET", "/cart");
-      setCart(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load cart");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchCart();
-  }, [fetchCart]);
-
-  const addItem = useCallback(
-    async (itemId: number, quantity = 1) => {
-      const payload: AddCartItemRequest = { item_id: itemId, quantity };
-      await guestRequest("POST", "/cart/items", payload);
-      await fetchCart();
-    },
-    [fetchCart]
-  );
-
-  const updateItem = useCallback(
-    async (itemId: number, quantity: number) => {
-      const payload: UpdateCartItemRequest = { quantity };
-      await guestRequest("PATCH", `/cart/items/${itemId}`, payload);
-      await fetchCart();
-    },
-    [fetchCart]
-  );
-
-  const removeItem = useCallback(
-    async (itemId: number) => {
-      await guestRequest("DELETE", `/cart/items/${itemId}`);
-      await fetchCart();
-    },
-    [fetchCart]
-  );
-
-  const clearCart = useCallback(async () => {
-    await guestRequest("DELETE", "/cart");
-    setCart(null);
-  }, []);
-
-  const placeOrder = useCallback(
-    async (data: PlaceOrderRequest = {}): Promise<PlaceOrderResponse> => {
-      setPlacing(true);
-      try {
-        const result = await guestRequest<PlaceOrderResponse>(
-          "POST",
-          "/orders",
-          data
-        );
-        // Cart has been cleared server-side; reflect that locally
-        setCart(null);
-        return result;
-      } finally {
-        setPlacing(false);
-      }
-    },
-    []
-  );
-
-  return {
-    cart,
-    loading,
-    error,
-    placing,
-    addItem,
-    updateItem,
-    removeItem,
-    clearCart,
-    placeOrder,
-    refetch: fetchCart,
-  };
+  return useSessionCart<
+    AddCartItemRequest,
+    UpdateCartItemRequest,
+    CartResponse,
+    PlaceOrderRequest,
+    PlaceOrderResponse
+  >({
+    headerName: "X-Guest-Session",
+    getToken: getGuestToken,
+    cartPath: "/cart",
+    placeOrderPath: "/orders",
+    loadErrorMessage: "Failed to load cart",
+    buildAddPayload: buildGuestAddPayload,
+    buildUpdatePayload: buildGuestUpdatePayload,
+  });
 }

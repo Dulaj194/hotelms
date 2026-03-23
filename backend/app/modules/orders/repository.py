@@ -23,6 +23,7 @@ def create_order_header(
     order_source: str = "table",
     room_id: int | None = None,
     room_number: str | None = None,
+    initial_status: OrderStatus = OrderStatus.pending,
     subtotal_amount: float,
     tax_amount: float,
     discount_amount: float,
@@ -31,6 +32,19 @@ def create_order_header(
     customer_name: str | None,
     customer_phone: str | None,
 ) -> OrderHeader:
+    now = datetime.now(UTC)
+    lifecycle_timestamps: dict[str, datetime] = {}
+    if initial_status == OrderStatus.confirmed:
+        lifecycle_timestamps["confirmed_at"] = now
+    elif initial_status == OrderStatus.processing:
+        lifecycle_timestamps["processing_at"] = now
+    elif initial_status == OrderStatus.completed:
+        lifecycle_timestamps["completed_at"] = now
+    elif initial_status == OrderStatus.rejected:
+        lifecycle_timestamps["rejected_at"] = now
+    elif initial_status == OrderStatus.paid:
+        lifecycle_timestamps["paid_at"] = now
+
     order = OrderHeader(
         session_id=session_id,
         restaurant_id=restaurant_id,
@@ -38,6 +52,7 @@ def create_order_header(
         order_source=order_source,
         room_id=room_id,
         room_number=room_number,
+        status=initial_status,
         subtotal_amount=round(subtotal_amount, 2),
         tax_amount=round(tax_amount, 2),
         discount_amount=round(discount_amount, 2),
@@ -45,6 +60,7 @@ def create_order_header(
         notes=notes,
         customer_name=customer_name,
         customer_phone=customer_phone,
+        **lifecycle_timestamps,
     )
     db.add(order)
     db.flush()  # get order.id without committing

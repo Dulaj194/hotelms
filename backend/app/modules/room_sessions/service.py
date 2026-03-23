@@ -22,10 +22,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import create_room_session_token
+from app.core.security import create_room_session_token, decode_room_qr_access_token
 from app.modules.cart import repository as cart_repo
 from app.modules.items.repository import get_by_id as get_item
 from app.modules.orders import repository as order_repo
+from app.modules.orders.model import OrderStatus
 from app.modules.payments import repository as payment_repo
 from app.modules.realtime import service as realtime_service
 from app.modules.restaurants.repository import get_by_id as get_restaurant
@@ -91,6 +92,33 @@ def start_room_session(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Room is not currently active.",
         )
+
+    try:
+        qr_payload = decode_room_qr_access_token(data.qr_access_key)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired room QR credential. Please scan the room QR again.",
+        )
+
+    payload_restaurant_id = int(qr_payload.get("restaurant_id", -1))
+    payload_room_number = str(qr_payload.get("room_number", "")).strip()
+    if payload_restaurant_id != data.restaurant_id or payload_room_number != room.room_number:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Room QR credential does not match this room context.",
+        )
+
+    # Opportunistic cleanup keeps room session table healthy without a separate cron.
+    repository.cleanup_stale_room_sessions(
+        db,
+        idle_timeout_minutes=settings.room_session_idle_timeout_minutes,
+    )
+    repository.deactivate_active_sessions_for_room(
+        db,
+        restaurant_id=data.restaurant_id,
+        room_id=room.id,
+    )
 
     session_id = uuid.uuid4().hex
     expire_minutes = settings.guest_session_expire_minutes
@@ -388,6 +416,7 @@ def place_room_order(
             order_source="room",
             room_id=session.room_id,
             room_number=session.room_number_snapshot,
+            initial_status=OrderStatus.confirmed,
             subtotal_amount=subtotal,
             tax_amount=tax_amount,
             discount_amount=discount_amount,
@@ -437,6 +466,7 @@ def place_room_order(
             order_source="room",
             room_id=session.room_id,
             room_number=session.room_number_snapshot,
+            status=placed.status.value,
             total_amount=float(placed.total_amount),
             placed_at=placed.placed_at,
             items=[

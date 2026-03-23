@@ -45,7 +45,7 @@ function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
     order_number: data.order_number,
     table_number: data.table_number,
     customer_name: null,
-    status: "pending",
+    status: data.status as OrderStatus,
     total_amount: data.total_amount,
     placed_at: data.placed_at,
     confirmed_at: null,

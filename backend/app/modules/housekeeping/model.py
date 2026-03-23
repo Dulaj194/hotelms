@@ -14,6 +14,7 @@ from app.db.base import Base
 class RequestStatus(str, enum.Enum):
     pending = "pending"
     done = "done"
+    cancelled = "cancelled"
 
 
 class RequestType(str, enum.Enum):
@@ -64,6 +65,10 @@ class HousekeepingRequest(Base):
 
     request_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    requested_for_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending", server_default="pending", index=True
@@ -73,6 +78,9 @@ class HousekeepingRequest(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     done_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
