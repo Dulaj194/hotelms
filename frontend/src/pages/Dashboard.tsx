@@ -29,6 +29,17 @@ function alertStyle(level: string): string {
   }
 }
 
+function alertPrimaryButtonStyle(level: string): string {
+  switch (level) {
+    case "critical":
+      return "bg-red-700 hover:bg-red-800";
+    case "warning":
+      return "bg-amber-700 hover:bg-amber-800";
+    default:
+      return "bg-blue-700 hover:bg-blue-800";
+  }
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = getUser();
@@ -40,6 +51,7 @@ export default function Dashboard() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardSaving, setWizardSaving] = useState(false);
+  const [dismissingAlertKey, setDismissingAlertKey] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +59,7 @@ export default function Dashboard() {
     async function loadOverview() {
       setOverviewLoading(true);
       setOverviewError(null);
+
       try {
         const data = await api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview");
         if (!active) return;
@@ -55,19 +68,20 @@ export default function Dashboard() {
         setWizardStep(data.setup_wizard.current_step || 1);
         setWizardOpen(data.setup_wizard.should_show);
 
-        const visibleAlerts = data.alerts.filter((item) => item.should_show);
-        for (const item of visibleAlerts) {
-          void api.post(`/dashboard/alerts/${encodeURIComponent(item.key)}/shown`, {});
+        const visible = data.alerts.filter((alert) => alert.should_show);
+        for (const alert of visible) {
+          void api.post(`/dashboard/alerts/${encodeURIComponent(alert.key)}/shown`, {});
         }
       } catch (err) {
-        if (active) {
-          const errorMsg = err instanceof ApiError
+        if (!active) return;
+
+        const message =
+          err instanceof ApiError
             ? err.detail
             : err instanceof Error
               ? err.message
               : "Failed to load dashboard data.";
-          setOverviewError(errorMsg);
-        }
+        setOverviewError(message);
       } finally {
         if (active) {
           setOverviewLoading(false);
@@ -75,11 +89,11 @@ export default function Dashboard() {
       }
     }
 
-    loadOverview();
+    void loadOverview();
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, []);
 
   const visibleAlerts = useMemo(() => {
     if (!overview) return [];
@@ -93,24 +107,37 @@ export default function Dashboard() {
 
   const blockingRequirements = useMemo(() => {
     if (!overview) return [];
-    return overview.setup_requirements.filter((item) => item.severity === "blocking" && !item.completed);
+    return overview.setup_requirements.filter(
+      (item) => item.severity === "blocking" && !item.completed
+    );
+  }, [overview]);
+
+  const pendingRequirements = useMemo(() => {
+    if (!overview) return [];
+    return overview.setup_requirements.filter((item) => !item.completed);
   }, [overview]);
 
   async function dismissAlert(alert: DashboardAlertItem) {
-    await api.post(`/dashboard/alerts/${encodeURIComponent(alert.key)}/dismiss`, { hours: 8 });
-    setOverview((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        alerts: prev.alerts.map((item) =>
-          item.key === alert.key ? { ...item, should_show: false } : item,
-        ),
-      };
-    });
+    setDismissingAlertKey(alert.key);
+    try {
+      await api.post(`/dashboard/alerts/${encodeURIComponent(alert.key)}/dismiss`, { hours: 8 });
+      setOverview((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          alerts: prev.alerts.map((item) =>
+            item.key === alert.key ? { ...item, should_show: false } : item
+          ),
+        };
+      });
+    } finally {
+      setDismissingAlertKey(null);
+    }
   }
 
   async function saveWizardProgress(nextStep: number) {
     if (!overview) return;
+
     setWizardSaving(true);
     try {
       const completedKeys = overview.setup_requirements
@@ -142,23 +169,30 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-gray-200 px-6 py-5">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Welcome back{user?.full_name ? `, ${user.full_name}` : ""} 👋
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {ROLE_LABELS[role] ?? role} · HotelMS
-          </p>
+        <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Welcome back{user?.full_name ? `, ${user.full_name}` : ""}
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                {ROLE_LABELS[role] ?? role} - {overview?.restaurant.name ?? "HotelMS"}
+              </p>
+            </div>
+            <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+              {overview ? `${overview.setup_wizard.progress_percent}% setup complete` : "Setup status loading"}
+            </span>
+          </div>
         </div>
 
         {overviewLoading && (
-          <div className="bg-white rounded-xl border border-gray-200 px-6 py-5 text-sm text-gray-500">
+          <div className="rounded-xl border border-gray-200 bg-white px-6 py-5 text-sm text-gray-500">
             Loading dashboard overview...
           </div>
         )}
 
         {overviewError && (
-          <div className="bg-red-50 rounded-xl border border-red-200 px-6 py-5 text-sm text-red-700">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
             {overviewError}
           </div>
         )}
@@ -190,16 +224,17 @@ export default function Dashboard() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     onClick={() => navigate(alert.action.path)}
-                    className="rounded-md bg-black/80 px-3 py-2 text-xs font-semibold text-white hover:bg-black"
+                    className={`rounded-md px-3 py-2 text-xs font-semibold text-white ${alertPrimaryButtonStyle(alert.level)}`}
                   >
                     {alert.action.label}
                   </button>
                   {alert.dismissible && (
                     <button
                       onClick={() => void dismissAlert(alert)}
-                      className="rounded-md border border-black/20 px-3 py-2 text-xs font-semibold"
+                      disabled={dismissingAlertKey === alert.key}
+                      className="rounded-md border border-black/20 px-3 py-2 text-xs font-semibold disabled:opacity-60"
                     >
-                      Dismiss for now
+                      {dismissingAlertKey === alert.key ? "Dismissing..." : "Dismiss for now"}
                     </button>
                   )}
                 </div>
@@ -210,31 +245,44 @@ export default function Dashboard() {
               <MetricCard label="Pending Orders" value={overview.metrics.pending_orders} />
               <MetricCard label="Overdue Orders" value={overview.metrics.overdue_orders} />
               <MetricCard label="Today Orders" value={overview.metrics.today_orders} />
-              <MetricCard label="Housekeeping" value={overview.metrics.pending_housekeeping_tasks} />
+              <MetricCard
+                label="Housekeeping"
+                value={overview.metrics.pending_housekeeping_tasks}
+              />
               <MetricCard label="Exceptions" value={overview.metrics.exception_count} />
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Module Lanes</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">
+                Module Lanes
+              </h2>
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {visibleLanes.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-slate-200 px-4 py-3 text-sm text-slate-500">
+                    No lanes are currently visible for this account.
+                  </p>
+                )}
+
                 {visibleLanes.map((lane) => (
                   <button
                     key={lane.key}
                     onClick={() => navigate(lane.path)}
-                    className="rounded-lg border border-gray-200 px-4 py-3 text-left hover:bg-gray-50"
+                    className="rounded-lg border border-gray-200 px-4 py-3 text-left transition-colors hover:bg-gray-50"
                   >
                     <p className="text-sm font-semibold text-gray-800">{lane.label}</p>
-                    <p className="text-xs text-gray-500 mt-1">Lane key: {lane.key}</p>
+                    <p className="mt-1 text-xs text-gray-500">Lane key: {lane.key}</p>
                   </button>
                 ))}
               </div>
-              <div className="mt-4 text-xs text-gray-500">
+              <p className="mt-4 text-xs text-gray-500">
                 SLA priority: {overview.sla_priority_model.join(" > ")}
-              </div>
+              </p>
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Setup Progress</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">
+                Setup Progress
+              </h2>
               <div className="mt-3">
                 <div className="h-2 w-full rounded bg-gray-100">
                   <div
@@ -243,10 +291,22 @@ export default function Dashboard() {
                   />
                 </div>
                 <p className="mt-2 text-xs text-gray-500">
-                  {overview.setup_wizard.progress_percent}% complete · Step {overview.setup_wizard.current_step}/
-                  {overview.setup_wizard.total_steps}
+                  {overview.setup_wizard.progress_percent}% complete - Step{" "}
+                  {overview.setup_wizard.current_step}/{overview.setup_wizard.total_steps}
                 </p>
               </div>
+
+              {pendingRequirements.length > 0 && (
+                <p className="mt-3 text-xs text-gray-500">
+                  Pending:{" "}
+                  {pendingRequirements
+                    .slice(0, 3)
+                    .map((item) => item.label)
+                    .join(", ")}
+                  {pendingRequirements.length > 3 ? "..." : ""}
+                </p>
+              )}
+
               <button
                 onClick={() => setWizardOpen(true)}
                 className="mt-3 rounded-md bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700"
@@ -263,8 +323,10 @@ export default function Dashboard() {
           step={wizardStep}
           requirements={overview.setup_requirements}
           onClose={() => setWizardOpen(false)}
-          onPrevious={() => setWizardStep((s) => Math.max(1, s - 1))}
-          onNext={() => void saveWizardProgress(Math.min(overview.setup_wizard.total_steps, wizardStep + 1))}
+          onPrevious={() => setWizardStep((current) => Math.max(1, current - 1))}
+          onNext={() =>
+            void saveWizardProgress(Math.min(overview.setup_wizard.total_steps, wizardStep + 1))
+          }
           onGoProfile={() => {
             setWizardOpen(false);
             navigate("/admin/restaurant-profile");
@@ -277,10 +339,13 @@ export default function Dashboard() {
 }
 
 function MetricCard({ label, value }: { label: string; value: number }) {
+  const hasValue = value > 0;
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-5 py-4">
       <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-gray-900">{value}</p>
+      <p className={`mt-2 text-2xl font-bold ${hasValue ? "text-slate-900" : "text-slate-700"}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -309,11 +374,13 @@ function WizardModal({
       <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Setup Wizard</h2>
-          <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">Close</button>
+          <button onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">
+            Close
+          </button>
         </div>
 
         <p className="mt-2 text-sm text-gray-600">
-          Step {step} of {requirements.length}
+          Step {step} of {Math.max(requirements.length, 1)}
         </p>
 
         {current ? (
@@ -348,7 +415,7 @@ function WizardModal({
             disabled={saving}
             className="rounded-md bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Save & Next"}
+            {saving ? "Saving..." : "Save and Next"}
           </button>
         </div>
       </div>
