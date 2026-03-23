@@ -166,6 +166,45 @@ export default function Dashboard() {
     }
   }
 
+  const wizardTotalSteps = useMemo(() => {
+    if (!overview) return 1;
+    return Math.max(overview.setup_wizard.total_steps, overview.setup_requirements.length, 1);
+  }, [overview]);
+
+  function openWizard(focusBlocking = false) {
+    if (!overview) {
+      setWizardOpen(true);
+      return;
+    }
+
+    if (focusBlocking) {
+      const firstBlockingIndex = overview.setup_requirements.findIndex(
+        (item) => item.severity === "blocking" && !item.completed
+      );
+      if (firstBlockingIndex >= 0) {
+        setWizardStep(firstBlockingIndex + 1);
+      }
+    }
+
+    setWizardOpen(true);
+  }
+
+  async function handleWizardNext() {
+    if (!overview) return;
+
+    if (wizardStep >= wizardTotalSteps) {
+      const firstPendingIndex = overview.setup_requirements.findIndex((item) => !item.completed);
+      if (firstPendingIndex >= 0) {
+        setWizardStep(firstPendingIndex + 1);
+        return;
+      }
+      setWizardOpen(false);
+      return;
+    }
+
+    await saveWizardProgress(Math.min(wizardTotalSteps, wizardStep + 1));
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -209,7 +248,7 @@ export default function Dashboard() {
                   Missing: {blockingRequirements.map((item) => item.label).join(", ")}
                 </div>
                 <button
-                  onClick={() => setWizardOpen(true)}
+                  onClick={() => openWizard(true)}
                   className="mt-3 rounded-md bg-red-700 px-3 py-2 text-xs font-semibold text-white hover:bg-red-800"
                 >
                   Open Setup Wizard
@@ -308,7 +347,7 @@ export default function Dashboard() {
               )}
 
               <button
-                onClick={() => setWizardOpen(true)}
+                onClick={() => openWizard()}
                 className="mt-3 rounded-md bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700"
               >
                 Continue Setup Wizard
@@ -321,12 +360,11 @@ export default function Dashboard() {
       {overview && wizardOpen && (
         <WizardModal
           step={wizardStep}
+          totalSteps={wizardTotalSteps}
           requirements={overview.setup_requirements}
           onClose={() => setWizardOpen(false)}
           onPrevious={() => setWizardStep((current) => Math.max(1, current - 1))}
-          onNext={() =>
-            void saveWizardProgress(Math.min(overview.setup_wizard.total_steps, wizardStep + 1))
-          }
+          onNext={() => void handleWizardNext()}
           onGoProfile={() => {
             setWizardOpen(false);
             navigate("/admin/restaurant-profile");
@@ -352,6 +390,7 @@ function MetricCard({ label, value }: { label: string; value: number }) {
 
 function WizardModal({
   step,
+  totalSteps,
   requirements,
   onClose,
   onPrevious,
@@ -360,6 +399,7 @@ function WizardModal({
   saving,
 }: {
   step: number;
+  totalSteps: number;
   requirements: DashboardSetupRequirement[];
   onClose: () => void;
   onPrevious: () => void;
@@ -367,7 +407,11 @@ function WizardModal({
   onGoProfile: () => void;
   saving: boolean;
 }) {
-  const current = requirements[Math.min(Math.max(step - 1, 0), requirements.length - 1)] ?? null;
+  const safeTotalSteps = Math.max(totalSteps, 1);
+  const safeStep = Math.min(Math.max(step, 1), safeTotalSteps);
+  const isLastStep = safeStep >= safeTotalSteps;
+  const hasPendingRequirements = requirements.some((item) => !item.completed);
+  const current = requirements[Math.min(Math.max(safeStep - 1, 0), requirements.length - 1)] ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -380,7 +424,7 @@ function WizardModal({
         </div>
 
         <p className="mt-2 text-sm text-gray-600">
-          Step {step} of {Math.max(requirements.length, 1)}
+          Step {safeStep} of {safeTotalSteps}
         </p>
 
         {current ? (
@@ -396,6 +440,13 @@ function WizardModal({
           <p className="mt-4 text-sm text-gray-500">No setup requirements.</p>
         )}
 
+        {isLastStep && hasPendingRequirements && (
+          <p className="mt-3 text-xs text-amber-700">
+            Some setup fields are still pending. Use "Review Pending" to jump to the first pending
+            requirement.
+          </p>
+        )}
+
         <div className="mt-6 flex flex-wrap gap-2">
           <button
             onClick={onGoProfile}
@@ -405,7 +456,7 @@ function WizardModal({
           </button>
           <button
             onClick={onPrevious}
-            disabled={step <= 1 || saving}
+            disabled={safeStep <= 1 || saving}
             className="rounded-md border px-3 py-2 text-xs font-semibold disabled:opacity-50"
           >
             Previous
@@ -413,9 +464,21 @@ function WizardModal({
           <button
             onClick={onNext}
             disabled={saving}
-            className="rounded-md bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+            className={`rounded-md px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 ${
+              isLastStep
+                ? hasPendingRequirements
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+                : "bg-amber-600 hover:bg-amber-700"
+            }`}
           >
-            {saving ? "Saving..." : "Save and Next"}
+            {saving
+              ? "Saving..."
+              : isLastStep
+                ? hasPendingRequirements
+                  ? "Review Pending"
+                  : "Finish Setup"
+                : "Save and Next"}
           </button>
         </div>
       </div>
