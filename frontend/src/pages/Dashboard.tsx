@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardSaving, setWizardSaving] = useState(false);
+  const [wizardError, setWizardError] = useState<string | null>(null);
   const [dismissingAlertKey, setDismissingAlertKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,9 +65,21 @@ export default function Dashboard() {
         const data = await api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview");
         if (!active) return;
 
+        const firstPendingIndex = data.setup_requirements.findIndex((item) => !item.completed);
+        const firstBlockingPendingIndex = data.setup_requirements.findIndex(
+          (item) => item.severity === "blocking" && !item.completed
+        );
+        const totalSteps = Math.max(data.setup_wizard.total_steps, data.setup_requirements.length, 1);
+        const persistedStep = Number.isFinite(data.setup_wizard.current_step)
+          ? data.setup_wizard.current_step
+          : 1;
+        const clampedPersistedStep = Math.min(Math.max(persistedStep, 1), totalSteps);
+        const firstPendingStep = firstPendingIndex >= 0 ? firstPendingIndex + 1 : 1;
+        const hasPersistedProgress = clampedPersistedStep > 1;
+
         setOverview(data);
-        setWizardStep(data.setup_wizard.current_step || 1);
-        setWizardOpen(data.setup_wizard.should_show);
+        setWizardStep(hasPersistedProgress ? clampedPersistedStep : firstPendingStep);
+        setWizardOpen(data.setup_wizard.has_blocking_missing && firstBlockingPendingIndex >= 0);
 
         const visible = data.alerts.filter((alert) => alert.should_show);
         for (const alert of visible) {
@@ -117,6 +130,13 @@ export default function Dashboard() {
     return overview.setup_requirements.filter((item) => !item.completed);
   }, [overview]);
 
+  const nextBlockingLabels = useMemo(() => {
+    if (!overview) return [];
+    return overview.setup_requirements
+      .filter((item) => item.severity === "blocking" && !item.completed)
+      .map((item) => item.label);
+  }, [overview]);
+
   async function dismissAlert(alert: DashboardAlertItem) {
     setDismissingAlertKey(alert.key);
     try {
@@ -135,10 +155,11 @@ export default function Dashboard() {
     }
   }
 
-  async function saveWizardProgress(nextStep: number) {
-    if (!overview) return;
+  async function saveWizardProgress(nextStep: number): Promise<boolean> {
+    if (!overview) return false;
 
     setWizardSaving(true);
+    setWizardError(null);
     try {
       const completedKeys = overview.setup_requirements
         .filter((item) => item.completed)
@@ -161,6 +182,16 @@ export default function Dashboard() {
           },
         };
       });
+      return true;
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Failed to save setup progress.";
+      setWizardError(message);
+      return false;
     } finally {
       setWizardSaving(false);
     }
@@ -173,6 +204,7 @@ export default function Dashboard() {
 
   function openWizard(focusBlocking = false) {
     if (!overview) {
+      setWizardError(null);
       setWizardOpen(true);
       return;
     }
@@ -184,8 +216,14 @@ export default function Dashboard() {
       if (firstBlockingIndex >= 0) {
         setWizardStep(firstBlockingIndex + 1);
       }
+    } else {
+      const firstPendingIndex = overview.setup_requirements.findIndex((item) => !item.completed);
+      if (firstPendingIndex >= 0) {
+        setWizardStep(firstPendingIndex + 1);
+      }
     }
 
+    setWizardError(null);
     setWizardOpen(true);
   }
 
@@ -193,6 +231,9 @@ export default function Dashboard() {
     if (!overview) return;
 
     if (wizardStep >= wizardTotalSteps) {
+      const saved = await saveWizardProgress(wizardTotalSteps);
+      if (!saved) return;
+
       const firstPendingIndex = overview.setup_requirements.findIndex((item) => !item.completed);
       if (firstPendingIndex >= 0) {
         setWizardStep(firstPendingIndex + 1);
@@ -362,6 +403,8 @@ export default function Dashboard() {
           step={wizardStep}
           totalSteps={wizardTotalSteps}
           requirements={overview.setup_requirements}
+          pendingBlockingLabels={nextBlockingLabels}
+          errorMessage={wizardError}
           onClose={() => setWizardOpen(false)}
           onPrevious={() => setWizardStep((current) => Math.max(1, current - 1))}
           onNext={() => void handleWizardNext()}
@@ -392,6 +435,8 @@ function WizardModal({
   step,
   totalSteps,
   requirements,
+  pendingBlockingLabels,
+  errorMessage,
   onClose,
   onPrevious,
   onNext,
@@ -401,6 +446,8 @@ function WizardModal({
   step: number;
   totalSteps: number;
   requirements: DashboardSetupRequirement[];
+  pendingBlockingLabels: string[];
+  errorMessage: string | null;
   onClose: () => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -441,10 +488,19 @@ function WizardModal({
         )}
 
         {isLastStep && hasPendingRequirements && (
-          <p className="mt-3 text-xs text-amber-700">
-            Some setup fields are still pending. Use "Review Pending" to jump to the first pending
-            requirement.
-          </p>
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <p>Some setup fields are still pending.</p>
+            {pendingBlockingLabels.length > 0 && (
+              <p className="mt-1">Blocking fields: {pendingBlockingLabels.join(", ")}</p>
+            )}
+            <p className="mt-1">Use "Review Pending" to jump to the first pending requirement.</p>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {errorMessage}
+          </div>
         )}
 
         <div className="mt-6 flex flex-wrap gap-2">
@@ -474,11 +530,11 @@ function WizardModal({
           >
             {saving
               ? "Saving..."
-              : isLastStep
-                ? hasPendingRequirements
-                  ? "Review Pending"
-                  : "Finish Setup"
-                : "Save and Next"}
+                : isLastStep
+                  ? hasPendingRequirements
+                    ? "Review Pending"
+                    : "Finish Setup"
+                : "Save Step and Next"}
           </button>
         </div>
       </div>
