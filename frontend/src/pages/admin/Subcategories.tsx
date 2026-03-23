@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
@@ -22,6 +22,7 @@ const EMPTY_FORM: FormData = {
 };
 
 export default function Subcategories() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -310,6 +311,16 @@ export default function Subcategories() {
                 </div>
 
                 <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() =>
+                      navigate(
+                        `/admin/menu/items?categoryId=${subcat.category_id}&subcategoryId=${subcat.id}`
+                      )
+                    }
+                    className="flex-1 text-xs py-1.5 border border-blue-200 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                  >
+                    Items
+                  </button>
                   <button
                     onClick={() => openUpload(subcat)}
                     disabled={uploading && uploadTarget?.id === subcat.id}

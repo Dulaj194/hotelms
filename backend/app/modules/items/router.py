@@ -6,6 +6,7 @@ from app.modules.items import service
 from app.modules.items.schemas import (
     ItemCreateRequest,
     ItemImageUploadResponse,
+    ItemMediaUploadResponse,
     ItemResponse,
     ItemUpdateRequest,
 )
@@ -78,4 +79,19 @@ async def upload_item_image(
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
     return await service.upload_item_image(
         db, item_id, current_user.restaurant_id, file
+    )
+
+
+@router.post("/{item_id}/media/{slot}", response_model=ItemMediaUploadResponse)
+async def upload_item_media(
+    item_id: int,
+    slot: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles("owner", "admin")),
+    db: Session = Depends(get_db),
+) -> ItemMediaUploadResponse:
+    if current_user.restaurant_id is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
+    return await service.upload_item_media(
+        db, item_id, current_user.restaurant_id, slot, file
     )

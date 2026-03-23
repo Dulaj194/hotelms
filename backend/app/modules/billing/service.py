@@ -46,12 +46,33 @@ from app.modules.table_sessions import repository as session_repo
 
 def _load_session_or_404(db: Session, session_id: str, restaurant_id: int):
     """Load a session scoped to the restaurant — raises 404 if not found."""
-    session = session_repo.get_session_by_id_and_restaurant(db, session_id, restaurant_id)
+    candidate = (session_id or "").strip()
+    session = session_repo.get_session_by_id_and_restaurant(db, candidate, restaurant_id)
+
+    if session is None and candidate:
+        # Real-world staff input often uses a short session prefix copied from UI.
+        # Accept prefix only when it resolves to exactly one session.
+        matches = session_repo.list_sessions_by_id_prefix(
+            db,
+            restaurant_id=restaurant_id,
+            session_id_prefix=candidate,
+            limit=2,
+        )
+        if len(matches) == 1:
+            session = matches[0]
+        elif len(matches) > 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Session id is ambiguous. Please enter a longer session id "
+                    "or use the table number."
+                ),
+            )
 
     if session is None:
         # Staff may enter table number in the billing search field.
         # Fallback to latest session for that table when session_id lookup fails.
-        table_number_candidate = session_id.strip()
+        table_number_candidate = candidate
         if table_number_candidate:
             fallback = session_repo.get_latest_session_by_table_number(
                 db,
@@ -64,7 +85,10 @@ def _load_session_or_404(db: Session, session_id: str, restaurant_id: int):
     if session is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Table session not found.",
+            detail=(
+                "Table session not found. Enter a valid full/short session id "
+                "or a table number."
+            ),
         )
     return session
 

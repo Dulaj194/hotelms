@@ -139,6 +139,33 @@ def get_latest_session_by_table_number(
     )
 
 
+def list_sessions_by_id_prefix(
+    db: Session,
+    restaurant_id: int,
+    session_id_prefix: str,
+    limit: int = 5,
+) -> list[TableSession]:
+    """Return recent sessions where session_id starts with a prefix.
+
+    Used by staff billing lookup to support short session id input.
+    Caller is responsible for handling ambiguous prefix matches.
+    """
+    prefix = (session_id_prefix or "").strip()
+    if not prefix:
+        return []
+
+    return (
+        db.query(TableSession)
+        .filter(
+            TableSession.restaurant_id == restaurant_id,
+            TableSession.session_id.like(f"{prefix}%"),
+        )
+        .order_by(TableSession.created_at.desc(), TableSession.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
 def close_session_by_id(
     db: Session,
     session_id: str,

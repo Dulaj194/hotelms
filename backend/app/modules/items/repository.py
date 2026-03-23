@@ -78,8 +78,16 @@ def create(db: Session, restaurant_id: int, data: ItemCreateRequest) -> Item:
     item = Item(
         name=data.name,
         description=data.description,
+        more_details=data.more_details,
         price=data.price,
+        currency=(data.currency or "LKR").upper(),
         image_path=data.image_path,
+        image_path_2=data.image_path_2,
+        image_path_3=data.image_path_3,
+        image_path_4=data.image_path_4,
+        image_path_5=data.image_path_5,
+        video_path=data.video_path,
+        blog_link=data.blog_link,
         is_available=data.is_available,
         category_id=data.category_id,
         subcategory_id=data.subcategory_id,
@@ -120,6 +128,22 @@ def update_image_path(
     if not item:
         return None
     item.image_path = image_path
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def update_media_path(
+    db: Session,
+    item_id: int,
+    restaurant_id: int,
+    field_name: str,
+    media_path: str,
+) -> Item | None:
+    item = get_by_id(db, item_id, restaurant_id)
+    if not item:
+        return None
+    setattr(item, field_name, media_path)
     db.commit()
     db.refresh(item)
     return item

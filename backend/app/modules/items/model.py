@@ -21,8 +21,16 @@ class Item(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    more_details: Mapped[str | None] = mapped_column(Text, nullable=True)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(12), nullable=False, default="LKR")
     image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_path_2: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_path_3: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_path_4: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_path_5: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    video_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    blog_link: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     is_available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # Tenant scope — item belongs to both a category and a restaurant.

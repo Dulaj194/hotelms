@@ -19,6 +19,7 @@ logger = get_logger(__name__)
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
 (Path(settings.upload_dir) / "logos").mkdir(parents=True, exist_ok=True)
 (Path(settings.upload_dir) / "qrcodes").mkdir(parents=True, exist_ok=True)
+(Path(settings.upload_dir) / "videos").mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -29,6 +30,7 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     upload_root = Path(settings.upload_dir)
     (upload_root / "logos").mkdir(parents=True, exist_ok=True)
     (upload_root / "qrcodes").mkdir(parents=True, exist_ok=True)
+    (upload_root / "videos").mkdir(parents=True, exist_ok=True)
     logger.info("Upload directories ready at %s", upload_root.resolve())
 
     if settings.app_env == "development":

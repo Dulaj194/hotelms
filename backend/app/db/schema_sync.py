@@ -111,6 +111,45 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
         ),
     )
 
+    item_column_patches: Sequence[tuple[str, str]] = (
+        (
+            "subcategory_id",
+            "ALTER TABLE items ADD COLUMN subcategory_id INT NULL",
+        ),
+        (
+            "more_details",
+            "ALTER TABLE items ADD COLUMN more_details TEXT NULL",
+        ),
+        (
+            "currency",
+            "ALTER TABLE items ADD COLUMN currency VARCHAR(12) NOT NULL DEFAULT 'LKR'",
+        ),
+        (
+            "image_path_2",
+            "ALTER TABLE items ADD COLUMN image_path_2 VARCHAR(500) NULL",
+        ),
+        (
+            "image_path_3",
+            "ALTER TABLE items ADD COLUMN image_path_3 VARCHAR(500) NULL",
+        ),
+        (
+            "image_path_4",
+            "ALTER TABLE items ADD COLUMN image_path_4 VARCHAR(500) NULL",
+        ),
+        (
+            "image_path_5",
+            "ALTER TABLE items ADD COLUMN image_path_5 VARCHAR(500) NULL",
+        ),
+        (
+            "video_path",
+            "ALTER TABLE items ADD COLUMN video_path VARCHAR(500) NULL",
+        ),
+        (
+            "blog_link",
+            "ALTER TABLE items ADD COLUMN blog_link VARCHAR(1000) NULL",
+        ),
+    )
+
     with engine.begin() as conn:
         for column_name, alter_sql in order_header_column_patches:
             if _column_exists(conn, "order_headers", column_name):
@@ -145,5 +184,14 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             conn.execute(text(alter_sql))
             logger.warning(
                 "Applied development schema patch: categories.%s was missing and has been added.",
+                column_name,
+            )
+
+        for column_name, alter_sql in item_column_patches:
+            if _column_exists(conn, "items", column_name):
+                continue
+            conn.execute(text(alter_sql))
+            logger.warning(
+                "Applied development schema patch: items.%s was missing and has been added.",
                 column_name,
             )

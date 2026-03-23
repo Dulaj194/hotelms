@@ -13,6 +13,7 @@
 import { useState } from "react";
 
 import { api } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import type {
   BillOrder,
   BillPaymentMethod,
@@ -120,9 +121,17 @@ export default function Billing() {
       );
       setSummary(data);
     } catch (err) {
-      setFetchError(
-        err instanceof Error ? err.message : "Failed to load bill summary."
-      );
+      if (err instanceof ApiError && err.status === 404) {
+        setFetchError(
+          "Session not found. Use a valid session ID (full or short prefix) or table number."
+        );
+      } else if (err instanceof ApiError && err.status === 422) {
+        setFetchError(err.detail);
+      } else {
+        setFetchError(
+          err instanceof Error ? err.message : "Failed to load bill summary."
+        );
+      }
     } finally {
       setFetchLoading(false);
     }
@@ -237,7 +246,7 @@ export default function Billing() {
               type="text"
               value={sessionInput}
               onChange={(e) => setSessionInput(e.target.value)}
-              placeholder="e.g. a3f9b2c1..."
+              placeholder="e.g. session id, short id prefix, or table number"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>

@@ -9,12 +9,25 @@ from app.modules.items import repository
 from app.modules.items.schemas import (
     ItemCreateRequest,
     ItemImageUploadResponse,
+    ItemMediaUploadResponse,
     ItemResponse,
     ItemUpdateRequest,
 )
+from app.modules.restaurants import repository as restaurant_repository
 
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+_ALLOWED_VIDEO_CONTENT_TYPES = {"video/mp4", "video/webm", "video/quicktime"}
+_VIDEO_EXT_MAP = {"video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov"}
+
+_MEDIA_SLOT_TO_FIELD = {
+    "primary": "image_path",
+    "additional_1": "image_path_2",
+    "additional_2": "image_path_3",
+    "additional_3": "image_path_4",
+    "additional_4": "image_path_5",
+    "video": "video_path",
+}
 
 
 def list_items(db: Session, restaurant_id: int) -> list[ItemResponse]:
@@ -46,6 +59,11 @@ def add_item(db: Session, restaurant_id: int, data: ItemCreateRequest) -> ItemRe
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Subcategory not found or does not belong to your restaurant.",
             )
+
+    restaurant = restaurant_repository.get_by_id(db, restaurant_id)
+    if restaurant is not None:
+        data.currency = (restaurant.currency or "LKR").upper()  # type: ignore[attr-defined]
+
     item = repository.create(db, restaurant_id, data)
     return ItemResponse.model_validate(item)
 
@@ -117,3 +135,54 @@ async def upload_item_image(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found.")
 
     return ItemImageUploadResponse(image_path=image_path)
+
+
+async def upload_item_media(
+    db: Session,
+    item_id: int,
+    restaurant_id: int,
+    slot: str,
+    file: UploadFile,
+) -> ItemMediaUploadResponse:
+    if slot not in _MEDIA_SLOT_TO_FIELD:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid media slot.",
+        )
+
+    is_video_slot = slot == "video"
+    allowed_content_types = (
+        _ALLOWED_VIDEO_CONTENT_TYPES if is_video_slot else _ALLOWED_CONTENT_TYPES
+    )
+    ext_map = _VIDEO_EXT_MAP if is_video_slot else _EXT_MAP
+
+    if file.content_type not in allowed_content_types:
+        expected = "mp4, webm, mov" if is_video_slot else "jpg, png, webp"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type '{file.content_type}'. Allowed: {expected}.",
+        )
+
+    content = await file.read()
+    max_mb = 25 if is_video_slot else settings.max_upload_size_mb
+    max_bytes = max_mb * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds the {max_mb} MB size limit.",
+        )
+
+    ext = ext_map[file.content_type]  # type: ignore[index]
+    filename = f"{uuid.uuid4().hex}{ext}"
+    folder = "videos" if is_video_slot else "items"
+    upload_path = Path(settings.upload_dir) / folder
+    upload_path.mkdir(parents=True, exist_ok=True)
+    (upload_path / filename).write_bytes(content)
+
+    media_path = f"/uploads/{folder}/{filename}"
+    field_name = _MEDIA_SLOT_TO_FIELD[slot]
+    item = repository.update_media_path(db, item_id, restaurant_id, field_name, media_path)
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found.")
+
+    return ItemMediaUploadResponse(slot=slot, path=media_path)
