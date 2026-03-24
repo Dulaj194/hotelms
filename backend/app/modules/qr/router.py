@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_privilege, require_roles
+from app.core.dependencies import get_db, require_roles
 from app.modules.qr import service
 from app.modules.qr.schemas import (
     BulkQRCodeResponse,
@@ -21,7 +21,6 @@ router = APIRouter()
 def get_table_qr(
     table_number: str,
     current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("QR_MENU")),
     db: Session = Depends(get_db),
 ) -> QRCodeResponse:
     """Generate or fetch QR code for a table.
@@ -38,7 +37,6 @@ def get_table_qr(
 def get_room_qr(
     room_number: str,
     current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("QR_MENU")),
     db: Session = Depends(get_db),
 ) -> QRCodeResponse:
     """Generate or fetch QR code for a room.
@@ -55,7 +53,6 @@ def get_room_qr(
 def bulk_table_qr(
     payload: BulkQRRequest,
     current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("QR_MENU")),
     db: Session = Depends(get_db),
 ) -> BulkQRCodeResponse:
     """Generate QR codes for a range of tables (start–end inclusive). Owner/admin only."""
@@ -69,7 +66,6 @@ def bulk_table_qr(
 def bulk_room_qr(
     payload: RoomBulkQRRequest,
     current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("QR_MENU")),
     db: Session = Depends(get_db),
 ) -> BulkQRCodeResponse:
     """Generate QR codes for an explicit list of existing rooms. Owner/admin only."""

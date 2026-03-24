@@ -158,7 +158,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     location.pathname.startsWith("/admin/kitchen") || location.pathname === "/admin/steward";
   const isQrGroupVisible = role === "owner" || role === "admin";
   const isQrGroupActive = qrPaths.some((path) => location.pathname === path);
-  const qrFeatureLocked = !privilegesLoading && !hasPrivilege("QR_MENU");
   const isOfferGroupVisible =
     (role === "owner" || role === "admin") && !privilegesLoading && hasPrivilege("OFFERS");
   const isOfferGroupActive = offerPaths.some((path) =>
@@ -315,11 +314,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   QR Codes
                 </span>
                 <div className="flex items-center gap-2">
-                  {qrFeatureLocked && (
-                    <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                      Locked
-                    </span>
-                  )}
                   <ChevronDown
                     className={`h-4 w-4 transition-transform ${qrOpen ? "rotate-180" : ""}`}
                   />

@@ -13,7 +13,6 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { RoomCreateRequest, RoomResponse, RoomUpdateRequest } from "@/types/room";
 import type { BulkQRCodeResponse, QRCodeResponse } from "@/types/publicMenu";
-import type { SubscriptionPrivilegeResponse } from "@/types/subscription";
 
 const API_ORIGIN =
   import.meta.env.VITE_BACKEND_URL ??
@@ -69,8 +68,6 @@ export default function Rooms() {
   const [qrLoading, setQrLoading] = useState<string | null>(null); // room_number being fetched
   const [bulkQrResult, setBulkQrResult] = useState<BulkQRCodeResponse | null>(null);
   const [bulkQrLoading, setBulkQrLoading] = useState(false);
-  const [qrEnabled, setQrEnabled] = useState(false);
-  const [privilegesLoading, setPrivilegesLoading] = useState(true);
 
   // ── Data loading ────────────────────────────────────────────────────────────
 
@@ -90,25 +87,6 @@ export default function Rooms() {
   useEffect(() => {
     void loadRooms();
   }, [loadRooms]);
-
-  useEffect(() => {
-    async function loadPrivileges() {
-      setPrivilegesLoading(true);
-      try {
-        const data = await api.get<SubscriptionPrivilegeResponse>(
-          "/subscriptions/me/privileges"
-        );
-        const privileges = new Set(data.privileges.map((item) => item.toUpperCase()));
-        setQrEnabled(privileges.has("QR_MENU"));
-      } catch {
-        setError("Failed to load subscription privileges.");
-      } finally {
-        setPrivilegesLoading(false);
-      }
-    }
-
-    void loadPrivileges();
-  }, []);
 
   // ── Create / edit modal ─────────────────────────────────────────────────────
 
@@ -193,10 +171,6 @@ export default function Rooms() {
   // ── QR generation ───────────────────────────────────────────────────────────
 
   const handleGenerateQR = async (room: RoomResponse) => {
-    if (!qrEnabled) {
-      setError("Your subscription does not include QR Menu access.");
-      return;
-    }
     setQrLoading(room.room_number);
     setQrResult(null);
     try {
@@ -212,10 +186,6 @@ export default function Rooms() {
   };
 
   const handleGenerateAllRoomQR = async () => {
-    if (!qrEnabled) {
-      setError("Your subscription does not include QR Menu access.");
-      return;
-    }
     setBulkQrLoading(true);
     setBulkQrResult(null);
     try {
@@ -304,13 +274,7 @@ export default function Rooms() {
         </div>
       )}
 
-      {!privilegesLoading && !qrEnabled && (
-        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-          QR generation is locked for this restaurant because the current subscription does not include the QR Menu privilege.
-        </div>
-      )}
-
-      {!privilegesLoading && qrEnabled && rooms.length > 0 && (
+      {rooms.length > 0 && (
         <div className="mb-4 p-4 bg-white border rounded-lg flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -407,7 +371,7 @@ export default function Rooms() {
                       {/* QR */}
                       <button
                         onClick={() => handleGenerateQR(room)}
-                        disabled={qrLoading === room.room_number || privilegesLoading || !qrEnabled}
+                        disabled={qrLoading === room.room_number}
                         className="px-2 py-1 text-xs border rounded hover:bg-gray-100 transition-colors
                                    disabled:opacity-50"
                         title="Generate QR"
