@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import KitchenOrderSection from "@/components/shared/KitchenOrderSection";
 import { useKitchenSocket } from "@/hooks/useKitchenSocket";
-import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import type { NewOrderEvent, OrderStatusUpdatedEvent } from "@/types/realtime";
@@ -154,9 +153,7 @@ interface StewardDashboardProps {
 }
 
 function StewardDashboard({ restaurantId }: StewardDashboardProps) {
-  const { loading: privilegeLoading, hasPrivilege } = useSubscriptionPrivileges();
-  const qrMenuEnabled = hasPrivilege("QR_MENU");
-  const canAccessSteward = !privilegeLoading && qrMenuEnabled && Boolean(restaurantId);
+  const canAccessSteward = Boolean(restaurantId);
 
   const servedStorageKey = useMemo(
     () => (restaurantId ? `steward_served_orders_${restaurantId}` : null),
@@ -262,10 +259,8 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   );
 
   useEffect(() => {
-    if (!privilegeLoading) {
-      void loadData();
-    }
-  }, [loadData, privilegeLoading]);
+    void loadData();
+  }, [loadData]);
 
   useEffect(() => {
     if (!canAccessSteward) return;
@@ -407,14 +402,6 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     () => filteredReadyOrders.filter((order) => order.order_source === "room"),
     [filteredReadyOrders]
   );
-
-  if (!privilegeLoading && !qrMenuEnabled) {
-    return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        Steward dashboard is locked because this restaurant does not have the QR_MENU privilege.
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">

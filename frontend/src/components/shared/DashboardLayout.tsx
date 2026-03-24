@@ -84,13 +84,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ["owner", "admin"],
   },
   {
-    path: "/admin/steward",
-    label: "Steward",
-    icon: UserCog,
-    roles: ["owner", "admin", "steward"],
-    privilege: "QR_MENU",
-  },
-  {
     path: "/admin/reports",
     label: "Reports",
     icon: ReceiptText,
@@ -147,6 +140,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const kitchenSubItems: MenuSubItem[] = useMemo(
     () => [
+      { path: "/admin/steward", label: "Steward Dashboard", icon: UserCog },
       { path: "/admin/kitchen/orders", label: "Orders", icon: ClipboardList },
       { path: "/admin/kitchen/old-orders", label: "Old Orders", icon: ReceiptText },
     ],
@@ -158,11 +152,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const offerPaths = useMemo(() => offerSubItems.map((item) => item.path), [offerSubItems]);
   const isMenuGroupVisible = role === "owner" || role === "admin";
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
-  const isKitchenGroupVisible =
-    (role === "owner" || role === "admin" || role === "steward") &&
-    !privilegesLoading &&
-    hasPrivilege("QR_MENU");
-  const isKitchenGroupActive = location.pathname.startsWith("/admin/kitchen");
+  const isKitchenGroupVisible = role === "owner" || role === "admin" || role === "steward";
+  const isKitchenGroupActive =
+    location.pathname.startsWith("/admin/kitchen") || location.pathname === "/admin/steward";
   const isOfferGroupVisible =
     (role === "owner" || role === "admin") && !privilegesLoading && hasPrivilege("OFFERS");
   const isOfferGroupActive = offerPaths.some((path) =>
@@ -245,7 +237,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="mb-1">
               <button
                 type="button"
-                onClick={() => setKitchenOpen((prev) => !prev)}
+                onClick={() => {
+                  if (!isKitchenGroupActive) {
+                    setKitchenOpen(true);
+                    navigate("/admin/kitchen/orders");
+                    return;
+                  }
+                  setKitchenOpen((prev) => !prev);
+                }}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
                   isKitchenGroupActive
                     ? "bg-slate-700 text-white"
@@ -256,9 +255,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <CookingPot className="h-4 w-4 mr-2 shrink-0" />
                   Kitchen
                 </span>
-                <ChevronDown
-                  className={`h-4 w-4 transition-transform ${kitchenOpen ? "rotate-180" : ""}`}
-                />
+                <div className="flex items-center gap-2">
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${kitchenOpen ? "rotate-180" : ""}`}
+                  />
+                </div>
               </button>
 
               {kitchenOpen && (
@@ -364,7 +365,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             onClick={handleLogout}
             className="w-full text-left text-xs text-gray-400 hover:text-red-400 transition-colors"
           >
-            ⏻ Logout
+            Logout
           </button>
         </div>
       </aside>
