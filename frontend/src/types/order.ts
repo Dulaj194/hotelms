@@ -49,6 +49,7 @@ export interface OrderHeaderResponse {
   restaurant_id: number;
   table_number: string | null;
   customer_name: string | null;
+  customer_phone: string | null;
   status: OrderStatus;
   subtotal_amount: number;
   tax_amount: number;
@@ -128,6 +129,7 @@ export interface KitchenOrderCard {
   order_number: string;
   table_number: string | null;
   customer_name: string | null;
+  customer_phone: string | null;
   status: OrderStatus;
   total_amount: number;
   placed_at: string;

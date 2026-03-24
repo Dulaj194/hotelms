@@ -1,49 +1,45 @@
-/**
- * Steward — Order confirmation dashboard.
- *
- * Stewards see ALL incoming pending orders (table + room) and confirm
- * them before they reach the kitchen, or reject them outright.
- *
- * Mirrors the PHP admin_kitchen.php steward-confirmation flow:
- *   pending order → steward confirms → OrderStatus.confirmed → kitchen sees it
- *
- * Layout:
- *   Left column  — Table Orders (pending)
- *   Right column — Room Orders  (pending)
- *
- * Real-time via WebSocket (same channel as kitchen). Auto-refresh every 30s.
- */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
+import DashboardLayout from "@/components/shared/DashboardLayout";
 import KitchenOrderSection from "@/components/shared/KitchenOrderSection";
+import { useKitchenSocket } from "@/hooks/useKitchenSocket";
+import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
-import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import type { NewOrderEvent, OrderStatusUpdatedEvent } from "@/types/realtime";
 import type {
   KitchenOrderCard,
-  KitchenOrderListResponse,
   KitchenOrderItemSummary,
+  KitchenOrderListResponse,
 } from "@/types/order";
 
 const STEWARD_ROLES = new Set(["owner", "admin", "steward"]);
+const POLL_INTERVAL_MS = 3000;
+const SERVED_STORAGE_TTL_MS = 12 * 60 * 60 * 1000;
 
-// ── Build a card from a new_order WS event ────────────────────────────────────
+type StewardTab = "awaiting" | "ready";
+type SourceFilter = "all" | "table" | "room";
+
+interface StoredServedState {
+  [orderId: string]: number;
+}
+
 function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
-  const items: KitchenOrderItemSummary[] = data.items.map((item, idx) => ({
-    id: idx,
+  const items: KitchenOrderItemSummary[] = data.items.map((item, index) => ({
+    id: index,
     item_id: 0,
     item_name_snapshot: item.item_name_snapshot,
     quantity: item.quantity,
     unit_price_snapshot: item.quantity > 0 ? item.line_total / item.quantity : 0,
     line_total: item.line_total,
   }));
+
   return {
     id: data.order_id,
     order_number: data.order_number,
     table_number: data.table_number,
     customer_name: null,
+    customer_phone: null,
     status: "pending",
     total_amount: data.total_amount,
     placed_at: data.placed_at,
@@ -59,263 +55,529 @@ function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
   };
 }
 
-// ── Auth guard wrapper ─────────────────────────────────────────────────────────
-export default function Steward() {
-  const navigate = useNavigate();
-  const user = getUser();
+function playNotificationTone() {
+  try {
+    const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
 
-  useEffect(() => {
-    if (!user) {
-      navigate("/login", { replace: true });
-    } else if (!STEWARD_ROLES.has(user.role)) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [user, navigate]);
+    const audioContext = new AudioCtx();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
 
-  if (!user || !STEWARD_ROLES.has(user.role)) return null;
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.25);
 
-  return <StewardDashboard restaurantId={user.restaurant_id} />;
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.25);
+    oscillator.onended = () => {
+      void audioContext.close();
+    };
+  } catch {
+    // Audio notification is best-effort only.
+  }
 }
 
-// ── Dashboard internals ───────────────────────────────────────────────────────
+function sourceMatches(order: KitchenOrderCard, sourceFilter: SourceFilter): boolean {
+  if (sourceFilter === "all") return true;
+  if (sourceFilter === "room") return order.order_source === "room";
+  return order.order_source !== "room";
+}
+
+function locationMatches(order: KitchenOrderCard, locationFilter: string): boolean {
+  const filter = locationFilter.trim().toLowerCase();
+  if (!filter) return true;
+
+  const haystack = [
+    order.order_number,
+    order.table_number ?? "",
+    order.room_number ?? "",
+    order.customer_name ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(filter);
+}
+
+function loadServedOrderIds(storageKey: string | null): Set<number> {
+  if (!storageKey) return new Set();
+
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return new Set();
+
+    const parsed = JSON.parse(raw) as StoredServedState;
+    const now = Date.now();
+    const filteredEntries = Object.entries(parsed).filter(([, ts]) => now - ts <= SERVED_STORAGE_TTL_MS);
+    localStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(filteredEntries)));
+
+    return new Set(filteredEntries.map(([id]) => Number(id)).filter((id) => Number.isFinite(id)));
+  } catch {
+    return new Set();
+  }
+}
+
+function persistServedOrderIds(storageKey: string | null, servedOrderIds: Set<number>) {
+  if (!storageKey) return;
+
+  const now = Date.now();
+  const payload: StoredServedState = {};
+  servedOrderIds.forEach((id) => {
+    payload[String(id)] = now;
+  });
+
+  localStorage.setItem(storageKey, JSON.stringify(payload));
+}
+
+export default function Steward() {
+  const user = getUser();
+  const role = user?.role ?? "";
+
+  if (!user || !STEWARD_ROLES.has(role)) {
+    return null;
+  }
+
+  return (
+    <DashboardLayout>
+      <StewardDashboard restaurantId={user.restaurant_id} />
+    </DashboardLayout>
+  );
+}
+
 interface StewardDashboardProps {
   restaurantId: number | null;
 }
 
 function StewardDashboard({ restaurantId }: StewardDashboardProps) {
-  const [orders, setOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { loading: privilegeLoading, hasPrivilege } = useSubscriptionPrivileges();
+  const qrMenuEnabled = hasPrivilege("QR_MENU");
+  const canAccessSteward = !privilegeLoading && qrMenuEnabled && Boolean(restaurantId);
+
+  const servedStorageKey = useMemo(
+    () => (restaurantId ? `steward_served_orders_${restaurantId}` : null),
+    [restaurantId]
+  );
+
+  const [pendingOrders, setPendingOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
+  const [readyOrders, setReadyOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
+  const [servedOrderIds, setServedOrderIds] = useState<Set<number>>(() => loadServedOrderIds(servedStorageKey));
+
+  const [activeTab, setActiveTab] = useState<StewardTab>("awaiting");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [locationFilter, setLocationFilter] = useState("");
+
   const [loading, setLoading] = useState(true);
-  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
+
   const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── Load pending orders ──────────────────────────────────────────────────
-  const loadPending = useCallback(async () => {
-    if (!restaurantId) return;
-    try {
-      const res = await api.get<KitchenOrderListResponse>("/orders/pending");
-      const map = new Map<number, KitchenOrderCard>();
-      for (const o of res.orders) map.set(o.id, o);
-      setOrders(map);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setLoadError(err.detail || "Failed to load orders.");
-      } else {
-        setLoadError("Failed to load orders. Please refresh.");
-      }
-    }
-  }, [restaurantId]);
+  const lastPendingCountRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!restaurantId) return;
-    setLoading(true);
-    setLoadError(null);
-    loadPending().finally(() => setLoading(false));
-  }, [restaurantId, loadPending]);
+    setServedOrderIds(loadServedOrderIds(servedStorageKey));
+  }, [servedStorageKey]);
 
-  // ── Auto-refresh every 30 s (fallback if WS drops) ──────────────────────
   useEffect(() => {
-    if (!restaurantId) return;
-    const interval = setInterval(() => void loadPending(), 30_000);
-    return () => clearInterval(interval);
-  }, [restaurantId, loadPending]);
+    persistServedOrderIds(servedStorageKey, servedOrderIds);
+  }, [servedOrderIds, servedStorageKey]);
 
-  // ── Alert helper ─────────────────────────────────────────────────────────
-  const showAlert = useCallback((message: string) => {
+  useEffect(() => {
+    return () => {
+      if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+    };
+  }, []);
+
+  const showAlert = useCallback((message: string, withSound = false) => {
     if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
     setAlert(message);
     alertTimerRef.current = setTimeout(() => setAlert(null), 8000);
+    if (withSound) playNotificationTone();
   }, []);
 
-  // ── WebSocket handlers ────────────────────────────────────────────────────
+  const loadData = useCallback(
+    async (silent = false, notifyIfIncreased = false) => {
+      if (!restaurantId || !canAccessSteward) {
+        setLoading(false);
+        return;
+      }
+
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      setLoadError(null);
+
+      try {
+        const [pendingRes, completedRes] = await Promise.all([
+          api.get<KitchenOrderListResponse>("/orders/pending"),
+          api.get<KitchenOrderListResponse>("/orders/completed"),
+        ]);
+
+        const nextPending = new Map<number, KitchenOrderCard>();
+        for (const order of pendingRes.orders) {
+          nextPending.set(order.id, order);
+        }
+
+        const nextReady = new Map<number, KitchenOrderCard>();
+        for (const order of completedRes.orders) {
+          if (!servedOrderIds.has(order.id)) {
+            nextReady.set(order.id, order);
+          }
+        }
+
+        setPendingOrders(nextPending);
+        setReadyOrders(nextReady);
+
+        if (
+          notifyIfIncreased &&
+          lastPendingCountRef.current !== null &&
+          nextPending.size > lastPendingCountRef.current
+        ) {
+          showAlert("New pending orders arrived.", true);
+        }
+
+        lastPendingCountRef.current = nextPending.size;
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setLoadError(err.detail || "Failed to load steward orders.");
+        } else {
+          setLoadError("Failed to load steward orders.");
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [canAccessSteward, restaurantId, servedOrderIds, showAlert]
+  );
+
+  useEffect(() => {
+    if (!privilegeLoading) {
+      void loadData();
+    }
+  }, [loadData, privilegeLoading]);
+
+  useEffect(() => {
+    if (!canAccessSteward) return;
+    const interval = setInterval(() => {
+      void loadData(true, true);
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [canAccessSteward, loadData]);
+
   const handleNewOrder = useCallback(
     (event: NewOrderEvent) => {
-      const card = orderCardFromEvent(event.data);
-      setOrders((prev) => {
+      const order = orderCardFromEvent(event.data);
+
+      setPendingOrders((prev) => {
         const next = new Map(prev);
-        next.set(card.id, card);
+        if (!next.has(order.id)) {
+          showAlert(`New order ${order.order_number} requires confirmation.`, true);
+        }
+        next.set(order.id, order);
+        lastPendingCountRef.current = next.size;
         return next;
       });
-      const loc =
-        event.data.order_source === "room"
-          ? `Room ${event.data.room_number ?? "?"}`
-          : `Table ${event.data.table_number ?? "?"}`;
-      showAlert(`New order ${event.data.order_number} — ${loc} needs confirmation!`);
     },
     [showAlert]
   );
 
-  const handleStatusUpdate = useCallback((event: OrderStatusUpdatedEvent) => {
-    const { order_id, status } = event.data;
-    // Remove from board once no longer pending (confirmed / rejected / etc.)
-    if (status !== "pending") {
-      setOrders((prev) => {
+  const handleStatusUpdate = useCallback(
+    (event: OrderStatusUpdatedEvent) => {
+      const { order_id, status, updated_at } = event.data;
+
+      setPendingOrders((prev) => {
         if (!prev.has(order_id)) return prev;
         const next = new Map(prev);
-        next.delete(order_id);
+        if (status !== "pending") {
+          next.delete(order_id);
+        }
+        lastPendingCountRef.current = next.size;
         return next;
       });
-    }
-  }, []);
+
+      setReadyOrders((prev) => {
+        const next = new Map(prev);
+
+        if (status === "completed") {
+          const current = next.get(order_id);
+          if (current) {
+            next.set(order_id, { ...current, status: "completed", completed_at: updated_at });
+          }
+        }
+
+        if (status === "paid" || status === "rejected") {
+          next.delete(order_id);
+        }
+
+        return next;
+      });
+
+      if (status === "completed") {
+        void loadData(true);
+      }
+    },
+    [loadData]
+  );
 
   const { isConnected, connectionError } = useKitchenSocket({
-    restaurantId,
+    restaurantId: canAccessSteward ? restaurantId : null,
     onNewOrder: handleNewOrder,
     onStatusUpdate: handleStatusUpdate,
   });
 
-  // ── Status action handler ─────────────────────────────────────────────────
-  const handleAction = useCallback(async (orderId: number, newStatus: string) => {
+  const handlePendingAction = useCallback(async (orderId: number, newStatus: string) => {
     setActionLoadingId(orderId);
     setActionError(null);
+
     try {
       await api.patch(`/orders/${orderId}/status`, { status: newStatus });
-      // Optimistic: remove confirmed/rejected orders from board immediately
-      if (newStatus === "confirmed" || newStatus === "rejected") {
-        setOrders((prev) => {
-          const next = new Map(prev);
-          next.delete(orderId);
-          return next;
-        });
-      }
+
+      setPendingOrders((prev) => {
+        const next = new Map(prev);
+        next.delete(orderId);
+        lastPendingCountRef.current = next.size;
+        return next;
+      });
     } catch (err) {
       if (err instanceof ApiError) {
         setActionError(err.detail || "Failed to update order.");
       } else {
-        setActionError("Failed to update order. Please try again.");
+        setActionError("Failed to update order.");
       }
     } finally {
       setActionLoadingId(null);
     }
   }, []);
 
-  // ── Derived order lists ───────────────────────────────────────────────────
-  const allPending = useMemo(
-    () =>
-      Array.from(orders.values()).sort(
-        (a, b) => new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
-      ),
-    [orders]
+  const handleMarkServed = useCallback((orderId: number) => {
+    setServedOrderIds((prev) => {
+      const next = new Set(prev);
+      next.add(orderId);
+      return next;
+    });
+    setReadyOrders((prev) => {
+      const next = new Map(prev);
+      next.delete(orderId);
+      return next;
+    });
+  }, []);
+
+  const filteredPendingOrders = useMemo(() => {
+    return Array.from(pendingOrders.values())
+      .filter((order) => sourceMatches(order, sourceFilter))
+      .filter((order) => locationMatches(order, locationFilter))
+      .sort((a, b) => new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime());
+  }, [locationFilter, pendingOrders, sourceFilter]);
+
+  const filteredReadyOrders = useMemo(() => {
+    return Array.from(readyOrders.values())
+      .filter((order) => sourceMatches(order, sourceFilter))
+      .filter((order) => locationMatches(order, locationFilter))
+      .sort(
+        (a, b) =>
+          new Date(b.completed_at ?? b.placed_at).getTime() -
+          new Date(a.completed_at ?? a.placed_at).getTime()
+      );
+  }, [locationFilter, readyOrders, sourceFilter]);
+
+  const awaitingTableOrders = useMemo(
+    () => filteredPendingOrders.filter((order) => order.order_source !== "room"),
+    [filteredPendingOrders]
+  );
+  const awaitingRoomOrders = useMemo(
+    () => filteredPendingOrders.filter((order) => order.order_source === "room"),
+    [filteredPendingOrders]
+  );
+  const readyTableOrders = useMemo(
+    () => filteredReadyOrders.filter((order) => order.order_source !== "room"),
+    [filteredReadyOrders]
+  );
+  const readyRoomOrders = useMemo(
+    () => filteredReadyOrders.filter((order) => order.order_source === "room"),
+    [filteredReadyOrders]
   );
 
-  const tableOrders = useMemo(
-    () => allPending.filter((o) => o.order_source !== "room"),
-    [allPending]
-  );
+  if (!privilegeLoading && !qrMenuEnabled) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        Steward dashboard is locked because this restaurant does not have the QR_MENU privilege.
+      </div>
+    );
+  }
 
-  const roomOrders = useMemo(
-    () => allPending.filter((o) => o.order_source === "room"),
-    [allPending]
-  );
-
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Top bar */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-gray-900">Steward Dashboard</h1>
-          {!loading && (
-            <span className="text-sm text-gray-400">
-              {allPending.length} pending order{allPending.length !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Connection indicator */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span
-              className={`inline-block w-2 h-2 rounded-full ${
-                isConnected ? "bg-green-500" : "bg-gray-400"
-              }`}
-            />
-            <span className={isConnected ? "text-green-600" : "text-gray-400"}>
-              {isConnected ? "Live" : "Connecting…"}
-            </span>
+    <div className="space-y-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Steward Dashboard</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Confirm incoming orders quickly and manage the ready-to-serve queue.
+            </p>
           </div>
-
           <button
-            onClick={() => window.location.reload()}
-            className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded px-2 py-1"
+            type="button"
+            onClick={() => void loadData(true)}
+            disabled={loading || refreshing}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Refresh
+            {refreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
-      </header>
 
-      {/* New-order alert banner */}
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold ${
+              isConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
+            {isConnected ? "Live" : "Polling every 3s"}
+          </span>
+          <span className="text-slate-500">Awaiting: {pendingOrders.size}</span>
+          <span className="text-slate-500">Ready to Serve: {readyOrders.size}</span>
+        </div>
+      </div>
+
       {alert && (
-        <div className="bg-orange-500 text-white px-4 py-2.5 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🔔</span>
-            <span className="font-semibold">{alert}</span>
-          </div>
-          <button
-            onClick={() => setAlert(null)}
-            className="text-white/80 hover:text-white text-lg leading-none ml-4"
-          >
-            ×
-          </button>
+        <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-800">
+          {alert}
         </div>
       )}
 
-      {/* WS error */}
       {connectionError && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-sm text-red-700">
-          ⚠ {connectionError}
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {connectionError}
         </div>
       )}
 
-      {/* Action error */}
       {actionError && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-sm text-red-700 flex justify-between">
-          <span>⚠ {actionError}</span>
-          <button onClick={() => setActionError(null)} className="ml-2">
-            ×
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {actionError}
+        </div>
+      )}
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("awaiting")}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === "awaiting"
+                ? "bg-blue-600 text-white"
+                : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Awaiting Confirmation ({pendingOrders.size})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("ready")}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              activeTab === "ready"
+                ? "bg-emerald-600 text-white"
+                : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Ready to Serve ({readyOrders.size})
           </button>
         </div>
-      )}
 
-      {/* Main content */}
-      <main className="p-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-gray-400 text-sm">Loading orders…</div>
-          </div>
-        ) : loadError ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-3">
-            <p className="text-red-600 text-sm">{loadError}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="text-sm bg-gray-800 text-white px-4 py-2 rounded"
-            >
-              Retry
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <KitchenOrderSection
-              title="Table Orders"
-              orders={tableOrders}
-              headerColor="bg-indigo-600"
-              emptyMessage="No pending table orders"
-              onAction={handleAction}
-              actionLoadingId={actionLoadingId}
-            />
-            <KitchenOrderSection
-              title="Room Orders"
-              orders={roomOrders}
-              headerColor="bg-teal-600"
-              emptyMessage="No pending room orders"
-              onAction={handleAction}
-              actionLoadingId={actionLoadingId}
-            />
-          </div>
-        )}
-      </main>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <select
+            value={sourceFilter}
+            onChange={(event) => setSourceFilter(event.target.value as SourceFilter)}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="all">All Sources</option>
+            <option value="table">Table Orders</option>
+            <option value="room">Room Orders</option>
+          </select>
+
+          <input
+            type="text"
+            value={locationFilter}
+            onChange={(event) => setLocationFilter(event.target.value)}
+            placeholder="Filter by order no / table / room / customer"
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+          Loading steward orders...
+        </div>
+      ) : loadError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{loadError}</div>
+      ) : activeTab === "awaiting" ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <KitchenOrderSection
+            title="Table Orders"
+            orders={awaitingTableOrders}
+            headerColor="bg-indigo-600"
+            emptyMessage="No pending table orders"
+            onAction={handlePendingAction}
+            actionLoadingId={actionLoadingId}
+          />
+          <KitchenOrderSection
+            title="Room Orders"
+            orders={awaitingRoomOrders}
+            headerColor="bg-teal-600"
+            emptyMessage="No pending room orders"
+            onAction={handlePendingAction}
+            actionLoadingId={actionLoadingId}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <KitchenOrderSection
+            title="Ready Table Orders"
+            orders={readyTableOrders}
+            headerColor="bg-emerald-600"
+            emptyMessage="No ready table orders"
+            onAction={handlePendingAction}
+            actionLoadingId={actionLoadingId}
+            renderActions={(order) => (
+              <button
+                type="button"
+                onClick={() => handleMarkServed(order.id)}
+                className="w-full rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+              >
+                Mark Served
+              </button>
+            )}
+          />
+          <KitchenOrderSection
+            title="Ready Room Orders"
+            orders={readyRoomOrders}
+            headerColor="bg-cyan-600"
+            emptyMessage="No ready room orders"
+            onAction={handlePendingAction}
+            actionLoadingId={actionLoadingId}
+            renderActions={(order) => (
+              <button
+                type="button"
+                onClick={() => handleMarkServed(order.id)}
+                className="w-full rounded bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-cyan-700"
+              >
+                Mark Served
+              </button>
+            )}
+          />
+        </div>
+      )}
     </div>
   );
 }

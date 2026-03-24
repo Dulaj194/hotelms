@@ -4,6 +4,7 @@
  * Displays order summary, item list, and contextual action buttons
  * based on the current order status.
  */
+import type { ReactNode } from "react";
 import type { KitchenOrderCard } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 
@@ -11,6 +12,7 @@ interface OrderCardProps {
   order: KitchenOrderCard;
   onAction: (orderId: number, newStatus: string) => void;
   actionLoading: boolean;
+  renderActions?: (order: KitchenOrderCard, actionLoading: boolean) => ReactNode;
 }
 
 function timeAgo(isoDate: string): string {
@@ -20,7 +22,18 @@ function timeAgo(isoDate: string): string {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-export default function OrderCard({ order, onAction, actionLoading }: OrderCardProps) {
+function formatDateTime(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  return date.toLocaleString();
+}
+
+export default function OrderCard({
+  order,
+  onAction,
+  actionLoading,
+  renderActions,
+}: OrderCardProps) {
   const statusLabel = ORDER_STATUS_LABEL[order.status];
   const statusColor = ORDER_STATUS_COLOR[order.status];
 
@@ -38,6 +51,9 @@ export default function OrderCard({ order, onAction, actionLoading }: OrderCardP
               : <>Table <span className="font-semibold text-gray-700">{order.table_number ?? "?"}</span></>}
             {order.customer_name && (
               <span className="ml-2 text-gray-400">· {order.customer_name}</span>
+            )}
+            {order.customer_phone && (
+              <span className="ml-2 text-gray-400">· {order.customer_phone}</span>
             )}
           </p>
         </div>
@@ -65,7 +81,10 @@ export default function OrderCard({ order, onAction, actionLoading }: OrderCardP
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-        <div className="text-xs text-gray-400">{timeAgo(order.placed_at)}</div>
+        <div className="text-xs text-gray-400">
+          <div>{timeAgo(order.placed_at)}</div>
+          <div>{formatDateTime(order.placed_at)}</div>
+        </div>
         <div className="font-semibold text-gray-900 text-sm">
           Total: {order.total_amount.toFixed(2)}
         </div>
@@ -79,55 +98,59 @@ export default function OrderCard({ order, onAction, actionLoading }: OrderCardP
       )}
 
       {/* Action buttons */}
-      <div className="flex flex-wrap gap-2 pt-1">
-        {order.status === "pending" && (
-          <>
-            <button
-              onClick={() => onAction(order.id, "confirmed")}
-              disabled={actionLoading}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium py-1.5 px-3 rounded"
-            >
-              Confirm
-            </button>
-            <button
-              onClick={() => onAction(order.id, "rejected")}
-              disabled={actionLoading}
-              className="flex-1 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-sm font-medium py-1.5 px-3 rounded"
-            >
-              Reject
-            </button>
-          </>
-        )}
+      {renderActions ? (
+        <div className="flex flex-wrap gap-2 pt-1">{renderActions(order, actionLoading)}</div>
+      ) : (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {order.status === "pending" && (
+            <>
+              <button
+                onClick={() => onAction(order.id, "confirmed")}
+                disabled={actionLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium py-1.5 px-3 rounded"
+              >
+                Confirm
+              </button>
+              <button
+                onClick={() => onAction(order.id, "rejected")}
+                disabled={actionLoading}
+                className="flex-1 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-sm font-medium py-1.5 px-3 rounded"
+              >
+                Reject
+              </button>
+            </>
+          )}
 
-        {order.status === "confirmed" && (
-          <>
-            <button
-              onClick={() => onAction(order.id, "processing")}
-              disabled={actionLoading}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-1.5 px-3 rounded"
-            >
-              Start Preparing
-            </button>
-            <button
-              onClick={() => onAction(order.id, "rejected")}
-              disabled={actionLoading}
-              className="flex-1 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-sm font-medium py-1.5 px-3 rounded"
-            >
-              Reject
-            </button>
-          </>
-        )}
+          {order.status === "confirmed" && (
+            <>
+              <button
+                onClick={() => onAction(order.id, "processing")}
+                disabled={actionLoading}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-1.5 px-3 rounded"
+              >
+                Start Preparing
+              </button>
+              <button
+                onClick={() => onAction(order.id, "rejected")}
+                disabled={actionLoading}
+                className="flex-1 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 text-sm font-medium py-1.5 px-3 rounded"
+              >
+                Reject
+              </button>
+            </>
+          )}
 
-        {order.status === "processing" && (
-          <button
-            onClick={() => onAction(order.id, "completed")}
-            disabled={actionLoading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium py-1.5 px-3 rounded"
-          >
-            Mark Complete
-          </button>
-        )}
-      </div>
+          {order.status === "processing" && (
+            <button
+              onClick={() => onAction(order.id, "completed")}
+              disabled={actionLoading}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium py-1.5 px-3 rounded"
+            >
+              Mark Complete
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

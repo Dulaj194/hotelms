@@ -4,6 +4,7 @@
  * Renders a header with count badge, an empty-state message, and
  * a vertical list of OrderCard components.
  */
+import type { ReactNode } from "react";
 import OrderCard from "@/components/shared/OrderCard";
 import type { KitchenOrderCard } from "@/types/order";
 
@@ -14,6 +15,7 @@ interface KitchenOrderSectionProps {
   emptyMessage: string;
   onAction: (orderId: number, newStatus: string) => void;
   actionLoadingId: number | null;
+  renderActions?: (order: KitchenOrderCard, actionLoading: boolean) => ReactNode;
 }
 
 export default function KitchenOrderSection({
@@ -23,6 +25,7 @@ export default function KitchenOrderSection({
   emptyMessage,
   onAction,
   actionLoadingId,
+  renderActions,
 }: KitchenOrderSectionProps) {
   return (
     <div className="flex flex-col min-w-0">
@@ -49,6 +52,7 @@ export default function KitchenOrderSection({
               order={order}
               onAction={onAction}
               actionLoading={actionLoadingId === order.id}
+              renderActions={renderActions}
             />
           ))
         )}

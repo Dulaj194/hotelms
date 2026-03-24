@@ -53,6 +53,7 @@ class OrderHeaderResponse(BaseModel):
     room_id: int | None
     room_number: str | None
     customer_name: str | None
+    customer_phone: str | None
     status: OrderStatus
     subtotal_amount: float
     tax_amount: float
@@ -126,6 +127,7 @@ class KitchenOrderCard(BaseModel):
     room_number: str | None
     room_id: int | None
     customer_name: str | None
+    customer_phone: str | None
     status: OrderStatus
     total_amount: float
     placed_at: datetime

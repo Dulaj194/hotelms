@@ -5,6 +5,8 @@ import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { api, ApiError } from "@/lib/api";
 import type { ReportFilterType, SalesReportResponse } from "@/types/report";
 
+type ReportViewMode = "daily" | "monthly" | "range";
+
 function formatDate(value: string | null): string {
   if (!value) return "—";
   return new Date(value).toLocaleDateString();
@@ -29,8 +31,9 @@ export default function Reports() {
     return current.toISOString().split("T")[0];
   }, []);
 
-  const [filterType, setFilterType] = useState<ReportFilterType>("single");
+  const [viewMode, setViewMode] = useState<ReportViewMode>("daily");
   const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedMonth, setSelectedMonth] = useState(today.slice(0, 7));
   const [fromDate, setFromDate] = useState(defaultFromDate);
   const [toDate, setToDate] = useState(today);
 
@@ -47,10 +50,28 @@ export default function Reports() {
     setLoading(true);
     setError(null);
     try {
-      const path =
-        filterType === "range"
-          ? `/reports/sales?filter_type=range&from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`
-          : `/reports/sales?filter_type=single&date_value=${encodeURIComponent(selectedDate)}`;
+      let queryFilterType: ReportFilterType = "single";
+      let path = "";
+
+      if (viewMode === "daily") {
+        queryFilterType = "single";
+        path = `/reports/sales?filter_type=single&date_value=${encodeURIComponent(selectedDate)}`;
+      } else if (viewMode === "monthly") {
+        queryFilterType = "range";
+        const [yearRaw, monthRaw] = selectedMonth.split("-").map(Number);
+        const year = Number.isFinite(yearRaw) ? yearRaw : new Date().getFullYear();
+        const month = Number.isFinite(monthRaw) ? monthRaw : new Date().getMonth() + 1;
+        const monthStart = `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-01`;
+        const monthEndDate = new Date(year, month, 0);
+        const monthEnd = `${year.toString().padStart(4, "0")}-${month
+          .toString()
+          .padStart(2, "0")}-${monthEndDate.getDate().toString().padStart(2, "0")}`;
+        path = `/reports/sales?filter_type=${queryFilterType}&from_date=${encodeURIComponent(monthStart)}&to_date=${encodeURIComponent(monthEnd)}`;
+      } else {
+        queryFilterType = "range";
+        path = `/reports/sales?filter_type=${queryFilterType}&from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`;
+      }
+
       const data = await api.get<SalesReportResponse>(path);
       setReport(data);
     } catch (err) {
@@ -62,7 +83,7 @@ export default function Reports() {
     } finally {
       setLoading(false);
     }
-  }, [filterType, fromDate, reportsEnabled, selectedDate, toDate]);
+  }, [fromDate, reportsEnabled, selectedDate, selectedMonth, toDate, viewMode]);
 
   useEffect(() => {
     if (!privilegeLoading) {
@@ -150,24 +171,32 @@ export default function Reports() {
           <section className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setFilterType("single")}
+                onClick={() => setViewMode("daily")}
                 className={`rounded-md px-3 py-2 text-sm ${
-                  filterType === "single" ? "bg-blue-600 text-white" : "border text-gray-700"
+                  viewMode === "daily" ? "bg-blue-600 text-white" : "border text-gray-700"
                 }`}
               >
-                Single Date
+                Daily
               </button>
               <button
-                onClick={() => setFilterType("range")}
+                onClick={() => setViewMode("monthly")}
                 className={`rounded-md px-3 py-2 text-sm ${
-                  filterType === "range" ? "bg-blue-600 text-white" : "border text-gray-700"
+                  viewMode === "monthly" ? "bg-blue-600 text-white" : "border text-gray-700"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setViewMode("range")}
+                className={`rounded-md px-3 py-2 text-sm ${
+                  viewMode === "range" ? "bg-blue-600 text-white" : "border text-gray-700"
                 }`}
               >
                 Date Range
               </button>
             </div>
 
-            {filterType === "single" ? (
+            {viewMode === "daily" ? (
               <div className="flex flex-wrap items-end gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
@@ -191,7 +220,7 @@ export default function Reports() {
                       value={selectedDate}
                       onChange={(e) => {
                         setSelectedDate(e.target.value);
-                        setFilterType("single");
+                        setViewMode("daily");
                       }}
                       className="rounded-md border px-3 py-2 text-sm"
                     >
@@ -203,6 +232,24 @@ export default function Reports() {
                     </select>
                   </div>
                 )}
+              </div>
+            ) : viewMode === "monthly" ? (
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                  <input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="rounded-md border px-3 py-2 text-sm"
+                  />
+                </div>
+                <button
+                  onClick={() => void loadReport()}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+                >
+                  Apply
+                </button>
               </div>
             ) : (
               <div className="flex flex-wrap items-end gap-3">

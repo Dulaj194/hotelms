@@ -91,13 +91,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     privilege: "QR_MENU",
   },
   {
-    path: "/admin/kitchen",
-    label: "Kitchen",
-    icon: CookingPot,
-    roles: ["owner", "admin", "steward"],
-    privilege: "QR_MENU",
-  },
-  {
     path: "/admin/reports",
     label: "Reports",
     icon: ReceiptText,
@@ -131,6 +124,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const role = normalizeRole(user?.role);
   const { loading: privilegesLoading, hasPrivilege } = useSubscriptionPrivileges();
   const [menusOpen, setMenusOpen] = useState(true);
+  const [kitchenOpen, setKitchenOpen] = useState(true);
   const [offersOpen, setOffersOpen] = useState(true);
 
   const menuSubItems: MenuSubItem[] = useMemo(
@@ -151,10 +145,24 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     []
   );
 
+  const kitchenSubItems: MenuSubItem[] = useMemo(
+    () => [
+      { path: "/admin/kitchen/orders", label: "Orders", icon: ClipboardList },
+      { path: "/admin/kitchen/old-orders", label: "Old Orders", icon: ReceiptText },
+    ],
+    []
+  );
+
   const menuPaths = useMemo(() => menuSubItems.map((item) => item.path), [menuSubItems]);
+  const kitchenPaths = useMemo(() => kitchenSubItems.map((item) => item.path), [kitchenSubItems]);
   const offerPaths = useMemo(() => offerSubItems.map((item) => item.path), [offerSubItems]);
   const isMenuGroupVisible = role === "owner" || role === "admin";
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
+  const isKitchenGroupVisible =
+    (role === "owner" || role === "admin" || role === "steward") &&
+    !privilegesLoading &&
+    hasPrivilege("QR_MENU");
+  const isKitchenGroupActive = location.pathname.startsWith("/admin/kitchen");
   const isOfferGroupVisible =
     (role === "owner" || role === "admin") && !privilegesLoading && hasPrivilege("OFFERS");
   const isOfferGroupActive = offerPaths.some((path) =>
@@ -166,6 +174,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navItems = ALL_NAV_ITEMS.filter(
     (item) =>
       !menuPaths.includes(item.path) &&
+      !kitchenPaths.includes(item.path) &&
       !offerPaths.includes(item.path) &&
       (item.roles === null || item.roles.includes(role)) &&
       (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
@@ -210,6 +219,51 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {menusOpen && (
                 <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
                   {menuSubItems.map((subItem) => {
+                    const subActive = location.pathname === subItem.path;
+                    const SubIcon = subItem.icon;
+                    return (
+                      <Link
+                        key={subItem.path}
+                        to={subItem.path}
+                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          subActive
+                            ? "bg-blue-950 text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        }`}
+                      >
+                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        {subItem.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isKitchenGroupVisible && (
+            <div className="mb-1">
+              <button
+                type="button"
+                onClick={() => setKitchenOpen((prev) => !prev)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  isKitchenGroupActive
+                    ? "bg-slate-700 text-white"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                <span className="flex items-center">
+                  <CookingPot className="h-4 w-4 mr-2 shrink-0" />
+                  Kitchen
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${kitchenOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {kitchenOpen && (
+                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                  {kitchenSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
                     return (

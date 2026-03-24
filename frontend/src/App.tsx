@@ -9,6 +9,7 @@ import ResetPassword from "@/pages/auth/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import AdminRestaurantProfile from "@/pages/admin/RestaurantProfile";
 import Kitchen from "@/pages/admin/Kitchen";
+import KitchenOldOrders from "@/pages/admin/KitchenOldOrders";
 import Steward from "@/pages/admin/Steward";
 import Billing from "@/pages/admin/Billing";
 import Offers from "@/pages/admin/Offers";
@@ -157,9 +158,21 @@ function App() {
         />
         <Route
           path="/admin/kitchen"
+          element={<Navigate to="/admin/kitchen/orders" replace />}
+        />
+        <Route
+          path="/admin/kitchen/orders"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
               <Kitchen />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/kitchen/old-orders"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
+              <KitchenOldOrders />
             </ProtectedRoute>
           }
         />

@@ -1,42 +1,29 @@
-/**
- * Kitchen — Real-time kitchen order dashboard.
- *
- * Displays three sections:
- *   1. Pending — orders waiting for confirmation
- *   2. In Progress — confirmed + currently preparing
- *   3. Completed — recently fulfilled orders
- *
- * Real-time updates arrive via WebSocket (Redis pub/sub fan-out).
- * Staff actions (confirm / reject / start / complete) call the HTTP API,
- * with an optimistic update so the UI responds immediately.
- */
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import DashboardLayout from "@/components/shared/DashboardLayout";
 import KitchenOrderSection from "@/components/shared/KitchenOrderSection";
+import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
+import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
-import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import type { NewOrderEvent, OrderStatusUpdatedEvent } from "@/types/realtime";
 import type {
   KitchenOrderCard,
-  KitchenOrderListResponse,
   KitchenOrderItemSummary,
+  KitchenOrderListResponse,
   OrderStatus,
 } from "@/types/order";
 
-// Roles permitted to access the kitchen dashboard
 const KITCHEN_ROLES = new Set(["owner", "admin", "steward"]);
+type SourceFilter = "all" | "table" | "room";
 
-// ── Helper: build a KitchenOrderCard from a new_order WS event ───────────────
 function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
-  const items: KitchenOrderItemSummary[] = data.items.map((item, idx) => ({
-    id: idx,       // placeholder — real id not in event payload
-    item_id: 0,    // placeholder
+  const items: KitchenOrderItemSummary[] = data.items.map((item, index) => ({
+    id: index,
+    item_id: 0,
     item_name_snapshot: item.item_name_snapshot,
     quantity: item.quantity,
-    unit_price_snapshot:
-      item.quantity > 0 ? item.line_total / item.quantity : 0,
+    unit_price_snapshot: item.quantity > 0 ? item.line_total / item.quantity : 0,
     line_total: item.line_total,
   }));
 
@@ -45,6 +32,7 @@ function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
     order_number: data.order_number,
     table_number: data.table_number,
     customer_name: null,
+    customer_phone: null,
     status: data.status as OrderStatus,
     total_amount: data.total_amount,
     placed_at: data.placed_at,
@@ -60,52 +48,78 @@ function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
   };
 }
 
-export default function Kitchen() {
-  const navigate = useNavigate();
-  const user = getUser();
-
-  // ── Auth guard ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!user) {
-      navigate("/login", { replace: true });
-    } else if (!KITCHEN_ROLES.has(user.role)) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [user, navigate]);
-
-  if (!user || !KITCHEN_ROLES.has(user.role)) return null;
-
-  const restaurantId = user.restaurant_id;
-
-  return <KitchenDashboard restaurantId={restaurantId} />;
+function sourceMatches(order: KitchenOrderCard, sourceFilter: SourceFilter): boolean {
+  if (sourceFilter === "all") return true;
+  if (sourceFilter === "room") return order.order_source === "room";
+  return order.order_source !== "room";
 }
 
-// ── Kitchen dashboard internals ───────────────────────────────────────────────
-// Separated so hooks are not called conditionally.
+function locationMatches(order: KitchenOrderCard, locationFilter: string): boolean {
+  const filter = locationFilter.trim().toLowerCase();
+  if (!filter) return true;
+
+  const haystack = [
+    order.order_number,
+    order.customer_name ?? "",
+    order.table_number ?? "",
+    order.room_number ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(filter);
+}
+
+export default function Kitchen() {
+  const user = getUser();
+  const role = user?.role ?? "";
+
+  if (!user || !KITCHEN_ROLES.has(role)) {
+    return null;
+  }
+
+  return (
+    <DashboardLayout>
+      <KitchenDashboard restaurantId={user.restaurant_id} />
+    </DashboardLayout>
+  );
+}
 
 interface KitchenDashboardProps {
   restaurantId: number | null;
 }
 
 function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
-  // Unified order store — keyed by order id
+  const { loading: privilegeLoading, hasPrivilege } = useSubscriptionPrivileges();
+  const qrMenuEnabled = hasPrivilege("QR_MENU");
+  const canAccessKitchen = !privilegeLoading && qrMenuEnabled && Boolean(restaurantId);
+
   const [orders, setOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
-
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  // Alert for operator awareness (set by WS handlers)
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [locationFilter, setLocationFilter] = useState("");
+  const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Initial data load ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (!restaurantId) return;
+  const loadOrders = useCallback(
+    async (silent = false) => {
+      if (!restaurantId || !canAccessKitchen) {
+        setLoading(false);
+        return;
+      }
 
-    async function load() {
-      setLoading(true);
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
       setLoadError(null);
+
       try {
         const [pendingRes, processingRes, completedRes] = await Promise.all([
           api.get<KitchenOrderListResponse>("/orders/pending"),
@@ -114,261 +128,283 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
         ]);
 
         const map = new Map<number, KitchenOrderCard>();
-        for (const o of pendingRes.orders) map.set(o.id, o);
-        for (const o of processingRes.orders) map.set(o.id, o);
-        for (const o of completedRes.orders) map.set(o.id, o);
+        for (const order of pendingRes.orders) map.set(order.id, order);
+        for (const order of processingRes.orders) map.set(order.id, order);
+        for (const order of completedRes.orders) map.set(order.id, order);
 
         setOrders(map);
       } catch (err) {
         if (err instanceof ApiError) {
-          setLoadError(err.detail || "Failed to load orders.");
+          setLoadError(err.detail || "Failed to load kitchen orders.");
         } else {
-          setLoadError("Failed to load orders. Please refresh.");
+          setLoadError("Failed to load kitchen orders.");
         }
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
-    }
-
-    void load();
-  }, [restaurantId]);
-
-  // ── WebSocket event handlers ───────────────────────────────────────────
-  const handleNewOrder = useCallback(
-    (event: NewOrderEvent) => {
-      // Add to internal map so status-update deltas work once steward confirms.
-      // Kitchen does NOT display pending orders — that is the Steward's job.
-      const card = orderCardFromEvent(event.data);
-      setOrders((prev) => {
-        const next = new Map(prev);
-        next.set(card.id, card);
-        return next;
-      });
     },
-    []
+    [canAccessKitchen, restaurantId]
   );
+
+  useEffect(() => {
+    if (!privilegeLoading) {
+      void loadOrders();
+    }
+  }, [loadOrders, privilegeLoading]);
+
+  useEffect(() => {
+    if (!canAccessKitchen) return;
+    const interval = setInterval(() => {
+      void loadOrders(true);
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [canAccessKitchen, loadOrders]);
+
+  useEffect(() => {
+    return () => {
+      if (alertTimerRef.current) {
+        clearTimeout(alertTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleNewOrder = useCallback((event: NewOrderEvent) => {
+    const card = orderCardFromEvent(event.data);
+
+    setOrders((prev) => {
+      const next = new Map(prev);
+      next.set(card.id, card);
+      return next;
+    });
+
+    if (alertTimerRef.current) {
+      clearTimeout(alertTimerRef.current);
+    }
+    const locationLabel =
+      card.order_source === "room" ? `Room ${card.room_number ?? "?"}` : `Table ${card.table_number ?? "?"}`;
+    setAlert(`New order received: ${card.order_number} (${locationLabel})`);
+    alertTimerRef.current = setTimeout(() => setAlert(null), 8000);
+  }, []);
 
   const handleStatusUpdate = useCallback((event: OrderStatusUpdatedEvent) => {
     const { order_id, status, updated_at } = event.data;
 
     setOrders((prev) => {
-      const order = prev.get(order_id);
-      if (!order) return prev;
-
-      // Build updated order with new status and appropriate timestamp
-      const updated: KitchenOrderCard = {
-        ...order,
-        status: status as OrderStatus,
-        confirmed_at:
-          status === "confirmed" ? updated_at : order.confirmed_at,
-        processing_at:
-          status === "processing" ? updated_at : order.processing_at,
-        completed_at:
-          status === "completed" ? updated_at : order.completed_at,
-        rejected_at:
-          status === "rejected" ? updated_at : order.rejected_at,
-      };
+      const current = prev.get(order_id);
+      if (!current) return prev;
 
       const next = new Map(prev);
-      // Remove rejected orders from the visible board
       if (status === "rejected" || status === "paid") {
         next.delete(order_id);
-      } else {
-        next.set(order_id, updated);
+        return next;
       }
+
+      next.set(order_id, {
+        ...current,
+        status: status as OrderStatus,
+        confirmed_at: status === "confirmed" ? updated_at : current.confirmed_at,
+        processing_at: status === "processing" ? updated_at : current.processing_at,
+        completed_at: status === "completed" ? updated_at : current.completed_at,
+        rejected_at: status === "rejected" ? updated_at : current.rejected_at,
+      });
       return next;
     });
   }, []);
 
   const { isConnected, connectionError } = useKitchenSocket({
-    restaurantId,
+    restaurantId: canAccessKitchen ? restaurantId : null,
     onNewOrder: handleNewOrder,
     onStatusUpdate: handleStatusUpdate,
   });
 
-  // ── Action handler ─────────────────────────────────────────────────────
-  const handleAction = useCallback(
-    async (orderId: number, newStatus: string) => {
-      setActionLoadingId(orderId);
-      setActionError(null);
-      try {
-        await api.patch(`/orders/${orderId}/status`, { status: newStatus });
+  const handleAction = useCallback(async (orderId: number, newStatus: string) => {
+    setActionLoadingId(orderId);
+    setActionError(null);
 
-        // Optimistic update (WS event also updates — idempotent)
-        setOrders((prev) => {
-          const order = prev.get(orderId);
-          if (!order) return prev;
-          const now = new Date().toISOString();
-          const updated: KitchenOrderCard = {
-            ...order,
-            status: newStatus as OrderStatus,
-            confirmed_at:
-              newStatus === "confirmed" ? now : order.confirmed_at,
-            processing_at:
-              newStatus === "processing" ? now : order.processing_at,
-            completed_at:
-              newStatus === "completed" ? now : order.completed_at,
-            rejected_at:
-              newStatus === "rejected" ? now : order.rejected_at,
-          };
-          const next = new Map(prev);
-          if (newStatus === "rejected" || newStatus === "paid") {
-            next.delete(orderId);
-          } else {
-            next.set(orderId, updated);
-          }
+    try {
+      await api.patch(`/orders/${orderId}/status`, { status: newStatus });
+
+      setOrders((prev) => {
+        const current = prev.get(orderId);
+        if (!current) return prev;
+
+        const now = new Date().toISOString();
+        const next = new Map(prev);
+
+        if (newStatus === "rejected" || newStatus === "paid") {
+          next.delete(orderId);
           return next;
-        });
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setActionError(err.detail || "Failed to update order.");
-        } else {
-          setActionError("Failed to update order. Please try again.");
         }
-      } finally {
-        setActionLoadingId(null);
-      }
-    },
-    []
-  );
 
-  // ── Derived sections ───────────────────────────────────────────────────
-  const sorted = useMemo(
+        next.set(orderId, {
+          ...current,
+          status: newStatus as OrderStatus,
+          confirmed_at: newStatus === "confirmed" ? now : current.confirmed_at,
+          processing_at: newStatus === "processing" ? now : current.processing_at,
+          completed_at: newStatus === "completed" ? now : current.completed_at,
+          rejected_at: newStatus === "rejected" ? now : current.rejected_at,
+        });
+
+        return next;
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setActionError(err.detail || "Failed to update order status.");
+      } else {
+        setActionError("Failed to update order status.");
+      }
+    } finally {
+      setActionLoadingId(null);
+    }
+  }, []);
+
+  const sortedOrders = useMemo(
     () =>
-      Array.from(orders.values()).sort(
-        (a, b) =>
-          new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
-      ),
-    [orders]
+      Array.from(orders.values())
+        .filter((order) => sourceMatches(order, sourceFilter))
+        .filter((order) => locationMatches(order, locationFilter))
+        .sort((a, b) => new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()),
+    [locationFilter, orders, sourceFilter]
   );
 
   const processingOrders = useMemo(
-    () =>
-      sorted.filter(
-        (o) => o.status === "confirmed" || o.status === "processing"
-      ),
-    [sorted]
+    () => sortedOrders.filter((order) => order.status === "confirmed" || order.status === "processing"),
+    [sortedOrders]
   );
 
   const completedOrders = useMemo(
     () =>
-      sorted
-        .filter((o) => o.status === "completed")
+      sortedOrders
+        .filter((order) => order.status === "completed")
         .sort(
           (a, b) =>
             new Date(b.completed_at ?? b.placed_at).getTime() -
             new Date(a.completed_at ?? a.placed_at).getTime()
         ),
-    [sorted]
+    [sortedOrders]
   );
 
-  // ── Render ─────────────────────────────────────────────────────────────
+  const tableOrderCount = useMemo(
+    () => sortedOrders.filter((order) => order.order_source !== "room").length,
+    [sortedOrders]
+  );
+  const roomOrderCount = useMemo(
+    () => sortedOrders.filter((order) => order.order_source === "room").length,
+    [sortedOrders]
+  );
+
+  if (!privilegeLoading && !qrMenuEnabled) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        Kitchen module is locked for this restaurant because the current subscription does not include the QR_MENU
+        privilege.
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Top bar */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-gray-900">Kitchen Dashboard</h1>
-          {!loading && (
-            <span className="text-sm text-gray-400">
-              {orders.size} active order{orders.size !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Connection indicator */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span
-              className={`inline-block w-2 h-2 rounded-full ${
-                isConnected ? "bg-green-500" : "bg-gray-400"
-              }`}
-            />
-            <span className={isConnected ? "text-green-600" : "text-gray-400"}>
-              {isConnected ? "Live" : "Connecting…"}
-            </span>
+    <div className="space-y-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Kitchen Orders</h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Track order progression in real time. Auto-refresh runs every 60 seconds.
+            </p>
           </div>
-
-          {/* Refresh button */}
           <button
-            onClick={() => window.location.reload()}
-            className="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded px-2 py-1"
+            type="button"
+            onClick={() => void loadOrders(true)}
+            disabled={refreshing || loading}
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Refresh
+            {refreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
-      </header>
 
-      {/* New order alert banner */}
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold ${
+              isConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
+            {isConnected ? "Live" : "Connecting"}
+          </span>
+          <span className="text-slate-500">In progress: {processingOrders.length}</span>
+          <span className="text-slate-500">Completed: {completedOrders.length}</span>
+          <span className="text-slate-500">Table: {tableOrderCount}</span>
+          <span className="text-slate-500">Room: {roomOrderCount}</span>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid gap-3 md:grid-cols-2">
+          <select
+            value={sourceFilter}
+            onChange={(event) => setSourceFilter(event.target.value as SourceFilter)}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          >
+            <option value="all">All Sources</option>
+            <option value="table">Table Orders</option>
+            <option value="room">Room Orders</option>
+          </select>
+
+          <input
+            type="text"
+            value={locationFilter}
+            onChange={(event) => setLocationFilter(event.target.value)}
+            placeholder="Filter by order no / table / room / customer"
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+          />
+        </div>
+      </div>
+
       {alert && (
-        <div className="bg-orange-500 text-white px-4 py-2.5 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🔔</span>
-            <span className="font-semibold">{alert}</span>
-          </div>
-          <button
-            onClick={() => setAlert(null)}
-            className="text-white/80 hover:text-white text-lg leading-none ml-4"
-          >
-            ×
-          </button>
+        <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-800">
+          {alert}
         </div>
       )}
 
-      {/* WS connection error */}
       {connectionError && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-sm text-red-700">
-          ⚠ {connectionError}
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {connectionError}
         </div>
       )}
 
-      {/* Action error */}
       {actionError && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-sm text-red-700 flex justify-between">
-          <span>⚠ {actionError}</span>
-          <button onClick={() => setActionError(null)} className="ml-2">
-            ×
-          </button>
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {actionError}
         </div>
       )}
 
-      {/* Main content */}
-      <main className="p-4">
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-gray-400 text-sm">Loading orders…</div>
-          </div>
-        ) : loadError ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-3">
-            <p className="text-red-600 text-sm">{loadError}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="text-sm bg-gray-800 text-white px-4 py-2 rounded"
-            >
-              Retry
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <KitchenOrderSection
-              title="In Progress"
-              orders={processingOrders}
-              headerColor="bg-blue-600"
-              emptyMessage="No orders in progress"
-              onAction={handleAction}
-              actionLoadingId={actionLoadingId}
-            />
-            <KitchenOrderSection
-              title="Completed"
-              orders={completedOrders}
-              headerColor="bg-green-600"
-              emptyMessage="No completed orders"
-              onAction={handleAction}
-              actionLoadingId={actionLoadingId}
-            />
-          </div>
-        )}
-      </main>
+      {loading ? (
+        <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+          Loading kitchen orders...
+        </div>
+      ) : loadError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{loadError}</div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <KitchenOrderSection
+            title="In Progress"
+            orders={processingOrders}
+            headerColor="bg-blue-600"
+            emptyMessage="No orders in progress"
+            onAction={handleAction}
+            actionLoadingId={actionLoadingId}
+          />
+          <KitchenOrderSection
+            title="Completed"
+            orders={completedOrders}
+            headerColor="bg-green-600"
+            emptyMessage="No completed orders"
+            onAction={handleAction}
+            actionLoadingId={actionLoadingId}
+          />
+        </div>
+      )}
     </div>
   );
 }
