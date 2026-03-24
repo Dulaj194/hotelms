@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Star } from "lucide-react";
 
@@ -12,24 +12,16 @@ import type {
   RestaurantUpdateRequest,
 } from "@/types/restaurant";
 
-const COUNTRY_OPTIONS = [
-  "Sri Lanka",
-  "India",
-  "United Arab Emirates",
-  "United Kingdom",
-  "United States",
-  "Australia",
-  "Singapore",
-  "Maldives",
-];
-
-const CURRENCY_OPTIONS = ["LKR", "INR", "AED", "GBP", "USD", "AUD", "SGD", "MVR"];
-
 type NoticeTone = "success" | "error";
 
 interface NoticeMessage {
   tone: NoticeTone;
   text: string;
+}
+
+interface ScheduleFormState {
+  opening_time: string;
+  closing_time: string;
 }
 
 export default function RestaurantProfile() {
@@ -44,19 +36,16 @@ export default function RestaurantProfile() {
   const [restaurant, setRestaurant] = useState<RestaurantMeResponse | null>(null);
   const [subscriptionSummary, setSubscriptionSummary] = useState<DashboardSubscriptionSummary | null>(null);
 
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
   const [profileNotice, setProfileNotice] = useState<NoticeMessage | null>(null);
-  const [form, setForm] = useState<RestaurantUpdateRequest>({});
+  const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>({
+    opening_time: "",
+    closing_time: "",
+  });
 
   const [uploading, setUploading] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<NoticeMessage | null>(null);
-
-  const [setupModalOpen, setSetupModalOpen] = useState(false);
-  const [setupCountry, setSetupCountry] = useState("");
-  const [setupCurrency, setSetupCurrency] = useState("");
-  const [setupSaving, setSetupSaving] = useState(false);
-  const [setupError, setSetupError] = useState<string | null>(null);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -73,27 +62,16 @@ export default function RestaurantProfile() {
     if (showLoader) {
       setLoading(true);
     }
-
     setFetchError(null);
 
-    let profileData: RestaurantMeResponse | null = null;
-
     try {
-      profileData = await api.get<RestaurantMeResponse>("/restaurants/me");
+      const profileData = await api.get<RestaurantMeResponse>("/restaurants/me");
       if (!aliveRef.current) {
         return;
       }
 
       setRestaurant(profileData);
-      resetForm(profileData);
-
-      const countryMissing = !profileData.country || !profileData.country.trim();
-      const currencyMissing = !profileData.currency || !profileData.currency.trim();
-      if (countryMissing || currencyMissing) {
-        setSetupCountry(profileData.country ?? "");
-        setSetupCurrency(profileData.currency ?? "");
-        setSetupModalOpen(true);
-      }
+      resetScheduleForm(profileData);
     } catch (err) {
       if (!aliveRef.current) {
         return;
@@ -105,6 +83,7 @@ export default function RestaurantProfile() {
           : err instanceof Error
             ? err.message
             : "Failed to load restaurant profile.";
+
       setFetchError(message || "Failed to load restaurant profile.");
       setRestaurant(null);
       setSubscriptionSummary(null);
@@ -125,7 +104,7 @@ export default function RestaurantProfile() {
       if (!aliveRef.current) {
         return;
       }
-      // Non-blocking: the profile should remain usable even if overview fails.
+      // Non-blocking call: profile UI remains usable without this summary.
       setSubscriptionSummary(null);
     } finally {
       if (showLoader && aliveRef.current) {
@@ -134,18 +113,10 @@ export default function RestaurantProfile() {
     }
   }
 
-  function resetForm(data: RestaurantMeResponse) {
-    setForm({
-      name: data.name,
-      email: data.email ?? undefined,
-      phone: data.phone ?? undefined,
-      address: data.address ?? undefined,
-      country: data.country ?? undefined,
-      currency: data.currency ?? undefined,
-      billing_email: data.billing_email ?? undefined,
-      tax_id: data.tax_id ?? undefined,
-      opening_time: data.opening_time ?? undefined,
-      closing_time: data.closing_time ?? undefined,
+  function resetScheduleForm(data: RestaurantMeResponse) {
+    setScheduleForm({
+      opening_time: data.opening_time ?? "",
+      closing_time: data.closing_time ?? "",
     });
   }
 
@@ -157,29 +128,29 @@ export default function RestaurantProfile() {
     }
   }
 
-  async function handleSetupSave() {
-    if (!setupCountry || !setupCurrency) {
-      setSetupError("Please select both country and currency.");
+  async function handleScheduleSave() {
+    if (!restaurant) {
       return;
     }
 
-    setSetupSaving(true);
-    setSetupError(null);
+    setSavingSchedule(true);
+    setProfileNotice(null);
+
+    const payload: RestaurantUpdateRequest = {
+      opening_time: toNullable(scheduleForm.opening_time),
+      closing_time: toNullable(scheduleForm.closing_time),
+    };
 
     try {
-      const updated = await api.patch<RestaurantMeResponse>("/restaurants/me", {
-        country: setupCountry,
-        currency: setupCurrency,
-      });
-
+      const updated = await api.patch<RestaurantMeResponse>("/restaurants/me", payload);
       if (!aliveRef.current) {
         return;
       }
 
       setRestaurant(updated);
-      resetForm(updated);
-      setSetupModalOpen(false);
-      setProfileNotice({ tone: "success", text: "Country and currency saved successfully." });
+      resetScheduleForm(updated);
+      setEditingSchedule(false);
+      setProfileNotice({ tone: "success", text: "Operating schedule updated successfully." });
     } catch (err) {
       if (!aliveRef.current) {
         return;
@@ -190,76 +161,26 @@ export default function RestaurantProfile() {
           ? err.detail
           : err instanceof Error
             ? err.message
-            : "Failed to save country and currency.";
-      setSetupError(detail || "Failed to save country and currency.");
+            : "Failed to save operating schedule.";
+
+      setProfileNotice({ tone: "error", text: detail || "Failed to save operating schedule." });
     } finally {
       if (aliveRef.current) {
-        setSetupSaving(false);
+        setSavingSchedule(false);
       }
     }
   }
 
-  async function handleSave() {
+  function handleCancelScheduleEdit() {
     if (!restaurant) {
       return;
     }
-
-    if (!form.name || !form.name.trim()) {
-      setProfileNotice({ tone: "error", text: "Restaurant name is required." });
-      return;
-    }
-
-    setSaving(true);
-    setProfileNotice(null);
-
-    try {
-      const updated = await api.patch<RestaurantMeResponse>("/restaurants/me", {
-        ...form,
-        name: form.name.trim(),
-      });
-
-      if (!aliveRef.current) {
-        return;
-      }
-
-      setRestaurant(updated);
-      resetForm(updated);
-      setEditing(false);
-      setProfileNotice({ tone: "success", text: "Profile updated successfully." });
-    } catch (err) {
-      if (!aliveRef.current) {
-        return;
-      }
-
-      const detail =
-        err instanceof ApiError
-          ? err.detail
-          : err instanceof Error
-            ? err.message
-            : "Failed to save profile changes.";
-
-      setProfileNotice({
-        tone: "error",
-        text: detail || "Failed to save profile changes.",
-      });
-    } finally {
-      if (aliveRef.current) {
-        setSaving(false);
-      }
-    }
-  }
-
-  function handleCancelEdit() {
-    if (!restaurant) {
-      return;
-    }
-
-    resetForm(restaurant);
-    setEditing(false);
+    resetScheduleForm(restaurant);
+    setEditingSchedule(false);
     setProfileNotice(null);
   }
 
-  async function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file || !restaurant) {
       return;
@@ -352,7 +273,7 @@ export default function RestaurantProfile() {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Profile Management</p>
               <h1 className="mt-1 text-2xl font-semibold text-slate-900">Restaurant Profile</h1>
               <p className="mt-1 text-sm text-slate-600">
-                Keep business identity, contact details, and operating hours accurate.
+                Keep profile details clear and maintain daily operation hours.
               </p>
             </div>
 
@@ -454,109 +375,77 @@ export default function RestaurantProfile() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SectionHeader
+            title="Business Details"
+            description="Core restaurant profile information."
+          />
+
+          <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+            <DetailItem label="Name" value={restaurant.name} />
+            <DetailItem label="Email" value={restaurant.email} />
+            <DetailItem label="Phone" value={restaurant.phone} />
+            <DetailItem label="Country" value={restaurant.country} />
+            <DetailItem label="Currency" value={restaurant.currency} />
+            <DetailItem label="Billing Email" value={restaurant.billing_email} />
+            <DetailItem label="Tax ID" value={restaurant.tax_id} />
+            <DetailItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
+            <DetailItem label="Address" value={restaurant.address} fullWidth />
+          </dl>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <SectionHeader
-              title="Business Details"
-              description="Maintain contact, billing, and operation schedule details."
+              title="Operating Schedule"
+              description="Admin can update opening and closing times for daily operation."
             />
-            {!editing && (
+            {!editingSchedule && (
               <button
                 type="button"
                 onClick={() => {
-                  setEditing(true);
+                  setEditingSchedule(true);
                   setProfileNotice(null);
                 }}
                 className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
-                Edit
+                Edit Schedule
               </button>
             )}
           </div>
 
-          {editing ? (
+          {editingSchedule ? (
             <div className="mt-5 space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <InputField
-                  label="Name *"
-                  value={form.name ?? ""}
-                  onChange={(value) => setForm((prev) => ({ ...prev, name: value }))}
-                />
-                <InputField
-                  label="Email"
-                  type="email"
-                  value={form.email ?? ""}
-                  onChange={(value) => setForm((prev) => ({ ...prev, email: toNullable(value) }))}
-                />
-                <InputField
-                  label="Phone"
-                  value={form.phone ?? ""}
-                  onChange={(value) => setForm((prev) => ({ ...prev, phone: toNullable(value) }))}
-                />
-                <SelectField
-                  label="Country"
-                  value={form.country ?? ""}
-                  options={COUNTRY_OPTIONS}
-                  placeholder="Select country"
-                  onChange={(value) => setForm((prev) => ({ ...prev, country: toNullable(value) }))}
-                />
-                <SelectField
-                  label="Currency"
-                  value={form.currency ?? ""}
-                  options={CURRENCY_OPTIONS}
-                  placeholder="Select currency"
-                  onChange={(value) =>
-                    setForm((prev) => ({ ...prev, currency: value ? value.toUpperCase() : null }))
-                  }
-                />
-                <InputField
-                  label="Billing Email"
-                  type="email"
-                  value={form.billing_email ?? ""}
-                  onChange={(value) => setForm((prev) => ({ ...prev, billing_email: toNullable(value) }))}
-                />
-                <InputField
-                  label="Tax ID"
-                  value={form.tax_id ?? ""}
-                  onChange={(value) => setForm((prev) => ({ ...prev, tax_id: toNullable(value) }))}
-                />
-                <InputField
                   label="Opening Time"
                   type="time"
-                  value={form.opening_time ?? ""}
-                  onChange={(value) => setForm((prev) => ({ ...prev, opening_time: toNullable(value) }))}
+                  value={scheduleForm.opening_time}
+                  onChange={(value) =>
+                    setScheduleForm((prev) => ({ ...prev, opening_time: value }))
+                  }
                 />
                 <InputField
                   label="Closing Time"
                   type="time"
-                  value={form.closing_time ?? ""}
-                  onChange={(value) => setForm((prev) => ({ ...prev, closing_time: toNullable(value) }))}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Address</label>
-                <textarea
-                  value={form.address ?? ""}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, address: toNullable(event.target.value) }))
+                  value={scheduleForm.closing_time}
+                  onChange={(value) =>
+                    setScheduleForm((prev) => ({ ...prev, closing_time: value }))
                   }
-                  rows={3}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 />
               </div>
 
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={handleSave}
-                  disabled={saving}
+                  onClick={handleScheduleSave}
+                  disabled={savingSchedule}
                   className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {saving ? "Saving..." : "Save Changes"}
+                  {savingSchedule ? "Saving..." : "Save Schedule"}
                 </button>
                 <button
                   type="button"
-                  onClick={handleCancelEdit}
+                  onClick={handleCancelScheduleEdit}
                   className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
@@ -565,61 +454,12 @@ export default function RestaurantProfile() {
             </div>
           ) : (
             <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-              <DetailItem label="Name" value={restaurant.name} />
-              <DetailItem label="Email" value={restaurant.email} />
-              <DetailItem label="Phone" value={restaurant.phone} />
-              <DetailItem label="Country" value={restaurant.country} />
-              <DetailItem label="Currency" value={restaurant.currency} />
-              <DetailItem label="Billing Email" value={restaurant.billing_email} />
-              <DetailItem label="Tax ID" value={restaurant.tax_id} />
               <DetailItem label="Opening Time" value={restaurant.opening_time} />
               <DetailItem label="Closing Time" value={restaurant.closing_time} />
-              <DetailItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
-              <DetailItem label="Address" value={restaurant.address} fullWidth />
             </dl>
           )}
         </section>
       </div>
-
-      {setupModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="text-xl font-semibold text-slate-900">Set Country and Currency</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Complete these fields to continue using billing and subscription modules correctly.
-            </p>
-
-            <div className="mt-5 space-y-4">
-              <SelectField
-                label="Country"
-                value={setupCountry}
-                options={COUNTRY_OPTIONS}
-                placeholder="Select country"
-                onChange={setSetupCountry}
-              />
-
-              <SelectField
-                label="Currency"
-                value={setupCurrency}
-                options={CURRENCY_OPTIONS}
-                placeholder="Select currency"
-                onChange={setSetupCurrency}
-              />
-
-              {setupError && <NoticeText tone="error">{setupError}</NoticeText>}
-
-              <button
-                type="button"
-                onClick={handleSetupSave}
-                disabled={setupSaving}
-                className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {setupSaving ? "Saving..." : "Save and Continue"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </DashboardLayout>
   );
 }
@@ -652,9 +492,7 @@ function NoticeBanner({ tone, text }: { tone: NoticeTone; text: string }) {
 }
 
 function NoticeText({ tone, children }: { tone: NoticeTone; children: ReactNode }) {
-  return (
-    <p className={`text-xs ${tone === "success" ? "text-emerald-600" : "text-red-600"}`}>{children}</p>
-  );
+  return <p className={`text-xs ${tone === "success" ? "text-emerald-600" : "text-red-600"}`}>{children}</p>;
 }
 
 function InputField({
@@ -677,38 +515,6 @@ function InputField({
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
       />
-    </div>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  options,
-  placeholder,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  placeholder: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
     </div>
   );
 }

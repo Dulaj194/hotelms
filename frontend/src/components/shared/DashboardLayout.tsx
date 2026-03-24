@@ -118,13 +118,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     icon: Handshake,
     roles: ["owner", "admin", "housekeeper"],
   },
-  {
-    path: "/admin/offers",
-    label: "Offers",
-    icon: ShieldCheck,
-    roles: ["owner", "admin"],
-    privilege: "OFFERS",
-  },
 ];
 
 interface DashboardLayoutProps {
@@ -138,6 +131,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const role = normalizeRole(user?.role);
   const { loading: privilegesLoading, hasPrivilege } = useSubscriptionPrivileges();
   const [menusOpen, setMenusOpen] = useState(true);
+  const [offersOpen, setOffersOpen] = useState(true);
 
   const menuSubItems: MenuSubItem[] = useMemo(
     () => [
@@ -149,13 +143,30 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     []
   );
 
+  const offerSubItems: MenuSubItem[] = useMemo(
+    () => [
+      { path: "/admin/offers/new", label: "Add New Offer", icon: ShieldCheck },
+      { path: "/admin/offers", label: "Manage Offers", icon: ClipboardList },
+    ],
+    []
+  );
+
   const menuPaths = useMemo(() => menuSubItems.map((item) => item.path), [menuSubItems]);
+  const offerPaths = useMemo(() => offerSubItems.map((item) => item.path), [offerSubItems]);
   const isMenuGroupVisible = role === "owner" || role === "admin";
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
+  const isOfferGroupVisible =
+    (role === "owner" || role === "admin") && !privilegesLoading && hasPrivilege("OFFERS");
+  const isOfferGroupActive = offerPaths.some((path) =>
+    path === "/admin/offers"
+      ? location.pathname === "/admin/offers" || location.pathname.startsWith("/admin/offers/")
+      : location.pathname === path
+  );
 
   const navItems = ALL_NAV_ITEMS.filter(
     (item) =>
       !menuPaths.includes(item.path) &&
+      !offerPaths.includes(item.path) &&
       (item.roles === null || item.roles.includes(role)) &&
       (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
   );
@@ -222,7 +233,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
 
           {navItems.map((item) => {
-            const active = location.pathname === item.path;
+            const active =
+              location.pathname === item.path ||
+              location.pathname.startsWith(`${item.path}/`);
             const Icon = item.icon;
             return (
               <Link
@@ -239,6 +252,58 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </Link>
             );
           })}
+
+          {isOfferGroupVisible && (
+            <div className="mt-2 mb-1">
+              <button
+                type="button"
+                onClick={() => setOffersOpen((prev) => !prev)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  isOfferGroupActive
+                    ? "bg-slate-700 text-white"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                <span className="flex items-center">
+                  <ShieldCheck className="h-4 w-4 mr-2 shrink-0" />
+                  Special Offers
+                </span>
+                <div className="flex items-center gap-2">
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${offersOpen ? "rotate-180" : ""}`}
+                  />
+                </div>
+              </button>
+
+              {offersOpen && (
+                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                  {offerSubItems.map((subItem) => {
+                    const subActive =
+                      subItem.path === "/admin/offers"
+                        ? location.pathname === "/admin/offers" ||
+                          (location.pathname.startsWith("/admin/offers/") &&
+                            location.pathname !== "/admin/offers/new")
+                        : location.pathname === subItem.path;
+                    const SubIcon = subItem.icon;
+                    return (
+                      <Link
+                        key={subItem.path}
+                        to={subItem.path}
+                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          subActive
+                            ? "bg-blue-950 text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        }`}
+                      >
+                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        {subItem.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
         <div className="px-4 py-4 border-t border-gray-700">
           <button

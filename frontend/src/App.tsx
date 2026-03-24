@@ -12,6 +12,7 @@ import Kitchen from "@/pages/admin/Kitchen";
 import Steward from "@/pages/admin/Steward";
 import Billing from "@/pages/admin/Billing";
 import Offers from "@/pages/admin/Offers";
+import OfferFormPage from "@/pages/admin/OfferFormPage";
 import Reports from "@/pages/admin/Reports";
 import Staff from "@/pages/admin/Staff";
 import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
@@ -119,6 +120,22 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
               <Offers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/offers/new"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <OfferFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/offers/:offerId/edit"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <OfferFormPage />
             </ProtectedRoute>
           }
         />
