@@ -11,6 +11,7 @@ import {
   Home,
   LayoutGrid,
   Package,
+  QrCode,
   ReceiptText,
   ShieldCheck,
   SquareMenu,
@@ -52,13 +53,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ["owner", "admin"],
   },
   { path: "/admin/staff", label: "Staff", icon: Users, roles: ["owner", "admin"] },
-  {
-    path: "/admin/tables",
-    label: "Tables",
-    icon: LayoutGrid,
-    roles: ["owner", "admin"],
-    privilege: "QR_MENU",
-  },
   {
     path: "/admin/menu/menus",
     label: "Menus",
@@ -118,6 +112,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { loading: privilegesLoading, hasPrivilege } = useSubscriptionPrivileges();
   const [menusOpen, setMenusOpen] = useState(true);
   const [kitchenOpen, setKitchenOpen] = useState(true);
+  const [qrOpen, setQrOpen] = useState(true);
   const [offersOpen, setOffersOpen] = useState(true);
 
   const menuSubItems: MenuSubItem[] = useMemo(
@@ -147,14 +142,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     []
   );
 
+  const qrSubItems: MenuSubItem[] = useMemo(
+    () => [{ path: "/admin/tables", label: "Table QR Codes", icon: LayoutGrid }],
+    []
+  );
+
   const menuPaths = useMemo(() => menuSubItems.map((item) => item.path), [menuSubItems]);
   const kitchenPaths = useMemo(() => kitchenSubItems.map((item) => item.path), [kitchenSubItems]);
+  const qrPaths = useMemo(() => qrSubItems.map((item) => item.path), [qrSubItems]);
   const offerPaths = useMemo(() => offerSubItems.map((item) => item.path), [offerSubItems]);
   const isMenuGroupVisible = role === "owner" || role === "admin";
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
   const isKitchenGroupVisible = role === "owner" || role === "admin" || role === "steward";
   const isKitchenGroupActive =
     location.pathname.startsWith("/admin/kitchen") || location.pathname === "/admin/steward";
+  const isQrGroupVisible = role === "owner" || role === "admin";
+  const isQrGroupActive = qrPaths.some((path) => location.pathname === path);
+  const qrFeatureLocked = !privilegesLoading && !hasPrivilege("QR_MENU");
   const isOfferGroupVisible =
     (role === "owner" || role === "admin") && !privilegesLoading && hasPrivilege("OFFERS");
   const isOfferGroupActive = offerPaths.some((path) =>
@@ -167,6 +171,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     (item) =>
       !menuPaths.includes(item.path) &&
       !kitchenPaths.includes(item.path) &&
+      !qrPaths.includes(item.path) &&
       !offerPaths.includes(item.path) &&
       (item.roles === null || item.roles.includes(role)) &&
       (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
@@ -265,6 +270,65 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               {kitchenOpen && (
                 <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
                   {kitchenSubItems.map((subItem) => {
+                    const subActive = location.pathname === subItem.path;
+                    const SubIcon = subItem.icon;
+                    return (
+                      <Link
+                        key={subItem.path}
+                        to={subItem.path}
+                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          subActive
+                            ? "bg-blue-950 text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        }`}
+                      >
+                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        {subItem.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isQrGroupVisible && (
+            <div className="mb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isQrGroupActive) {
+                    setQrOpen(true);
+                    navigate("/admin/tables");
+                    return;
+                  }
+                  setQrOpen((prev) => !prev);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  isQrGroupActive
+                    ? "bg-slate-700 text-white"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                <span className="flex items-center">
+                  <QrCode className="h-4 w-4 mr-2 shrink-0" />
+                  QR Codes
+                </span>
+                <div className="flex items-center gap-2">
+                  {qrFeatureLocked && (
+                    <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                      Locked
+                    </span>
+                  )}
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${qrOpen ? "rotate-180" : ""}`}
+                  />
+                </div>
+              </button>
+
+              {qrOpen && (
+                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                  {qrSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
                     return (
