@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock3, Star } from "lucide-react";
-import { ApiError, api } from "@/lib/api";
+import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Star } from "lucide-react";
+
 import DashboardLayout from "@/components/shared/DashboardLayout";
-import type { DashboardSubscriptionSummary, AdminDashboardOverviewResponse } from "@/types/dashboard";
+import { ApiError, api } from "@/lib/api";
+import type { AdminDashboardOverviewResponse, DashboardSubscriptionSummary } from "@/types/dashboard";
 import type {
   RestaurantLogoUploadResponse,
   RestaurantMeResponse,
@@ -22,75 +24,115 @@ const COUNTRY_OPTIONS = [
 ];
 
 const CURRENCY_OPTIONS = ["LKR", "INR", "AED", "GBP", "USD", "AUD", "SGD", "MVR"];
+
+type NoticeTone = "success" | "error";
+
+interface NoticeMessage {
+  tone: NoticeTone;
+  text: string;
+}
+
 export default function RestaurantProfile() {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const aliveRef = useRef(true);
+
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
   const [restaurant, setRestaurant] = useState<RestaurantMeResponse | null>(null);
+  const [subscriptionSummary, setSubscriptionSummary] = useState<DashboardSubscriptionSummary | null>(null);
+
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [profileNotice, setProfileNotice] = useState<NoticeMessage | null>(null);
   const [form, setForm] = useState<RestaurantUpdateRequest>({});
 
   const [uploading, setUploading] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [uploadNotice, setUploadNotice] = useState<NoticeMessage | null>(null);
+
   const [setupModalOpen, setSetupModalOpen] = useState(false);
   const [setupCountry, setSetupCountry] = useState("");
   const [setupCurrency, setSetupCurrency] = useState("");
   const [setupSaving, setSetupSaving] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
-  const [subscriptionSummary, setSubscriptionSummary] = useState<DashboardSubscriptionSummary | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    let active = true;
-
-    async function loadProfile() {
-      setLoading(true);
-      setFetchError(null);
-
-      try {
-        const restaurantData = await api.get<RestaurantMeResponse>("/restaurants/me");
-        if (!active) return;
-
-        setRestaurant(restaurantData);
-        resetForm(restaurantData);
-        const countryMissing = !restaurantData.country || !restaurantData.country.trim();
-        const currencyMissing = !restaurantData.currency || !restaurantData.currency.trim();
-        if (countryMissing || currencyMissing) {
-          setSetupCountry(restaurantData.country ?? "");
-          setSetupCurrency(restaurantData.currency ?? "");
-          setSetupModalOpen(true);
-        }
-      } catch (err) {
-        if (!active) return;
-        const message =
-          err instanceof ApiError
-            ? err.detail
-            : err instanceof Error
-              ? err.message
-              : "Failed to load restaurant profile.";
-        setFetchError(message || "Failed to load restaurant profile.");
-        return;
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-
-      try {
-        const overviewData = await api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview");
-        if (!active) return;
-        setSubscriptionSummary(overviewData.subscription);
-      } catch {
-        // Non-blocking: profile page should remain usable even if overview fails.
-      }
-    }
-
+    aliveRef.current = true;
     void loadProfile();
+
     return () => {
-      active = false;
+      aliveRef.current = false;
     };
   }, []);
+
+  async function loadProfile(options?: { showLoader?: boolean }) {
+    const showLoader = options?.showLoader ?? true;
+
+    if (showLoader) {
+      setLoading(true);
+    }
+
+    setFetchError(null);
+
+    let profileData: RestaurantMeResponse | null = null;
+
+    try {
+      profileData = await api.get<RestaurantMeResponse>("/restaurants/me");
+      if (!aliveRef.current) {
+        return;
+      }
+
+      setRestaurant(profileData);
+      resetForm(profileData);
+
+      const countryMissing = !profileData.country || !profileData.country.trim();
+      const currencyMissing = !profileData.currency || !profileData.currency.trim();
+      if (countryMissing || currencyMissing) {
+        setSetupCountry(profileData.country ?? "");
+        setSetupCurrency(profileData.currency ?? "");
+        setSetupModalOpen(true);
+      }
+    } catch (err) {
+      if (!aliveRef.current) {
+        return;
+      }
+
+      const message =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Failed to load restaurant profile.";
+      setFetchError(message || "Failed to load restaurant profile.");
+      setRestaurant(null);
+      setSubscriptionSummary(null);
+
+      if (showLoader) {
+        setLoading(false);
+      }
+      return;
+    }
+
+    try {
+      const overviewData = await api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview");
+      if (!aliveRef.current) {
+        return;
+      }
+      setSubscriptionSummary(overviewData.subscription);
+    } catch {
+      if (!aliveRef.current) {
+        return;
+      }
+      // Non-blocking: the profile should remain usable even if overview fails.
+      setSubscriptionSummary(null);
+    } finally {
+      if (showLoader && aliveRef.current) {
+        setLoading(false);
+      }
+    }
+  }
 
   function resetForm(data: RestaurantMeResponse) {
     setForm({
@@ -107,6 +149,14 @@ export default function RestaurantProfile() {
     });
   }
 
+  async function handleRefresh() {
+    setRefreshing(true);
+    await loadProfile({ showLoader: false });
+    if (aliveRef.current) {
+      setRefreshing(false);
+    }
+  }
+
   async function handleSetupSave() {
     if (!setupCountry || !setupCurrency) {
       setSetupError("Please select both country and currency.");
@@ -115,71 +165,151 @@ export default function RestaurantProfile() {
 
     setSetupSaving(true);
     setSetupError(null);
+
     try {
       const updated = await api.patch<RestaurantMeResponse>("/restaurants/me", {
         country: setupCountry,
         currency: setupCurrency,
       });
+
+      if (!aliveRef.current) {
+        return;
+      }
+
       setRestaurant(updated);
       resetForm(updated);
       setSetupModalOpen(false);
-      setSaveMsg({ type: "ok", text: "Country and currency saved successfully." });
-    } catch {
-      setSetupError("Failed to save country and currency.");
+      setProfileNotice({ tone: "success", text: "Country and currency saved successfully." });
+    } catch (err) {
+      if (!aliveRef.current) {
+        return;
+      }
+
+      const detail =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Failed to save country and currency.";
+      setSetupError(detail || "Failed to save country and currency.");
     } finally {
-      setSetupSaving(false);
+      if (aliveRef.current) {
+        setSetupSaving(false);
+      }
     }
   }
 
   async function handleSave() {
-    if (!restaurant) return;
+    if (!restaurant) {
+      return;
+    }
+
+    if (!form.name || !form.name.trim()) {
+      setProfileNotice({ tone: "error", text: "Restaurant name is required." });
+      return;
+    }
+
     setSaving(true);
-    setSaveMsg(null);
+    setProfileNotice(null);
+
     try {
-      const updated = await api.patch<RestaurantMeResponse>("/restaurants/me", form);
+      const updated = await api.patch<RestaurantMeResponse>("/restaurants/me", {
+        ...form,
+        name: form.name.trim(),
+      });
+
+      if (!aliveRef.current) {
+        return;
+      }
+
       setRestaurant(updated);
       resetForm(updated);
       setEditing(false);
-      setSaveMsg({ type: "ok", text: "Profile updated successfully." });
-    } catch {
-      setSaveMsg({ type: "err", text: "Failed to save changes." });
+      setProfileNotice({ tone: "success", text: "Profile updated successfully." });
+    } catch (err) {
+      if (!aliveRef.current) {
+        return;
+      }
+
+      const detail =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Failed to save profile changes.";
+
+      setProfileNotice({
+        tone: "error",
+        text: detail || "Failed to save profile changes.",
+      });
     } finally {
-      setSaving(false);
+      if (aliveRef.current) {
+        setSaving(false);
+      }
     }
   }
 
-  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !restaurant) return;
+  function handleCancelEdit() {
+    if (!restaurant) {
+      return;
+    }
+
+    resetForm(restaurant);
+    setEditing(false);
+    setProfileNotice(null);
+  }
+
+  async function handleLogoUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file || !restaurant) {
+      return;
+    }
 
     setUploading(true);
-    setUploadMsg(null);
+    setUploadNotice(null);
 
     try {
       const formData = new FormData();
       formData.append("file", file);
 
-      const data = await api.post<RestaurantLogoUploadResponse>(
-        "/restaurants/me/logo",
-        formData,
-      );
-      setRestaurant((prev) => prev ? { ...prev, logo_url: data.logo_url } : prev);
-      setUploadMsg({ type: "ok", text: "Logo uploaded successfully." });
-    } catch (err: unknown) {
-      setUploadMsg({
-        type: "err",
-        text: err instanceof Error ? err.message : "Logo upload failed.",
-      });
+      const data = await api.post<RestaurantLogoUploadResponse>("/restaurants/me/logo", formData);
+      if (!aliveRef.current) {
+        return;
+      }
+
+      setRestaurant((prev) => (prev ? { ...prev, logo_url: data.logo_url } : prev));
+      setUploadNotice({ tone: "success", text: "Logo uploaded successfully." });
+    } catch (err) {
+      if (!aliveRef.current) {
+        return;
+      }
+
+      const detail =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Logo upload failed.";
+
+      setUploadNotice({ tone: "error", text: detail || "Logo upload failed." });
     } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (aliveRef.current) {
+        setUploading(false);
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   }
 
   if (loading) {
     return (
       <DashboardLayout>
-        <p className="text-muted-foreground">Loading…</p>
+        <div className="space-y-4">
+          <div className="h-36 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+          <div className="h-28 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+          <div className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+        </div>
       </DashboardLayout>
     );
   }
@@ -187,7 +317,18 @@ export default function RestaurantProfile() {
   if (fetchError || !restaurant) {
     return (
       <DashboardLayout>
-        <p className="text-red-600">{fetchError ?? "Restaurant not found."}</p>
+        <section className="rounded-2xl border border-red-200 bg-red-50 p-6">
+          <h1 className="text-lg font-semibold text-red-800">Unable to load restaurant profile</h1>
+          <p className="mt-2 text-sm text-red-700">{fetchError ?? "Restaurant profile not found."}</p>
+          <button
+            type="button"
+            onClick={() => void loadProfile()}
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Retry
+          </button>
+        </section>
       </DashboardLayout>
     );
   }
@@ -197,31 +338,71 @@ export default function RestaurantProfile() {
     : null;
 
   const trialDaysRemaining = subscriptionSummary?.days_remaining ?? null;
-  const showTrialBanner = subscriptionSummary?.is_trial && (trialDaysRemaining === null || trialDaysRemaining >= 0);
+  const showTrialBanner =
+    Boolean(subscriptionSummary?.is_trial) &&
+    (trialDaysRemaining === null || trialDaysRemaining >= 0);
+  const trialDaysLabel = trialDaysRemaining ?? 0;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Profile Management</p>
+              <h1 className="mt-1 text-2xl font-semibold text-slate-900">Restaurant Profile</h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Keep business identity, contact details, and operating hours accurate.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/admin/menu/menus")}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                Go to Admin Dashboard
+              </button>
+            </div>
+          </div>
+        </section>
+
         {showTrialBanner && (
-          <section className="rounded-lg border-l-4 border-yellow-400 bg-yellow-50 p-5">
-            <h2 className="flex items-center gap-2 text-4xl font-semibold text-slate-900">
-              <Star className="h-8 w-8 fill-slate-900 text-slate-900" />
-              30 days Free Trial
-            </h2>
-            <p className="mt-2 text-xl text-slate-800">
-              You are currently using our free trial. Enjoy all features for {trialDaysRemaining ?? 0} more days!
-            </p>
-            <p className="mt-4 flex items-center gap-2 text-2xl font-bold text-orange-600">
-              <Clock3 className="h-6 w-6" />
-              {trialDaysRemaining ?? 0} days remaining
-            </p>
-            <div className="mt-4 rounded-md bg-sky-100 p-4">
-              <p className="text-lg text-slate-800">
-                Upgrade now to continue using our service without interruption after your trial ends.
+          <section className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-5 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-900">
+                  <Star className="h-6 w-6 fill-slate-900 text-slate-900" />
+                  30 Days Free Trial
+                </h2>
+                <p className="mt-2 text-base text-slate-700">
+                  You are currently using our free trial. Enjoy all features for {trialDaysLabel} more day(s).
+                </p>
+              </div>
+              <p className="inline-flex items-center gap-2 rounded-lg border border-orange-200 bg-white px-3 py-2 text-base font-semibold text-orange-700">
+                <Clock3 className="h-4 w-4" />
+                {trialDaysLabel} day(s) remaining
+              </p>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-sky-100 bg-sky-50 p-4">
+              <p className="text-sm text-slate-700">
+                Upgrade now to continue using all modules without interruption when your trial ends.
               </p>
               <button
+                type="button"
                 onClick={() => navigate("/admin/subscription")}
-                className="mt-4 rounded-md bg-green-600 px-6 py-2 text-base font-medium text-white hover:bg-green-700"
+                className="mt-3 rounded-md bg-green-600 px-5 py-2 text-sm font-semibold text-white hover:bg-green-700"
               >
                 Upgrade Now
               </button>
@@ -229,37 +410,33 @@ export default function RestaurantProfile() {
           </section>
         )}
 
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Restaurant Profile</h1>
-          <button
-            onClick={() => navigate("/admin/menu/menus")}
-            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Go to Admin Dashboard
-          </button>
-        </div>
+        {profileNotice && <NoticeBanner tone={profileNotice.tone} text={profileNotice.text} />}
 
-        {/* Logo section */}
-        <div className="rounded-lg border bg-white p-5 space-y-3">
-          <h2 className="font-medium text-sm text-gray-500 uppercase tracking-wide">Logo</h2>
-          <div className="flex items-center gap-4">
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SectionHeader
+            title="Branding"
+            description="Upload a logo to represent your restaurant in menus and dashboard views."
+          />
+
+          <div className="mt-4 flex flex-wrap items-center gap-4">
             {logoSrc ? (
               <img
                 src={logoSrc}
                 alt="Restaurant logo"
-                className="h-20 w-20 rounded-md object-cover border"
+                className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
               />
             ) : (
-              <div className="h-20 w-20 rounded-md border bg-gray-100 flex items-center justify-center text-gray-400 text-xs">
+              <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs font-medium text-slate-400">
                 No logo
               </div>
             )}
-            <div>
+
+            <div className="space-y-2">
               <label
                 htmlFor="logo-upload"
-                className="cursor-pointer rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
-                {uploading ? "Uploading…" : "Upload logo"}
+                {uploading ? "Uploading..." : "Upload logo"}
               </label>
               <input
                 id="logo-upload"
@@ -270,191 +447,175 @@ export default function RestaurantProfile() {
                 onChange={handleLogoUpload}
                 disabled={uploading}
               />
-              <p className="mt-1 text-xs text-gray-400">JPG, PNG or WebP · Max 5 MB</p>
-              {uploadMsg && (
-                <p
-                  className={`mt-1 text-xs ${
-                    uploadMsg.type === "ok" ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  {uploadMsg.text}
-                </p>
-              )}
+              <p className="text-xs text-slate-500">Supported: JPG, PNG, WebP. Max size: 5 MB.</p>
+              {uploadNotice && <NoticeText tone={uploadNotice.tone}>{uploadNotice.text}</NoticeText>}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Profile section */}
-        <div className="rounded-lg border bg-white p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-medium text-sm text-gray-500 uppercase tracking-wide">Details</h2>
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <SectionHeader
+              title="Business Details"
+              description="Maintain contact, billing, and operation schedule details."
+            />
             {!editing && (
               <button
-                onClick={() => { setEditing(true); setSaveMsg(null); }}
-                className="text-sm text-blue-600 hover:underline"
+                type="button"
+                onClick={() => {
+                  setEditing(true);
+                  setProfileNotice(null);
+                }}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Edit
               </button>
             )}
           </div>
 
-          {saveMsg && (
-            <p className={`text-sm ${saveMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
-              {saveMsg.text}
-            </p>
-          )}
-
           {editing ? (
-            <div className="space-y-3">
-              <FormField
-                label="Name *"
-                value={form.name ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, name: v }))}
-              />
-              <FormField
-                label="Email"
-                type="email"
-                value={form.email ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, email: v || null }))}
-              />
-              <FormField
-                label="Phone"
-                value={form.phone ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, phone: v || null }))}
-              />
-              <FormField
-                label="Country"
-                value={form.country ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, country: v || null }))}
-              />
-              <FormField
-                label="Currency"
-                value={form.currency ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, currency: v.toUpperCase() || null }))}
-              />
-              <FormField
-                label="Billing Email"
-                type="email"
-                value={form.billing_email ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, billing_email: v || null }))}
-              />
-              <FormField
-                label="Tax ID"
-                value={form.tax_id ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, tax_id: v || null }))}
-              />
-              <FormField
-                label="Opening Time"
-                type="time"
-                value={form.opening_time ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, opening_time: v || null }))}
-              />
-              <FormField
-                label="Closing Time"
-                type="time"
-                value={form.closing_time ?? ""}
-                onChange={(v) => setForm((f) => ({ ...f, closing_time: v || null }))}
-              />
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Address</label>
-                <textarea
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  rows={3}
-                  value={form.address ?? ""}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, address: e.target.value || null }))
+            <div className="mt-5 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <InputField
+                  label="Name *"
+                  value={form.name ?? ""}
+                  onChange={(value) => setForm((prev) => ({ ...prev, name: value }))}
+                />
+                <InputField
+                  label="Email"
+                  type="email"
+                  value={form.email ?? ""}
+                  onChange={(value) => setForm((prev) => ({ ...prev, email: toNullable(value) }))}
+                />
+                <InputField
+                  label="Phone"
+                  value={form.phone ?? ""}
+                  onChange={(value) => setForm((prev) => ({ ...prev, phone: toNullable(value) }))}
+                />
+                <SelectField
+                  label="Country"
+                  value={form.country ?? ""}
+                  options={COUNTRY_OPTIONS}
+                  placeholder="Select country"
+                  onChange={(value) => setForm((prev) => ({ ...prev, country: toNullable(value) }))}
+                />
+                <SelectField
+                  label="Currency"
+                  value={form.currency ?? ""}
+                  options={CURRENCY_OPTIONS}
+                  placeholder="Select currency"
+                  onChange={(value) =>
+                    setForm((prev) => ({ ...prev, currency: value ? value.toUpperCase() : null }))
                   }
                 />
+                <InputField
+                  label="Billing Email"
+                  type="email"
+                  value={form.billing_email ?? ""}
+                  onChange={(value) => setForm((prev) => ({ ...prev, billing_email: toNullable(value) }))}
+                />
+                <InputField
+                  label="Tax ID"
+                  value={form.tax_id ?? ""}
+                  onChange={(value) => setForm((prev) => ({ ...prev, tax_id: toNullable(value) }))}
+                />
+                <InputField
+                  label="Opening Time"
+                  type="time"
+                  value={form.opening_time ?? ""}
+                  onChange={(value) => setForm((prev) => ({ ...prev, opening_time: toNullable(value) }))}
+                />
+                <InputField
+                  label="Closing Time"
+                  type="time"
+                  value={form.closing_time ?? ""}
+                  onChange={(value) => setForm((prev) => ({ ...prev, closing_time: toNullable(value) }))}
+                />
               </div>
-              <div className="flex gap-2 pt-1">
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Address</label>
+                <textarea
+                  value={form.address ?? ""}
+                  onChange={(event) =>
+                    setForm((prev) => ({ ...prev, address: toNullable(event.target.value) }))
+                  }
+                  rows={3}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
                 <button
+                  type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {saving ? "Saving…" : "Save changes"}
+                  {saving ? "Saving..." : "Save Changes"}
                 </button>
                 <button
-                  onClick={() => {
-                    setEditing(false);
-                    setSaveMsg(null);
-                    resetForm(restaurant);
-                  }}
-                  className="flex-1 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   Cancel
                 </button>
               </div>
             </div>
           ) : (
-            <dl className="grid grid-cols-2 gap-4">
-              <InfoItem label="Name" value={restaurant.name} />
-              <InfoItem label="Email" value={restaurant.email} />
-              <InfoItem label="Phone" value={restaurant.phone} />
-              <InfoItem label="Country" value={restaurant.country ?? "Unknown Country"} />
-              <InfoItem label="Currency" value={restaurant.currency ?? "Unknown Currency"} />
-              <InfoItem label="Billing Email" value={restaurant.billing_email} />
-              <InfoItem label="Tax ID" value={restaurant.tax_id} />
-              <InfoItem label="Opening Time" value={restaurant.opening_time} />
-              <InfoItem label="Closing Time" value={restaurant.closing_time} />
-              <InfoItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
-              <div className="col-span-2">
-                <InfoItem label="Address" value={restaurant.address} />
-              </div>
+            <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+              <DetailItem label="Name" value={restaurant.name} />
+              <DetailItem label="Email" value={restaurant.email} />
+              <DetailItem label="Phone" value={restaurant.phone} />
+              <DetailItem label="Country" value={restaurant.country} />
+              <DetailItem label="Currency" value={restaurant.currency} />
+              <DetailItem label="Billing Email" value={restaurant.billing_email} />
+              <DetailItem label="Tax ID" value={restaurant.tax_id} />
+              <DetailItem label="Opening Time" value={restaurant.opening_time} />
+              <DetailItem label="Closing Time" value={restaurant.closing_time} />
+              <DetailItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
+              <DetailItem label="Address" value={restaurant.address} fullWidth />
             </dl>
           )}
-        </div>
+        </section>
       </div>
 
       {setupModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="text-4xl font-semibold text-center text-gray-700">Add Country and Currency</h2>
+            <h2 className="text-xl font-semibold text-slate-900">Set Country and Currency</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Complete these fields to continue using billing and subscription modules correctly.
+            </p>
 
-            <div className="mt-6 space-y-5">
-              <div className="space-y-2">
-                <label className="block text-3xl font-semibold text-center">Country</label>
-                <select
-                  value={setupCountry}
-                  onChange={(e) => setSetupCountry(e.target.value)}
-                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Country</option>
-                  {COUNTRY_OPTIONS.map((country) => (
-                    <option key={country} value={country}>
-                      {country}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="mt-5 space-y-4">
+              <SelectField
+                label="Country"
+                value={setupCountry}
+                options={COUNTRY_OPTIONS}
+                placeholder="Select country"
+                onChange={setSetupCountry}
+              />
 
-              <div className="space-y-2">
-                <label className="block text-3xl font-semibold text-center">Currency</label>
-                <select
-                  value={setupCurrency}
-                  onChange={(e) => setSetupCurrency(e.target.value)}
-                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Currency</option>
-                  {CURRENCY_OPTIONS.map((currency) => (
-                    <option key={currency} value={currency}>
-                      {currency}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SelectField
+                label="Currency"
+                value={setupCurrency}
+                options={CURRENCY_OPTIONS}
+                placeholder="Select currency"
+                onChange={setSetupCurrency}
+              />
 
-              {setupError && <p className="text-sm text-red-600">{setupError}</p>}
+              {setupError && <NoticeText tone="error">{setupError}</NoticeText>}
 
-              <div className="pt-1 text-center">
-                <button
-                  onClick={handleSetupSave}
-                  disabled={setupSaving}
-                  className="rounded-md bg-blue-600 px-6 py-2 text-base font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {setupSaving ? "Saving…" : "Save"}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleSetupSave}
+                disabled={setupSaving}
+                className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {setupSaving ? "Saving..." : "Save and Continue"}
+              </button>
             </div>
           </div>
         </div>
@@ -463,7 +624,40 @@ export default function RestaurantProfile() {
   );
 }
 
-function FormField({
+function SectionHeader({ title, description }: { title: string; description: string }) {
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      <p className="mt-1 text-sm text-slate-500">{description}</p>
+    </div>
+  );
+}
+
+function NoticeBanner({ tone, text }: { tone: NoticeTone; text: string }) {
+  const isSuccess = tone === "success";
+  const Icon = isSuccess ? CheckCircle2 : AlertTriangle;
+
+  return (
+    <div
+      className={`flex items-start gap-2 rounded-lg border px-4 py-3 text-sm ${
+        isSuccess
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-red-200 bg-red-50 text-red-700"
+      }`}
+    >
+      <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function NoticeText({ tone, children }: { tone: NoticeTone; children: ReactNode }) {
+  return (
+    <p className={`text-xs ${tone === "success" ? "text-emerald-600" : "text-red-600"}`}>{children}</p>
+  );
+}
+
+function InputField({
   label,
   value,
   type = "text",
@@ -472,26 +666,71 @@ function FormField({
   label: string;
   value: string;
   type?: string;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
 }) {
   return (
-    <div className="space-y-1">
-      <label className="text-sm font-medium">{label}</label>
+    <div>
+      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
       <input
         type={type}
-        className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
       />
     </div>
   );
 }
 
-function InfoItem({ label, value }: { label: string; value: string | null | undefined }) {
+function SelectField({
+  label,
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <div>
-      <dt className="text-xs font-medium text-gray-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-gray-900">{value ?? "—"}</dd>
+      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
     </div>
   );
+}
+
+function DetailItem({
+  label,
+  value,
+  fullWidth = false,
+}: {
+  label: string;
+  value: string | null | undefined;
+  fullWidth?: boolean;
+}) {
+  return (
+    <div className={fullWidth ? "sm:col-span-2" : undefined}>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-slate-900">{value || "--"}</dd>
+    </div>
+  );
+}
+
+function toNullable(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
 }
