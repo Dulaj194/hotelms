@@ -163,6 +163,81 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             "cancelled_at",
             "ALTER TABLE housekeeping_requests ADD COLUMN cancelled_at DATETIME NULL",
         ),
+        (
+            "priority",
+            "ALTER TABLE housekeeping_requests ADD COLUMN priority VARCHAR(20) NOT NULL DEFAULT 'normal'",
+        ),
+        (
+            "due_at",
+            "ALTER TABLE housekeeping_requests ADD COLUMN due_at DATETIME NULL",
+        ),
+        (
+            "photo_proof_url",
+            "ALTER TABLE housekeeping_requests ADD COLUMN photo_proof_url VARCHAR(500) NULL",
+        ),
+        (
+            "assigned_to_user_id",
+            "ALTER TABLE housekeeping_requests ADD COLUMN assigned_to_user_id INT NULL",
+        ),
+        (
+            "assigned_by_user_id",
+            "ALTER TABLE housekeeping_requests ADD COLUMN assigned_by_user_id INT NULL",
+        ),
+        (
+            "assigned_at",
+            "ALTER TABLE housekeeping_requests ADD COLUMN assigned_at DATETIME NULL",
+        ),
+        (
+            "started_at",
+            "ALTER TABLE housekeeping_requests ADD COLUMN started_at DATETIME NULL",
+        ),
+        (
+            "inspection_submitted_at",
+            "ALTER TABLE housekeeping_requests ADD COLUMN inspection_submitted_at DATETIME NULL",
+        ),
+        (
+            "inspected_at",
+            "ALTER TABLE housekeeping_requests ADD COLUMN inspected_at DATETIME NULL",
+        ),
+        (
+            "inspected_by_user_id",
+            "ALTER TABLE housekeeping_requests ADD COLUMN inspected_by_user_id INT NULL",
+        ),
+        (
+            "inspection_notes",
+            "ALTER TABLE housekeeping_requests ADD COLUMN inspection_notes TEXT NULL",
+        ),
+        (
+            "blocked_reason",
+            "ALTER TABLE housekeeping_requests ADD COLUMN blocked_reason TEXT NULL",
+        ),
+        (
+            "delay_reason",
+            "ALTER TABLE housekeeping_requests ADD COLUMN delay_reason TEXT NULL",
+        ),
+        (
+            "remarks",
+            "ALTER TABLE housekeeping_requests ADD COLUMN remarks TEXT NULL",
+        ),
+        (
+            "rework_count",
+            "ALTER TABLE housekeeping_requests ADD COLUMN rework_count INT NOT NULL DEFAULT 0",
+        ),
+        (
+            "sla_breached",
+            "ALTER TABLE housekeeping_requests ADD COLUMN sla_breached BOOLEAN NOT NULL DEFAULT FALSE",
+        ),
+    )
+
+    room_column_patches: Sequence[tuple[str, str]] = (
+        (
+            "housekeeping_status",
+            "ALTER TABLE rooms ADD COLUMN housekeeping_status VARCHAR(32) NOT NULL DEFAULT 'vacant_dirty'",
+        ),
+        (
+            "maintenance_required",
+            "ALTER TABLE rooms ADD COLUMN maintenance_required BOOLEAN NOT NULL DEFAULT FALSE",
+        ),
     )
 
     with engine.begin() as conn:
@@ -217,5 +292,14 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             conn.execute(text(alter_sql))
             logger.warning(
                 "Applied development schema patch: housekeeping_requests.%s was missing and has been added.",
+                column_name,
+            )
+
+        for column_name, alter_sql in room_column_patches:
+            if _column_exists(conn, "rooms", column_name):
+                continue
+            conn.execute(text(alter_sql))
+            logger.warning(
+                "Applied development schema patch: rooms.%s was missing and has been added.",
                 column_name,
             )

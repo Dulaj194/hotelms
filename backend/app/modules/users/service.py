@@ -101,7 +101,7 @@ def list_staff_filtered(
         db.query(func.count(HousekeepingRequest.id))
         .filter(
             HousekeepingRequest.restaurant_id == restaurant_id,
-            HousekeepingRequest.status == "pending",
+            HousekeepingRequest.status.notin_(["ready", "cancelled", "done"]),
         )
         .scalar()
         or 0

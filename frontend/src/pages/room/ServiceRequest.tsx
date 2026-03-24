@@ -24,8 +24,10 @@ function formatDateTime(value: string | null): string {
 }
 
 function statusClassName(status: HousekeepingRequestStatus): string {
-  if (status === "done") return "bg-green-100 text-green-700";
+  if (status === "done" || status === "ready") return "bg-green-100 text-green-700";
   if (status === "cancelled") return "bg-gray-200 text-gray-700";
+  if (status === "blocked") return "bg-red-100 text-red-700";
+  if (status === "inspection") return "bg-blue-100 text-blue-700";
   return "bg-amber-100 text-amber-700";
 }
 
@@ -364,7 +366,7 @@ export default function ServiceRequest() {
                       </p>
                     )}
                   </div>
-                  {req.status === "pending" && (
+                  {(req.status === "pending" || req.status === "pending_assignment" || req.status === "assigned") && (
                     <button
                       onClick={() => void handleCancel(req.id)}
                       disabled={cancellingId === req.id}

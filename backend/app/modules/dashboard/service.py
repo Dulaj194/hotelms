@@ -171,7 +171,10 @@ def _build_metrics(db: Session, *, restaurant_id: int) -> DashboardOverviewMetri
     )
     pending_housekeeping = (
         db.query(func.count(HousekeepingRequest.id))
-        .filter(HousekeepingRequest.restaurant_id == restaurant_id, HousekeepingRequest.status == "pending")
+        .filter(
+            HousekeepingRequest.restaurant_id == restaurant_id,
+            HousekeepingRequest.status.notin_(["ready", "cancelled", "done"]),
+        )
         .scalar()
         or 0
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint
@@ -7,6 +8,14 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from app.db.base import Base
+
+
+class RoomHousekeepingStatus(str, enum.Enum):
+    vacant_dirty = "vacant_dirty"
+    assigned = "assigned"
+    in_progress = "in_progress"
+    inspection = "inspection"
+    ready = "ready"
 
 
 class Room(Base):
@@ -39,6 +48,20 @@ class Room(Base):
     qr_code_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    housekeeping_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=RoomHousekeepingStatus.vacant_dirty.value,
+        server_default=RoomHousekeepingStatus.vacant_dirty.value,
+        index=True,
+    )
+    maintenance_required: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+        index=True,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
