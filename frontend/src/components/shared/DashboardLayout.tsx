@@ -60,7 +60,6 @@ type SidebarGroupState = {
 };
 
 const SIDEBAR_GROUPS_STORAGE_KEY = "hotelms.sidebar.groups";
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "hotelms.sidebar.collapsed";
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.admin";
 const DEFAULT_SIDEBAR_GROUP_STATE: SidebarGroupState = {
   menusOpen: true,
@@ -86,15 +85,6 @@ function loadSidebarGroupState(): SidebarGroupState {
     };
   } catch {
     return DEFAULT_SIDEBAR_GROUP_STATE;
-  }
-}
-
-function loadSidebarCollapsedState(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
-  } catch {
-    return false;
   }
 }
 
@@ -166,9 +156,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [groupState, setGroupState] = useState<SidebarGroupState>(() =>
     loadSidebarGroupState()
   );
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() =>
-    loadSidebarCollapsedState()
-  );
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [housekeepingPendingCount, setHousekeepingPendingCount] = useState(0);
   const [activeSidebarRoot, setActiveSidebarRoot] = useState<string | null>(() =>
     getActiveSidebarNavigationRoot()
@@ -312,14 +300,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const toggleGroup = (group: keyof SidebarGroupState) => {
     setGroupState((prev) => ({ ...prev, [group]: !prev[group] }));
   };
-  const toggleSidebarCollapsed = () => {
-    setSidebarCollapsed((prev) => !prev);
+  const toggleMobileSidebar = () => {
+    setMobileSidebarOpen((prev) => !prev);
+  };
+  const closeMobileSidebar = () => {
+    setMobileSidebarOpen(false);
   };
 
   const handleSidebarNavigate = (path: string) => {
     const targetRouteKey = buildRouteKey(path);
     markSidebarNavigationTarget(targetRouteKey);
     setActiveSidebarRoot(targetRouteKey);
+    closeMobileSidebar();
   };
   const handleSidebarScroll = () => {
     if (typeof window === "undefined" || !sidebarNavRef.current) return;
@@ -336,17 +328,26 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
-  }, [sidebarCollapsed]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || sidebarCollapsed) return;
     const saved = window.sessionStorage.getItem(SIDEBAR_SCROLL_STORAGE_KEY);
     if (!saved || !sidebarNavRef.current) return;
     const parsed = Number(saved);
     if (!Number.isFinite(parsed)) return;
     sidebarNavRef.current.scrollTop = parsed;
-  }, [sidebarCollapsed, location.pathname]);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    closeMobileSidebar();
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!mobileSidebarOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [mobileSidebarOpen]);
 
   useEffect(() => {
     setGroupState((prev) => {
@@ -462,26 +463,31 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [currentRouteKey, isCurrentSidebarRoute]);
 
   return (
-    <div
-      className="h-screen overflow-hidden bg-gray-50 transition-[grid-template-columns] duration-300"
-      style={{
-        display: "grid",
-        gridTemplateColumns: sidebarCollapsed ? "0 1fr" : "14rem 1fr",
-      }}
-    >
+    <div className="h-screen overflow-hidden bg-gray-50 md:grid md:grid-cols-[14rem_1fr]">
       <button
         type="button"
-        onClick={toggleSidebarCollapsed}
-        aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className={`fixed top-4 z-50 inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-100 ${
-          sidebarCollapsed ? "left-3" : "left-[13.25rem]"
-        }`}
+        onClick={toggleMobileSidebar}
+        aria-label={mobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
+        title={mobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
+        className="fixed left-3 top-4 z-50 inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-100 md:hidden"
       >
         <Menu className="h-4 w-4" />
       </button>
+
+      <div
+        onClick={closeMobileSidebar}
+        className={`fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden ${
+          mobileSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        aria-hidden="true"
+      />
+
       {/* Sidebar */}
-      <aside className="h-screen bg-gray-900 text-white flex flex-col overflow-hidden">
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-56 h-screen bg-gray-900 text-white flex flex-col overflow-hidden transform transition-transform duration-300 md:static md:translate-x-0 md:z-auto ${
+          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="px-4 py-5 border-b border-gray-700">
           <span className="text-lg font-bold tracking-tight">HotelMS</span>
           {user && (
@@ -783,7 +789,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main content */}
       <main className="h-screen overflow-y-auto">
-        <div className={sidebarCollapsed ? "w-full px-6 py-8" : "max-w-4xl mx-auto px-6 py-8"}>
+        <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6">
           {showGlobalBackButton && (
             <div className="mb-5">
               <button
