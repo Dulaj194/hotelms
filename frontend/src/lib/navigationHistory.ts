@@ -98,13 +98,12 @@ export function syncSidebarNavigationRoot(routeKey: string, isSidebarRoute: bool
     }
   }
 
-  const currentRoot = readStoredRouteKey(NAV_SIDEBAR_ROOT_STORAGE_KEY);
-  if (!currentRoot && isSidebarRoute) {
+  if (isSidebarRoute) {
     window.sessionStorage.setItem(NAV_SIDEBAR_ROOT_STORAGE_KEY, routeKey);
     return routeKey;
   }
 
-  return currentRoot;
+  return readStoredRouteKey(NAV_SIDEBAR_ROOT_STORAGE_KEY);
 }
 
 export function getStandardAdminFallbackRoute(pathname: string) {

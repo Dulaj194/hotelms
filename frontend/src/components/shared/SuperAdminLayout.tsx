@@ -73,7 +73,8 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   );
   const isInSidebarDrilldown =
     Boolean(activeSidebarRoot) && currentRouteKey !== activeSidebarRoot;
-  const showGlobalBackButton = isInSidebarDrilldown;
+  // Show the global back button for both sidebar root pages and drilldown pages.
+  const showGlobalBackButton = isCurrentSidebarRoute || isInSidebarDrilldown;
 
   const handleGlobalBack = () => {
     if (canNavigateBack()) {
