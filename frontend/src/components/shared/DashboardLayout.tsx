@@ -92,7 +92,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: ["owner", "admin", "steward"],
     privilege: "QR_MENU",
   },
-  { path: "/admin/rooms", label: "Rooms", icon: BedDouble, roles: ["owner", "admin"] },
 ];
 
 interface DashboardLayoutProps {
@@ -146,19 +145,25 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const housekeepingSubItems: MenuSubItem[] = useMemo(
     () => [
       {
+        path: "/admin/housekeeping/rooms",
+        label: "Rooms",
+        icon: BedDouble,
+        roles: ["owner", "admin", "housekeeper"],
+      },
+      {
         path: "/admin/housekeeping",
         label: "Messages",
         icon: Handshake,
         roles: ["owner", "admin", "housekeeper"],
       },
       {
-        path: "/admin/rooms/qr/all",
+        path: "/admin/housekeeping/rooms/qr/all",
         label: "All Room QR Codes",
         icon: QrCode,
         roles: ["owner", "admin"],
       },
       {
-        path: "/admin/rooms/qr/generate",
+        path: "/admin/housekeeping/rooms/qr/generate",
         label: "Generate Room QR Codes",
         icon: LayoutGrid,
         roles: ["owner", "admin"],
@@ -433,8 +438,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {navItems.map((item) => {
             const active =
               location.pathname === item.path ||
-              (location.pathname.startsWith(`${item.path}/`) &&
-                !(item.path === "/admin/rooms" && location.pathname.startsWith("/admin/rooms/qr/")));
+              location.pathname.startsWith(`${item.path}/`);
             const Icon = item.icon;
             return (
               <Link

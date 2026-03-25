@@ -1,8 +1,10 @@
-"""Rooms admin router — protected CRUD endpoints.
+"""Rooms admin router.
 
-All endpoints require owner or admin role.
-restaurant_id is always derived from the authenticated user — never from the request body.
+Read endpoints allow owner/admin/housekeeper.
+Write endpoints require owner/admin.
+restaurant_id is always derived from authenticated context.
 """
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -18,16 +20,17 @@ from app.modules.rooms.schemas import (
 
 router = APIRouter()
 
-_ADMIN_ROLES = ("owner", "admin")
+_ROOM_READ_ROLES = ("owner", "admin", "housekeeper")
+_ROOM_WRITE_ROLES = ("owner", "admin")
 
 
 @router.get("", response_model=RoomListResponse)
 def list_rooms(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    _=Depends(require_roles(*_ADMIN_ROLES)),
+    _=Depends(require_roles(*_ROOM_READ_ROLES)),
 ) -> RoomListResponse:
-    """List all rooms in the current restaurant. Owner/admin only."""
+    """List all rooms in the current restaurant."""
     return service.list_rooms(db, restaurant_id)
 
 
@@ -36,12 +39,9 @@ def create_room(
     payload: RoomCreateRequest,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    _=Depends(require_roles(*_ADMIN_ROLES)),
+    _=Depends(require_roles(*_ROOM_WRITE_ROLES)),
 ) -> RoomResponse:
-    """Create a new room in the current restaurant. Owner/admin only.
-
-    SECURITY: restaurant_id comes from auth context, never from request body.
-    """
+    """Create a new room in the current restaurant."""
     return service.create_room(db, restaurant_id, payload)
 
 
@@ -50,9 +50,9 @@ def get_room(
     room_id: int,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    _=Depends(require_roles(*_ADMIN_ROLES)),
+    _=Depends(require_roles(*_ROOM_READ_ROLES)),
 ) -> RoomResponse:
-    """Get one room by ID, scoped to the current restaurant. Owner/admin only."""
+    """Get one room by id, scoped to current restaurant."""
     return service.get_room(db, room_id, restaurant_id)
 
 
@@ -62,9 +62,9 @@ def update_room(
     payload: RoomUpdateRequest,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    _=Depends(require_roles(*_ADMIN_ROLES)),
+    _=Depends(require_roles(*_ROOM_WRITE_ROLES)),
 ) -> RoomResponse:
-    """Update a room in the current restaurant. Owner/admin only."""
+    """Update a room in the current restaurant."""
     return service.update_room(db, room_id, restaurant_id, payload)
 
 
@@ -73,9 +73,9 @@ def disable_room(
     room_id: int,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    _=Depends(require_roles(*_ADMIN_ROLES)),
+    _=Depends(require_roles(*_ROOM_WRITE_ROLES)),
 ) -> RoomStatusResponse:
-    """Mark a room as inactive. It will not accept new guest sessions. Owner/admin only."""
+    """Mark a room as inactive."""
     return service.disable_room(db, room_id, restaurant_id)
 
 
@@ -84,9 +84,9 @@ def enable_room(
     room_id: int,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    _=Depends(require_roles(*_ADMIN_ROLES)),
+    _=Depends(require_roles(*_ROOM_WRITE_ROLES)),
 ) -> RoomStatusResponse:
-    """Mark a room as active. Owner/admin only."""
+    """Mark a room as active."""
     return service.enable_room(db, room_id, restaurant_id)
 
 
@@ -95,7 +95,7 @@ def delete_room(
     room_id: int,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    _=Depends(require_roles(*_ADMIN_ROLES)),
+    _=Depends(require_roles(*_ROOM_WRITE_ROLES)),
 ) -> None:
-    """Delete a room from the current restaurant. Owner/admin only."""
+    """Delete a room from the current restaurant."""
     service.delete_room(db, room_id, restaurant_id)

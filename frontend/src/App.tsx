@@ -188,14 +188,22 @@ function App() {
         />
         <Route
           path="/admin/rooms"
+          element={<Navigate to="/admin/housekeeping/rooms" replace />}
+        />
+        <Route
+          path="/admin/housekeeping/rooms"
           element={
-            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+            <ProtectedRoute allowedRoles={["owner", "admin", "housekeeper"]}>
               <Rooms />
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/rooms/qr/all"
+          element={<Navigate to="/admin/housekeeping/rooms/qr/all" replace />}
+        />
+        <Route
+          path="/admin/housekeeping/rooms/qr/all"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
               <AllRoomQRCodes />
@@ -204,6 +212,10 @@ function App() {
         />
         <Route
           path="/admin/rooms/qr/generate"
+          element={<Navigate to="/admin/housekeeping/rooms/qr/generate" replace />}
+        />
+        <Route
+          path="/admin/housekeeping/rooms/qr/generate"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
               <GenerateRoomQRCodes />

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
+import { getUser, normalizeRole } from "@/lib/auth";
 import type {
   RoomCreateRequest,
   RoomListResponse,
@@ -21,6 +22,10 @@ function Badge({ active }: { active: boolean }) {
 }
 
 export default function Rooms() {
+  const user = getUser();
+  const role = normalizeRole(user?.role);
+  const canManageRooms = role === "owner" || role === "admin";
+
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -135,14 +140,20 @@ export default function Rooms() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage hotel rooms for your restaurant.</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {canManageRooms
+              ? "Manage hotel rooms for your restaurant."
+              : "View room inventory for housekeeping operations."}
+          </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors"
-        >
-          + Add Room
-        </button>
+        {canManageRooms && (
+          <button
+            onClick={openCreate}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors"
+          >
+            + Add Room
+          </button>
+        )}
       </div>
 
       {error && (
@@ -161,8 +172,10 @@ export default function Rooms() {
         <p className="text-center text-gray-400 py-12 animate-pulse">Loading rooms...</p>
       ) : rooms.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          <p className="text-lg">No rooms yet.</p>
-          <p className="text-sm mt-1">Click "Add Room" to create your first room.</p>
+          <p className="text-lg">{canManageRooms ? "No rooms yet." : "No rooms available."}</p>
+          {canManageRooms && (
+            <p className="text-sm mt-1">Click "Add Room" to create your first room.</p>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl border overflow-hidden">
@@ -188,33 +201,37 @@ export default function Rooms() {
                     <Badge active={room.is_active} />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(room)}
-                        className="px-2 py-1 text-xs border rounded hover:bg-gray-100 transition-colors"
-                        title="Edit room"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => void handleToggleActive(room)}
-                        className={`px-2 py-1 text-xs border rounded transition-colors ${
-                          room.is_active
-                            ? "hover:bg-orange-50 border-orange-200 text-orange-600"
-                            : "hover:bg-green-50 border-green-200 text-green-600"
-                        }`}
-                        title={room.is_active ? "Disable room" : "Enable room"}
-                      >
-                        {room.is_active ? "Disable" : "Enable"}
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(room)}
-                        className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 transition-colors"
-                        title="Delete room"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    {canManageRooms ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEdit(room)}
+                          className="px-2 py-1 text-xs border rounded hover:bg-gray-100 transition-colors"
+                          title="Edit room"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => void handleToggleActive(room)}
+                          className={`px-2 py-1 text-xs border rounded transition-colors ${
+                            room.is_active
+                              ? "hover:bg-orange-50 border-orange-200 text-orange-600"
+                              : "hover:bg-green-50 border-green-200 text-green-600"
+                          }`}
+                          title={room.is_active ? "Disable room" : "Enable room"}
+                        >
+                          {room.is_active ? "Disable" : "Enable"}
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(room)}
+                          className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 transition-colors"
+                          title="Delete room"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-right text-xs text-gray-500">View only</div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -223,7 +240,7 @@ export default function Rooms() {
         </div>
       )}
 
-      {modalOpen && (
+      {canManageRooms && modalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
             <h2 className="text-lg font-semibold mb-4">
@@ -302,7 +319,7 @@ export default function Rooms() {
         </div>
       )}
 
-      {deleteTarget && (
+      {canManageRooms && deleteTarget && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
             <h2 className="text-lg font-semibold mb-2">Delete Room?</h2>
