@@ -1,5 +1,14 @@
+import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { clearAuth, getUser } from "@/lib/auth";
+import {
+  buildRouteKey,
+  canGoBackInApp,
+  clearInAppNavigationHistory,
+  popAndGetPreviousInApp,
+  recordInAppNavigation,
+} from "@/lib/navigationHistory";
 
 const SUPER_ADMIN_NAV = [
   { path: "/super-admin/restaurants", label: "🏨 Hotels" },
@@ -15,9 +24,42 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const user = getUser();
 
   function handleLogout() {
+    clearInAppNavigationHistory();
     clearAuth();
     navigate("/login", { replace: true });
   }
+
+  const canNavigateBack = () => {
+    if (typeof window === "undefined") return false;
+    const state = window.history.state as { idx?: number } | null;
+    if (typeof state?.idx === "number") {
+      return state.idx > 0;
+    }
+    return window.history.length > 1;
+  };
+
+  const currentRouteKey = buildRouteKey(location.pathname, location.search);
+  const hasAppBack = canGoBackInApp(currentRouteKey);
+  const showGlobalBackButton =
+    location.pathname !== "/super-admin/restaurants" || hasAppBack || canNavigateBack();
+
+  const handleGlobalBack = () => {
+    const previousRoute = popAndGetPreviousInApp(currentRouteKey);
+    if (previousRoute) {
+      navigate(previousRoute);
+      return;
+    }
+
+    if (canNavigateBack()) {
+      navigate(-1);
+      return;
+    }
+    navigate("/super-admin/restaurants", { replace: true });
+  };
+
+  useEffect(() => {
+    recordInAppNavigation(currentRouteKey);
+  }, [currentRouteKey]);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -60,7 +102,22 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-6 py-8">{children}</div>
+        <div className="max-w-5xl mx-auto px-6 py-8">
+          {showGlobalBackButton && (
+            <div className="mb-5">
+              <button
+                type="button"
+                onClick={handleGlobalBack}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+                aria-label="Go back to previous page"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </button>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );

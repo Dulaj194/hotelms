@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
   BedDouble,
   ChevronDown,
   ClipboardList,
@@ -24,6 +25,14 @@ import {
 import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
+import {
+  buildRouteKey,
+  canGoBackInApp,
+  clearInAppNavigationHistory,
+  getStandardAdminFallbackRoute,
+  popAndGetPreviousInApp,
+  recordInAppNavigation,
+} from "@/lib/navigationHistory";
 import type { HousekeepingPendingCountResponse } from "@/types/housekeeping";
 
 interface NavItem {
@@ -341,9 +350,42 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [hasHousekeepingPrivilege, isHousekeepingGroupVisible, privilegesLoading]);
 
   function handleLogout() {
+    clearInAppNavigationHistory();
     clearAuth();
     navigate("/login", { replace: true });
   }
+
+  const canNavigateBack = () => {
+    if (typeof window === "undefined") return false;
+    const state = window.history.state as { idx?: number } | null;
+    if (typeof state?.idx === "number") {
+      return state.idx > 0;
+    }
+    return window.history.length > 1;
+  };
+
+  const currentRouteKey = buildRouteKey(location.pathname, location.search);
+  const hasAppBack = canGoBackInApp(currentRouteKey);
+  const showGlobalBackButton =
+    location.pathname !== "/dashboard" || hasAppBack || canNavigateBack();
+
+  const handleGlobalBack = () => {
+    const previousRoute = popAndGetPreviousInApp(currentRouteKey);
+    if (previousRoute) {
+      navigate(previousRoute);
+      return;
+    }
+
+    if (canNavigateBack()) {
+      navigate(-1);
+      return;
+    }
+    navigate(getStandardAdminFallbackRoute(location.pathname), { replace: true });
+  };
+
+  useEffect(() => {
+    recordInAppNavigation(currentRouteKey);
+  }, [currentRouteKey]);
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -640,7 +682,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8">{children}</div>
+        <div className="max-w-4xl mx-auto px-6 py-8">
+          {showGlobalBackButton && (
+            <div className="mb-5">
+              <button
+                type="button"
+                onClick={handleGlobalBack}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+                aria-label="Go back to previous page"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </button>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );

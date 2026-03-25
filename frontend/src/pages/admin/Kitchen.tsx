@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import OrderCard from "@/components/shared/OrderCard";
@@ -67,7 +66,6 @@ interface KitchenDashboardProps {
 }
 
 function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
-  const navigate = useNavigate();
   const canAccessKitchen = Boolean(restaurantId);
 
   const [orders, setOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
@@ -268,13 +266,6 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
     <div className="space-y-6">
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="rounded-md bg-slate-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
-          >
-            Back
-          </button>
           <div className="flex items-center gap-2 text-xs">
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold ${

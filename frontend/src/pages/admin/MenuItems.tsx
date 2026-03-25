@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
@@ -56,7 +56,6 @@ const EMPTY_FORM: FormData = {
 };
 
 export default function MenuItems() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const [items, setItems] = useState<Item[]>([]);
@@ -395,12 +394,6 @@ export default function MenuItems() {
   return (
     <DashboardLayout>
       <div className="mb-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="mb-3 px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 transition-colors"
-        >
-          Back
-        </button>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Menu Items</h1>
           <button

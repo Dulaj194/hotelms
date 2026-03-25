@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, UploadCloud } from "lucide-react";
+import { CalendarDays, UploadCloud } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
@@ -353,14 +353,6 @@ export default function OfferFormPage() {
         {offersEnabled && !loading && !pageError && (
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 p-6">
-              <button
-                type="button"
-                onClick={() => navigate("/admin/offers")}
-                className="mb-4 inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Back
-              </button>
               <h1 className="text-2xl font-bold text-slate-900">
                 {isEditMode ? "Edit Special Offer" : "Add New Offer"}
               </h1>
