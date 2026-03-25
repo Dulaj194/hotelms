@@ -88,11 +88,11 @@ export default function AllRoomQRCodes() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="app-page-stack mx-auto max-w-6xl">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">All Room QR Codes</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="app-page-title text-gray-900">All Room QR Codes</h1>
+          <p className="app-muted-text mt-1 text-gray-500">
             View and manage generated room QR codes for operations.
           </p>
         </div>
@@ -100,14 +100,14 @@ export default function AllRoomQRCodes() {
           <button
             onClick={() => void loadRoomQRCodes()}
             disabled={loading || working}
-            className="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            className="app-btn-base border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
           >
             Refresh
           </button>
           <button
             onClick={() => void handleDeleteAll()}
             disabled={loading || working || qrcodes.length === 0}
-            className="px-3 py-2 text-sm font-semibold text-red-700 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
+            className="app-btn-base border border-red-200 bg-white text-red-700 hover:bg-red-50"
           >
             Delete All
           </button>
@@ -134,8 +134,8 @@ export default function AllRoomQRCodes() {
 
       <div className="bg-white border rounded-xl p-6">
         <div className="flex items-center justify-between gap-2 mb-4">
-          <h2 className="text-base font-semibold text-gray-900">Generated Room QRs</h2>
-          <p className="text-sm text-gray-500">{qrcodes.length} total</p>
+          <h2 className="app-section-title text-gray-900">Generated Room QRs</h2>
+          <p className="app-muted-text text-gray-500">{qrcodes.length} total</p>
         </div>
 
         {loading ? (
@@ -161,21 +161,21 @@ export default function AllRoomQRCodes() {
                       href={`${API_ORIGIN}${qr.qr_image_url}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-3 py-1.5 text-xs border rounded hover:bg-white transition-colors"
+                      className="app-btn-compact border border-gray-300 bg-white text-gray-700 hover:bg-white"
                     >
                       Open
                     </a>
                     <a
                       href={`${API_ORIGIN}${qr.qr_image_url}`}
                       download
-                      className="px-3 py-1.5 text-xs bg-gray-900 text-white rounded hover:bg-black transition-colors"
+                      className="app-btn-compact bg-gray-900 text-white hover:bg-black"
                     >
                       Download
                     </a>
                     <button
                       onClick={() => void handleDeleteSingle(qr.target_number)}
                       disabled={working}
-                      className="px-3 py-1.5 text-xs text-red-700 border border-red-200 rounded hover:bg-red-50 disabled:opacity-50"
+                      className="app-btn-compact border border-red-200 text-red-700 hover:bg-red-50"
                     >
                       Delete
                     </button>

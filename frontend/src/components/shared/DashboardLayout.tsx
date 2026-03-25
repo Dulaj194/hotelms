@@ -789,13 +789,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main content */}
       <main className="h-screen overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 py-8 sm:px-6">
+        <div className="app-content-container py-8">
           {showGlobalBackButton && (
             <div className="mb-5">
               <button
                 type="button"
                 onClick={handleGlobalBack}
-                className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
+                className="app-btn-ghost"
                 aria-label="Go back to previous page"
               >
                 <ArrowLeft className="h-4 w-4" />

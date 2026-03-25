@@ -216,15 +216,15 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-5xl mx-auto">
-          <h1 className="text-xl font-bold text-gray-900">Housekeeping Workflow</h1>
-          <p className="text-sm text-gray-500 mt-1">
+        <div className="app-content-container mx-auto max-w-6xl">
+          <h1 className="app-page-title text-gray-900">Housekeeping Workflow</h1>
+          <p className="app-muted-text mt-1 text-gray-500">
             Supervisor approval and checklist completion are mandatory.
           </p>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-5 space-y-4">
+      <main className="app-content-container mx-auto max-w-6xl space-y-4 py-5 sm:space-y-5">
         {summary && (
           <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <MetricCard label="Rooms Ready" value={summary.rooms_cleaned} />
@@ -241,7 +241,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                className={`app-btn-compact rounded-none border-0 px-4 ${
                   tab === key ? "bg-orange-500 text-white" : "text-gray-600 hover:bg-gray-50"
                 }`}
               >
@@ -252,7 +252,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700"
+            className="app-body-text rounded-lg border border-gray-200 bg-white px-3 py-2 text-gray-700"
           >
             {REQUEST_TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -262,7 +262,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
           </select>
           <button
             onClick={() => void loadRequests()}
-            className="ml-auto text-xs text-gray-600 border border-gray-200 rounded px-3 py-2 hover:bg-gray-50"
+            className="app-btn-compact ml-auto border border-gray-200 text-gray-600 hover:bg-gray-50"
           >
             Refresh
           </button>
@@ -307,7 +307,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                     )}
                   </div>
 
-                  <p className="text-sm text-gray-700">{req.message}</p>
+                  <p className="app-body-text text-gray-700">{req.message}</p>
 
                   {req.audio_url && (
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-2">
@@ -363,7 +363,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                               [req.id]: Number(e.target.value),
                             }))
                           }
-                          className="text-xs border rounded px-2 py-1"
+                          className="app-muted-text rounded border border-gray-300 px-2 py-1"
                         >
                           <option value="">Select housekeeper</option>
                           {staff.map((member) => (
@@ -382,7 +382,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                             })
                           }
                           disabled={busyId === req.id}
-                          className="px-3 py-1.5 text-xs font-semibold rounded border border-blue-200 text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                          className="app-btn-compact border border-blue-200 text-blue-700 hover:bg-blue-50"
                         >
                           Assign
                         </button>
@@ -397,7 +397,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                           })
                         }
                         disabled={busyId === req.id}
-                        className="px-3 py-1.5 text-xs font-semibold rounded border border-violet-200 text-violet-700 hover:bg-violet-50 disabled:opacity-60"
+                        className="app-btn-compact border border-violet-200 text-violet-700 hover:bg-violet-50"
                       >
                         Claim
                       </button>
@@ -411,7 +411,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                           })
                         }
                         disabled={busyId === req.id}
-                        className="px-3 py-1.5 text-xs font-semibold rounded bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60"
+                        className="app-btn-compact bg-orange-500 text-white hover:bg-orange-600"
                       >
                         Start
                       </button>
@@ -426,7 +426,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                           })
                         }
                         disabled={busyId === req.id}
-                        className="px-3 py-1.5 text-xs font-semibold rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+                        className="app-btn-compact bg-green-600 text-white hover:bg-green-700"
                       >
                         Submit for Inspection
                       </button>
@@ -442,7 +442,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                             })
                           }
                           disabled={busyId === req.id}
-                          className="px-3 py-1.5 text-xs font-semibold rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+                          className="app-btn-compact bg-green-600 text-white hover:bg-green-700"
                         >
                           Approve Ready
                         </button>
@@ -454,7 +454,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                             })
                           }
                           disabled={busyId === req.id}
-                          className="px-3 py-1.5 text-xs font-semibold rounded border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                          className="app-btn-compact border border-amber-200 text-amber-700 hover:bg-amber-50"
                         >
                           Send Rework
                         </button>
@@ -473,7 +473,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                           })
                         }
                         disabled={busyId === req.id}
-                        className="px-3 py-1.5 text-xs font-semibold rounded border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60"
+                        className="app-btn-compact border border-red-200 text-red-700 hover:bg-red-50"
                       >
                         Block + Ticket
                       </button>
@@ -491,7 +491,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                           })
                         }
                         disabled={busyId === req.id}
-                        className="px-3 py-1.5 text-xs font-semibold rounded border border-teal-200 text-teal-700 hover:bg-teal-50 disabled:opacity-60"
+                        className="app-btn-compact border border-teal-200 text-teal-700 hover:bg-teal-50"
                       >
                         Resolve Ticket
                       </button>
@@ -504,7 +504,7 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                         })
                       }
                       disabled={busyId === req.id}
-                      className="ml-auto px-3 py-1.5 text-xs font-semibold rounded border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                      className="app-btn-compact ml-auto border border-slate-200 text-slate-600 hover:bg-slate-50"
                     >
                       Delete
                     </button>
@@ -522,17 +522,17 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
 function MetricCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl border bg-white p-3">
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className="text-lg font-semibold text-gray-900">{value}</p>
+      <p className="app-muted-text text-gray-500">{label}</p>
+      <p className="text-lg font-semibold text-gray-900 md:text-xl">{value}</p>
     </div>
   );
 }
 
 function ErrorBox({ message, onClose }: { message: string; onClose: () => void }) {
   return (
-    <div className="bg-red-50 border border-red-200 text-sm text-red-700 px-4 py-2 rounded-lg flex justify-between">
-      <span>{message}</span>
-      <button onClick={onClose} className="ml-2 font-bold">
+    <div className="app-body-text flex justify-between rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-red-700">
+      <span className="pr-2">{message}</span>
+      <button onClick={onClose} className="app-btn-compact border border-red-200 text-red-700 hover:bg-red-100">
         x
       </button>
     </div>

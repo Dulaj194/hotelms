@@ -90,18 +90,18 @@ export default function GenerateRoomQRCodes() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="app-page-stack mx-auto max-w-6xl">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Generate Room QR Codes</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="app-page-title text-gray-900">Generate Room QR Codes</h1>
+          <p className="app-muted-text mt-1 text-gray-500">
             Create or reuse room QR codes in bulk for onboarding and daily operations.
           </p>
         </div>
         <button
           onClick={() => void loadRooms()}
           disabled={loading || working}
-          className="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          className="app-btn-base border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
         >
           Refresh Rooms
         </button>
@@ -119,8 +119,8 @@ export default function GenerateRoomQRCodes() {
       <div className="bg-white border rounded-xl p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Room Selection</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="app-section-title text-gray-900">Room Selection</h2>
+            <p className="app-muted-text mt-1 text-gray-500">
               Selected {selectedCount} of {selectableCount} active room(s).
             </p>
           </div>
@@ -128,21 +128,21 @@ export default function GenerateRoomQRCodes() {
             <button
               onClick={() => setSelectedRooms(activeRoomNumbers)}
               disabled={loading || working || activeRoomNumbers.length === 0}
-              className="px-3 py-2 text-xs border rounded hover:bg-gray-50 disabled:opacity-50"
+              className="app-btn-compact border border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               Select All Active
             </button>
             <button
               onClick={() => setSelectedRooms([])}
               disabled={loading || working || selectedRooms.length === 0}
-              className="px-3 py-2 text-xs border rounded hover:bg-gray-50 disabled:opacity-50"
+              className="app-btn-compact border border-gray-300 text-gray-700 hover:bg-gray-50"
             >
               Clear
             </button>
             <button
               onClick={() => void handleGenerate()}
               disabled={loading || working || selectedRooms.length === 0}
-              className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors"
+              className="app-btn-base bg-orange-500 text-white hover:bg-orange-600"
             >
               {working ? "Generating..." : "Generate QR Codes"}
             </button>
@@ -205,8 +205,8 @@ export default function GenerateRoomQRCodes() {
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Generated QRs</h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <h2 className="app-section-title text-gray-900">Generated QRs</h2>
+              <p className="app-muted-text mt-1 text-gray-500">
                 {result.count} room QR code{result.count !== 1 ? "s" : ""} ready.
               </p>
             </div>
@@ -234,14 +234,14 @@ export default function GenerateRoomQRCodes() {
                       href={`${API_ORIGIN}${qr.qr_image_url}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-3 py-1.5 text-xs border rounded hover:bg-white transition-colors"
+                      className="app-btn-compact border border-gray-300 bg-white text-gray-700 hover:bg-white"
                     >
                       Open
                     </a>
                     <a
                       href={`${API_ORIGIN}${qr.qr_image_url}`}
                       download
-                      className="px-3 py-1.5 text-xs bg-gray-900 text-white rounded hover:bg-black transition-colors"
+                      className="app-btn-compact bg-gray-900 text-white hover:bg-black"
                     >
                       Download
                     </a>

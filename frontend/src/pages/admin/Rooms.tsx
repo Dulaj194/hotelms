@@ -138,11 +138,11 @@ export default function Rooms() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-4xl mx-auto">
+      <div className="app-page-stack mx-auto max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="app-page-title text-gray-900">Rooms</h1>
+          <p className="app-muted-text mt-1 text-gray-500">
             {canManageRooms
               ? "Manage hotel rooms for your restaurant."
               : "View room inventory for housekeeping operations."}
@@ -151,7 +151,7 @@ export default function Rooms() {
         {canManageRooms && (
           <button
             onClick={openCreate}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors"
+            className="app-btn-base bg-orange-500 text-white hover:bg-orange-600"
           >
             + Add Room
           </button>
@@ -207,14 +207,14 @@ export default function Rooms() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => openEdit(room)}
-                          className="px-2 py-1 text-xs border rounded hover:bg-gray-100 transition-colors"
+                          className="app-btn-compact border border-gray-200 text-gray-700 hover:bg-gray-100"
                           title="Edit room"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => void handleToggleActive(room)}
-                          className={`px-2 py-1 text-xs border rounded transition-colors ${
+                          className={`app-btn-compact border ${
                             room.is_active
                               ? "hover:bg-orange-50 border-orange-200 text-orange-600"
                               : "hover:bg-green-50 border-green-200 text-green-600"
@@ -225,7 +225,7 @@ export default function Rooms() {
                         </button>
                         <button
                           onClick={() => setDeleteTarget(room)}
-                          className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 transition-colors"
+                          className="app-btn-compact border border-red-200 text-red-600 hover:bg-red-50"
                           title="Delete room"
                         >
                           Delete
@@ -245,13 +245,13 @@ export default function Rooms() {
       {canManageRooms && modalOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold mb-4">
+            <h2 className="app-section-title mb-4 text-gray-900">
               {editingRoom ? `Edit Room ${editingRoom.room_number}` : "Add Room"}
             </h2>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="app-muted-text mb-1 block font-medium text-gray-700">
                   Room Number <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -266,7 +266,9 @@ export default function Rooms() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Room Name (optional)</label>
+                <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                  Room Name (optional)
+                </label>
                 <input
                   type="text"
                   value={formData.room_name ?? ""}
@@ -282,7 +284,9 @@ export default function Rooms() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Floor Number (optional)</label>
+                <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                  Floor Number (optional)
+                </label>
                 <input
                   type="number"
                   min={0}
@@ -305,14 +309,14 @@ export default function Rooms() {
               <button
                 onClick={() => void handleSave()}
                 disabled={saving}
-                className="flex-1 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 transition-colors disabled:opacity-60"
+                className="app-btn-base flex-1 bg-orange-500 text-white hover:bg-orange-600"
               >
                 {saving ? "Saving..." : editingRoom ? "Save Changes" : "Create Room"}
               </button>
               <button
                 onClick={() => setModalOpen(false)}
                 disabled={saving}
-                className="flex-1 py-2 border rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                className="app-btn-base flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
@@ -324,7 +328,7 @@ export default function Rooms() {
       {canManageRooms && deleteTarget && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h2 className="text-lg font-semibold mb-2">Delete Room?</h2>
+            <h2 className="app-section-title mb-2 text-gray-900">Delete Room?</h2>
             <p className="text-sm text-gray-600 mb-6">
               Are you sure you want to delete Room <span className="font-semibold">{deleteTarget.room_number}</span>?
               This action cannot be undone.
@@ -333,14 +337,14 @@ export default function Rooms() {
               <button
                 onClick={() => void handleConfirmDelete()}
                 disabled={deleting}
-                className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-60"
+                className="app-btn-base flex-1 bg-red-600 text-white hover:bg-red-700"
               >
                 {deleting ? "Deleting..." : "Delete"}
               </button>
               <button
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleting}
-                className="flex-1 py-2 border rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                className="app-btn-base flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>

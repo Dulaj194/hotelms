@@ -53,10 +53,10 @@ export default function Tables() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <div className="app-page-stack mx-auto max-w-6xl">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Table QR Codes</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="app-page-title text-gray-900">Table QR Codes</h1>
+        <p className="app-muted-text mt-1 text-gray-500">
           Generate guest QR codes for restaurant tables. Each code opens the table menu directly.
         </p>
       </div>
@@ -72,8 +72,8 @@ export default function Tables() {
 
       <div className="bg-white border rounded-xl p-6 space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Bulk Generate</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="app-section-title text-gray-900">Bulk Generate</h2>
+          <p className="app-muted-text mt-1 text-gray-500">
             Generate or reuse QR codes for a continuous table range.
           </p>
         </div>
@@ -102,7 +102,7 @@ export default function Tables() {
           <button
             onClick={handleGenerate}
             disabled={working}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors"
+            className="app-btn-base bg-orange-500 text-white hover:bg-orange-600"
           >
             {working ? "Generating..." : "Generate QR Codes"}
           </button>
@@ -113,8 +113,8 @@ export default function Tables() {
         <div className="bg-white border rounded-xl p-6 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Generated QRs</h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <h2 className="app-section-title text-gray-900">Generated QRs</h2>
+              <p className="app-muted-text mt-1 text-gray-500">
                 {result.count} table QR code{result.count !== 1 ? "s" : ""} ready.
               </p>
             </div>
@@ -142,14 +142,14 @@ export default function Tables() {
                       href={`${API_ORIGIN}${qr.qr_image_url}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-3 py-1.5 text-xs border rounded hover:bg-white transition-colors"
+                      className="app-btn-compact border border-gray-300 bg-white text-gray-700 hover:bg-white"
                     >
                       Open
                     </a>
                     <a
                       href={`${API_ORIGIN}${qr.qr_image_url}`}
                       download
-                      className="px-3 py-1.5 text-xs bg-gray-900 text-white rounded hover:bg-black transition-colors"
+                      className="app-btn-compact bg-gray-900 text-white hover:bg-black"
                     >
                       Download
                     </a>
