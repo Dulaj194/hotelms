@@ -320,10 +320,83 @@ def delete_request_by_restaurant(
     *,
     request_id: int,
     restaurant_id: int,
-) -> bool:
+) -> HousekeepingRequest | None:
     req = get_request_by_id_and_restaurant(db, request_id, restaurant_id)
     if req is None:
-        return False
+        return None
     db.delete(req)
     db.commit()
-    return True
+    return req
+
+
+def delete_request_by_session(
+    db: Session,
+    *,
+    request_id: int,
+    restaurant_id: int,
+    room_session_id: str,
+) -> HousekeepingRequest | None:
+    req = get_request_by_id_and_session(
+        db,
+        request_id=request_id,
+        restaurant_id=restaurant_id,
+        room_session_id=room_session_id,
+    )
+    if req is None:
+        return None
+    db.delete(req)
+    db.commit()
+    return req
+
+
+def count_pending_requests(
+    db: Session,
+    *,
+    restaurant_id: int,
+) -> int:
+    pending_count = (
+        db.query(func.count(HousekeepingRequest.id))
+        .filter(
+            HousekeepingRequest.restaurant_id == restaurant_id,
+            HousekeepingRequest.status.notin_(["ready", "cancelled", "done"]),
+        )
+        .scalar()
+        or 0
+    )
+    return int(pending_count)
+
+
+def list_expired_requests_for_cleanup(
+    db: Session,
+    *,
+    restaurant_id: int,
+    cutoff_dt: datetime,
+) -> list[HousekeepingRequest]:
+    return (
+        db.query(HousekeepingRequest)
+        .filter(
+            HousekeepingRequest.restaurant_id == restaurant_id,
+            HousekeepingRequest.created_at < cutoff_dt,
+        )
+        .all()
+    )
+
+
+def delete_requests_by_ids(
+    db: Session,
+    *,
+    restaurant_id: int,
+    request_ids: list[int],
+) -> int:
+    if not request_ids:
+        return 0
+    deleted = (
+        db.query(HousekeepingRequest)
+        .filter(
+            HousekeepingRequest.restaurant_id == restaurant_id,
+            HousekeepingRequest.id.in_(request_ids),
+        )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return int(deleted)

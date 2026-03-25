@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -21,8 +21,10 @@ import {
   Users,
   UtensilsCrossed,
 } from "lucide-react";
+import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
+import type { HousekeepingPendingCountResponse } from "@/types/housekeeping";
 
 interface NavItem {
   path: string;
@@ -37,6 +39,42 @@ interface MenuSubItem {
   label: string;
   icon: ComponentType<{ className?: string }>;
   roles?: string[];
+}
+
+type SidebarGroupState = {
+  menusOpen: boolean;
+  kitchenOpen: boolean;
+  qrOpen: boolean;
+  housekeepingOpen: boolean;
+  offersOpen: boolean;
+};
+
+const SIDEBAR_GROUPS_STORAGE_KEY = "hotelms.sidebar.groups";
+const DEFAULT_SIDEBAR_GROUP_STATE: SidebarGroupState = {
+  menusOpen: true,
+  kitchenOpen: true,
+  qrOpen: true,
+  housekeepingOpen: true,
+  offersOpen: true,
+};
+
+function loadSidebarGroupState(): SidebarGroupState {
+  if (typeof window === "undefined") return DEFAULT_SIDEBAR_GROUP_STATE;
+  try {
+    const raw = window.localStorage.getItem(SIDEBAR_GROUPS_STORAGE_KEY);
+    if (!raw) return DEFAULT_SIDEBAR_GROUP_STATE;
+    const parsed = JSON.parse(raw) as Partial<SidebarGroupState>;
+    return {
+      menusOpen: parsed.menusOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.menusOpen,
+      kitchenOpen: parsed.kitchenOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.kitchenOpen,
+      qrOpen: parsed.qrOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.qrOpen,
+      housekeepingOpen:
+        parsed.housekeepingOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.housekeepingOpen,
+      offersOpen: parsed.offersOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.offersOpen,
+    };
+  } catch {
+    return DEFAULT_SIDEBAR_GROUP_STATE;
+  }
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -103,12 +141,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const user = getUser();
   const role = normalizeRole(user?.role);
-  const { loading: privilegesLoading, hasPrivilege } = useSubscriptionPrivileges();
-  const [menusOpen, setMenusOpen] = useState(true);
-  const [kitchenOpen, setKitchenOpen] = useState(true);
-  const [qrOpen, setQrOpen] = useState(true);
-  const [housekeepingOpen, setHousekeepingOpen] = useState(true);
-  const [offersOpen, setOffersOpen] = useState(true);
+  const { loading: privilegesLoading, hasPrivilege, privileges } = useSubscriptionPrivileges();
+  const [groupState, setGroupState] = useState<SidebarGroupState>(() =>
+    loadSidebarGroupState()
+  );
+  const [housekeepingPendingCount, setHousekeepingPendingCount] = useState(0);
+
+  const { menusOpen, kitchenOpen, qrOpen, housekeepingOpen, offersOpen } = groupState;
 
   const menuSubItems: MenuSubItem[] = useMemo(
     () => [
@@ -192,6 +231,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const isQrGroupVisible = role === "owner" || role === "admin";
   const isQrGroupActive = qrPaths.some((path) => location.pathname === path);
   const isHousekeepingGroupVisible = visibleHousekeepingSubItems.length > 0;
+  const hasHousekeepingPrivilege =
+    role === "housekeeper" || privileges.includes("HOUSEKEEPING");
   const isHousekeepingGroupActive = housekeepingPaths.some((path) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
@@ -214,6 +255,91 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
   );
 
+  const toggleGroup = (group: keyof SidebarGroupState) => {
+    setGroupState((prev) => ({ ...prev, [group]: !prev[group] }));
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(SIDEBAR_GROUPS_STORAGE_KEY, JSON.stringify(groupState));
+  }, [groupState]);
+
+  useEffect(() => {
+    setGroupState((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      if (isMenuGroupVisible && isMenuGroupActive && !next.menusOpen) {
+        next.menusOpen = true;
+        changed = true;
+      }
+      if (isKitchenGroupVisible && isKitchenGroupActive && !next.kitchenOpen) {
+        next.kitchenOpen = true;
+        changed = true;
+      }
+      if (isQrGroupVisible && isQrGroupActive && !next.qrOpen) {
+        next.qrOpen = true;
+        changed = true;
+      }
+      if (
+        isHousekeepingGroupVisible &&
+        isHousekeepingGroupActive &&
+        !next.housekeepingOpen
+      ) {
+        next.housekeepingOpen = true;
+        changed = true;
+      }
+      if (isOfferGroupVisible && isOfferGroupActive && !next.offersOpen) {
+        next.offersOpen = true;
+        changed = true;
+      }
+
+      return changed ? next : prev;
+    });
+  }, [
+    isHousekeepingGroupActive,
+    isHousekeepingGroupVisible,
+    isKitchenGroupActive,
+    isKitchenGroupVisible,
+    isMenuGroupActive,
+    isMenuGroupVisible,
+    isOfferGroupActive,
+    isOfferGroupVisible,
+    isQrGroupActive,
+    isQrGroupVisible,
+  ]);
+
+  useEffect(() => {
+    if (!isHousekeepingGroupVisible || privilegesLoading || !hasHousekeepingPrivilege) {
+      setHousekeepingPendingCount(0);
+      return;
+    }
+
+    let active = true;
+    const loadPendingCount = async () => {
+      try {
+        const data = await api.get<HousekeepingPendingCountResponse>("/housekeeping/pending-count");
+        if (active) {
+          setHousekeepingPendingCount(data.pending_count);
+        }
+      } catch {
+        if (active) {
+          setHousekeepingPendingCount(0);
+        }
+      }
+    };
+
+    void loadPendingCount();
+    const timer = window.setInterval(() => {
+      void loadPendingCount();
+    }, 60000);
+
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [hasHousekeepingPrivilege, isHousekeepingGroupVisible, privilegesLoading]);
+
   function handleLogout() {
     clearAuth();
     navigate("/login", { replace: true });
@@ -234,7 +360,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="mb-1">
               <button
                 type="button"
-                onClick={() => setMenusOpen((prev) => !prev)}
+                onClick={() => toggleGroup("menusOpen")}
+                aria-expanded={menusOpen}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
                   isMenuGroupActive
                     ? "bg-slate-700 text-white"
@@ -279,14 +406,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="mb-1">
               <button
                 type="button"
-                onClick={() => {
-                  if (!isKitchenGroupActive) {
-                    setKitchenOpen(true);
-                    navigate("/admin/kitchen/orders");
-                    return;
-                  }
-                  setKitchenOpen((prev) => !prev);
-                }}
+                onClick={() => toggleGroup("kitchenOpen")}
+                aria-expanded={kitchenOpen}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
                   isKitchenGroupActive
                     ? "bg-slate-700 text-white"
@@ -333,14 +454,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="mb-1">
               <button
                 type="button"
-                onClick={() => {
-                  if (!isQrGroupActive) {
-                    setQrOpen(true);
-                    navigate("/admin/tables");
-                    return;
-                  }
-                  setQrOpen((prev) => !prev);
-                }}
+                onClick={() => toggleGroup("qrOpen")}
+                aria-expanded={qrOpen}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
                   isQrGroupActive
                     ? "bg-slate-700 text-white"
@@ -387,14 +502,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="mb-1">
               <button
                 type="button"
-                onClick={() => {
-                  if (!isHousekeepingGroupActive && visibleHousekeepingSubItems.length > 0) {
-                    setHousekeepingOpen(true);
-                    navigate(visibleHousekeepingSubItems[0].path);
-                    return;
-                  }
-                  setHousekeepingOpen((prev) => !prev);
-                }}
+                onClick={() => toggleGroup("housekeepingOpen")}
+                aria-expanded={housekeepingOpen}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
                   isHousekeepingGroupActive
                     ? "bg-slate-700 text-white"
@@ -405,6 +514,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <Handshake className="h-4 w-4 mr-2 shrink-0" />
                   Housekeeping
                 </span>
+                {housekeepingPendingCount > 0 && (
+                  <span className="ml-auto mr-2 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-orange-500 text-white text-[11px] font-semibold">
+                    {housekeepingPendingCount}
+                  </span>
+                )}
                 <ChevronDown
                   className={`h-4 w-4 transition-transform ${housekeepingOpen ? "rotate-180" : ""}`}
                 />
@@ -426,7 +540,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         }`}
                       >
                         <SubIcon className="h-4 w-4 mr-2 shrink-0" />
-                        {subItem.label}
+                        <span>{subItem.label}</span>
+                        {subItem.path === "/admin/housekeeping" && housekeepingPendingCount > 0 && (
+                          <span className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-orange-500 text-white text-[11px] font-semibold">
+                            {housekeepingPendingCount}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
@@ -460,7 +579,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="mt-2 mb-1">
               <button
                 type="button"
-                onClick={() => setOffersOpen((prev) => !prev)}
+                onClick={() => toggleGroup("offersOpen")}
+                aria-expanded={offersOpen}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
                   isOfferGroupActive
                     ? "bg-slate-700 text-white"

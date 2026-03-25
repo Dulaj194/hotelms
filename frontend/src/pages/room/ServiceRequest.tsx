@@ -6,11 +6,11 @@ import { createSessionRequest } from "@/lib/sessionRequest";
 import {
   REQUEST_TYPE_LABELS,
   REQUEST_TYPES,
+  type HousekeepingAudioUploadResponse,
   type HousekeepingRequestCreateResponse,
   type HousekeepingRequestListResponse,
   type HousekeepingRequestResponse,
   type HousekeepingRequestStatus,
-  type HousekeepingRequestStatusResponse,
   type HousekeepingRequestType,
 } from "@/types/housekeeping";
 
@@ -45,6 +45,8 @@ export default function ServiceRequest() {
   const [requestDate, setRequestDate] = useState("");
   const [requestTime, setRequestTime] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,13 @@ export default function ServiceRequest() {
     void loadMyRequests();
   }, [loadMyRequests]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadMyRequests();
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [loadMyRequests]);
+
   if (!token) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
@@ -93,6 +102,27 @@ export default function ServiceRequest() {
       </div>
     );
   }
+
+  const handleAudioUpload = async () => {
+    if (!audioFile) {
+      setError("Please select an audio file first.");
+      return;
+    }
+    setUploadingAudio(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const form = new FormData();
+      form.append("file", audioFile);
+      const result = await roomRequest<HousekeepingAudioUploadResponse>("POST", "/housekeeping/audio", form);
+      setAudioUrl(result.audio_url);
+      setSuccess("Audio note uploaded.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload audio note.");
+    } finally {
+      setUploadingAudio(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,6 +174,7 @@ export default function ServiceRequest() {
       setRequestDate("");
       setRequestTime("");
       setAudioUrl("");
+      setAudioFile(null);
       await loadMyRequests();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit request.");
@@ -153,10 +184,13 @@ export default function ServiceRequest() {
   };
 
   const handleCancel = async (requestId: number) => {
+    const confirmed = window.confirm("Cancel this pending request?");
+    if (!confirmed) return;
+
     setCancellingId(requestId);
     setRequestsError(null);
     try {
-      await roomRequest<HousekeepingRequestStatusResponse>("PATCH", `/housekeeping/${requestId}/cancel`, {});
+      await roomRequest<{ message: string }>("DELETE", `/housekeeping/my-requests/${requestId}`);
       await loadMyRequests();
     } catch (err) {
       setRequestsError(err instanceof Error ? err.message : "Failed to cancel request.");
@@ -288,24 +322,36 @@ export default function ServiceRequest() {
                 />
               </div>
               <div>
-                <label htmlFor="audioUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                  Audio Note URL (optional)
+                <label htmlFor="audioFile" className="block text-sm font-medium text-gray-700 mb-1">
+                  Voice Note (optional)
                 </label>
-                <input
-                  id="audioUrl"
-                  type="url"
-                  value={audioUrl}
-                  onChange={(e) => setAudioUrl(e.target.value)}
-                  placeholder="https://..."
-                  maxLength={500}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
+                <div className="space-y-2">
+                  <input
+                    id="audioFile"
+                    type="file"
+                    accept="audio/*"
+                    onChange={(e) => setAudioFile(e.target.files?.[0] ?? null)}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleAudioUpload()}
+                      disabled={!audioFile || uploadingAudio}
+                      className="px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {uploadingAudio ? "Uploading..." : "Upload Voice"}
+                    </button>
+                    {audioUrl && <span className="text-xs text-green-700">Voice note ready</span>}
+                  </div>
+                  {audioUrl && <audio controls src={audioUrl} className="w-full h-10" />}
+                </div>
               </div>
             </div>
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || uploadingAudio}
               className="w-full py-3.5 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-60 text-sm"
             >
               {submitting ? "Sending..." : "Send Request"}
@@ -353,17 +399,10 @@ export default function ServiceRequest() {
                     {req.done_at && <p>Done: {formatDateTime(req.done_at)}</p>}
                     {req.cancelled_at && <p>Cancelled: {formatDateTime(req.cancelled_at)}</p>}
                     {req.audio_url && (
-                      <p>
-                        Audio:{" "}
-                        <a
-                          href={req.audio_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-600 hover:underline break-all"
-                        >
-                          Open
-                        </a>
-                      </p>
+                      <div className="space-y-1">
+                        <p>Voice Note:</p>
+                        <audio controls src={req.audio_url} className="w-full h-10" />
+                      </div>
                     )}
                   </div>
                   {(req.status === "pending" || req.status === "pending_assignment" || req.status === "assigned") && (

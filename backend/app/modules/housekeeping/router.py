@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import (
@@ -18,6 +18,7 @@ from app.core.dependencies import (
 from app.modules.housekeeping import service
 from app.modules.housekeeping.schemas import (
     GenericMessageResponse,
+    HousekeepingAudioUploadResponse,
     HousekeepingAssignRequest,
     HousekeepingBlockRequest,
     HousekeepingChecklistUpdateRequest,
@@ -25,6 +26,7 @@ from app.modules.housekeeping.schemas import (
     HousekeepingInspectRequest,
     HousekeepingManualTaskCreateRequest,
     HousekeepingPendingListResponse,
+    HousekeepingPendingCountResponse,
     HousekeepingRequestCreateRequest,
     HousekeepingRequestCreateResponse,
     HousekeepingRequestListResponse,
@@ -62,6 +64,15 @@ def list_my_requests(
     return service.list_my_requests(db, session)
 
 
+@router.post("/audio", response_model=HousekeepingAudioUploadResponse)
+async def upload_housekeeping_audio(
+    file: UploadFile = File(...),
+    session: RoomSession = Depends(get_current_room_session),
+    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
+) -> HousekeepingAudioUploadResponse:
+    return await service.upload_audio_note(room_session=session, file=file)
+
+
 @router.patch("/{request_id}/cancel", response_model=HousekeepingRequestStatusResponse)
 def cancel_my_request(
     request_id: int,
@@ -70,6 +81,17 @@ def cancel_my_request(
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestStatusResponse:
     return service.cancel_my_request(db, request_id=request_id, room_session=session)
+
+
+@router.delete("/my-requests/{request_id}", response_model=GenericMessageResponse)
+def delete_my_request(
+    request_id: int,
+    session: RoomSession = Depends(get_current_room_session),
+    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
+    db: Session = Depends(get_db),
+) -> GenericMessageResponse:
+    service.delete_my_request(db, request_id=request_id, room_session=session)
+    return GenericMessageResponse(message="Housekeeping request cancelled.")
 
 
 @router.post("/manual", response_model=HousekeepingRequestCreateResponse, status_code=201)
@@ -112,6 +134,16 @@ def get_pending_list(
     db: Session = Depends(get_db),
 ) -> HousekeepingPendingListResponse:
     return service.get_pending_list(db, restaurant_id=restaurant_id)
+
+
+@router.get("/pending-count", response_model=HousekeepingPendingCountResponse)
+def get_pending_count(
+    _=Depends(require_roles(*_HK_ROLES)),
+    __=Depends(require_privilege("HOUSEKEEPING")),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+) -> HousekeepingPendingCountResponse:
+    return service.get_pending_count(db, restaurant_id=restaurant_id)
 
 
 @router.get("/reports/staff-performance", response_model=HousekeepingStaffPerformanceResponse)

@@ -208,3 +208,12 @@ export interface HousekeepingStaffPerformanceResponse {
   date: string;
   staff: HousekeepingStaffPerformanceItem[];
 }
+
+export interface HousekeepingAudioUploadResponse {
+  audio_url: string;
+  message: string;
+}
+
+export interface HousekeepingPendingCountResponse {
+  pending_count: number;
+}

@@ -24,9 +24,11 @@ export function createSessionRequest(
     body?: unknown
   ): Promise<T> {
     const token = getToken();
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    const isFormData = body instanceof FormData;
+    const headers: Record<string, string> = {};
+    if (!isFormData) {
+      headers["Content-Type"] = "application/json";
+    }
     if (token) {
       headers[headerName] = token;
     }
@@ -34,7 +36,9 @@ export function createSessionRequest(
     const response = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
-      ...(body !== undefined && { body: JSON.stringify(body) }),
+      ...(body !== undefined && {
+        body: isFormData ? (body as FormData) : JSON.stringify(body),
+      }),
     });
 
     if (!response.ok) {

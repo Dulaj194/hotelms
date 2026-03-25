@@ -167,6 +167,14 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
     void loadSummary();
   }, [loadStaff, loadSummary]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadRequests();
+      if (supervisor) void loadSummary();
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [loadRequests, loadSummary, supervisor]);
+
   const filtered = useMemo(() => {
     return requests.filter((req) => {
       const status = req.status;
@@ -295,6 +303,13 @@ function HousekeepingDashboard({ role, userId }: { role: string; userId: number 
                   </div>
 
                   <p className="text-sm text-gray-700">{req.message}</p>
+
+                  {req.audio_url && (
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 p-2">
+                      <p className="text-xs text-gray-600 mb-1">Voice note</p>
+                      <audio controls src={req.audio_url} className="w-full h-10" />
+                    </div>
+                  )}
 
                   <div className="text-xs text-gray-500 flex flex-wrap gap-3">
                     <span>Assignee: {assigneeName}</span>

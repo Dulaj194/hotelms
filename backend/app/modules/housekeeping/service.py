@@ -5,9 +5,11 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import UTC, date, datetime, time, timedelta
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.file_storage import delete_uploaded_file, save_upload_file
 from app.modules.housekeeping import repository
 from app.modules.housekeeping.model import (
     HousekeepingChecklistItem,
@@ -17,12 +19,14 @@ from app.modules.housekeeping.model import (
     RequestPriority,
 )
 from app.modules.housekeeping.schemas import (
+    HousekeepingAudioUploadResponse,
     HousekeepingAssignRequest,
     HousekeepingBlockRequest,
     HousekeepingDailySummaryResponse,
     HousekeepingInspectRequest,
     HousekeepingMaintenanceTicketResponse,
     HousekeepingPendingListResponse,
+    HousekeepingPendingCountResponse,
     HousekeepingRequestCreateRequest,
     HousekeepingRequestCreateResponse,
     HousekeepingRequestListResponse,
@@ -65,6 +69,26 @@ CHECKLIST_TEMPLATES: dict[str, list[tuple[str, str, bool]]] = {
         ("request_verify", "Request reviewed", True),
         ("room_refresh", "Basic room refresh", True),
     ],
+}
+
+_HOUSEKEEPING_RETENTION_DAYS = 7
+_AUDIO_ALLOWED_CONTENT_TYPES = {
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/webm",
+    "audio/mp4",
+    "audio/x-m4a",
+}
+_AUDIO_EXT_MAP = {
+    "audio/mpeg": ".mp3",
+    "audio/mp3": ".mp3",
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav",
+    "audio/webm": ".webm",
+    "audio/mp4": ".m4a",
+    "audio/x-m4a": ".m4a",
 }
 
 
@@ -119,6 +143,33 @@ def _default_due_at(*, requested_for_at: datetime | None, priority: str) -> date
     if priority == "low":
         return now + timedelta(hours=4)
     return now + timedelta(hours=2)
+
+
+def _delete_attached_audio_if_local(audio_url: str | None) -> None:
+    if not audio_url:
+        return
+    delete_uploaded_file(upload_root=settings.upload_dir, public_path=audio_url)
+
+
+def _cleanup_old_requests_for_restaurant(db: Session, *, restaurant_id: int) -> int:
+    cutoff_dt = datetime.now(UTC) - timedelta(days=_HOUSEKEEPING_RETENTION_DAYS)
+    expired = repository.list_expired_requests_for_cleanup(
+        db,
+        restaurant_id=restaurant_id,
+        cutoff_dt=cutoff_dt,
+    )
+    if not expired:
+        return 0
+
+    for req in expired:
+        _delete_attached_audio_if_local(req.audio_url)
+
+    request_ids = [req.id for req in expired]
+    return repository.delete_requests_by_ids(
+        db,
+        restaurant_id=restaurant_id,
+        request_ids=request_ids,
+    )
 
 
 def _to_checklist_response(item: HousekeepingChecklistItem):
@@ -271,6 +322,8 @@ def submit_request(
     room_session: RoomSession,
     payload: HousekeepingRequestCreateRequest,
 ) -> HousekeepingRequestCreateResponse:
+    _cleanup_old_requests_for_restaurant(db, restaurant_id=room_session.restaurant_id)
+
     requested_for_at = _resolve_requested_for_at(payload)
     priority = _default_priority(payload.request_type)
     due_at = _default_due_at(requested_for_at=requested_for_at, priority=priority)
@@ -356,10 +409,28 @@ def submit_request(
     )
 
 
+async def upload_audio_note(
+    *,
+    room_session: RoomSession,
+    file: UploadFile,
+) -> HousekeepingAudioUploadResponse:
+    audio_url = await save_upload_file(
+        file=file,
+        upload_root=settings.upload_dir,
+        subdir="housekeeping-audio",
+        allowed_content_types=_AUDIO_ALLOWED_CONTENT_TYPES,
+        ext_map=_AUDIO_EXT_MAP,
+        max_size_mb=settings.max_upload_size_mb,
+    )
+    return HousekeepingAudioUploadResponse(audio_url=audio_url)
+
+
 def list_my_requests(
     db: Session,
     room_session: RoomSession,
 ) -> HousekeepingRequestListResponse:
+    _cleanup_old_requests_for_restaurant(db, restaurant_id=room_session.restaurant_id)
+
     reqs = repository.list_requests_by_session(
         db,
         restaurant_id=room_session.restaurant_id,
@@ -406,6 +477,39 @@ def cancel_my_request(
     return _to_status_response(req)
 
 
+def delete_my_request(
+    db: Session,
+    *,
+    request_id: int,
+    room_session: RoomSession,
+) -> None:
+    req = repository.get_request_by_id_and_session(
+        db,
+        request_id=request_id,
+        restaurant_id=room_session.restaurant_id,
+        room_session_id=room_session.session_id,
+    )
+    if req is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Housekeeping request not found.")
+
+    current_status = _normalize_status(req.status)
+    if current_status not in {"pending_assignment", "assigned"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Only pending requests can be cancelled (current: {current_status}).",
+        )
+
+    deleted_req = repository.delete_request_by_session(
+        db,
+        request_id=request_id,
+        restaurant_id=room_session.restaurant_id,
+        room_session_id=room_session.session_id,
+    )
+    if deleted_req is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Housekeeping request not found.")
+    _delete_attached_audio_if_local(deleted_req.audio_url)
+
+
 def list_requests(
     db: Session,
     restaurant_id: int,
@@ -416,6 +520,8 @@ def list_requests(
     priority: str | None = None,
     assigned_to_user_id: int | None = None,
 ) -> HousekeepingRequestListResponse:
+    _cleanup_old_requests_for_restaurant(db, restaurant_id=restaurant_id)
+
     reqs = repository.list_requests_by_restaurant(
         db,
         restaurant_id,
@@ -900,13 +1006,14 @@ def delete_request(
     request_id: int,
     restaurant_id: int,
 ) -> None:
-    deleted = repository.delete_request_by_restaurant(
+    deleted_req = repository.delete_request_by_restaurant(
         db,
         request_id=request_id,
         restaurant_id=restaurant_id,
     )
-    if not deleted:
+    if deleted_req is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Housekeeping request not found.")
+    _delete_attached_audio_if_local(deleted_req.audio_url)
 
 
 def create_manual_task(
@@ -1020,11 +1127,22 @@ def get_daily_summary(
     )
 
 
+def get_pending_count(
+    db: Session,
+    *,
+    restaurant_id: int,
+) -> HousekeepingPendingCountResponse:
+    _cleanup_old_requests_for_restaurant(db, restaurant_id=restaurant_id)
+    pending_count = repository.count_pending_requests(db, restaurant_id=restaurant_id)
+    return HousekeepingPendingCountResponse(pending_count=pending_count)
+
+
 def get_pending_list(
     db: Session,
     *,
     restaurant_id: int,
 ) -> HousekeepingPendingListResponse:
+    _cleanup_old_requests_for_restaurant(db, restaurant_id=restaurant_id)
     pending = repository.list_pending_requests(db, restaurant_id=restaurant_id)
     return HousekeepingPendingListResponse(
         total=len(pending),

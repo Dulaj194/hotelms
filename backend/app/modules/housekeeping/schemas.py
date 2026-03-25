@@ -219,5 +219,14 @@ class HousekeepingStaffPerformanceResponse(BaseModel):
     staff: list[HousekeepingStaffPerformanceItem]
 
 
+class HousekeepingAudioUploadResponse(BaseModel):
+    audio_url: str
+    message: str = "Audio uploaded successfully."
+
+
+class HousekeepingPendingCountResponse(BaseModel):
+    pending_count: int
+
+
 class GenericMessageResponse(BaseModel):
     message: str
