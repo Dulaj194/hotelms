@@ -12,6 +12,13 @@ import { clearAuth, setAccessToken } from "@/lib/auth";
 const BASE_URL =
   import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 const REFRESH_PATH = "/auth/refresh";
+const NO_REFRESH_RETRY_PATHS = new Set([
+  "/auth/login",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/register-restaurant",
+  REFRESH_PATH,
+]);
 
 let refreshPromise: Promise<string | null> | null = null;
 
@@ -35,6 +42,10 @@ export class ApiError extends Error {
     this.status = status;
     this.detail = detail;
   }
+}
+
+function shouldRetryWithRefresh(path: string, retryOnAuth: boolean): boolean {
+  return retryOnAuth && !NO_REFRESH_RETRY_PATHS.has(path);
 }
 
 async function request<T>(
@@ -75,7 +86,7 @@ async function request<T>(
     );
   }
 
-  if (response.status === 401 && retryOnAuth && path !== REFRESH_PATH) {
+  if (response.status === 401 && shouldRetryWithRefresh(path, retryOnAuth)) {
     const nextToken = await refreshAccessToken();
     if (nextToken) {
       return request<T>(method, path, body, options, false);

@@ -5,6 +5,25 @@ import { ApiError, api } from "@/lib/api";
 import { setAccessToken, setUser, getRoleRedirect } from "@/lib/auth";
 import type { TokenResponse, UserMeResponse } from "@/types/auth";
 
+const TOO_MANY_REQUESTS_FALLBACK =
+  "Too many failed login attempts. Please wait a few minutes and try again.";
+
+function getLoginErrorMessage(err: unknown): string {
+  if (!(err instanceof ApiError)) {
+    return "Login failed. Please try again.";
+  }
+
+  if ([401, 403].includes(err.status)) {
+    return "Invalid email or password.";
+  }
+
+  if (err.status === 429) {
+    return err.detail || TOO_MANY_REQUESTS_FALLBACK;
+  }
+
+  return err.detail || "Login failed. Please try again.";
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -50,11 +69,7 @@ export default function Login() {
       }
       navigate(getRoleRedirect(me.role), { replace: true });
     } catch (err) {
-      if (err instanceof ApiError && [401, 403].includes(err.status)) {
-        setError("Invalid email or password.");
-      } else {
-        setError("Login failed. Please try again.");
-      }
+      setError(getLoginErrorMessage(err));
     } finally {
       setLoading(false);
     }
