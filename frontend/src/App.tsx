@@ -193,6 +193,22 @@ function App() {
           }
         />
         <Route
+          path="/admin/rooms/qr/all"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Rooms />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/rooms/qr/generate"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Rooms />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/tables"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>

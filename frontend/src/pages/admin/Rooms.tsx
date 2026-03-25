@@ -10,6 +10,7 @@
  * - Generate QR code for a room
  */
 import { useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
 import type { RoomCreateRequest, RoomResponse, RoomUpdateRequest } from "@/types/room";
 import type { BulkQRCodeResponse, QRCodeResponse } from "@/types/publicMenu";
@@ -44,6 +45,11 @@ function Badge({ active }: { active: boolean }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function Rooms() {
+  const location = useLocation();
+  const qrMode = location.pathname.startsWith("/admin/rooms/qr/");
+  const qrAllMode = location.pathname === "/admin/rooms/qr/all";
+  const qrGenerateMode = location.pathname === "/admin/rooms/qr/generate";
+
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -207,18 +213,26 @@ export default function Rooms() {
       {/* Page header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Rooms</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {qrAllMode ? "All Room QR Codes" : qrGenerateMode ? "Generate Room QR Codes" : "Rooms"}
+          </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Manage hotel rooms and generate QR codes for guests.
+            {qrAllMode
+              ? "View, open, and download room QR codes."
+              : qrGenerateMode
+                ? "Bulk generate room QR codes for onboarding and operations."
+                : "Manage hotel rooms and generate QR codes for guests."}
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold
-                     hover:bg-orange-600 transition-colors"
-        >
-          + Add Room
-        </button>
+        {!qrMode && (
+          <button
+            onClick={openCreate}
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold
+                       hover:bg-orange-600 transition-colors"
+          >
+            + Add Room
+          </button>
+        )}
       </div>
 
       {/* Global error */}
@@ -378,35 +392,39 @@ export default function Rooms() {
                       >
                         {qrLoading === room.room_number ? "…" : "QR"}
                       </button>
-                      {/* Edit */}
-                      <button
-                        onClick={() => openEdit(room)}
-                        className="px-2 py-1 text-xs border rounded hover:bg-gray-100 transition-colors"
-                        title="Edit room"
-                      >
-                        Edit
-                      </button>
-                      {/* Enable/Disable */}
-                      <button
-                        onClick={() => handleToggleActive(room)}
-                        className={`px-2 py-1 text-xs border rounded transition-colors ${
-                          room.is_active
-                            ? "hover:bg-orange-50 border-orange-200 text-orange-600"
-                            : "hover:bg-green-50 border-green-200 text-green-600"
-                        }`}
-                        title={room.is_active ? "Disable room" : "Enable room"}
-                      >
-                        {room.is_active ? "Disable" : "Enable"}
-                      </button>
-                      {/* Delete */}
-                      <button
-                        onClick={() => setDeleteTarget(room)}
-                        className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded
-                                   hover:bg-red-50 transition-colors"
-                        title="Delete room"
-                      >
-                        Delete
-                      </button>
+                      {!qrMode && (
+                        <>
+                          {/* Edit */}
+                          <button
+                            onClick={() => openEdit(room)}
+                            className="px-2 py-1 text-xs border rounded hover:bg-gray-100 transition-colors"
+                            title="Edit room"
+                          >
+                            Edit
+                          </button>
+                          {/* Enable/Disable */}
+                          <button
+                            onClick={() => handleToggleActive(room)}
+                            className={`px-2 py-1 text-xs border rounded transition-colors ${
+                              room.is_active
+                                ? "hover:bg-orange-50 border-orange-200 text-orange-600"
+                                : "hover:bg-green-50 border-green-200 text-green-600"
+                            }`}
+                            title={room.is_active ? "Disable room" : "Enable room"}
+                          >
+                            {room.is_active ? "Disable" : "Enable"}
+                          </button>
+                          {/* Delete */}
+                          <button
+                            onClick={() => setDeleteTarget(room)}
+                            className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded
+                                       hover:bg-red-50 transition-colors"
+                            title="Delete room"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

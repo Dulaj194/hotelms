@@ -36,6 +36,7 @@ interface MenuSubItem {
   path: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
+  roles?: string[];
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -92,12 +93,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     privilege: "QR_MENU",
   },
   { path: "/admin/rooms", label: "Rooms", icon: BedDouble, roles: ["owner", "admin"] },
-  {
-    path: "/admin/housekeeping",
-    label: "Housekeeping",
-    icon: Handshake,
-    roles: ["owner", "admin", "housekeeper"],
-  },
 ];
 
 interface DashboardLayoutProps {
@@ -113,6 +108,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [menusOpen, setMenusOpen] = useState(true);
   const [kitchenOpen, setKitchenOpen] = useState(true);
   const [qrOpen, setQrOpen] = useState(true);
+  const [housekeepingOpen, setHousekeepingOpen] = useState(true);
   const [offersOpen, setOffersOpen] = useState(true);
 
   const menuSubItems: MenuSubItem[] = useMemo(
@@ -147,10 +143,42 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     []
   );
 
+  const housekeepingSubItems: MenuSubItem[] = useMemo(
+    () => [
+      {
+        path: "/admin/housekeeping",
+        label: "Messages",
+        icon: Handshake,
+        roles: ["owner", "admin", "housekeeper"],
+      },
+      {
+        path: "/admin/rooms/qr/all",
+        label: "All Room QR Codes",
+        icon: QrCode,
+        roles: ["owner", "admin"],
+      },
+      {
+        path: "/admin/rooms/qr/generate",
+        label: "Generate Room QR Codes",
+        icon: LayoutGrid,
+        roles: ["owner", "admin"],
+      },
+    ],
+    []
+  );
+
   const menuPaths = useMemo(() => menuSubItems.map((item) => item.path), [menuSubItems]);
   const kitchenPaths = useMemo(() => kitchenSubItems.map((item) => item.path), [kitchenSubItems]);
   const qrPaths = useMemo(() => qrSubItems.map((item) => item.path), [qrSubItems]);
+  const housekeepingPaths = useMemo(() => housekeepingSubItems.map((item) => item.path), [housekeepingSubItems]);
   const offerPaths = useMemo(() => offerSubItems.map((item) => item.path), [offerSubItems]);
+  const visibleHousekeepingSubItems = useMemo(
+    () =>
+      housekeepingSubItems.filter(
+        (item) => !item.roles || item.roles.includes(role)
+      ),
+    [housekeepingSubItems, role]
+  );
   const isMenuGroupVisible = role === "owner" || role === "admin";
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
   const isKitchenGroupVisible = role === "owner" || role === "admin" || role === "steward";
@@ -158,6 +186,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     location.pathname.startsWith("/admin/kitchen") || location.pathname === "/admin/steward";
   const isQrGroupVisible = role === "owner" || role === "admin";
   const isQrGroupActive = qrPaths.some((path) => location.pathname === path);
+  const isHousekeepingGroupVisible = visibleHousekeepingSubItems.length > 0;
+  const isHousekeepingGroupActive = housekeepingPaths.some((path) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`)
+  );
   const isOfferGroupVisible =
     (role === "owner" || role === "admin") && !privilegesLoading && hasPrivilege("OFFERS");
   const isOfferGroupActive = offerPaths.some((path) =>
@@ -171,6 +203,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       !menuPaths.includes(item.path) &&
       !kitchenPaths.includes(item.path) &&
       !qrPaths.includes(item.path) &&
+      !housekeepingPaths.includes(item.path) &&
       !offerPaths.includes(item.path) &&
       (item.roles === null || item.roles.includes(role)) &&
       (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
@@ -345,10 +378,63 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           )}
 
+          {isHousekeepingGroupVisible && (
+            <div className="mb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isHousekeepingGroupActive && visibleHousekeepingSubItems.length > 0) {
+                    setHousekeepingOpen(true);
+                    navigate(visibleHousekeepingSubItems[0].path);
+                    return;
+                  }
+                  setHousekeepingOpen((prev) => !prev);
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  isHousekeepingGroupActive
+                    ? "bg-slate-700 text-white"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                <span className="flex items-center">
+                  <Handshake className="h-4 w-4 mr-2 shrink-0" />
+                  Housekeeping
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${housekeepingOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {housekeepingOpen && (
+                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                  {visibleHousekeepingSubItems.map((subItem) => {
+                    const subActive = location.pathname === subItem.path;
+                    const SubIcon = subItem.icon;
+                    return (
+                      <Link
+                        key={subItem.path}
+                        to={subItem.path}
+                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                          subActive
+                            ? "bg-blue-950 text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        }`}
+                      >
+                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        {subItem.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {navItems.map((item) => {
             const active =
               location.pathname === item.path ||
-              location.pathname.startsWith(`${item.path}/`);
+              (location.pathname.startsWith(`${item.path}/`) &&
+                !(item.path === "/admin/rooms" && location.pathname.startsWith("/admin/rooms/qr/")));
             const Icon = item.icon;
             return (
               <Link
