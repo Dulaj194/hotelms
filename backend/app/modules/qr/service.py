@@ -1,4 +1,3 @@
-import io
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
@@ -10,7 +9,12 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import create_room_qr_access_token
 from app.modules.qr import repository
-from app.modules.qr.schemas import BulkQRCodeResponse, QRCodeResponse
+from app.modules.qr.schemas import (
+    BulkQRCodeResponse,
+    QRCodeDeleteResponse,
+    QRCodeResponse,
+    RoomQRCodeListResponse,
+)
 from app.modules.rooms.repository import get_room_by_number_and_restaurant
 
 _QR_DIR = Path(settings.upload_dir) / "qrcodes"
@@ -62,6 +66,25 @@ def _to_response(qr_record, restaurant_id: int) -> QRCodeResponse:
         qr_image_url=qr_image_url,
         restaurant_id=restaurant_id,
     )
+
+
+def _resolve_qr_file_path(file_path: str) -> Path:
+    path = Path(file_path)
+    if path.is_absolute():
+        return path
+    if path.exists():
+        return path
+    return _QR_DIR / path.name
+
+
+def _delete_qr_file_if_exists(file_path: str) -> None:
+    path = _resolve_qr_file_path(file_path)
+    if path.exists():
+        try:
+            path.unlink()
+        except OSError:
+            # Keep DB deletion successful even if local file cleanup fails.
+            return
 
 
 def generate_qr(
@@ -189,3 +212,47 @@ def generate_bulk_room_qr(
         for room_number in normalized
     ]
     return BulkQRCodeResponse(generated=results, count=len(results))
+
+
+def list_room_qr(
+    db: Session,
+    restaurant_id: int,
+) -> RoomQRCodeListResponse:
+    records = repository.list_qr_by_type(db, restaurant_id, "room")
+    responses = [_to_response(record, restaurant_id) for record in records]
+    return RoomQRCodeListResponse(qrcodes=responses, total=len(responses))
+
+
+def delete_room_qr(
+    db: Session,
+    restaurant_id: int,
+    room_number: str,
+) -> QRCodeDeleteResponse:
+    normalized_room = room_number.strip()
+    if not normalized_room:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Room number is required.",
+        )
+
+    deleted = repository.delete_qr(db, restaurant_id, "room", normalized_room)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Room QR '{normalized_room}' not found.",
+        )
+
+    _delete_qr_file_if_exists(deleted.file_path)
+    return QRCodeDeleteResponse(message=f"Room QR '{normalized_room}' deleted.")
+
+
+def delete_all_room_qr(
+    db: Session,
+    restaurant_id: int,
+) -> QRCodeDeleteResponse:
+    deleted_records = repository.delete_qr_by_type(db, restaurant_id, "room")
+    for record in deleted_records:
+        _delete_qr_file_if_exists(record.file_path)
+    return QRCodeDeleteResponse(
+        message=f"Deleted {len(deleted_records)} room QR code(s).",
+    )

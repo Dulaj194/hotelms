@@ -21,3 +21,12 @@ class RoomBulkQRRequest(BaseModel):
 class BulkQRCodeResponse(BaseModel):
     generated: list[QRCodeResponse]
     count: int
+
+
+class RoomQRCodeListResponse(BaseModel):
+    qrcodes: list[QRCodeResponse]
+    total: int
+
+
+class QRCodeDeleteResponse(BaseModel):
+    message: str

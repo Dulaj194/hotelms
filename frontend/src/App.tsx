@@ -24,6 +24,8 @@ import Landing from "@/pages/public/Landing";
 import ServiceRequest from "@/pages/room/ServiceRequest";
 import Rooms from "@/pages/admin/Rooms";
 import Housekeeping from "@/pages/admin/Housekeeping";
+import AllRoomQRCodes from "@/pages/admin/AllRoomQRCodes";
+import GenerateRoomQRCodes from "@/pages/admin/GenerateRoomQRCodes";
 import Menus from "@/pages/admin/Menus";
 import MenuCategories from "@/pages/admin/MenuCategories";
 import MenuItems from "@/pages/admin/MenuItems";
@@ -196,7 +198,7 @@ function App() {
           path="/admin/rooms/qr/all"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <Rooms />
+              <AllRoomQRCodes />
             </ProtectedRoute>
           }
         />
@@ -204,7 +206,7 @@ function App() {
           path="/admin/rooms/qr/generate"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <Rooms />
+              <GenerateRoomQRCodes />
             </ProtectedRoute>
           }
         />

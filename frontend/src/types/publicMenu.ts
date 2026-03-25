@@ -64,3 +64,12 @@ export interface BulkQRCodeResponse {
   generated: QRCodeResponse[];
   count: number;
 }
+
+export interface RoomQRCodeListResponse {
+  qrcodes: QRCodeResponse[];
+  total: number;
+}
+
+export interface QRCodeDeleteResponse {
+  message: string;
+}
