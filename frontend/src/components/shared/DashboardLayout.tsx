@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -28,13 +28,10 @@ import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 import {
   buildRouteKey,
-  canGoBackInApp,
   clearInAppNavigationHistory,
   getActiveSidebarNavigationRoot,
   getStandardAdminFallbackRoute,
   markSidebarNavigationTarget,
-  popAndGetPreviousInApp,
-  recordInAppNavigation,
   syncSidebarNavigationRoot,
 } from "@/lib/navigationHistory";
 import type { HousekeepingPendingCountResponse } from "@/types/housekeeping";
@@ -64,6 +61,7 @@ type SidebarGroupState = {
 
 const SIDEBAR_GROUPS_STORAGE_KEY = "hotelms.sidebar.groups";
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "hotelms.sidebar.collapsed";
+const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.admin";
 const DEFAULT_SIDEBAR_GROUP_STATE: SidebarGroupState = {
   menusOpen: true,
   kitchenOpen: true,
@@ -175,6 +173,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [activeSidebarRoot, setActiveSidebarRoot] = useState<string | null>(() =>
     getActiveSidebarNavigationRoot()
   );
+  const sidebarNavRef = useRef<HTMLElement | null>(null);
 
   const { menusOpen, kitchenOpen, qrOpen, housekeepingOpen, offersOpen } = groupState;
 
@@ -322,6 +321,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     markSidebarNavigationTarget(targetRouteKey);
     setActiveSidebarRoot(targetRouteKey);
   };
+  const handleSidebarScroll = () => {
+    if (typeof window === "undefined" || !sidebarNavRef.current) return;
+    window.sessionStorage.setItem(
+      SIDEBAR_SCROLL_STORAGE_KEY,
+      String(sidebarNavRef.current.scrollTop)
+    );
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -332,6 +338,15 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || sidebarCollapsed) return;
+    const saved = window.sessionStorage.getItem(SIDEBAR_SCROLL_STORAGE_KEY);
+    if (!saved || !sidebarNavRef.current) return;
+    const parsed = Number(saved);
+    if (!Number.isFinite(parsed)) return;
+    sidebarNavRef.current.scrollTop = parsed;
+  }, [sidebarCollapsed, location.pathname]);
 
   useEffect(() => {
     setGroupState((prev) => {
@@ -425,19 +440,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   const currentRouteKey = buildRouteKey(location.pathname, location.search);
-  const hasAppBack = canGoBackInApp(currentRouteKey);
   const isInSidebarDrilldown =
     Boolean(activeSidebarRoot) && currentRouteKey !== activeSidebarRoot;
-  const showGlobalBackButton =
-    isInSidebarDrilldown && (hasAppBack || canNavigateBack());
+  const showGlobalBackButton = isInSidebarDrilldown;
 
   const handleGlobalBack = () => {
-    const previousRoute = popAndGetPreviousInApp(currentRouteKey);
-    if (previousRoute) {
-      navigate(previousRoute);
-      return;
-    }
-
     if (canNavigateBack()) {
       navigate(-1);
       return;
@@ -453,10 +460,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const root = syncSidebarNavigationRoot(currentRouteKey, isCurrentSidebarRoute);
     setActiveSidebarRoot(root);
   }, [currentRouteKey, isCurrentSidebarRoute]);
-
-  useEffect(() => {
-    recordInAppNavigation(currentRouteKey);
-  }, [currentRouteKey]);
 
   return (
     <div
@@ -485,7 +488,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <p className="text-xs text-gray-400 mt-0.5 truncate">{user.full_name}</p>
           )}
         </div>
-        <nav className="flex-1 overflow-y-auto scrollbar-hide py-4 space-y-0.5 px-2">
+        <nav
+          ref={sidebarNavRef}
+          onScroll={handleSidebarScroll}
+          className="flex-1 overflow-y-auto scrollbar-hide py-4 space-y-0.5 px-2"
+        >
           {isMenuGroupVisible && (
             <div className="mb-1">
               <button

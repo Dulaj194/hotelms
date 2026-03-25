@@ -1,15 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Menu } from "lucide-react";
 import { clearAuth, getUser } from "@/lib/auth";
 import {
   buildRouteKey,
-  canGoBackInApp,
   clearInAppNavigationHistory,
   getActiveSidebarNavigationRoot,
   markSidebarNavigationTarget,
-  popAndGetPreviousInApp,
-  recordInAppNavigation,
   syncSidebarNavigationRoot,
 } from "@/lib/navigationHistory";
 
@@ -18,6 +15,7 @@ const SUPER_ADMIN_NAV = [
 ];
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "hotelms.sidebar.collapsed";
+const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.superAdmin";
 
 function loadSidebarCollapsedState(): boolean {
   if (typeof window === "undefined") return false;
@@ -42,6 +40,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() =>
     loadSidebarCollapsedState()
   );
+  const sidebarNavRef = useRef<HTMLElement | null>(null);
 
   function handleLogout() {
     clearInAppNavigationHistory();
@@ -53,6 +52,13 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
     const targetRouteKey = buildRouteKey(path);
     markSidebarNavigationTarget(targetRouteKey);
     setActiveSidebarRoot(targetRouteKey);
+  };
+  const handleSidebarScroll = () => {
+    if (typeof window === "undefined" || !sidebarNavRef.current) return;
+    window.sessionStorage.setItem(
+      SIDEBAR_SCROLL_STORAGE_KEY,
+      String(sidebarNavRef.current.scrollTop)
+    );
   };
   const toggleSidebarCollapsed = () => {
     setSidebarCollapsed((prev) => !prev);
@@ -68,22 +74,14 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   };
 
   const currentRouteKey = buildRouteKey(location.pathname, location.search);
-  const hasAppBack = canGoBackInApp(currentRouteKey);
   const isCurrentSidebarRoute = SUPER_ADMIN_NAV.some(
     (item) => item.path === location.pathname
   );
   const isInSidebarDrilldown =
     Boolean(activeSidebarRoot) && currentRouteKey !== activeSidebarRoot;
-  const showGlobalBackButton =
-    isInSidebarDrilldown && (hasAppBack || canNavigateBack());
+  const showGlobalBackButton = isInSidebarDrilldown;
 
   const handleGlobalBack = () => {
-    const previousRoute = popAndGetPreviousInApp(currentRouteKey);
-    if (previousRoute) {
-      navigate(previousRoute);
-      return;
-    }
-
     if (canNavigateBack()) {
       navigate(-1);
       return;
@@ -101,13 +99,18 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   }, [currentRouteKey, isCurrentSidebarRoute]);
 
   useEffect(() => {
-    recordInAppNavigation(currentRouteKey);
-  }, [currentRouteKey]);
-
-  useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || sidebarCollapsed) return;
+    const saved = window.sessionStorage.getItem(SIDEBAR_SCROLL_STORAGE_KEY);
+    if (!saved || !sidebarNavRef.current) return;
+    const parsed = Number(saved);
+    if (!Number.isFinite(parsed)) return;
+    sidebarNavRef.current.scrollTop = parsed;
+  }, [sidebarCollapsed, location.pathname]);
 
   return (
     <div
@@ -137,7 +140,11 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
             <p className="text-xs text-slate-500 mt-0.5 truncate">{user.full_name}</p>
           )}
         </div>
-        <nav className="flex-1 overflow-y-auto scrollbar-hide py-4 space-y-0.5 px-2">
+        <nav
+          ref={sidebarNavRef}
+          onScroll={handleSidebarScroll}
+          className="flex-1 overflow-y-auto scrollbar-hide py-4 space-y-0.5 px-2"
+        >
           {SUPER_ADMIN_NAV.map((item) => {
             const active = location.pathname === item.path;
             return (
