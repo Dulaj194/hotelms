@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import type { StaffListItemResponse } from "@/types/user";
@@ -99,7 +100,11 @@ export default function Housekeeping() {
   }, [navigate, user]);
 
   if (!user || !ALLOWED_ROLES.has(user.role)) return null;
-  return <HousekeepingDashboard role={user.role} userId={user.id} />;
+  return (
+    <DashboardLayout>
+      <HousekeepingDashboard role={user.role} userId={user.id} />
+    </DashboardLayout>
+  );
 }
 
 function HousekeepingDashboard({ role, userId }: { role: string; userId: number }) {

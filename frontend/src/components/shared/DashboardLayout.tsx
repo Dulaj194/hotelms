@@ -12,6 +12,7 @@ import {
   Home,
   LayoutGrid,
   Package,
+  Menu,
   QrCode,
   ReceiptText,
   ShieldCheck,
@@ -62,6 +63,7 @@ type SidebarGroupState = {
 };
 
 const SIDEBAR_GROUPS_STORAGE_KEY = "hotelms.sidebar.groups";
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "hotelms.sidebar.collapsed";
 const DEFAULT_SIDEBAR_GROUP_STATE: SidebarGroupState = {
   menusOpen: true,
   kitchenOpen: true,
@@ -86,6 +88,15 @@ function loadSidebarGroupState(): SidebarGroupState {
     };
   } catch {
     return DEFAULT_SIDEBAR_GROUP_STATE;
+  }
+}
+
+function loadSidebarCollapsedState(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
   }
 }
 
@@ -156,6 +167,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { loading: privilegesLoading, hasPrivilege, privileges } = useSubscriptionPrivileges();
   const [groupState, setGroupState] = useState<SidebarGroupState>(() =>
     loadSidebarGroupState()
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() =>
+    loadSidebarCollapsedState()
   );
   const [housekeepingPendingCount, setHousekeepingPendingCount] = useState(0);
   const [activeSidebarRoot, setActiveSidebarRoot] = useState<string | null>(() =>
@@ -299,6 +313,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const toggleGroup = (group: keyof SidebarGroupState) => {
     setGroupState((prev) => ({ ...prev, [group]: !prev[group] }));
   };
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => !prev);
+  };
 
   const handleSidebarNavigate = (path: string) => {
     const targetRouteKey = buildRouteKey(path);
@@ -310,6 +327,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(SIDEBAR_GROUPS_STORAGE_KEY, JSON.stringify(groupState));
   }, [groupState]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     setGroupState((prev) => {
@@ -437,9 +459,26 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [currentRouteKey]);
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div
+      className="min-h-screen bg-gray-50 transition-[grid-template-columns] duration-300"
+      style={{
+        display: "grid",
+        gridTemplateColumns: sidebarCollapsed ? "0 1fr" : "14rem 1fr",
+      }}
+    >
+      <button
+        type="button"
+        onClick={toggleSidebarCollapsed}
+        aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        className={`fixed top-4 z-50 inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-100 ${
+          sidebarCollapsed ? "left-3" : "left-[13.25rem]"
+        }`}
+      >
+        <Menu className="h-4 w-4" />
+      </button>
       {/* Sidebar */}
-      <aside className="w-56 bg-gray-900 text-white flex flex-col">
+      <aside className="bg-gray-900 text-white flex flex-col overflow-hidden">
         <div className="px-4 py-5 border-b border-gray-700">
           <span className="text-lg font-bold tracking-tight">HotelMS</span>
           {user && (
@@ -737,7 +776,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className={sidebarCollapsed ? "w-full px-6 py-8" : "max-w-4xl mx-auto px-6 py-8"}>
           {showGlobalBackButton && (
             <div className="mb-5">
               <button

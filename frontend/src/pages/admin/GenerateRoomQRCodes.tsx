@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
 import type { RoomListResponse, RoomResponse } from "@/types/room";
 import type { BulkQRCodeResponse } from "@/types/publicMenu";
@@ -88,7 +89,8 @@ export default function GenerateRoomQRCodes() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <DashboardLayout>
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Generate Room QR Codes</h1>
@@ -250,6 +252,7 @@ export default function GenerateRoomQRCodes() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

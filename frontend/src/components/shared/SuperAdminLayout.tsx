@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Menu } from "lucide-react";
 import { clearAuth, getUser } from "@/lib/auth";
 import {
   buildRouteKey,
@@ -17,6 +17,17 @@ const SUPER_ADMIN_NAV = [
   { path: "/super-admin/restaurants", label: "🏨 Hotels" },
 ];
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "hotelms.sidebar.collapsed";
+
+function loadSidebarCollapsedState(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
 interface SuperAdminLayoutProps {
   children: React.ReactNode;
 }
@@ -27,6 +38,9 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const user = getUser();
   const [activeSidebarRoot, setActiveSidebarRoot] = useState<string | null>(() =>
     getActiveSidebarNavigationRoot()
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() =>
+    loadSidebarCollapsedState()
   );
 
   function handleLogout() {
@@ -39,6 +53,9 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
     const targetRouteKey = buildRouteKey(path);
     markSidebarNavigationTarget(targetRouteKey);
     setActiveSidebarRoot(targetRouteKey);
+  };
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => !prev);
   };
 
   const canNavigateBack = () => {
@@ -87,10 +104,32 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
     recordInAppNavigation(currentRouteKey);
   }, [currentRouteKey]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div
+      className="min-h-screen bg-gray-50 transition-[grid-template-columns] duration-300"
+      style={{
+        display: "grid",
+        gridTemplateColumns: sidebarCollapsed ? "0 1fr" : "14rem 1fr",
+      }}
+    >
+      <button
+        type="button"
+        onClick={toggleSidebarCollapsed}
+        aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        className={`fixed top-4 z-50 inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-100 ${
+          sidebarCollapsed ? "left-3" : "left-[13.25rem]"
+        }`}
+      >
+        <Menu className="h-4 w-4" />
+      </button>
       {/* Sidebar */}
-      <aside className="w-56 bg-slate-900 text-white flex flex-col">
+      <aside className="bg-slate-900 text-white flex flex-col overflow-hidden">
         <div className="px-4 py-5 border-b border-slate-700">
           <span className="text-lg font-bold tracking-tight">HotelMS</span>
           <p className="text-xs text-slate-400 mt-0.5">Super Admin</p>
@@ -129,7 +168,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-6 py-8">
+        <div className={sidebarCollapsed ? "w-full px-6 py-8" : "max-w-5xl mx-auto px-6 py-8"}>
           {showGlobalBackButton && (
             <div className="mb-5">
               <button

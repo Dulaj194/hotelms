@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
 import type { BulkQRCodeResponse } from "@/types/publicMenu";
 
@@ -51,7 +52,8 @@ export default function Tables() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <DashboardLayout>
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Table QR Codes</h1>
         <p className="text-sm text-gray-500 mt-1">
@@ -158,6 +160,7 @@ export default function Tables() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

@@ -12,6 +12,7 @@
  */
 import { useState } from "react";
 
+import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import type {
@@ -184,7 +185,8 @@ export default function Billing() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <DashboardLayout>
+      <div className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="mb-6 text-2xl font-bold text-gray-900">Billing</h1>
 
       {/* ── Success receipt ── */}
@@ -449,6 +451,7 @@ export default function Billing() {
           )}
         </>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
