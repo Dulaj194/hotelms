@@ -29,9 +29,12 @@ import {
   buildRouteKey,
   canGoBackInApp,
   clearInAppNavigationHistory,
+  getActiveSidebarNavigationRoot,
   getStandardAdminFallbackRoute,
+  markSidebarNavigationTarget,
   popAndGetPreviousInApp,
   recordInAppNavigation,
+  syncSidebarNavigationRoot,
 } from "@/lib/navigationHistory";
 import type { HousekeepingPendingCountResponse } from "@/types/housekeeping";
 
@@ -155,6 +158,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     loadSidebarGroupState()
   );
   const [housekeepingPendingCount, setHousekeepingPendingCount] = useState(0);
+  const [activeSidebarRoot, setActiveSidebarRoot] = useState<string | null>(() =>
+    getActiveSidebarNavigationRoot()
+  );
 
   const { menusOpen, kitchenOpen, qrOpen, housekeepingOpen, offersOpen } = groupState;
 
@@ -263,9 +269,41 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       (item.roles === null || item.roles.includes(role)) &&
       (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
   );
+  const sidebarPaths = useMemo(() => {
+    const paths: string[] = [...navItems.map((item) => item.path)];
+    if (isMenuGroupVisible) paths.push(...menuPaths);
+    if (isKitchenGroupVisible) paths.push(...kitchenPaths);
+    if (isQrGroupVisible) paths.push(...qrPaths);
+    if (isHousekeepingGroupVisible) {
+      paths.push(...visibleHousekeepingSubItems.map((item) => item.path));
+    }
+    if (isOfferGroupVisible) paths.push(...offerPaths);
+    return Array.from(new Set(paths));
+  }, [
+    isHousekeepingGroupVisible,
+    isKitchenGroupVisible,
+    isMenuGroupVisible,
+    isOfferGroupVisible,
+    isQrGroupVisible,
+    kitchenPaths,
+    menuPaths,
+    navItems,
+    offerPaths,
+    qrPaths,
+    visibleHousekeepingSubItems,
+  ]);
+  const isCurrentSidebarRoute = sidebarPaths.some(
+    (path) => location.pathname === path
+  );
 
   const toggleGroup = (group: keyof SidebarGroupState) => {
     setGroupState((prev) => ({ ...prev, [group]: !prev[group] }));
+  };
+
+  const handleSidebarNavigate = (path: string) => {
+    const targetRouteKey = buildRouteKey(path);
+    markSidebarNavigationTarget(targetRouteKey);
+    setActiveSidebarRoot(targetRouteKey);
   };
 
   useEffect(() => {
@@ -366,8 +404,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const currentRouteKey = buildRouteKey(location.pathname, location.search);
   const hasAppBack = canGoBackInApp(currentRouteKey);
+  const isInSidebarDrilldown =
+    Boolean(activeSidebarRoot) && currentRouteKey !== activeSidebarRoot;
   const showGlobalBackButton =
-    location.pathname !== "/dashboard" || hasAppBack || canNavigateBack();
+    isInSidebarDrilldown && (hasAppBack || canNavigateBack());
 
   const handleGlobalBack = () => {
     const previousRoute = popAndGetPreviousInApp(currentRouteKey);
@@ -380,8 +420,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       navigate(-1);
       return;
     }
+    if (activeSidebarRoot && currentRouteKey !== activeSidebarRoot) {
+      navigate(activeSidebarRoot, { replace: true });
+      return;
+    }
     navigate(getStandardAdminFallbackRoute(location.pathname), { replace: true });
   };
+
+  useEffect(() => {
+    const root = syncSidebarNavigationRoot(currentRouteKey, isCurrentSidebarRoute);
+    setActiveSidebarRoot(root);
+  }, [currentRouteKey, isCurrentSidebarRoute]);
 
   useEffect(() => {
     recordInAppNavigation(currentRouteKey);
@@ -428,6 +477,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
+                        onClick={() => handleSidebarNavigate(subItem.path)}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"
@@ -476,6 +526,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
+                        onClick={() => handleSidebarNavigate(subItem.path)}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"
@@ -524,6 +575,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
+                        onClick={() => handleSidebarNavigate(subItem.path)}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"
@@ -575,6 +627,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
+                        onClick={() => handleSidebarNavigate(subItem.path)}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"
@@ -605,6 +658,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <Link
                 key={item.path}
                 to={item.path}
+                onClick={() => handleSidebarNavigate(item.path)}
                 className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                   active
                     ? "bg-slate-700 text-white"
@@ -654,6 +708,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
+                        onClick={() => handleSidebarNavigate(subItem.path)}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"

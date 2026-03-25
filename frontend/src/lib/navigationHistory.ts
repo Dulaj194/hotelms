@@ -1,4 +1,6 @@
 const NAV_STACK_STORAGE_KEY = "hotelms.nav.stack";
+const NAV_SIDEBAR_ROOT_STORAGE_KEY = "hotelms.nav.sidebarRoot";
+const NAV_PENDING_SIDEBAR_TARGET_STORAGE_KEY = "hotelms.nav.pendingSidebarTarget";
 const MAX_NAV_STACK_SIZE = 120;
 
 function readStack(): string[] {
@@ -21,6 +23,12 @@ function writeStack(stack: string[]) {
       ? stack.slice(stack.length - MAX_NAV_STACK_SIZE)
       : stack;
   window.sessionStorage.setItem(NAV_STACK_STORAGE_KEY, JSON.stringify(normalized));
+}
+
+function readStoredRouteKey(storageKey: string): string | null {
+  if (typeof window === "undefined") return null;
+  const value = window.sessionStorage.getItem(storageKey);
+  return value && value.trim().length > 0 ? value : null;
 }
 
 export function buildRouteKey(pathname: string, search = "") {
@@ -65,6 +73,38 @@ export function popAndGetPreviousInApp(routeKey: string): string | null {
 export function clearInAppNavigationHistory() {
   if (typeof window === "undefined") return;
   window.sessionStorage.removeItem(NAV_STACK_STORAGE_KEY);
+  window.sessionStorage.removeItem(NAV_SIDEBAR_ROOT_STORAGE_KEY);
+  window.sessionStorage.removeItem(NAV_PENDING_SIDEBAR_TARGET_STORAGE_KEY);
+}
+
+export function markSidebarNavigationTarget(routeKey: string) {
+  if (!routeKey || typeof window === "undefined") return;
+  window.sessionStorage.setItem(NAV_PENDING_SIDEBAR_TARGET_STORAGE_KEY, routeKey);
+}
+
+export function getActiveSidebarNavigationRoot() {
+  return readStoredRouteKey(NAV_SIDEBAR_ROOT_STORAGE_KEY);
+}
+
+export function syncSidebarNavigationRoot(routeKey: string, isSidebarRoute: boolean) {
+  if (!routeKey || typeof window === "undefined") return null;
+
+  const pendingTarget = readStoredRouteKey(NAV_PENDING_SIDEBAR_TARGET_STORAGE_KEY);
+  if (pendingTarget) {
+    window.sessionStorage.removeItem(NAV_PENDING_SIDEBAR_TARGET_STORAGE_KEY);
+    if (pendingTarget === routeKey) {
+      window.sessionStorage.setItem(NAV_SIDEBAR_ROOT_STORAGE_KEY, routeKey);
+      return routeKey;
+    }
+  }
+
+  const currentRoot = readStoredRouteKey(NAV_SIDEBAR_ROOT_STORAGE_KEY);
+  if (!currentRoot && isSidebarRoute) {
+    window.sessionStorage.setItem(NAV_SIDEBAR_ROOT_STORAGE_KEY, routeKey);
+    return routeKey;
+  }
+
+  return currentRoot;
 }
 
 export function getStandardAdminFallbackRoute(pathname: string) {

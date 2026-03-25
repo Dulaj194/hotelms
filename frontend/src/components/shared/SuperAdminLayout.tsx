@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { clearAuth, getUser } from "@/lib/auth";
@@ -6,8 +6,11 @@ import {
   buildRouteKey,
   canGoBackInApp,
   clearInAppNavigationHistory,
+  getActiveSidebarNavigationRoot,
+  markSidebarNavigationTarget,
   popAndGetPreviousInApp,
   recordInAppNavigation,
+  syncSidebarNavigationRoot,
 } from "@/lib/navigationHistory";
 
 const SUPER_ADMIN_NAV = [
@@ -22,12 +25,21 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const user = getUser();
+  const [activeSidebarRoot, setActiveSidebarRoot] = useState<string | null>(() =>
+    getActiveSidebarNavigationRoot()
+  );
 
   function handleLogout() {
     clearInAppNavigationHistory();
     clearAuth();
     navigate("/login", { replace: true });
   }
+
+  const handleSidebarNavigate = (path: string) => {
+    const targetRouteKey = buildRouteKey(path);
+    markSidebarNavigationTarget(targetRouteKey);
+    setActiveSidebarRoot(targetRouteKey);
+  };
 
   const canNavigateBack = () => {
     if (typeof window === "undefined") return false;
@@ -40,8 +52,13 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
 
   const currentRouteKey = buildRouteKey(location.pathname, location.search);
   const hasAppBack = canGoBackInApp(currentRouteKey);
+  const isCurrentSidebarRoute = SUPER_ADMIN_NAV.some(
+    (item) => item.path === location.pathname
+  );
+  const isInSidebarDrilldown =
+    Boolean(activeSidebarRoot) && currentRouteKey !== activeSidebarRoot;
   const showGlobalBackButton =
-    location.pathname !== "/super-admin/restaurants" || hasAppBack || canNavigateBack();
+    isInSidebarDrilldown && (hasAppBack || canNavigateBack());
 
   const handleGlobalBack = () => {
     const previousRoute = popAndGetPreviousInApp(currentRouteKey);
@@ -54,8 +71,17 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       navigate(-1);
       return;
     }
+    if (activeSidebarRoot && currentRouteKey !== activeSidebarRoot) {
+      navigate(activeSidebarRoot, { replace: true });
+      return;
+    }
     navigate("/super-admin/restaurants", { replace: true });
   };
+
+  useEffect(() => {
+    const root = syncSidebarNavigationRoot(currentRouteKey, isCurrentSidebarRoute);
+    setActiveSidebarRoot(root);
+  }, [currentRouteKey, isCurrentSidebarRoute]);
 
   useEffect(() => {
     recordInAppNavigation(currentRouteKey);
@@ -79,6 +105,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
               <Link
                 key={item.path}
                 to={item.path}
+                onClick={() => handleSidebarNavigate(item.path)}
                 className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                   active
                     ? "bg-slate-700 text-white"
