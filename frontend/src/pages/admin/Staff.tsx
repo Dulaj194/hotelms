@@ -1,5 +1,6 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import ActionDialog from "@/components/shared/ActionDialog";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import type {
   AssignedArea,
@@ -18,6 +19,13 @@ import { ApiError } from "@/lib/api";
 import { getUser, normalizeRole } from "@/lib/auth";
 
 type DialogMode = { type: "add" } | { type: "edit"; staff: StaffListItemResponse } | null;
+type ConfirmActionState = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  confirmTone?: "primary" | "success" | "warning" | "danger";
+  onConfirm: () => Promise<void>;
+} | null;
 
 const EMPTY_CREATE: StaffCreateRequest = {
   full_name: "",
@@ -51,6 +59,9 @@ export default function Staff() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   const [pageMsg, setPageMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmActionState>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const allowedRoles = useMemo<UserRole[]>(() => {
     if (currentUserRole === "owner") {
@@ -116,6 +127,57 @@ export default function Staff() {
     setFormError(null);
   }
 
+  async function runConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    setConfirmError(null);
+    try {
+      await confirmAction.onConfirm();
+      setConfirmAction(null);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "An error occurred.";
+      setConfirmError(msg);
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
+  async function submitStaffChange() {
+    if (!dialog) return;
+
+    setSubmitting(true);
+    setFormError(null);
+
+    try {
+      if (dialog.type === "add") {
+        await api.post<StaffListItemResponse>("/users", formData);
+        setPageMsg({ type: "ok", text: "Staff member added successfully." });
+      } else {
+        const payload: StaffUpdateRequest = {
+          full_name: formData.full_name || undefined,
+          email: formData.email || undefined,
+          username: formData.username || undefined,
+          phone: formData.phone || undefined,
+          role: formData.role,
+          assigned_area: formData.assigned_area,
+          is_active: formData.is_active,
+        };
+        if (formData.password) payload.password = formData.password;
+        await api.patch<StaffListItemResponse>(`/users/${dialog.staff.id}`, payload);
+        setPageMsg({ type: "ok", text: "Staff member updated successfully." });
+      }
+      closeDialog();
+      loadStaff();
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleSubmit() {
     if (!dialog) return;
 
@@ -142,93 +204,65 @@ export default function Staff() {
       return;
     }
 
-    const confirmationText =
-      dialog.type === "add"
-        ? `Create staff account for ${formData.full_name.trim()}?`
-        : `Save updates for ${dialog.staff.full_name}?`;
-    if (!window.confirm(confirmationText)) return;
-
-    setSubmitting(true);
-    setFormError(null);
-
-    try {
-      if (dialog.type === "add") {
-        // SECURITY: No restaurant_id sent â€” backend derives it from token
-        await api.post<StaffListItemResponse>("/users", formData);
-        setPageMsg({ type: "ok", text: "Staff member added successfully." });
-      } else {
-        // Only send changed fields for edit; skip empty password
-        const payload: StaffUpdateRequest = {
-          full_name: formData.full_name || undefined,
-          email: formData.email || undefined,
-          username: formData.username || undefined,
-          phone: formData.phone || undefined,
-          role: formData.role,
-          assigned_area: formData.assigned_area,
-          is_active: formData.is_active,
-        };
-        if (formData.password) payload.password = formData.password;
-        await api.patch<StaffListItemResponse>(`/users/${dialog.staff.id}`, payload);
-        setPageMsg({ type: "ok", text: "Staff member updated successfully." });
-      }
-      closeDialog();
-      loadStaff();
-    } catch (err: unknown) {
-      const msg =
-        err instanceof ApiError
-          ? err.detail
-          : err instanceof Error
-            ? err.message
-            : "An error occurred.";
-      setFormError(msg);
-    } finally {
-      setSubmitting(false);
-    }
+    setConfirmError(null);
+    setConfirmAction({
+      title: dialog.type === "add" ? "Create Staff Account" : "Save Staff Changes",
+      description:
+        dialog.type === "add"
+          ? `Create a new staff account for ${formData.full_name.trim()}?`
+          : `Apply updates for ${dialog.staff.full_name}?`,
+      confirmLabel: dialog.type === "add" ? "Create Account" : "Save Changes",
+      confirmTone: "primary",
+      onConfirm: submitStaffChange,
+    });
   }
 
   async function handleDisable(id: number) {
-    if (!window.confirm("Deactivate this staff account now?")) return;
-    setPageMsg(null);
-    try {
-      await api.patch(`/users/${id}/disable`, {});
-      setPageMsg({ type: "ok", text: "Staff member disabled." });
-      loadStaff();
-    } catch (err: unknown) {
-      setPageMsg({
-        type: "err",
-        text: err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Failed to disable.",
-      });
-    }
+    setConfirmError(null);
+    setConfirmAction({
+      title: "Deactivate Staff Account",
+      description: "This staff member will lose access until the account is enabled again.",
+      confirmLabel: "Deactivate",
+      confirmTone: "warning",
+      onConfirm: async () => {
+        setPageMsg(null);
+        await api.patch(`/users/${id}/disable`, {});
+        setPageMsg({ type: "ok", text: "Staff member disabled." });
+        loadStaff();
+      },
+    });
   }
 
   async function handleEnable(id: number) {
-    if (!window.confirm("Reactivate this staff account?")) return;
-    setPageMsg(null);
-    try {
-      await api.patch(`/users/${id}/enable`, {});
-      setPageMsg({ type: "ok", text: "Staff member enabled." });
-      loadStaff();
-    } catch (err: unknown) {
-      setPageMsg({
-        type: "err",
-        text: err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Failed to enable.",
-      });
-    }
+    setConfirmError(null);
+    setConfirmAction({
+      title: "Reactivate Staff Account",
+      description: "This staff member will regain access to operational pages immediately.",
+      confirmLabel: "Enable",
+      confirmTone: "success",
+      onConfirm: async () => {
+        setPageMsg(null);
+        await api.patch(`/users/${id}/enable`, {});
+        setPageMsg({ type: "ok", text: "Staff member enabled." });
+        loadStaff();
+      },
+    });
   }
 
   async function handleDelete(id: number, name: string) {
-    if (!window.confirm(`Delete "${name}" permanently? (Deactivate first recommended)`)) return;
-    setPageMsg(null);
-    try {
-      await api.delete(`/users/${id}`);
-      setPageMsg({ type: "ok", text: "Staff member deleted." });
-      loadStaff();
-    } catch (err: unknown) {
-      setPageMsg({
-        type: "err",
-        text: err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Failed to delete.",
-      });
-    }
+    setConfirmError(null);
+    setConfirmAction({
+      title: "Delete Staff Account",
+      description: `Delete "${name}" permanently? Deactivating first is recommended.`,
+      confirmLabel: "Delete Staff",
+      confirmTone: "danger",
+      onConfirm: async () => {
+        setPageMsg(null);
+        await api.delete(`/users/${id}`);
+        setPageMsg({ type: "ok", text: "Staff member deleted." });
+        loadStaff();
+      },
+    });
   }
 
   const filteredStaff = useMemo(() => {
@@ -589,6 +623,23 @@ export default function Staff() {
             </div>
           </div>
         </div>
+      )}
+
+      {confirmAction && (
+        <ActionDialog
+          title={confirmAction.title}
+          description={confirmAction.description}
+          error={confirmError}
+          busy={confirmBusy || submitting}
+          onClose={() => {
+            if (confirmBusy || submitting) return;
+            setConfirmAction(null);
+            setConfirmError(null);
+          }}
+          onConfirm={() => void runConfirmedAction()}
+          confirmLabel={confirmBusy || submitting ? "Processing..." : confirmAction.confirmLabel}
+          confirmTone={confirmAction.confirmTone}
+        />
       )}
     </DashboardLayout>
   );

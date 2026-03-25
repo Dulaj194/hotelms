@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import ActionDialog from "@/components/shared/ActionDialog";
 import { getRoomToken } from "@/hooks/useRoomSession";
 import { createSessionRequest } from "@/lib/sessionRequest";
 import {
@@ -56,6 +57,8 @@ export default function ServiceRequest() {
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [requestsError, setRequestsError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const loadMyRequests = useCallback(async () => {
     if (!token) return;
@@ -184,16 +187,17 @@ export default function ServiceRequest() {
   };
 
   const handleCancel = async (requestId: number) => {
-    const confirmed = window.confirm("Cancel this pending request?");
-    if (!confirmed) return;
-
     setCancellingId(requestId);
     setRequestsError(null);
+    setCancelError(null);
     try {
       await roomRequest<{ message: string }>("DELETE", `/housekeeping/my-requests/${requestId}`);
       await loadMyRequests();
+      setCancelTargetId(null);
     } catch (err) {
-      setRequestsError(err instanceof Error ? err.message : "Failed to cancel request.");
+      const message = err instanceof Error ? err.message : "Failed to cancel request.";
+      setRequestsError(message);
+      setCancelError(message);
     } finally {
       setCancellingId(null);
     }
@@ -407,7 +411,10 @@ export default function ServiceRequest() {
                   </div>
                   {(req.status === "pending" || req.status === "pending_assignment" || req.status === "assigned") && (
                     <button
-                      onClick={() => void handleCancel(req.id)}
+                      onClick={() => {
+                        setCancelTargetId(req.id);
+                        setCancelError(null);
+                      }}
                       disabled={cancellingId === req.id}
                       className="mt-3 rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60"
                     >
@@ -420,6 +427,22 @@ export default function ServiceRequest() {
           )}
         </section>
       </main>
+      {cancelTargetId !== null && (
+        <ActionDialog
+          title="Cancel Pending Request"
+          description="This pending room request will be removed from the housekeeping queue."
+          error={cancelError}
+          busy={cancellingId === cancelTargetId}
+          onClose={() => {
+            if (cancellingId === cancelTargetId) return;
+            setCancelTargetId(null);
+            setCancelError(null);
+          }}
+          onConfirm={() => void handleCancel(cancelTargetId)}
+          confirmLabel={cancellingId === cancelTargetId ? "Cancelling..." : "Cancel Request"}
+          confirmTone="danger"
+        />
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import ActionDialog from "@/components/shared/ActionDialog";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
 import type {
@@ -18,6 +19,13 @@ export default function AllRoomQRCodes() {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string;
+    description: string;
+    confirmLabel: string;
+    onConfirm: () => Promise<void>;
+  } | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const orderedQRCodes = useMemo(
     () =>
@@ -48,10 +56,7 @@ export default function AllRoomQRCodes() {
     void loadRoomQRCodes();
   }, [loadRoomQRCodes]);
 
-  async function handleDeleteSingle(roomNumber: string) {
-    const confirmed = window.confirm(`Delete QR for room ${roomNumber}?`);
-    if (!confirmed) return;
-
+  async function deleteSingleRoomQr(roomNumber: string) {
     setWorking(true);
     setError(null);
     setNotice(null);
@@ -67,10 +72,7 @@ export default function AllRoomQRCodes() {
     }
   }
 
-  async function handleDeleteAll() {
-    const confirmed = window.confirm("Delete all room QR codes?");
-    if (!confirmed) return;
-
+  async function deleteAllRoomQrs() {
     setWorking(true);
     setError(null);
     setNotice(null);
@@ -83,6 +85,19 @@ export default function AllRoomQRCodes() {
       else setError("Failed to delete room QR codes.");
     } finally {
       setWorking(false);
+    }
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmAction) return;
+    setConfirmError(null);
+    try {
+      await confirmAction.onConfirm();
+      setConfirmAction(null);
+    } catch (err) {
+      if (err instanceof ApiError) setConfirmError(err.detail || "Action failed.");
+      else if (err instanceof Error) setConfirmError(err.message || "Action failed.");
+      else setConfirmError("Action failed.");
     }
   }
 
@@ -105,7 +120,16 @@ export default function AllRoomQRCodes() {
             Refresh
           </button>
           <button
-            onClick={() => void handleDeleteAll()}
+            onClick={() =>
+              setConfirmAction({
+                title: "Delete All Room QR Codes",
+                description: "This will remove every generated room QR code from the system.",
+                confirmLabel: "Delete All",
+                onConfirm: async () => {
+                  await deleteAllRoomQrs();
+                },
+              })
+            }
             disabled={loading || working || qrcodes.length === 0}
             className="app-btn-base border border-red-200 bg-white text-red-700 hover:bg-red-50"
           >
@@ -173,7 +197,16 @@ export default function AllRoomQRCodes() {
                       Download
                     </a>
                     <button
-                      onClick={() => void handleDeleteSingle(qr.target_number)}
+                      onClick={() =>
+                        setConfirmAction({
+                          title: `Delete Room ${qr.target_number} QR`,
+                          description: "This QR code will no longer be available for room login until regenerated.",
+                          confirmLabel: "Delete QR",
+                          onConfirm: async () => {
+                            await deleteSingleRoomQr(qr.target_number);
+                          },
+                        })
+                      }
                       disabled={working}
                       className="app-btn-compact border border-red-200 text-red-700 hover:bg-red-50"
                     >
@@ -187,6 +220,22 @@ export default function AllRoomQRCodes() {
         )}
       </div>
       </div>
+      {confirmAction && (
+        <ActionDialog
+          title={confirmAction.title}
+          description={confirmAction.description}
+          error={confirmError}
+          busy={working}
+          onClose={() => {
+            if (working) return;
+            setConfirmAction(null);
+            setConfirmError(null);
+          }}
+          onConfirm={() => void handleConfirmAction()}
+          confirmLabel={working ? "Deleting..." : confirmAction.confirmLabel}
+          confirmTone="danger"
+        />
+      )}
     </DashboardLayout>
   );
 }

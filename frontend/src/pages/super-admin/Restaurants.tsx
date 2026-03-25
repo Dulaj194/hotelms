@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import ActionDialog from "@/components/shared/ActionDialog";
 import { api } from "@/lib/api";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import type {
@@ -14,6 +15,14 @@ import type {
   PackageListResponse,
 } from "@/types/subscription";
 import type { StaffDetailResponse } from "@/types/user";
+
+type ConfirmActionState = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  confirmTone?: "primary" | "success" | "warning" | "danger";
+  onConfirm: () => Promise<void>;
+} | null;
 
 export default function SuperAdminRestaurants() {
   const [list, setList] = useState<RestaurantMeResponse[]>([]);
@@ -36,6 +45,9 @@ export default function SuperAdminRestaurants() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [actionMsg, setActionMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmActionState>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   // ─── Subscription state ────────────────────────────────────────────────────
   const [selectedSub, setSelectedSub] = useState<SubscriptionResponse | null>(null);
@@ -255,8 +267,21 @@ export default function SuperAdminRestaurants() {
     }
   }
 
-  async function handleDelete(restaurantId: number, restaurantName: string) {
-    if (!window.confirm(`Delete "${restaurantName}"? This cannot be undone.`)) return;
+  async function runConfirmedAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+    setConfirmError(null);
+    try {
+      await confirmAction.onConfirm();
+      setConfirmAction(null);
+    } catch (err) {
+      setConfirmError(err instanceof Error ? err.message : "Action failed.");
+    } finally {
+      setConfirmBusy(false);
+    }
+  }
+
+  async function deleteRestaurantRecord(restaurantId: number) {
     setDeletingId(restaurantId);
     setActionMsg(null);
     try {
@@ -269,14 +294,22 @@ export default function SuperAdminRestaurants() {
       });
       if (selected?.id === restaurantId) { setSelected(null); setEditingId(null); }
       setActionMsg({ type: "ok", text: result.message });
-    } catch (err) {
-      setActionMsg({
-        type: "err",
-        text: err instanceof Error ? err.message : "Failed to delete hotel.",
-      });
     } finally {
       setDeletingId(null);
     }
+  }
+
+  function handleDelete(restaurantId: number, restaurantName: string) {
+    setConfirmError(null);
+    setConfirmAction({
+      title: "Delete Hotel",
+      description: `Delete "${restaurantName}" permanently? This cannot be undone.`,
+      confirmLabel: "Delete Hotel",
+      confirmTone: "danger",
+      onConfirm: async () => {
+        await deleteRestaurantRecord(restaurantId);
+      },
+    });
   }
 
   async function handleSaveSub() {
@@ -354,22 +387,30 @@ export default function SuperAdminRestaurants() {
     }
   }
 
-  async function handleDeleteUser(userId: number, userName: string) {
+  async function removeHotelUser(userId: number) {
     if (!selected) return;
-    if (!window.confirm(`Remove "${userName}" from this hotel?`)) return;
     setDeletingUserId(userId);
     setAddUserMsg(null);
     try {
       await api.delete(`/restaurants/${selected.id}/users/${userId}`);
       setHotelUsers((prev) => prev.filter((u) => u.id !== userId));
-    } catch (err) {
-      setAddUserMsg({
-        type: "err",
-        text: err instanceof Error ? err.message : "Failed to remove staff member.",
-      });
     } finally {
       setDeletingUserId(null);
     }
+  }
+
+  function handleDeleteUser(userId: number, userName: string) {
+    if (!selected) return;
+    setConfirmError(null);
+    setConfirmAction({
+      title: "Remove Hotel User",
+      description: `Remove "${userName}" from this hotel staff list?`,
+      confirmLabel: "Remove User",
+      confirmTone: "danger",
+      onConfirm: async () => {
+        await removeHotelUser(userId);
+      },
+    });
   }
 
   async function handleToggleUser(userId: number, isActive: boolean) {
@@ -935,6 +976,23 @@ export default function SuperAdminRestaurants() {
             )}
 
           </div>
+        )}
+
+        {confirmAction && (
+          <ActionDialog
+            title={confirmAction.title}
+            description={confirmAction.description}
+            error={confirmError}
+            busy={confirmBusy}
+            onClose={() => {
+              if (confirmBusy) return;
+              setConfirmAction(null);
+              setConfirmError(null);
+            }}
+            onConfirm={() => void runConfirmedAction()}
+            confirmLabel={confirmBusy ? "Processing..." : confirmAction.confirmLabel}
+            confirmTone={confirmAction.confirmTone}
+          />
         )}
       </div>
     </SuperAdminLayout>
