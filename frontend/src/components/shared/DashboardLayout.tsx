@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   BedDouble,
   ChevronDown,
   ClipboardList,
@@ -27,12 +26,7 @@ import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 import {
-  buildRouteKey,
   clearInAppNavigationHistory,
-  getActiveSidebarNavigationRoot,
-  getStandardAdminFallbackRoute,
-  markSidebarNavigationTarget,
-  syncSidebarNavigationRoot,
 } from "@/lib/navigationHistory";
 import type { HousekeepingPendingCountResponse } from "@/types/housekeeping";
 
@@ -158,9 +152,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [housekeepingPendingCount, setHousekeepingPendingCount] = useState(0);
-  const [activeSidebarRoot, setActiveSidebarRoot] = useState<string | null>(() =>
-    getActiveSidebarNavigationRoot()
-  );
   const sidebarNavRef = useRef<HTMLElement | null>(null);
 
   const { menusOpen, kitchenOpen, qrOpen, housekeepingOpen, offersOpen } = groupState;
@@ -270,33 +261,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       (item.roles === null || item.roles.includes(role)) &&
       (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
   );
-  const sidebarPaths = useMemo(() => {
-    const paths: string[] = [...navItems.map((item) => item.path)];
-    if (isMenuGroupVisible) paths.push(...menuPaths);
-    if (isKitchenGroupVisible) paths.push(...kitchenPaths);
-    if (isQrGroupVisible) paths.push(...qrPaths);
-    if (isHousekeepingGroupVisible) {
-      paths.push(...visibleHousekeepingSubItems.map((item) => item.path));
-    }
-    if (isOfferGroupVisible) paths.push(...offerPaths);
-    return Array.from(new Set(paths));
-  }, [
-    isHousekeepingGroupVisible,
-    isKitchenGroupVisible,
-    isMenuGroupVisible,
-    isOfferGroupVisible,
-    isQrGroupVisible,
-    kitchenPaths,
-    menuPaths,
-    navItems,
-    offerPaths,
-    qrPaths,
-    visibleHousekeepingSubItems,
-  ]);
-  const isCurrentSidebarRoute = sidebarPaths.some(
-    (path) => location.pathname === path
-  );
-
   const toggleGroup = (group: keyof SidebarGroupState) => {
     setGroupState((prev) => ({ ...prev, [group]: !prev[group] }));
   };
@@ -307,10 +271,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setMobileSidebarOpen(false);
   };
 
-  const handleSidebarNavigate = (path: string) => {
-    const targetRouteKey = buildRouteKey(path);
-    markSidebarNavigationTarget(targetRouteKey);
-    setActiveSidebarRoot(targetRouteKey);
+  const handleSidebarNavigate = () => {
     closeMobileSidebar();
   };
   const handleSidebarScroll = () => {
@@ -444,38 +405,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     navigate("/login", { replace: true });
   }
 
-  const canNavigateBack = () => {
-    if (typeof window === "undefined") return false;
-    const state = window.history.state as { idx?: number } | null;
-    if (typeof state?.idx === "number") {
-      return state.idx > 0;
-    }
-    return window.history.length > 1;
-  };
-
-  const currentRouteKey = buildRouteKey(location.pathname, location.search);
-  const isInSidebarDrilldown =
-    Boolean(activeSidebarRoot) && currentRouteKey !== activeSidebarRoot;
-  // Show the global back button for both sidebar root pages and drilldown pages.
-  const showGlobalBackButton = isCurrentSidebarRoute || isInSidebarDrilldown;
-
-  const handleGlobalBack = () => {
-    if (canNavigateBack()) {
-      navigate(-1);
-      return;
-    }
-    if (activeSidebarRoot && currentRouteKey !== activeSidebarRoot) {
-      navigate(activeSidebarRoot, { replace: true });
-      return;
-    }
-    navigate(getStandardAdminFallbackRoute(location.pathname), { replace: true });
-  };
-
-  useEffect(() => {
-    const root = syncSidebarNavigationRoot(currentRouteKey, isCurrentSidebarRoute);
-    setActiveSidebarRoot(root);
-  }, [currentRouteKey, isCurrentSidebarRoute]);
-
   return (
     <div className="h-screen overflow-hidden bg-gray-50 md:grid md:grid-cols-[14rem_1fr]">
       <button
@@ -545,7 +474,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
-                        onClick={() => handleSidebarNavigate(subItem.path)}
+                        onClick={handleSidebarNavigate}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"
@@ -594,7 +523,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
-                        onClick={() => handleSidebarNavigate(subItem.path)}
+                        onClick={handleSidebarNavigate}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"
@@ -643,7 +572,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
-                        onClick={() => handleSidebarNavigate(subItem.path)}
+                        onClick={handleSidebarNavigate}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"
@@ -695,7 +624,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
-                        onClick={() => handleSidebarNavigate(subItem.path)}
+                        onClick={handleSidebarNavigate}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"
@@ -726,7 +655,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={() => handleSidebarNavigate(item.path)}
+                onClick={handleSidebarNavigate}
                 className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                   active
                     ? "bg-slate-700 text-white"
@@ -776,7 +705,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       <Link
                         key={subItem.path}
                         to={subItem.path}
-                        onClick={() => handleSidebarNavigate(subItem.path)}
+                        onClick={handleSidebarNavigate}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                           subActive
                             ? "bg-blue-950 text-white"
@@ -806,19 +735,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main content */}
       <main className="h-screen overflow-y-auto">
         <div className="app-content-container py-8">
-          {showGlobalBackButton && (
-            <div className="mb-5">
-              <button
-                type="button"
-                onClick={handleGlobalBack}
-                className="app-btn-ghost"
-                aria-label="Go back to previous page"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </button>
-            </div>
-          )}
           {children}
         </div>
       </main>

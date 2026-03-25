@@ -1,14 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { clearAuth, getUser } from "@/lib/auth";
 import {
-  buildRouteKey,
   clearInAppNavigationHistory,
-  getActiveSidebarNavigationRoot,
-  markSidebarNavigationTarget,
-  syncSidebarNavigationRoot,
 } from "@/lib/navigationHistory";
 
 const SUPER_ADMIN_NAV = [{ path: "/super-admin/restaurants", label: "Hotels" }];
@@ -23,9 +19,6 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const user = getUser();
-  const [activeSidebarRoot, setActiveSidebarRoot] = useState<string | null>(() =>
-    getActiveSidebarNavigationRoot()
-  );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const sidebarNavRef = useRef<HTMLElement | null>(null);
 
@@ -43,10 +36,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
     setMobileSidebarOpen((prev) => !prev);
   };
 
-  const handleSidebarNavigate = (path: string) => {
-    const targetRouteKey = buildRouteKey(path);
-    markSidebarNavigationTarget(targetRouteKey);
-    setActiveSidebarRoot(targetRouteKey);
+  const handleSidebarNavigate = () => {
     closeMobileSidebar();
   };
 
@@ -57,41 +47,6 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       String(sidebarNavRef.current.scrollTop)
     );
   };
-
-  const canNavigateBack = () => {
-    if (typeof window === "undefined") return false;
-    const state = window.history.state as { idx?: number } | null;
-    if (typeof state?.idx === "number") {
-      return state.idx > 0;
-    }
-    return window.history.length > 1;
-  };
-
-  const currentRouteKey = buildRouteKey(location.pathname, location.search);
-  const isCurrentSidebarRoute = SUPER_ADMIN_NAV.some(
-    (item) => item.path === location.pathname
-  );
-  const isInSidebarDrilldown =
-    Boolean(activeSidebarRoot) && currentRouteKey !== activeSidebarRoot;
-  // Show the global back button for both sidebar root pages and drilldown pages.
-  const showGlobalBackButton = isCurrentSidebarRoute || isInSidebarDrilldown;
-
-  const handleGlobalBack = () => {
-    if (canNavigateBack()) {
-      navigate(-1);
-      return;
-    }
-    if (activeSidebarRoot && currentRouteKey !== activeSidebarRoot) {
-      navigate(activeSidebarRoot, { replace: true });
-      return;
-    }
-    navigate("/super-admin/restaurants", { replace: true });
-  };
-
-  useEffect(() => {
-    const root = syncSidebarNavigationRoot(currentRouteKey, isCurrentSidebarRoute);
-    setActiveSidebarRoot(root);
-  }, [currentRouteKey, isCurrentSidebarRoute]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -172,7 +127,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
               <Link
                 key={item.path}
                 to={item.path}
-                onClick={() => handleSidebarNavigate(item.path)}
+                onClick={handleSidebarNavigate}
                 className={`flex items-center rounded px-3 py-2 text-sm font-medium transition-colors ${
                   active
                     ? "bg-slate-700 text-white"
@@ -196,19 +151,6 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
 
       <main className="h-screen overflow-y-auto">
         <div className="app-content-container py-8">
-          {showGlobalBackButton && (
-            <div className="mb-5">
-              <button
-                type="button"
-                onClick={handleGlobalBack}
-                className="app-btn-ghost"
-                aria-label="Go back to previous page"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </button>
-            </div>
-          )}
           {children}
         </div>
       </main>
