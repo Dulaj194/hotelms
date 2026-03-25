@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import type {
@@ -153,7 +153,7 @@ export default function Staff() {
 
     try {
       if (dialog.type === "add") {
-        // SECURITY: No restaurant_id sent — backend derives it from token
+        // SECURITY: No restaurant_id sent â€” backend derives it from token
         await api.post<StaffListItemResponse>("/users", formData);
         setPageMsg({ type: "ok", text: "Staff member added successfully." });
       } else {
@@ -322,14 +322,80 @@ export default function Staff() {
         </div>
 
         {loading ? (
-          <p className="text-gray-500 text-sm">Loading…</p>
+          <p className="text-gray-500 text-sm">Loadingâ€¦</p>
         ) : fetchError ? (
           <p className="text-red-600 text-sm">{fetchError}</p>
         ) : filteredStaff.length === 0 ? (
           <p className="text-gray-400 text-sm">No staff found. Add the first member.</p>
         ) : (
           <div className="rounded-lg border bg-white overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="space-y-3 p-4 md:hidden">
+              {filteredStaff.map((s) => (
+                <article key={s.id} className="rounded-lg border border-slate-200 p-4 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-slate-900">{s.full_name}</p>
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        s.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      }`}
+                    >
+                      {s.is_active ? "Active" : "Disabled"}
+                    </span>
+                  </div>
+                  <div className="mt-2 space-y-1 text-xs text-slate-600">
+                    <p>Username: {s.username ?? "Ã¢â‚¬â€"}</p>
+                    <p>Contact: {s.phone ?? "Ã¢â‚¬â€"}</p>
+                    <p>Email: {s.email}</p>
+                    <p>Role: {ROLE_LABELS[s.role]}</p>
+                    <p>Area: {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "Ã¢â‚¬â€"}</p>
+                    <p>
+                      Load:{" "}
+                      {s.pending_tasks_count > 0
+                        ? `${s.pending_tasks_count} / ${s.load_per_staff.toFixed(2)}`
+                        : "Ã¢â‚¬â€"}
+                    </p>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    {canManageRole(s.role) ? (
+                      <>
+                        <button
+                          onClick={() => openEdit(s)}
+                          className="w-full rounded-md border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 sm:w-auto"
+                        >
+                          Edit
+                        </button>
+                        {s.is_active ? (
+                          <button
+                            onClick={() => handleDisable(s.id)}
+                            className="w-full rounded-md border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 sm:w-auto"
+                          >
+                            Disable
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleEnable(s.id)}
+                            className="w-full rounded-md border border-green-200 px-3 py-2 text-xs font-semibold text-green-700 hover:bg-green-50 sm:w-auto"
+                          >
+                            Enable
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(s.id, s.full_name)}
+                          className="w-full rounded-md border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 sm:w-auto"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-xs text-gray-400">Restricted</span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="app-table-scroll hidden md:block">
+              <table className="w-full min-w-[980px] text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
@@ -347,8 +413,8 @@ export default function Staff() {
                 {filteredStaff.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">{s.full_name}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.username ?? "—"}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.phone ?? "—"}</td>
+                    <td className="px-4 py-3 text-gray-600">{s.username ?? "â€”"}</td>
+                    <td className="px-4 py-3 text-gray-600">{s.phone ?? "â€”"}</td>
                     <td className="px-4 py-3 text-gray-500">{s.email}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
@@ -356,12 +422,12 @@ export default function Staff() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "—"}
+                      {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "â€”"}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {s.pending_tasks_count > 0
                         ? `${s.pending_tasks_count} / ${s.load_per_staff.toFixed(2)}`
-                        : "—"}
+                        : "â€”"}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -414,15 +480,16 @@ export default function Staff() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
       {/* Add / Edit dialog */}
       {dialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-lg bg-white shadow-xl p-6 space-y-4">
+        <div className="app-modal-shell">
+          <div className="app-modal-panel max-w-md space-y-4">
             <h2 className="text-lg font-semibold">
               {dialog.type === "add" ? "Add Staff Member" : "Edit Staff Member"}
             </h2>
@@ -505,17 +572,17 @@ export default function Staff() {
 
             {formError && <p className="text-sm text-red-600">{formError}</p>}
 
-            <div className="flex gap-2 pt-1">
+            <div className="app-form-actions pt-1">
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:w-auto"
               >
-                {submitting ? "Saving…" : dialog.type === "add" ? "Add member" : "Save changes"}
+                {submitting ? "Savingâ€¦" : dialog.type === "add" ? "Add member" : "Save changes"}
               </button>
               <button
                 onClick={closeDialog}
-                className="flex-1 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+                className="w-full rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50 sm:w-auto"
               >
                 Cancel
               </button>
@@ -559,3 +626,4 @@ function StaffFormField({
     </div>
   );
 }
+

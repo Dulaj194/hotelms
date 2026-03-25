@@ -488,7 +488,55 @@ export default function SuperAdminRestaurants() {
           </div>
         ) : (
           <div className="rounded-lg border bg-white overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="space-y-3 p-4 md:hidden">
+              {list.map((r) => (
+                <article key={r.id} className="rounded-lg border border-gray-200 p-4 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-gray-900">{r.name}</p>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBooleanStatusBadgeClass(r.is_active)}`}
+                    >
+                      {r.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+                  <div className="mt-2 space-y-1 text-xs text-gray-600">
+                    <p>Email: {r.email ?? "â€”"}</p>
+                    <p>Phone: {r.phone ?? "â€”"}</p>
+                    <p>
+                      Subscription:{" "}
+                      {formatSubscriptionStatusLabel(subscriptionStatusByHotel[r.id])}
+                    </p>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleView(r.id)}
+                      className="w-full rounded border px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 sm:w-auto"
+                    >
+                      View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStartEdit(r.id)}
+                      className="w-full rounded border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 sm:w-auto"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(r.id, r.name)}
+                      disabled={deletingId === r.id}
+                      className="w-full rounded border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:w-auto"
+                    >
+                      {deletingId === r.id ? "Deletingâ€¦" : "Delete"}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="app-table-scroll hidden md:block">
+              <table className="w-full min-w-[900px] text-sm">
               <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
                 <tr>
                   <th className="px-4 py-3 text-left">Hotel Name</th>
@@ -537,7 +585,8 @@ export default function SuperAdminRestaurants() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         )}
 
@@ -791,8 +840,50 @@ export default function SuperAdminRestaurants() {
                 ) : hotelUsers.length === 0 ? (
                   <p className="text-sm text-gray-400">No staff members found.</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                  <>
+                    <div className="space-y-3 md:hidden">
+                      {hotelUsers.map((u) => (
+                        <article key={u.id} className="rounded-lg border border-gray-200 p-4 text-sm">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-semibold text-gray-900">{u.full_name}</p>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBooleanStatusBadgeClass(u.is_active)}`}
+                            >
+                              {u.is_active ? "Active" : "Inactive"}
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-1 text-xs text-gray-600">
+                            <p>Email: {u.email}</p>
+                            <p>Role: {u.role}</p>
+                          </div>
+                          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUser(u.id, u.is_active)}
+                              disabled={togglingUserId === u.id}
+                              className={`w-full rounded border px-2 py-1 text-xs font-medium disabled:opacity-50 sm:w-auto ${
+                                u.is_active
+                                  ? "border-orange-200 text-orange-700 hover:bg-orange-50"
+                                  : "border-green-200 text-green-700 hover:bg-green-50"
+                              }`}
+                            >
+                              {togglingUserId === u.id ? "â€¦" : u.is_active ? "Disable" : "Enable"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(u.id, u.full_name)}
+                              disabled={deletingUserId === u.id}
+                              className="w-full rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:w-auto"
+                            >
+                              {deletingUserId === u.id ? "â€¦" : "Remove"}
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+
+                    <div className="app-table-scroll hidden md:block">
+                      <table className="w-full min-w-[760px] text-sm">
                       <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
                         <tr>
                           <th className="px-3 py-2 text-left">Name</th>
@@ -836,8 +927,9 @@ export default function SuperAdminRestaurants() {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
-                  </div>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
             )}

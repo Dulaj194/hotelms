@@ -523,8 +523,8 @@ export default function MenuItems() {
       )}
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl p-6">
+        <div className="app-modal-shell">
+          <div className="app-modal-panel max-w-4xl">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               {editingItem ? "Edit Food Item" : "Add Food Item"}
             </h2>
@@ -773,20 +773,20 @@ export default function MenuItems() {
 
             {formError && <p className="text-red-500 text-xs mt-3">{formError}</p>}
 
-            <div className="flex gap-2 mt-5">
+            <div className="app-form-actions mt-5">
               <button
                 onClick={() => {
                   setModalOpen(false);
                   resetMediaState();
                 }}
-                className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || categories.length === 0}
-                className="flex-1 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
               >
                 {saving ? "Saving..." : editingItem ? "Update Item" : "Add Item"}
               </button>
@@ -796,23 +796,23 @@ export default function MenuItems() {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-sm p-6">
+        <div className="app-modal-shell">
+          <div className="app-modal-panel max-w-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Delete Item?</h2>
             <p className="text-sm text-gray-600 mb-5">
               <span className="font-medium">{deleteTarget.name}</span> will be permanently deleted from the menu.
             </p>
-            <div className="flex gap-2">
+            <div className="app-form-actions">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
                 disabled={deleting}
-                className="flex-1 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className="w-full rounded-lg bg-red-600 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
               >
                 {deleting ? "Deleting..." : "Delete"}
               </button>

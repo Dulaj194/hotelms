@@ -38,7 +38,7 @@ export default function Pricing() {
       }
     };
 
-    load();
+    void load();
   }, []);
 
   const sortedPackages = useMemo(() => {
@@ -47,8 +47,8 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="mb-8 flex items-center justify-between">
+      <div className="app-content-container mx-auto max-w-6xl py-12">
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Pricing</h1>
             <p className="mt-2 text-sm text-gray-600">
@@ -97,8 +97,24 @@ export default function Pricing() {
 
         <div className="mt-10 rounded-lg border bg-white p-6">
           <h3 className="text-base font-semibold text-gray-900">Feature Comparison</h3>
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
+
+          <div className="mt-4 space-y-3 md:hidden">
+            {FEATURE_CODES.map((feature) => (
+              <article key={feature} className="rounded-lg border border-gray-200 p-4 text-sm">
+                <p className="font-semibold text-gray-800">{feature}</p>
+                <div className="mt-2 space-y-1 text-xs text-gray-600">
+                  {sortedPackages.map((pkg) => (
+                    <p key={`${feature}-${pkg.id}`}>
+                      {pkg.name}: {packagePrivileges[pkg.id]?.has(feature) ? "Included" : "Not Included"}
+                    </p>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="app-table-scroll mt-4 hidden md:block">
+            <table className="w-full min-w-[700px] border-collapse text-sm">
               <thead>
                 <tr className="border-b bg-gray-50">
                   <th className="px-4 py-2 text-left font-medium text-gray-700">Feature</th>
@@ -115,7 +131,7 @@ export default function Pricing() {
                     <td className="px-4 py-2 font-medium text-gray-700">{feature}</td>
                     {sortedPackages.map((pkg) => (
                       <td key={`${feature}-${pkg.id}`} className="px-4 py-2 text-gray-600">
-                        {packagePrivileges[pkg.id]?.has(feature) ? "✅" : "—"}
+                        {packagePrivileges[pkg.id]?.has(feature) ? "Included" : "Not Included"}
                       </td>
                     ))}
                   </tr>
@@ -123,6 +139,7 @@ export default function Pricing() {
               </tbody>
             </table>
           </div>
+
           <p className="mt-3 text-xs text-gray-500">
             Final unlocked features are determined by your active package privileges.
           </p>

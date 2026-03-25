@@ -194,43 +194,70 @@ export default function KitchenOldOrders() {
           ) : filteredOrders.length === 0 ? (
             <div className="p-8 text-center text-sm text-slate-500">No old orders found for current filters.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3">Order</th>
-                    <th className="px-4 py-3">Source</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Placed At</th>
-                    <th className="px-4 py-3 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{order.order_number}</div>
-                        {order.customer_name && <div className="text-xs text-slate-500">{order.customer_name}</div>}
-                      </td>
-                      <td className="px-4 py-3 text-slate-700">{sourceLabel(order)}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            ORDER_STATUS_COLOR[order.status]
-                          }`}
-                        >
-                          {ORDER_STATUS_LABEL[order.status]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{formatDateTime(order.placed_at)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                        {order.total_amount.toFixed(2)}
-                      </td>
+            <>
+              <div className="space-y-3 p-4 md:hidden">
+                {filteredOrders.map((order) => (
+                  <article key={order.id} className="rounded-lg border border-slate-200 p-4 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-900">{order.order_number}</p>
+                        {order.customer_name && <p className="text-xs text-slate-500">{order.customer_name}</p>}
+                      </div>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          ORDER_STATUS_COLOR[order.status]
+                        }`}
+                      >
+                        {ORDER_STATUS_LABEL[order.status]}
+                      </span>
+                    </div>
+                    <div className="mt-2 space-y-1 text-xs text-slate-600">
+                      <p>Source: {sourceLabel(order)}</p>
+                      <p>Placed At: {formatDateTime(order.placed_at)}</p>
+                      <p>Total: {order.total_amount.toFixed(2)}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="app-table-scroll hidden md:block">
+                <table className="min-w-[720px] w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3">Order</th>
+                      <th className="px-4 py-3">Source</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Placed At</th>
+                      <th className="px-4 py-3 text-right">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredOrders.map((order) => (
+                      <tr key={order.id} className="hover:bg-slate-50/70">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-900">{order.order_number}</div>
+                          {order.customer_name && <div className="text-xs text-slate-500">{order.customer_name}</div>}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">{sourceLabel(order)}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              ORDER_STATUS_COLOR[order.status]
+                            }`}
+                          >
+                            {ORDER_STATUS_LABEL[order.status]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{formatDateTime(order.placed_at)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                          {order.total_amount.toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

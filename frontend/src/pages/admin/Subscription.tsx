@@ -307,8 +307,8 @@ export default function SubscriptionPage() {
 
         {!loading && subscription && statusInfo && (
           <>
-            <div className="grid gap-6 xl:grid-cols-3">
-              <section className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="grid gap-6 lg:grid-cols-3">
+              <section className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-base font-semibold text-slate-900">Current Plan Summary</h2>
@@ -482,35 +482,55 @@ export default function SubscriptionPage() {
                   No billing transactions found yet.
                 </div>
               ) : (
-                <div className="mt-4 overflow-x-auto">
-                  <table className="min-w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
-                        <th className="px-2 py-2">Transaction</th>
-                        <th className="px-2 py-2">Amount</th>
-                        <th className="px-2 py-2">Status</th>
-                        <th className="px-2 py-2">Created</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {billingHistory.map((item) => (
-                        <tr key={item.id} className="border-b border-slate-100 last:border-b-0">
-                          <td className="px-2 py-3">
+                <>
+                  <div className="mt-4 space-y-3 md:hidden">
+                    {billingHistory.map((item) => (
+                      <article key={item.id} className="rounded-lg border border-slate-200 p-4 text-sm">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
                             <p className="font-semibold text-slate-800">#{item.id}</p>
                             <p className="text-xs text-slate-500">{prettifyCode(item.transaction_type)}</p>
-                          </td>
-                          <td className="px-2 py-3 font-semibold text-slate-900">
-                            {formatCurrency(item.amount, item.currency)}
-                          </td>
-                          <td className="px-2 py-3">
-                            <TransactionStatusBadge status={item.status} />
-                          </td>
-                          <td className="px-2 py-3 text-slate-600">{formatDateTime(item.created_at)}</td>
+                          </div>
+                          <TransactionStatusBadge status={item.status} />
+                        </div>
+                        <div className="mt-2 space-y-1 text-xs text-slate-600">
+                          <p>Amount: {formatCurrency(item.amount, item.currency)}</p>
+                          <p>Created: {formatDateTime(item.created_at)}</p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+
+                  <div className="app-table-scroll mt-4 hidden md:block">
+                    <table className="min-w-[640px] w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                          <th className="px-2 py-2">Transaction</th>
+                          <th className="px-2 py-2">Amount</th>
+                          <th className="px-2 py-2">Status</th>
+                          <th className="px-2 py-2">Created</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {billingHistory.map((item) => (
+                          <tr key={item.id} className="border-b border-slate-100 last:border-b-0">
+                            <td className="px-2 py-3">
+                              <p className="font-semibold text-slate-800">#{item.id}</p>
+                              <p className="text-xs text-slate-500">{prettifyCode(item.transaction_type)}</p>
+                            </td>
+                            <td className="px-2 py-3 font-semibold text-slate-900">
+                              {formatCurrency(item.amount, item.currency)}
+                            </td>
+                            <td className="px-2 py-3">
+                              <TransactionStatusBadge status={item.status} />
+                            </td>
+                            <td className="px-2 py-3 text-slate-600">{formatDateTime(item.created_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
           </>
@@ -657,7 +677,7 @@ function ActionButton({
   variant: "primary" | "neutral" | "danger";
 }) {
   const baseClassName =
-    "inline-flex min-w-32 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex w-full sm:w-auto min-w-32 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60";
 
   const variantClassName =
     variant === "primary"
