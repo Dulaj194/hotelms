@@ -111,7 +111,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
 
   return (
     <div
-      className="min-h-screen bg-gray-50 transition-[grid-template-columns] duration-300"
+      className="h-screen overflow-hidden bg-gray-50 transition-[grid-template-columns] duration-300"
       style={{
         display: "grid",
         gridTemplateColumns: sidebarCollapsed ? "0 1fr" : "14rem 1fr",
@@ -129,7 +129,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
         <Menu className="h-4 w-4" />
       </button>
       {/* Sidebar */}
-      <aside className="bg-slate-900 text-white flex flex-col overflow-hidden">
+      <aside className="h-screen bg-slate-900 text-white flex flex-col overflow-hidden">
         <div className="px-4 py-5 border-b border-slate-700">
           <span className="text-lg font-bold tracking-tight">HotelMS</span>
           <p className="text-xs text-slate-400 mt-0.5">Super Admin</p>
@@ -137,7 +137,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
             <p className="text-xs text-slate-500 mt-0.5 truncate">{user.full_name}</p>
           )}
         </div>
-        <nav className="flex-1 py-4 space-y-0.5 px-2">
+        <nav className="flex-1 overflow-y-auto scrollbar-hide py-4 space-y-0.5 px-2">
           {SUPER_ADMIN_NAV.map((item) => {
             const active = location.pathname === item.path;
             return (
@@ -167,7 +167,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="h-screen overflow-y-auto">
         <div className={sidebarCollapsed ? "w-full px-6 py-8" : "max-w-5xl mx-auto px-6 py-8"}>
           {showGlobalBackButton && (
             <div className="mb-5">
