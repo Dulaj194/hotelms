@@ -8,7 +8,7 @@ import type { ReportFilterType, SalesReportResponse } from "@/types/report";
 type ReportViewMode = "daily" | "monthly" | "range";
 
 function formatDate(value: string | null): string {
-  if (!value) return "—";
+  if (!value) return "-";
   return new Date(value).toLocaleDateString();
 }
 
@@ -121,7 +121,9 @@ export default function Reports() {
     ]);
 
     const csv = [header, ...rows]
-      .map((columns) => columns.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+      .map((columns) =>
+        columns.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")
+      )
       .join("\n");
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -135,29 +137,31 @@ export default function Reports() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="rounded-xl border bg-white p-6 shadow-sm flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">Reports</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Review paid sales, filter by date, and export operational summaries.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={downloadCsv}
-              disabled={!report || !reportsEnabled}
-              className="rounded-md border px-4 py-2 text-sm text-gray-700 disabled:opacity-60"
-            >
-              Download CSV
-            </button>
-            <button
-              onClick={() => window.print()}
-              disabled={!reportsEnabled}
-              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-            >
-              Print
-            </button>
+      <div className="app-page-stack">
+        <div className="rounded-xl border bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="app-section-title text-gray-900">Reports</h1>
+              <p className="app-muted-text mt-1 text-gray-600">
+                Review paid sales, filter by date, and export operational summaries.
+              </p>
+            </div>
+            <div className="app-form-actions">
+              <button
+                onClick={downloadCsv}
+                disabled={!report || !reportsEnabled}
+                className="app-btn-base w-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 sm:w-auto"
+              >
+                Download CSV
+              </button>
+              <button
+                onClick={() => window.print()}
+                disabled={!reportsEnabled}
+                className="app-btn-base w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
+              >
+                Print
+              </button>
+            </div>
           </div>
         </div>
 
@@ -169,27 +173,33 @@ export default function Reports() {
 
         {reportsEnabled && (
           <section className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="app-form-actions">
               <button
                 onClick={() => setViewMode("daily")}
-                className={`rounded-md px-3 py-2 text-sm ${
-                  viewMode === "daily" ? "bg-blue-600 text-white" : "border text-gray-700"
+                className={`app-btn-compact w-full sm:w-auto ${
+                  viewMode === "daily"
+                    ? "bg-blue-600 text-white"
+                    : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
                 }`}
               >
                 Daily
               </button>
               <button
                 onClick={() => setViewMode("monthly")}
-                className={`rounded-md px-3 py-2 text-sm ${
-                  viewMode === "monthly" ? "bg-blue-600 text-white" : "border text-gray-700"
+                className={`app-btn-compact w-full sm:w-auto ${
+                  viewMode === "monthly"
+                    ? "bg-blue-600 text-white"
+                    : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
                 }`}
               >
                 Monthly
               </button>
               <button
                 onClick={() => setViewMode("range")}
-                className={`rounded-md px-3 py-2 text-sm ${
-                  viewMode === "range" ? "bg-blue-600 text-white" : "border text-gray-700"
+                className={`app-btn-compact w-full sm:w-auto ${
+                  viewMode === "range"
+                    ? "bg-blue-600 text-white"
+                    : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
                 }`}
               >
                 Date Range
@@ -197,32 +207,30 @@ export default function Reports() {
             </div>
 
             {viewMode === "daily" ? (
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="app-form-grid items-end">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                    Date
+                  </label>
                   <input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   />
                 </div>
-                <button
-                  onClick={() => void loadReport()}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
-                >
-                  Apply
-                </button>
                 {report && report.available_dates.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">History</label>
+                    <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                      History
+                    </label>
                     <select
                       value={selectedDate}
                       onChange={(e) => {
                         setSelectedDate(e.target.value);
                         setViewMode("daily");
                       }}
-                      className="rounded-md border px-3 py-2 text-sm"
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                     >
                       {report.available_dates.map((value) => (
                         <option key={value} value={value}>
@@ -232,48 +240,62 @@ export default function Reports() {
                     </select>
                   </div>
                 )}
+                <button
+                  onClick={() => void loadReport()}
+                  className={`app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto ${
+                    report && report.available_dates.length > 0 ? "md:col-span-2" : ""
+                  }`}
+                >
+                  Apply
+                </button>
               </div>
             ) : viewMode === "monthly" ? (
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="app-form-grid items-end">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                    Month
+                  </label>
                   <input
                     type="month"
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   />
                 </div>
                 <button
                   onClick={() => void loadReport()}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+                  className="app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
                 >
                   Apply
                 </button>
               </div>
             ) : (
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="app-form-grid items-end">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                    From
+                  </label>
                   <input
                     type="date"
                     value={fromDate}
                     onChange={(e) => setFromDate(e.target.value)}
-                    className="rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                    To
+                  </label>
                   <input
                     type="date"
                     value={toDate}
                     onChange={(e) => setToDate(e.target.value)}
-                    className="rounded-md border px-3 py-2 text-sm"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   />
                 </div>
                 <button
                   onClick={() => void loadReport()}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white"
+                  className="app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto md:col-span-2"
                 >
                   Apply
                 </button>
@@ -287,7 +309,9 @@ export default function Reports() {
         )}
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
         )}
 
         {reportsEnabled && report && !loading && (
@@ -308,96 +332,156 @@ export default function Reports() {
             </section>
 
             <section className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border bg-white p-6 shadow-sm overflow-auto">
-                <h2 className="text-base font-semibold text-gray-900">Sales by Category</h2>
+              <div className="rounded-xl border bg-white p-6 shadow-sm">
+                <h2 className="app-section-title text-gray-900">Sales by Category</h2>
                 {report.categories.length === 0 ? (
                   <p className="mt-4 text-sm text-gray-500">No category data for the selected period.</p>
                 ) : (
-                  <table className="mt-4 w-full text-sm">
-                    <thead className="text-left text-gray-500">
-                      <tr>
-                        <th className="pb-2">Category</th>
-                        <th className="pb-2">Qty</th>
-                        <th className="pb-2">Lines</th>
-                        <th className="pb-2 text-right">Sales</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
+                  <>
+                    <div className="mt-4 space-y-2 md:hidden">
                       {report.categories.map((row) => (
-                        <tr key={row.category_name}>
-                          <td className="py-2 pr-3">{row.category_name}</td>
-                          <td className="py-2 pr-3">{row.total_quantity}</td>
-                          <td className="py-2 pr-3">{row.line_count}</td>
-                          <td className="py-2 text-right font-medium">{money(row.total_sales)}</td>
-                        </tr>
+                        <article key={row.category_name} className="rounded-lg border border-gray-200 p-3">
+                          <p className="text-sm font-semibold text-gray-900">{row.category_name}</p>
+                          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-gray-600">
+                            <p>Qty: {row.total_quantity}</p>
+                            <p className="text-right">Lines: {row.line_count}</p>
+                            <p className="col-span-2 text-right font-semibold text-gray-800">
+                              Sales: {money(row.total_sales)}
+                            </p>
+                          </div>
+                        </article>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                    <div className="app-table-scroll hidden md:block">
+                      <table className="mt-4 w-full min-w-[480px] text-sm">
+                        <thead className="text-left text-gray-500">
+                          <tr>
+                            <th className="pb-2">Category</th>
+                            <th className="pb-2">Qty</th>
+                            <th className="pb-2">Lines</th>
+                            <th className="pb-2 text-right">Sales</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {report.categories.map((row) => (
+                            <tr key={row.category_name}>
+                              <td className="py-2 pr-3">{row.category_name}</td>
+                              <td className="py-2 pr-3">{row.total_quantity}</td>
+                              <td className="py-2 pr-3">{row.line_count}</td>
+                              <td className="py-2 text-right font-medium">{money(row.total_sales)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
 
-              <div className="rounded-xl border bg-white p-6 shadow-sm overflow-auto">
-                <h2 className="text-base font-semibold text-gray-900">Sales by Payment Method</h2>
+              <div className="rounded-xl border bg-white p-6 shadow-sm">
+                <h2 className="app-section-title text-gray-900">Sales by Payment Method</h2>
                 {report.payment_methods.length === 0 ? (
                   <p className="mt-4 text-sm text-gray-500">No payment data for the selected period.</p>
                 ) : (
-                  <table className="mt-4 w-full text-sm">
-                    <thead className="text-left text-gray-500">
-                      <tr>
-                        <th className="pb-2">Method</th>
-                        <th className="pb-2">Count</th>
-                        <th className="pb-2 text-right">Sales</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
+                  <>
+                    <div className="mt-4 space-y-2 md:hidden">
                       {report.payment_methods.map((row) => (
-                        <tr key={row.payment_method}>
-                          <td className="py-2 pr-3">{row.payment_method}</td>
-                          <td className="py-2 pr-3">{row.payment_count}</td>
-                          <td className="py-2 text-right font-medium">{money(row.total_sales)}</td>
-                        </tr>
+                        <article key={row.payment_method} className="rounded-lg border border-gray-200 p-3">
+                          <p className="text-sm font-semibold text-gray-900">{row.payment_method}</p>
+                          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-gray-600">
+                            <p>Count: {row.payment_count}</p>
+                            <p className="text-right font-semibold text-gray-800">
+                              Sales: {money(row.total_sales)}
+                            </p>
+                          </div>
+                        </article>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                    <div className="app-table-scroll hidden md:block">
+                      <table className="mt-4 w-full min-w-[420px] text-sm">
+                        <thead className="text-left text-gray-500">
+                          <tr>
+                            <th className="pb-2">Method</th>
+                            <th className="pb-2">Count</th>
+                            <th className="pb-2 text-right">Sales</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {report.payment_methods.map((row) => (
+                            <tr key={row.payment_method}>
+                              <td className="py-2 pr-3">{row.payment_method}</td>
+                              <td className="py-2 pr-3">{row.payment_count}</td>
+                              <td className="py-2 text-right font-medium">{money(row.total_sales)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
               </div>
             </section>
 
-            <section className="rounded-xl border bg-white p-6 shadow-sm overflow-auto">
-              <h2 className="text-base font-semibold text-gray-900">Detailed Sales Report</h2>
+            <section className="rounded-xl border bg-white p-6 shadow-sm">
+              <h2 className="app-section-title text-gray-900">Detailed Sales Report</h2>
               {report.rows.length === 0 ? (
                 <p className="mt-4 text-sm text-gray-500">No paid sales found for the selected period.</p>
               ) : (
-                <table className="mt-4 w-full text-sm min-w-[900px]">
-                  <thead className="text-left text-gray-500">
-                    <tr>
-                      <th className="pb-2">Date & Time</th>
-                      <th className="pb-2">Category</th>
-                      <th className="pb-2">Item</th>
-                      <th className="pb-2">Qty</th>
-                      <th className="pb-2">Unit</th>
-                      <th className="pb-2">Total</th>
-                      <th className="pb-2">Method</th>
-                      <th className="pb-2">Location</th>
-                      <th className="pb-2">Customer</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
+                <>
+                  <div className="mt-4 space-y-3 md:hidden">
                     {report.rows.map((row) => (
-                      <tr key={`${row.order_id}-${row.item_name}-${row.sales_at}`}>
-                        <td className="py-2 pr-3">{formatDateTime(row.sales_at)}</td>
-                        <td className="py-2 pr-3">{row.category_name ?? "—"}</td>
-                        <td className="py-2 pr-3">{row.item_name}</td>
-                        <td className="py-2 pr-3">{row.quantity}</td>
-                        <td className="py-2 pr-3">{money(row.unit_price)}</td>
-                        <td className="py-2 pr-3 font-medium">{money(row.total_price)}</td>
-                        <td className="py-2 pr-3">{row.payment_method}</td>
-                        <td className="py-2 pr-3">{row.location_label}</td>
-                        <td className="py-2 pr-3">{row.customer_name ?? "—"}</td>
-                      </tr>
+                      <article
+                        key={`${row.order_id}-${row.item_name}-${row.sales_at}`}
+                        className="rounded-lg border border-gray-200 p-3 text-sm"
+                      >
+                        <p className="font-semibold text-gray-900">{row.item_name}</p>
+                        <p className="text-xs text-gray-500">{formatDateTime(row.sales_at)}</p>
+                        <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-600">
+                          <p>Category: {row.category_name ?? "-"}</p>
+                          <p className="text-right">Qty: {row.quantity}</p>
+                          <p>Unit: {money(row.unit_price)}</p>
+                          <p className="text-right">Total: {money(row.total_price)}</p>
+                          <p>Method: {row.payment_method}</p>
+                          <p className="text-right">Location: {row.location_label}</p>
+                          <p className="col-span-2">Customer: {row.customer_name ?? "-"}</p>
+                        </div>
+                      </article>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+
+                  <div className="app-table-scroll hidden md:block">
+                    <table className="mt-4 w-full min-w-[900px] text-sm">
+                      <thead className="text-left text-gray-500">
+                        <tr>
+                          <th className="pb-2">Date & Time</th>
+                          <th className="pb-2">Category</th>
+                          <th className="pb-2">Item</th>
+                          <th className="pb-2">Qty</th>
+                          <th className="pb-2">Unit</th>
+                          <th className="pb-2">Total</th>
+                          <th className="pb-2">Method</th>
+                          <th className="pb-2">Location</th>
+                          <th className="pb-2">Customer</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {report.rows.map((row) => (
+                          <tr key={`${row.order_id}-${row.item_name}-${row.sales_at}`}>
+                            <td className="py-2 pr-3">{formatDateTime(row.sales_at)}</td>
+                            <td className="py-2 pr-3">{row.category_name ?? "-"}</td>
+                            <td className="py-2 pr-3">{row.item_name}</td>
+                            <td className="py-2 pr-3">{row.quantity}</td>
+                            <td className="py-2 pr-3">{money(row.unit_price)}</td>
+                            <td className="py-2 pr-3 font-medium">{money(row.total_price)}</td>
+                            <td className="py-2 pr-3">{row.payment_method}</td>
+                            <td className="py-2 pr-3">{row.location_label}</td>
+                            <td className="py-2 pr-3">{row.customer_name ?? "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </section>
           </>

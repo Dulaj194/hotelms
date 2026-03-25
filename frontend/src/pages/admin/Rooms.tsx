@@ -151,7 +151,7 @@ export default function Rooms() {
         {canManageRooms && (
           <button
             onClick={openCreate}
-            className="app-btn-base bg-orange-500 text-white hover:bg-orange-600"
+            className="app-btn-base w-full bg-orange-500 text-white hover:bg-orange-600 sm:w-auto"
           >
             + Add Room
           </button>
@@ -181,76 +181,126 @@ export default function Rooms() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Room #</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Floor</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {rooms.map((room) => (
-                <tr key={room.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-semibold">{room.room_number}</td>
-                  <td className="px-4 py-3 text-gray-600">{room.room_name ?? "-"}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {room.floor_number !== null ? `Floor ${room.floor_number}` : "-"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge active={room.is_active} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {canManageRooms ? (
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEdit(room)}
-                          className="app-btn-compact border border-gray-200 text-gray-700 hover:bg-gray-100"
-                          title="Edit room"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => void handleToggleActive(room)}
-                          className={`app-btn-compact border ${
-                            room.is_active
-                              ? "hover:bg-orange-50 border-orange-200 text-orange-600"
-                              : "hover:bg-green-50 border-green-200 text-green-600"
-                          }`}
-                          title={room.is_active ? "Disable room" : "Enable room"}
-                        >
-                          {room.is_active ? "Disable" : "Enable"}
-                        </button>
-                        <button
-                          onClick={() => setDeleteTarget(room)}
-                          className="app-btn-compact border border-red-200 text-red-600 hover:bg-red-50"
-                          title="Delete room"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="text-right text-xs text-gray-500">View only</div>
-                    )}
-                  </td>
+          <div className="space-y-3 p-4 md:hidden">
+            {rooms.map((room) => (
+              <article key={room.id} className="rounded-lg border border-gray-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Room {room.room_number}</p>
+                    <p className="text-xs text-gray-500">{room.room_name ?? "No room name"}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {room.floor_number !== null ? `Floor ${room.floor_number}` : "Floor -"}
+                    </p>
+                  </div>
+                  <Badge active={room.is_active} />
+                </div>
+                {canManageRooms ? (
+                  <div className="app-form-actions mt-4">
+                    <button
+                      onClick={() => openEdit(room)}
+                      className="app-btn-compact w-full border border-gray-200 text-gray-700 hover:bg-gray-100 sm:w-auto"
+                      title="Edit room"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => void handleToggleActive(room)}
+                      className={`app-btn-compact w-full border sm:w-auto ${
+                        room.is_active
+                          ? "border-orange-200 text-orange-600 hover:bg-orange-50"
+                          : "border-green-200 text-green-600 hover:bg-green-50"
+                      }`}
+                      title={room.is_active ? "Disable room" : "Enable room"}
+                    >
+                      {room.is_active ? "Disable" : "Enable"}
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(room)}
+                      className="app-btn-compact w-full border border-red-200 text-red-600 hover:bg-red-50 sm:w-auto"
+                      title="Delete room"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-3 text-xs text-gray-500">View only</div>
+                )}
+              </article>
+            ))}
+          </div>
+
+          <div className="app-table-scroll hidden md:block">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Room #</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Floor</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y">
+                {rooms.map((room) => (
+                  <tr key={room.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-semibold">{room.room_number}</td>
+                    <td className="px-4 py-3 text-gray-600">{room.room_name ?? "-"}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {room.floor_number !== null ? `Floor ${room.floor_number}` : "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge active={room.is_active} />
+                    </td>
+                    <td className="px-4 py-3">
+                      {canManageRooms ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => openEdit(room)}
+                            className="app-btn-compact w-full border border-gray-200 text-gray-700 hover:bg-gray-100 sm:w-auto"
+                            title="Edit room"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => void handleToggleActive(room)}
+                            className={`app-btn-compact w-full border sm:w-auto ${
+                              room.is_active
+                                ? "border-orange-200 text-orange-600 hover:bg-orange-50"
+                                : "border-green-200 text-green-600 hover:bg-green-50"
+                            }`}
+                            title={room.is_active ? "Disable room" : "Enable room"}
+                          >
+                            {room.is_active ? "Disable" : "Enable"}
+                          </button>
+                          <button
+                            onClick={() => setDeleteTarget(room)}
+                            className="app-btn-compact w-full border border-red-200 text-red-600 hover:bg-red-50 sm:w-auto"
+                            title="Delete room"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-right text-xs text-gray-500">View only</div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
       {canManageRooms && modalOpen && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+        <div className="app-modal-shell">
+          <div className="app-modal-panel max-w-lg">
             <h2 className="app-section-title mb-4 text-gray-900">
               {editingRoom ? `Edit Room ${editingRoom.room_number}` : "Add Room"}
             </h2>
 
-            <div className="space-y-4">
-              <div>
+            <div className="app-form-grid">
+              <div className="md:col-span-2">
                 <label className="app-muted-text mb-1 block font-medium text-gray-700">
                   Room Number <span className="text-red-500">*</span>
                 </label>
@@ -265,7 +315,7 @@ export default function Rooms() {
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-1">
                 <label className="app-muted-text mb-1 block font-medium text-gray-700">
                   Room Name (optional)
                 </label>
@@ -283,7 +333,7 @@ export default function Rooms() {
                 />
               </div>
 
-              <div>
+              <div className="md:col-span-1">
                 <label className="app-muted-text mb-1 block font-medium text-gray-700">
                   Floor Number (optional)
                 </label>
@@ -305,18 +355,18 @@ export default function Rooms() {
 
             {formError && <p className="mt-3 text-sm text-red-600">{formError}</p>}
 
-            <div className="mt-6 flex gap-3">
+            <div className="app-form-actions mt-6">
               <button
                 onClick={() => void handleSave()}
                 disabled={saving}
-                className="app-btn-base flex-1 bg-orange-500 text-white hover:bg-orange-600"
+                className="app-btn-base w-full bg-orange-500 text-white hover:bg-orange-600 sm:w-auto"
               >
                 {saving ? "Saving..." : editingRoom ? "Save Changes" : "Create Room"}
               </button>
               <button
                 onClick={() => setModalOpen(false)}
                 disabled={saving}
-                className="app-btn-base flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                className="app-btn-base w-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 sm:w-auto"
               >
                 Cancel
               </button>
@@ -326,25 +376,25 @@ export default function Rooms() {
       )}
 
       {canManageRooms && deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+        <div className="app-modal-shell">
+          <div className="app-modal-panel max-w-md">
             <h2 className="app-section-title mb-2 text-gray-900">Delete Room?</h2>
             <p className="text-sm text-gray-600 mb-6">
               Are you sure you want to delete Room <span className="font-semibold">{deleteTarget.room_number}</span>?
               This action cannot be undone.
             </p>
-            <div className="flex gap-3">
+            <div className="app-form-actions">
               <button
                 onClick={() => void handleConfirmDelete()}
                 disabled={deleting}
-                className="app-btn-base flex-1 bg-red-600 text-white hover:bg-red-700"
+                className="app-btn-base w-full bg-red-600 text-white hover:bg-red-700 sm:w-auto"
               >
                 {deleting ? "Deleting..." : "Delete"}
               </button>
               <button
                 onClick={() => setDeleteTarget(null)}
                 disabled={deleting}
-                className="app-btn-base flex-1 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                className="app-btn-base w-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 sm:w-auto"
               >
                 Cancel
               </button>

@@ -350,6 +350,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [mobileSidebarOpen]);
 
   useEffect(() => {
+    if (!mobileSidebarOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMobileSidebar();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileSidebarOpen]);
+
+  useEffect(() => {
     setGroupState((prev) => {
       const next = { ...prev };
       let changed = false;
@@ -469,7 +482,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         onClick={toggleMobileSidebar}
         aria-label={mobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
         title={mobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
-        className="fixed left-3 top-4 z-50 inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition-colors hover:bg-slate-100 md:hidden"
+        className={`fixed top-4 z-[70] inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-100 md:hidden ${
+          mobileSidebarOpen ? "left-[13.75rem]" : "left-3"
+        }`}
       >
         <Menu className="h-4 w-4" />
       </button>
