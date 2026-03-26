@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
+import PrivilegeRoute from "@/components/shared/PrivilegeRoute";
 import ForgotPassword from "@/pages/auth/ForgotPassword";
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
@@ -37,6 +38,7 @@ import SubscriptionPaymentCancel from "@/pages/admin/SubscriptionPaymentCancel";
 import Pricing from "@/pages/public/Pricing";
 import SuperAdminRestaurants from "@/pages/super-admin/Restaurants";
 import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
+import { HOUSEKEEPING_TASK_ROLES } from "@/lib/moduleAccess";
 
 function RootRedirect() {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
@@ -233,8 +235,10 @@ function App() {
         <Route
           path="/admin/housekeeping"
           element={
-            <ProtectedRoute allowedRoles={["owner", "admin", "housekeeper"]}>
-              <Housekeeping />
+            <ProtectedRoute allowedRoles={[...HOUSEKEEPING_TASK_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="HOUSEKEEPING">
+                <Housekeeping />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />

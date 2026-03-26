@@ -26,6 +26,10 @@ import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 import {
+  canAccessHousekeepingTasks,
+  hasPrivilegeCode,
+} from "@/lib/moduleAccess";
+import {
   clearInAppNavigationHistory,
 } from "@/lib/navigationHistory";
 import type { HousekeepingPendingCountResponse } from "@/types/housekeeping";
@@ -43,6 +47,7 @@ interface MenuSubItem {
   label: string;
   icon: ComponentType<{ className?: string }>;
   roles?: string[];
+  privilege?: string;
 }
 
 type SidebarGroupState = {
@@ -201,6 +206,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         label: "Messages",
         icon: Handshake,
         roles: ["owner", "admin", "housekeeper"],
+        privilege: "HOUSEKEEPING",
       },
       {
         path: "/admin/housekeeping/rooms/qr/all",
@@ -226,9 +232,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const visibleHousekeepingSubItems = useMemo(
     () =>
       housekeepingSubItems.filter(
-        (item) => !item.roles || item.roles.includes(role)
+        (item) =>
+          (!item.roles || item.roles.includes(role)) &&
+          (!item.privilege || (!privilegesLoading && hasPrivilegeCode(privileges, item.privilege)))
       ),
-    [housekeepingSubItems, role]
+    [housekeepingSubItems, privileges, privilegesLoading, role]
   );
   const isMenuGroupVisible = role === "owner" || role === "admin";
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
@@ -238,8 +246,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const isQrGroupVisible = role === "owner" || role === "admin";
   const isQrGroupActive = qrPaths.some((path) => location.pathname === path);
   const isHousekeepingGroupVisible = visibleHousekeepingSubItems.length > 0;
-  const hasHousekeepingPrivilege =
-    role === "housekeeper" || privileges.includes("HOUSEKEEPING");
+  const housekeepingTasksEnabled = canAccessHousekeepingTasks(role, privileges);
   const isHousekeepingGroupActive = housekeepingPaths.some((path) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
@@ -369,7 +376,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   ]);
 
   useEffect(() => {
-    if (!isHousekeepingGroupVisible || privilegesLoading || !hasHousekeepingPrivilege) {
+    if (!isHousekeepingGroupVisible || privilegesLoading || !housekeepingTasksEnabled) {
       setHousekeepingPendingCount(0);
       return;
     }
@@ -397,7 +404,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       active = false;
       window.clearInterval(timer);
     };
-  }, [hasHousekeepingPrivilege, isHousekeepingGroupVisible, privilegesLoading]);
+  }, [housekeepingTasksEnabled, isHousekeepingGroupVisible, privilegesLoading]);
 
   function handleLogout() {
     clearInAppNavigationHistory();

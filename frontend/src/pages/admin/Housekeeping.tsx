@@ -5,6 +5,10 @@ import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
+import {
+  HOUSEKEEPING_SUPERVISOR_ROLES,
+  HOUSEKEEPING_TASK_ROLES,
+} from "@/lib/moduleAccess";
 import type { RoomListResponse, RoomResponse } from "@/types/room";
 import type { StaffListItemResponse } from "@/types/user";
 import {
@@ -31,8 +35,8 @@ import {
   type HousekeepingSubmitRequest,
 } from "@/types/housekeeping";
 
-const ALLOWED_ROLES = new Set(["owner", "admin", "housekeeper"]);
-const SUPERVISOR_ROLES = new Set(["owner", "admin"]);
+const ALLOWED_ROLES = new Set<string>(HOUSEKEEPING_TASK_ROLES);
+const SUPERVISOR_ROLES = new Set<string>(HOUSEKEEPING_SUPERVISOR_ROLES);
 
 const REQUEST_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "", label: "All Types" },
