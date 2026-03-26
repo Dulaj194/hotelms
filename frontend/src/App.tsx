@@ -17,7 +17,6 @@ import Offers from "@/pages/admin/Offers";
 import OfferFormPage from "@/pages/admin/OfferFormPage";
 import Reports from "@/pages/admin/Reports";
 import Staff from "@/pages/admin/Staff";
-import RestaurantProfile from "@/pages/restaurant/RestaurantProfile";
 import TableMenu from "@/pages/public/TableMenu";
 import TableOrderStatus from "@/pages/public/TableOrderStatus";
 import RoomMenu from "@/pages/public/RoomMenu";
@@ -97,11 +96,7 @@ function App() {
 
         <Route
           path="/restaurant"
-          element={
-            <ProtectedRoute>
-              <RestaurantProfile />
-            </ProtectedRoute>
-          }
+          element={<RootRedirect />}
         />
 
         <Route

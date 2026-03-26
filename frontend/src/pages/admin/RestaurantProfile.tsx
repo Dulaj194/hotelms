@@ -5,7 +5,11 @@ import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Star } from "lucide-rea
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
-import type { AdminDashboardOverviewResponse, DashboardSubscriptionSummary } from "@/types/dashboard";
+import type {
+  AdminDashboardOverviewResponse,
+  DashboardSetupRequirement,
+  DashboardSubscriptionSummary,
+} from "@/types/dashboard";
 import type {
   RestaurantLogoUploadResponse,
   RestaurantMeResponse,
@@ -19,10 +23,31 @@ interface NoticeMessage {
   text: string;
 }
 
+interface BusinessFormState {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  country: string;
+  currency: string;
+  billing_email: string;
+  tax_id: string;
+}
+
 interface ScheduleFormState {
   opening_time: string;
   closing_time: string;
 }
+
+const SETUP_SECTION_LABELS: Record<string, string> = {
+  country: "Business Details",
+  currency: "Business Details",
+  billing_email: "Business Details",
+  tax_id: "Business Details",
+  logo_url: "Branding",
+  opening_time: "Operating Schedule",
+  closing_time: "Operating Schedule",
+};
 
 export default function RestaurantProfile() {
   const navigate = useNavigate();
@@ -35,6 +60,21 @@ export default function RestaurantProfile() {
 
   const [restaurant, setRestaurant] = useState<RestaurantMeResponse | null>(null);
   const [subscriptionSummary, setSubscriptionSummary] = useState<DashboardSubscriptionSummary | null>(null);
+  const [setupRequirements, setSetupRequirements] = useState<DashboardSetupRequirement[]>([]);
+  const [setupProgress, setSetupProgress] = useState<number | null>(null);
+
+  const [editingBusiness, setEditingBusiness] = useState(false);
+  const [savingBusiness, setSavingBusiness] = useState(false);
+  const [businessForm, setBusinessForm] = useState<BusinessFormState>({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    country: "",
+    currency: "",
+    billing_email: "",
+    tax_id: "",
+  });
 
   const [editingSchedule, setEditingSchedule] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
@@ -71,22 +111,18 @@ export default function RestaurantProfile() {
       }
 
       setRestaurant(profileData);
+      resetBusinessForm(profileData);
       resetScheduleForm(profileData);
     } catch (err) {
       if (!aliveRef.current) {
         return;
       }
 
-      const message =
-        err instanceof ApiError
-          ? err.detail
-          : err instanceof Error
-            ? err.message
-            : "Failed to load restaurant profile.";
-
-      setFetchError(message || "Failed to load restaurant profile.");
+      setFetchError(getErrorMessage(err, "Failed to load restaurant profile."));
       setRestaurant(null);
       setSubscriptionSummary(null);
+      setSetupRequirements([]);
+      setSetupProgress(null);
 
       if (showLoader) {
         setLoading(false);
@@ -94,23 +130,46 @@ export default function RestaurantProfile() {
       return;
     }
 
+    await loadOverviewSummary();
+
+    if (showLoader && aliveRef.current) {
+      setLoading(false);
+    }
+  }
+
+  async function loadOverviewSummary() {
     try {
       const overviewData = await api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview");
       if (!aliveRef.current) {
         return;
       }
+
       setSubscriptionSummary(overviewData.subscription);
+      setSetupRequirements(overviewData.setup_requirements);
+      setSetupProgress(overviewData.setup_wizard.progress_percent);
     } catch {
       if (!aliveRef.current) {
         return;
       }
-      // Non-blocking call: profile UI remains usable without this summary.
+
+      // Non-blocking call: profile UI remains usable without setup summary.
       setSubscriptionSummary(null);
-    } finally {
-      if (showLoader && aliveRef.current) {
-        setLoading(false);
-      }
+      setSetupRequirements([]);
+      setSetupProgress(null);
     }
+  }
+
+  function resetBusinessForm(data: RestaurantMeResponse) {
+    setBusinessForm({
+      name: data.name,
+      email: data.email ?? "",
+      phone: data.phone ?? "",
+      address: data.address ?? "",
+      country: data.country ?? "",
+      currency: data.currency ?? "",
+      billing_email: data.billing_email ?? "",
+      tax_id: data.tax_id ?? "",
+    });
   }
 
   function resetScheduleForm(data: RestaurantMeResponse) {
@@ -122,10 +181,93 @@ export default function RestaurantProfile() {
 
   async function handleRefresh() {
     setRefreshing(true);
+    setProfileNotice(null);
+    setUploadNotice(null);
     await loadProfile({ showLoader: false });
     if (aliveRef.current) {
       setRefreshing(false);
     }
+  }
+
+  async function saveProfileChanges(
+    payload: RestaurantUpdateRequest,
+    messages: { success: string; failure: string },
+  ): Promise<RestaurantMeResponse | null> {
+    try {
+      const updated = await api.patch<RestaurantMeResponse>("/restaurants/me", payload);
+      if (!aliveRef.current) {
+        return null;
+      }
+
+      setRestaurant(updated);
+      resetBusinessForm(updated);
+      resetScheduleForm(updated);
+      await loadOverviewSummary();
+
+      if (!aliveRef.current) {
+        return null;
+      }
+
+      setProfileNotice({ tone: "success", text: messages.success });
+      return updated;
+    } catch (err) {
+      if (!aliveRef.current) {
+        return null;
+      }
+
+      setProfileNotice({ tone: "error", text: getErrorMessage(err, messages.failure) });
+      return null;
+    }
+  }
+
+  async function handleBusinessSave() {
+    if (!restaurant) {
+      return;
+    }
+
+    const trimmedName = businessForm.name.trim();
+    if (!trimmedName) {
+      setProfileNotice({ tone: "error", text: "Restaurant name is required." });
+      return;
+    }
+
+    setSavingBusiness(true);
+    setProfileNotice(null);
+
+    const updated = await saveProfileChanges(
+      {
+        name: trimmedName,
+        email: toNullable(businessForm.email),
+        phone: toNullable(businessForm.phone),
+        address: toNullable(businessForm.address),
+        country: toNullable(businessForm.country),
+        currency: toUpperNullable(businessForm.currency),
+        billing_email: toNullable(businessForm.billing_email),
+        tax_id: toNullable(businessForm.tax_id),
+      },
+      {
+        success: "Business details updated successfully.",
+        failure: "Failed to save business details.",
+      },
+    );
+
+    if (updated && aliveRef.current) {
+      setEditingBusiness(false);
+    }
+
+    if (aliveRef.current) {
+      setSavingBusiness(false);
+    }
+  }
+
+  function handleCancelBusinessEdit() {
+    if (!restaurant) {
+      return;
+    }
+
+    resetBusinessForm(restaurant);
+    setEditingBusiness(false);
+    setProfileNotice(null);
   }
 
   async function handleScheduleSave() {
@@ -136,38 +278,23 @@ export default function RestaurantProfile() {
     setSavingSchedule(true);
     setProfileNotice(null);
 
-    const payload: RestaurantUpdateRequest = {
-      opening_time: toNullable(scheduleForm.opening_time),
-      closing_time: toNullable(scheduleForm.closing_time),
-    };
+    const updated = await saveProfileChanges(
+      {
+        opening_time: toNullable(scheduleForm.opening_time),
+        closing_time: toNullable(scheduleForm.closing_time),
+      },
+      {
+        success: "Operating schedule updated successfully.",
+        failure: "Failed to save operating schedule.",
+      },
+    );
 
-    try {
-      const updated = await api.patch<RestaurantMeResponse>("/restaurants/me", payload);
-      if (!aliveRef.current) {
-        return;
-      }
-
-      setRestaurant(updated);
-      resetScheduleForm(updated);
+    if (updated && aliveRef.current) {
       setEditingSchedule(false);
-      setProfileNotice({ tone: "success", text: "Operating schedule updated successfully." });
-    } catch (err) {
-      if (!aliveRef.current) {
-        return;
-      }
+    }
 
-      const detail =
-        err instanceof ApiError
-          ? err.detail
-          : err instanceof Error
-            ? err.message
-            : "Failed to save operating schedule.";
-
-      setProfileNotice({ tone: "error", text: detail || "Failed to save operating schedule." });
-    } finally {
-      if (aliveRef.current) {
-        setSavingSchedule(false);
-      }
+    if (aliveRef.current) {
+      setSavingSchedule(false);
     }
   }
 
@@ -175,6 +302,7 @@ export default function RestaurantProfile() {
     if (!restaurant) {
       return;
     }
+
     resetScheduleForm(restaurant);
     setEditingSchedule(false);
     setProfileNotice(null);
@@ -199,20 +327,19 @@ export default function RestaurantProfile() {
       }
 
       setRestaurant((prev) => (prev ? { ...prev, logo_url: data.logo_url } : prev));
+      await loadOverviewSummary();
+
+      if (!aliveRef.current) {
+        return;
+      }
+
       setUploadNotice({ tone: "success", text: "Logo uploaded successfully." });
     } catch (err) {
       if (!aliveRef.current) {
         return;
       }
 
-      const detail =
-        err instanceof ApiError
-          ? err.detail
-          : err instanceof Error
-            ? err.message
-            : "Logo upload failed.";
-
-      setUploadNotice({ tone: "error", text: detail || "Logo upload failed." });
+      setUploadNotice({ tone: "error", text: getErrorMessage(err, "Logo upload failed.") });
     } finally {
       if (aliveRef.current) {
         setUploading(false);
@@ -264,6 +391,9 @@ export default function RestaurantProfile() {
     (trialDaysRemaining === null || trialDaysRemaining >= 0);
   const trialDaysLabel = trialDaysRemaining ?? 0;
 
+  const pendingRequirements = setupRequirements.filter((item) => !item.completed);
+  const blockingRequirements = pendingRequirements.filter((item) => item.severity === "blocking");
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -273,7 +403,7 @@ export default function RestaurantProfile() {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Profile Management</p>
               <h1 className="mt-1 text-2xl font-semibold text-slate-900">Restaurant Profile</h1>
               <p className="mt-1 text-sm text-slate-600">
-                Keep profile details clear and maintain daily operation hours.
+                Complete branding, business details, and operating hours from one place.
               </p>
             </div>
 
@@ -289,10 +419,10 @@ export default function RestaurantProfile() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate("/admin/menu/menus")}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                onClick={() => navigate("/dashboard")}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
-                Go to Admin Dashboard
+                Back to Dashboard
               </button>
             </div>
           </div>
@@ -328,6 +458,72 @@ export default function RestaurantProfile() {
                 Upgrade Now
               </button>
             </div>
+          </section>
+        )}
+
+        {setupRequirements.length > 0 && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <SectionHeader
+                title="Setup Status"
+                description="These fields drive the dashboard setup wizard and operational readiness checks."
+              />
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                {setupProgress ?? 0}% complete
+              </span>
+            </div>
+
+            <div className="mt-4 h-2 w-full rounded-full bg-slate-100">
+              <div
+                className="h-2 rounded-full bg-blue-600"
+                style={{ width: `${setupProgress ?? 0}%` }}
+              />
+            </div>
+
+            {pendingRequirements.length === 0 ? (
+              <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                All setup requirements are complete. Your profile is ready for daily operations.
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {pendingRequirements.map((item) => {
+                  const isBlocking = item.severity === "blocking";
+                  return (
+                    <div
+                      key={item.key}
+                      className={`rounded-xl border px-4 py-3 ${
+                        isBlocking
+                          ? "border-amber-200 bg-amber-50"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+                            isBlocking
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-200 text-slate-700"
+                          }`}
+                        >
+                          {item.severity}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600">{item.description}</p>
+                      <p className="mt-2 text-xs font-medium text-slate-500">
+                        Update in {getSetupSectionLabel(item.key)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {blockingRequirements.length > 0 && (
+              <p className="mt-4 text-xs text-slate-500">
+                Blocking items must be completed before operational workflows are fully ready.
+              </p>
+            )}
           </section>
         )}
 
@@ -375,34 +571,127 @@ export default function RestaurantProfile() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <SectionHeader
-            title="Business Details"
-            description="Core restaurant profile information."
-          />
+          <div className="flex items-start justify-between gap-3">
+            <SectionHeader
+              title="Business Details"
+              description="Core restaurant profile information used by setup, billing, and daily operations."
+            />
+            {!editingBusiness && (
+              <button
+                type="button"
+                onClick={() => {
+                  resetScheduleForm(restaurant);
+                  setEditingSchedule(false);
+                  setEditingBusiness(true);
+                  setProfileNotice(null);
+                }}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Edit Details
+              </button>
+            )}
+          </div>
 
-          <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-            <DetailItem label="Name" value={restaurant.name} />
-            <DetailItem label="Email" value={restaurant.email} />
-            <DetailItem label="Phone" value={restaurant.phone} />
-            <DetailItem label="Country" value={restaurant.country} />
-            <DetailItem label="Currency" value={restaurant.currency} />
-            <DetailItem label="Billing Email" value={restaurant.billing_email} />
-            <DetailItem label="Tax ID" value={restaurant.tax_id} />
-            <DetailItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
-            <DetailItem label="Address" value={restaurant.address} fullWidth />
-          </dl>
+          {editingBusiness ? (
+            <div className="mt-5 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <InputField
+                  label="Name"
+                  value={businessForm.name}
+                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, name: value }))}
+                />
+                <InputField
+                  label="Email"
+                  type="email"
+                  value={businessForm.email}
+                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, email: value }))}
+                />
+                <InputField
+                  label="Phone"
+                  value={businessForm.phone}
+                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, phone: value }))}
+                />
+                <InputField
+                  label="Country"
+                  value={businessForm.country}
+                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, country: value }))}
+                />
+                <InputField
+                  label="Currency"
+                  value={businessForm.currency}
+                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, currency: value }))}
+                />
+                <InputField
+                  label="Billing Email"
+                  type="email"
+                  value={businessForm.billing_email}
+                  onChange={(value) =>
+                    setBusinessForm((prev) => ({ ...prev, billing_email: value }))
+                  }
+                />
+                <InputField
+                  label="Tax ID"
+                  value={businessForm.tax_id}
+                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, tax_id: value }))}
+                />
+              </div>
+
+              <TextAreaField
+                label="Address"
+                value={businessForm.address}
+                onChange={(value) => setBusinessForm((prev) => ({ ...prev, address: value }))}
+              />
+
+              <p className="text-xs text-slate-500">
+                Country and currency are required to clear setup blockers. Billing email and tax ID
+                help with invoices and subscription notifications.
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleBusinessSave}
+                  disabled={savingBusiness}
+                  className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingBusiness ? "Saving..." : "Save Details"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelBusinessEdit}
+                  className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+              <DetailItem label="Name" value={restaurant.name} />
+              <DetailItem label="Email" value={restaurant.email} />
+              <DetailItem label="Phone" value={restaurant.phone} />
+              <DetailItem label="Country" value={restaurant.country} />
+              <DetailItem label="Currency" value={restaurant.currency} />
+              <DetailItem label="Billing Email" value={restaurant.billing_email} />
+              <DetailItem label="Tax ID" value={restaurant.tax_id} />
+              <DetailItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
+              <DetailItem label="Address" value={restaurant.address} fullWidth />
+            </dl>
+          )}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <SectionHeader
               title="Operating Schedule"
-              description="Admin can update opening and closing times for daily operation."
+              description="Update opening and closing times used by daily operational checks."
             />
             {!editingSchedule && (
               <button
                 type="button"
                 onClick={() => {
+                  resetBusinessForm(restaurant);
+                  setEditingBusiness(false);
                   setEditingSchedule(true);
                   setProfileNotice(null);
                 }}
@@ -519,6 +808,28 @@ function InputField({
   );
 }
 
+function TextAreaField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <textarea
+        rows={3}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+      />
+    </div>
+  );
+}
+
 function DetailItem({
   label,
   value,
@@ -539,4 +850,23 @@ function DetailItem({
 function toNullable(value: string): string | null {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function toUpperNullable(value: string): string | null {
+  const normalized = toNullable(value);
+  return normalized ? normalized.toUpperCase() : null;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    return error.detail || fallback;
+  }
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+  return fallback;
+}
+
+function getSetupSectionLabel(key: string): string {
+  return SETUP_SECTION_LABELS[key] ?? "Restaurant Profile";
 }
