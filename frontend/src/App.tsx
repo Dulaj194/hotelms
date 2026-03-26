@@ -38,7 +38,7 @@ import SubscriptionPaymentCancel from "@/pages/admin/SubscriptionPaymentCancel";
 import Pricing from "@/pages/public/Pricing";
 import SuperAdminRestaurants from "@/pages/super-admin/Restaurants";
 import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
-import { HOUSEKEEPING_TASK_ROLES } from "@/lib/moduleAccess";
+import { HOUSEKEEPING_TASK_ROLES, QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
 
 function RootRedirect() {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
@@ -147,16 +147,20 @@ function App() {
         <Route
           path="/admin/steward"
           element={
-            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
-              <Steward />
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <Steward />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/reports"
           element={
-            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
-              <Reports />
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <Reports />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
@@ -167,24 +171,30 @@ function App() {
         <Route
           path="/admin/kitchen/orders"
           element={
-            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
-              <Kitchen />
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <Kitchen />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/kitchen/old-orders"
           element={
-            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
-              <KitchenOldOrders />
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <KitchenOldOrders />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/billing"
           element={
-            <ProtectedRoute allowedRoles={["owner", "admin", "steward"]}>
-              <Billing />
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <Billing />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />

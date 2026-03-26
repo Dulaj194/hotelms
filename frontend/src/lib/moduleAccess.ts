@@ -2,6 +2,7 @@ import { normalizeRole } from "@/lib/auth";
 
 export const HOUSEKEEPING_TASK_ROLES = ["owner", "admin", "housekeeper"] as const;
 export const HOUSEKEEPING_SUPERVISOR_ROLES = ["owner", "admin"] as const;
+export const QR_MENU_STAFF_ROLES = ["owner", "admin", "steward"] as const;
 
 export function hasRoleAccess(
   role: string | null | undefined,
@@ -16,12 +17,27 @@ export function hasPrivilegeCode(privileges: string[], code: string): boolean {
   return privileges.some((item) => item.toUpperCase() === normalizedCode);
 }
 
+export function canAccessModuleItem(
+  role: string | null | undefined,
+  privileges: string[],
+  allowedRoles?: readonly string[] | null,
+  privilegeCode?: string,
+): boolean {
+  const roleOk = !allowedRoles || hasRoleAccess(role, allowedRoles);
+  const privilegeOk = !privilegeCode || hasPrivilegeCode(privileges, privilegeCode);
+  return roleOk && privilegeOk;
+}
+
 export function canAccessHousekeepingTasks(
   role: string | null | undefined,
   privileges: string[],
 ): boolean {
-  return (
-    hasRoleAccess(role, HOUSEKEEPING_TASK_ROLES) &&
-    hasPrivilegeCode(privileges, "HOUSEKEEPING")
-  );
+  return canAccessModuleItem(role, privileges, HOUSEKEEPING_TASK_ROLES, "HOUSEKEEPING");
+}
+
+export function canAccessQrMenuStaffModule(
+  role: string | null | undefined,
+  privileges: string[],
+): boolean {
+  return canAccessModuleItem(role, privileges, QR_MENU_STAFF_ROLES, "QR_MENU");
 }

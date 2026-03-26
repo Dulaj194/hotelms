@@ -5,6 +5,7 @@ import KitchenOrderSection from "@/components/shared/KitchenOrderSection";
 import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
+import { QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
 import type { NewOrderEvent, OrderStatusUpdatedEvent } from "@/types/realtime";
 import type {
   KitchenOrderCard,
@@ -12,7 +13,7 @@ import type {
   KitchenOrderListResponse,
 } from "@/types/order";
 
-const STEWARD_ROLES = new Set(["owner", "admin", "steward"]);
+const STEWARD_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
 const POLL_INTERVAL_MS = 3000;
 const SERVED_STORAGE_TTL_MS = 12 * 60 * 60 * 1000;
 

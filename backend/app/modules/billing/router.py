@@ -12,7 +12,7 @@ The restaurant_id is derived from the JWT token, never from the client request.
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_restaurant_id, require_roles
+from app.core.dependencies import get_current_restaurant_id, require_privilege, require_roles
 from app.core.dependencies import get_db
 from app.modules.billing import service as billing_service
 from app.modules.billing.schemas import (
@@ -38,6 +38,7 @@ def get_bill_summary(
     db: Session = Depends(get_db),
     restaurant_id: int = Depends(get_current_restaurant_id),
     _=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_privilege("QR_MENU")),
 ):
     return billing_service.get_bill_summary(db, session_id, restaurant_id)
 
@@ -54,6 +55,7 @@ def settle_session(
     db: Session = Depends(get_db),
     restaurant_id: int = Depends(get_current_restaurant_id),
     _=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_privilege("QR_MENU")),
 ):
     return billing_service.settle_session(db, session_id, restaurant_id, payload)
 
@@ -68,6 +70,7 @@ def list_session_payments(
     db: Session = Depends(get_db),
     restaurant_id: int = Depends(get_current_restaurant_id),
     _=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_privilege("QR_MENU")),
 ):
     return billing_service.list_session_payments(db, session_id, restaurant_id)
 
@@ -82,6 +85,7 @@ def get_session_billing_status(
     db: Session = Depends(get_db),
     restaurant_id: int = Depends(get_current_restaurant_id),
     _=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_privilege("QR_MENU")),
 ):
     return billing_service.get_session_billing_status(db, session_id, restaurant_id)
 

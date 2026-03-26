@@ -26,8 +26,8 @@ import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 import {
+  canAccessModuleItem,
   canAccessHousekeepingTasks,
-  hasPrivilegeCode,
 } from "@/lib/moduleAccess";
 import {
   clearInAppNavigationHistory,
@@ -181,9 +181,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const kitchenSubItems: MenuSubItem[] = useMemo(
     () => [
-      { path: "/admin/steward", label: "Steward Dashboard", icon: UserCog },
-      { path: "/admin/kitchen/orders", label: "Orders", icon: ClipboardList },
-      { path: "/admin/kitchen/old-orders", label: "Old Orders", icon: ReceiptText },
+      { path: "/admin/steward", label: "Steward Dashboard", icon: UserCog, privilege: "QR_MENU" },
+      { path: "/admin/kitchen/orders", label: "Orders", icon: ClipboardList, privilege: "QR_MENU" },
+      { path: "/admin/kitchen/old-orders", label: "Old Orders", icon: ReceiptText, privilege: "QR_MENU" },
     ],
     []
   );
@@ -229,18 +229,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const qrPaths = useMemo(() => qrSubItems.map((item) => item.path), [qrSubItems]);
   const housekeepingPaths = useMemo(() => housekeepingSubItems.map((item) => item.path), [housekeepingSubItems]);
   const offerPaths = useMemo(() => offerSubItems.map((item) => item.path), [offerSubItems]);
+  const visibleKitchenSubItems = useMemo(
+    () =>
+      kitchenSubItems.filter((item) =>
+        canAccessModuleItem(role, privileges, item.roles, item.privilege)
+      ),
+    [kitchenSubItems, privileges, role]
+  );
   const visibleHousekeepingSubItems = useMemo(
     () =>
-      housekeepingSubItems.filter(
-        (item) =>
-          (!item.roles || item.roles.includes(role)) &&
-          (!item.privilege || (!privilegesLoading && hasPrivilegeCode(privileges, item.privilege)))
+      housekeepingSubItems.filter((item) =>
+        canAccessModuleItem(role, privileges, item.roles, item.privilege)
       ),
-    [housekeepingSubItems, privileges, privilegesLoading, role]
+    [housekeepingSubItems, privileges, role]
   );
   const isMenuGroupVisible = role === "owner" || role === "admin";
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
-  const isKitchenGroupVisible = role === "owner" || role === "admin" || role === "steward";
+  const isKitchenGroupVisible = !privilegesLoading && visibleKitchenSubItems.length > 0;
   const isKitchenGroupActive =
     location.pathname.startsWith("/admin/kitchen") || location.pathname === "/admin/steward";
   const isQrGroupVisible = role === "owner" || role === "admin";
@@ -265,8 +270,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       !qrPaths.includes(item.path) &&
       !housekeepingPaths.includes(item.path) &&
       !offerPaths.includes(item.path) &&
-      (item.roles === null || item.roles.includes(role)) &&
-      (!("privilege" in item) || !item.privilege || (!privilegesLoading && hasPrivilege(item.privilege)))
+      canAccessModuleItem(role, privileges, item.roles, item.privilege)
   );
   const toggleGroup = (group: keyof SidebarGroupState) => {
     setGroupState((prev) => ({ ...prev, [group]: !prev[group] }));
@@ -523,7 +527,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               {kitchenOpen && (
                 <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
-                  {kitchenSubItems.map((subItem) => {
+                  {visibleKitchenSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
                     return (

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
-import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { api, ApiError } from "@/lib/api";
 import type { ReportFilterType, SalesReportResponse } from "@/types/report";
 
@@ -21,9 +20,6 @@ function money(value: number): string {
 }
 
 export default function Reports() {
-  const { loading: privilegeLoading, hasPrivilege } = useSubscriptionPrivileges();
-  const reportsEnabled = hasPrivilege("QR_MENU");
-
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
   const defaultFromDate = useMemo(() => {
     const current = new Date();
@@ -42,11 +38,6 @@ export default function Reports() {
   const [error, setError] = useState<string | null>(null);
 
   const loadReport = useCallback(async () => {
-    if (!reportsEnabled) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError(null);
     try {
@@ -83,13 +74,11 @@ export default function Reports() {
     } finally {
       setLoading(false);
     }
-  }, [fromDate, reportsEnabled, selectedDate, selectedMonth, toDate, viewMode]);
+  }, [fromDate, selectedDate, selectedMonth, toDate, viewMode]);
 
   useEffect(() => {
-    if (!privilegeLoading) {
-      void loadReport();
-    }
-  }, [loadReport, privilegeLoading]);
+    void loadReport();
+  }, [loadReport]);
 
   function downloadCsv() {
     if (!report) return;
@@ -149,14 +138,13 @@ export default function Reports() {
             <div className="app-form-actions">
               <button
                 onClick={downloadCsv}
-                disabled={!report || !reportsEnabled}
+                disabled={!report}
                 className="app-btn-base w-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 sm:w-auto"
               >
                 Download CSV
               </button>
               <button
                 onClick={() => window.print()}
-                disabled={!reportsEnabled}
                 className="app-btn-base w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
               >
                 Print
@@ -165,146 +153,138 @@ export default function Reports() {
           </div>
         </div>
 
-        {!privilegeLoading && !reportsEnabled && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            Reports are locked because this restaurant does not currently have the QR_MENU privilege.
+        <section className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
+          <div className="app-form-actions">
+            <button
+              onClick={() => setViewMode("daily")}
+              className={`app-btn-compact w-full sm:w-auto ${
+                viewMode === "daily"
+                  ? "bg-blue-600 text-white"
+                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Daily
+            </button>
+            <button
+              onClick={() => setViewMode("monthly")}
+              className={`app-btn-compact w-full sm:w-auto ${
+                viewMode === "monthly"
+                  ? "bg-blue-600 text-white"
+                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setViewMode("range")}
+              className={`app-btn-compact w-full sm:w-auto ${
+                viewMode === "range"
+                  ? "bg-blue-600 text-white"
+                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Date Range
+            </button>
           </div>
-        )}
 
-        {reportsEnabled && (
-          <section className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
-            <div className="app-form-actions">
+          {viewMode === "daily" ? (
+            <div className="app-form-grid items-end">
+              <div>
+                <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              {report && report.available_dates.length > 0 && (
+                <div>
+                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                    History
+                  </label>
+                  <select
+                    value={selectedDate}
+                    onChange={(e) => {
+                      setSelectedDate(e.target.value);
+                      setViewMode("daily");
+                    }}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  >
+                    {report.available_dates.map((value) => (
+                      <option key={value} value={value}>
+                        {formatDate(value)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <button
-                onClick={() => setViewMode("daily")}
-                className={`app-btn-compact w-full sm:w-auto ${
-                  viewMode === "daily"
-                    ? "bg-blue-600 text-white"
-                    : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                onClick={() => void loadReport()}
+                className={`app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto ${
+                  report && report.available_dates.length > 0 ? "md:col-span-2" : ""
                 }`}
               >
-                Daily
-              </button>
-              <button
-                onClick={() => setViewMode("monthly")}
-                className={`app-btn-compact w-full sm:w-auto ${
-                  viewMode === "monthly"
-                    ? "bg-blue-600 text-white"
-                    : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setViewMode("range")}
-                className={`app-btn-compact w-full sm:w-auto ${
-                  viewMode === "range"
-                    ? "bg-blue-600 text-white"
-                    : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                Date Range
+                Apply
               </button>
             </div>
+          ) : viewMode === "monthly" ? (
+            <div className="app-form-grid items-end">
+              <div>
+                <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                  Month
+                </label>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                onClick={() => void loadReport()}
+                className="app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
+              >
+                Apply
+              </button>
+            </div>
+          ) : (
+            <div className="app-form-grid items-end">
+              <div>
+                <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                  From
+                </label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="app-muted-text mb-1 block font-medium text-gray-700">
+                  To
+                </label>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                onClick={() => void loadReport()}
+                className="app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto md:col-span-2"
+              >
+                Apply
+              </button>
+            </div>
+          )}
+        </section>
 
-            {viewMode === "daily" ? (
-              <div className="app-form-grid items-end">
-                <div>
-                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                {report && report.available_dates.length > 0 && (
-                  <div>
-                    <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                      History
-                    </label>
-                    <select
-                      value={selectedDate}
-                      onChange={(e) => {
-                        setSelectedDate(e.target.value);
-                        setViewMode("daily");
-                      }}
-                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                    >
-                      {report.available_dates.map((value) => (
-                        <option key={value} value={value}>
-                          {formatDate(value)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <button
-                  onClick={() => void loadReport()}
-                  className={`app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto ${
-                    report && report.available_dates.length > 0 ? "md:col-span-2" : ""
-                  }`}
-                >
-                  Apply
-                </button>
-              </div>
-            ) : viewMode === "monthly" ? (
-              <div className="app-form-grid items-end">
-                <div>
-                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                    Month
-                  </label>
-                  <input
-                    type="month"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <button
-                  onClick={() => void loadReport()}
-                  className="app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
-                >
-                  Apply
-                </button>
-              </div>
-            ) : (
-              <div className="app-form-grid items-end">
-                <div>
-                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                    From
-                  </label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                    To
-                  </label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <button
-                  onClick={() => void loadReport()}
-                  className="app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto md:col-span-2"
-                >
-                  Apply
-                </button>
-              </div>
-            )}
-          </section>
-        )}
-
-        {loading && reportsEnabled && (
+        {loading && (
           <div className="rounded-lg border bg-white p-6 text-sm text-gray-500">Loading report...</div>
         )}
 
@@ -314,7 +294,7 @@ export default function Reports() {
           </div>
         )}
 
-        {reportsEnabled && report && !loading && (
+        {report && !loading && (
           <>
             <section className="grid gap-4 md:grid-cols-3">
               <div className="rounded-xl border bg-white p-5 shadow-sm">

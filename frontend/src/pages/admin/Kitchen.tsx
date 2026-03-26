@@ -5,6 +5,7 @@ import OrderCard from "@/components/shared/OrderCard";
 import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
+import { QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
 import type { NewOrderEvent, OrderStatusUpdatedEvent } from "@/types/realtime";
 import type {
   KitchenOrderCard,
@@ -13,7 +14,7 @@ import type {
   OrderStatus,
 } from "@/types/order";
 
-const KITCHEN_ROLES = new Set(["owner", "admin", "steward"]);
+const KITCHEN_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
 
 function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
   const items: KitchenOrderItemSummary[] = data.items.map((item, index) => ({
