@@ -146,36 +146,15 @@ SLA_PRIORITY_MODEL = [
 ]
 
 
-def get_default_module(privileges: list[str], role: str) -> str:
-    """
-    Determine which module should load by default based on privilege priority.
-    
-    Decision Tree (first match wins):
-    1. If has both QR_MENU and HOUSEKEEPING → Menu (menu has priority)
-    2. If has only QR_MENU → Menu
-    3. If has only HOUSEKEEPING → Housekeeping
-    4. Fallback → Dashboard (no module privileges)
-    
-    Args:
-        privileges: List of privilege codes (e.g., ["QR_MENU", "HOUSEKEEPING"])
-        role: User role (owner, admin, steward, etc.)
-    
-    Returns:
-        Lane key to auto-navigate to (e.g., "orders", "housekeeping", "dashboard")
-    """
+def get_default_module(privileges: list[str]) -> str:
+    """Return the recommended landing lane key for the current privilege set."""
     priv_upper = {p.upper() for p in privileges}
-    
-    # Priority 1: Both menu and housekeeping → show menu first
-    if "QR_MENU" in priv_upper and "HOUSEKEEPING" in priv_upper:
-        return "orders"  # Menu has priority
-    
-    # Priority 2: Only menu
+
+    # QR-menu work gets first priority when it is available.
     if "QR_MENU" in priv_upper:
         return "orders"
-    
-    # Priority 3: Only housekeeping
+
     if "HOUSEKEEPING" in priv_upper:
         return "housekeeping"
-    
-    # Fallback: No module privileges (stay on dashboard)
+
     return "dashboard"

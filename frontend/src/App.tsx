@@ -320,7 +320,7 @@ function App() {
 
         <Route
           path="/admin"
-          element={<Navigate to="/admin/restaurant-profile" replace />}
+          element={<RootRedirect />}
         />
         <Route path="/" element={<Landing />} />
         <Route path="*" element={<RootRedirect />} />

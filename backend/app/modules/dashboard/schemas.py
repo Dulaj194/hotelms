@@ -123,4 +123,4 @@ class AdminDashboardOverviewResponse(BaseModel):
     module_lanes: list[DashboardModuleLane]
     privilege_map: DashboardPrivilegeMap
     sla_priority_model: list[str]
-    default_module: str  # Lane key to auto-navigate to (orders, housekeeping, dashboard, etc.)
+    default_module: str  # Recommended lane key (orders, housekeeping, dashboard, etc.)

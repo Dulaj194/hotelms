@@ -7,6 +7,7 @@ import { getUser } from "@/lib/auth";
 import type {
   AdminDashboardOverviewResponse,
   DashboardAlertItem,
+  DashboardModuleLane,
   DashboardSetupRequirement,
 } from "@/types/dashboard";
 
@@ -16,6 +17,14 @@ const ROLE_LABELS: Record<string, string> = {
   steward: "Steward",
   housekeeper: "Housekeeper",
   super_admin: "Super Admin",
+};
+
+const LANE_DESCRIPTIONS: Record<string, string> = {
+  menu: "Manage menu structure, pricing, and item availability.",
+  orders: "Review live QR and room-service orders with the current SLA priority.",
+  housekeeping: "Continue room readiness and housekeeping task execution.",
+  reports: "Review performance, sales, and daily operational summaries.",
+  settings: "Maintain restaurant profile, branding, and setup details.",
 };
 
 function alertStyle(level: string): string {
@@ -38,6 +47,46 @@ function alertPrimaryButtonStyle(level: string): string {
     default:
       return "bg-blue-700 hover:bg-blue-800";
   }
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    return error.status === 0
+      ? "Unable to connect to the server. Please start backend and refresh this page."
+      : error.detail || fallback;
+  }
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+  return fallback;
+}
+
+function getFirstPendingStep(
+  requirements: DashboardSetupRequirement[],
+  severity?: string,
+): number {
+  const index = requirements.findIndex(
+    (item) => !item.completed && (severity ? item.severity === severity : true),
+  );
+  return index >= 0 ? index + 1 : 1;
+}
+
+function getLaneDescription(key: string): string {
+  return LANE_DESCRIPTIONS[key] ?? "Open the next module for this account.";
+}
+
+function getRecommendedLane(
+  overview: AdminDashboardOverviewResponse | null,
+): DashboardModuleLane | null {
+  if (!overview || overview.default_module === "dashboard") {
+    return null;
+  }
+
+  return (
+    overview.module_lanes.find(
+      (lane) => lane.visible && lane.key === overview.default_module,
+    ) ?? null
+  );
 }
 
 export default function Dashboard() {
@@ -63,40 +112,32 @@ export default function Dashboard() {
 
       try {
         const data = await api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview");
-        if (!active) return;
+        if (!active) {
+          return;
+        }
 
-        const firstPendingIndex = data.setup_requirements.findIndex((item) => !item.completed);
-        const firstBlockingPendingIndex = data.setup_requirements.findIndex(
-          (item) => item.severity === "blocking" && !item.completed
-        );
         const totalSteps = Math.max(data.setup_wizard.total_steps, data.setup_requirements.length, 1);
         const persistedStep = Number.isFinite(data.setup_wizard.current_step)
           ? data.setup_wizard.current_step
           : 1;
         const clampedPersistedStep = Math.min(Math.max(persistedStep, 1), totalSteps);
-        const firstPendingStep = firstPendingIndex >= 0 ? firstPendingIndex + 1 : 1;
+        const firstPendingStep = getFirstPendingStep(data.setup_requirements);
+        const firstBlockingStep = getFirstPendingStep(data.setup_requirements, "blocking");
         const hasPersistedProgress = clampedPersistedStep > 1;
 
         setOverview(data);
         setWizardStep(hasPersistedProgress ? clampedPersistedStep : firstPendingStep);
-        setWizardOpen(data.setup_wizard.has_blocking_missing && firstBlockingPendingIndex >= 0);
+        setWizardOpen(data.setup_wizard.has_blocking_missing && firstBlockingStep > 0);
 
-        const visible = data.alerts.filter((alert) => alert.should_show);
-        for (const alert of visible) {
+        const visibleAlerts = data.alerts.filter((alert) => alert.should_show);
+        for (const alert of visibleAlerts) {
           void api.post(`/dashboard/alerts/${encodeURIComponent(alert.key)}/shown`, {});
         }
-      } catch (err) {
-        if (!active) return;
-
-        const message =
-          err instanceof ApiError
-            ? err.status === 0
-              ? "Unable to connect to the server. Please start backend and refresh this page."
-              : err.detail
-            : err instanceof Error
-              ? err.message
-              : "Failed to load dashboard data.";
-        setOverviewError(message);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        setOverviewError(getErrorMessage(error, "Failed to load dashboard data."));
       } finally {
         if (active) {
           setOverviewLoading(false);
@@ -123,7 +164,7 @@ export default function Dashboard() {
   const blockingRequirements = useMemo(() => {
     if (!overview) return [];
     return overview.setup_requirements.filter(
-      (item) => item.severity === "blocking" && !item.completed
+      (item) => item.severity === "blocking" && !item.completed,
     );
   }, [overview]);
 
@@ -133,11 +174,10 @@ export default function Dashboard() {
   }, [overview]);
 
   const nextBlockingLabels = useMemo(() => {
-    if (!overview) return [];
-    return overview.setup_requirements
-      .filter((item) => item.severity === "blocking" && !item.completed)
-      .map((item) => item.label);
-  }, [overview]);
+    return blockingRequirements.map((item) => item.label);
+  }, [blockingRequirements]);
+
+  const recommendedLane = useMemo(() => getRecommendedLane(overview), [overview]);
 
   async function dismissAlert(alert: DashboardAlertItem) {
     setDismissingAlertKey(alert.key);
@@ -148,7 +188,7 @@ export default function Dashboard() {
         return {
           ...prev,
           alerts: prev.alerts.map((item) =>
-            item.key === alert.key ? { ...item, should_show: false } : item
+            item.key === alert.key ? { ...item, should_show: false } : item,
           ),
         };
       });
@@ -185,14 +225,8 @@ export default function Dashboard() {
         };
       });
       return true;
-    } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.detail
-          : err instanceof Error
-            ? err.message
-            : "Failed to save setup progress.";
-      setWizardError(message);
+    } catch (error) {
+      setWizardError(getErrorMessage(error, "Failed to save setup progress."));
       return false;
     } finally {
       setWizardSaving(false);
@@ -211,20 +245,11 @@ export default function Dashboard() {
       return;
     }
 
-    if (focusBlocking) {
-      const firstBlockingIndex = overview.setup_requirements.findIndex(
-        (item) => item.severity === "blocking" && !item.completed
-      );
-      if (firstBlockingIndex >= 0) {
-        setWizardStep(firstBlockingIndex + 1);
-      }
-    } else {
-      const firstPendingIndex = overview.setup_requirements.findIndex((item) => !item.completed);
-      if (firstPendingIndex >= 0) {
-        setWizardStep(firstPendingIndex + 1);
-      }
-    }
+    const nextStep = focusBlocking
+      ? getFirstPendingStep(overview.setup_requirements, "blocking")
+      : getFirstPendingStep(overview.setup_requirements);
 
+    setWizardStep(nextStep);
     setWizardError(null);
     setWizardOpen(true);
   }
@@ -236,11 +261,13 @@ export default function Dashboard() {
       const saved = await saveWizardProgress(wizardTotalSteps);
       if (!saved) return;
 
-      const firstPendingIndex = overview.setup_requirements.findIndex((item) => !item.completed);
-      if (firstPendingIndex >= 0) {
-        setWizardStep(firstPendingIndex + 1);
+      const firstPendingStep = getFirstPendingStep(overview.setup_requirements);
+      const hasPendingRequirements = overview.setup_requirements.some((item) => !item.completed);
+      if (hasPendingRequirements) {
+        setWizardStep(firstPendingStep);
         return;
       }
+
       setWizardOpen(false);
       return;
     }
@@ -323,6 +350,83 @@ export default function Dashboard() {
               </div>
             ))}
 
+            <div className="rounded-xl border border-sky-200 bg-sky-50 px-6 py-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="max-w-2xl">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                    Recommended Start
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                    {overview.setup_wizard.has_blocking_missing
+                      ? "Complete blocking setup first"
+                      : recommendedLane
+                        ? `Open ${recommendedLane.label}`
+                        : "Review dashboard and profile settings"}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {overview.setup_wizard.has_blocking_missing
+                      ? "Blocking setup items must be completed before the system can guide you into operational modules."
+                      : recommendedLane
+                        ? getLaneDescription(recommendedLane.key)
+                        : "No privilege-driven default module is active right now. Use the dashboard overview and profile settings to continue."}
+                  </p>
+                  {!overview.setup_wizard.has_blocking_missing && pendingRequirements.length > 0 && (
+                    <p className="mt-2 text-xs text-slate-600">
+                      Remaining setup items:{" "}
+                      {pendingRequirements
+                        .slice(0, 3)
+                        .map((item) => item.label)
+                        .join(", ")}
+                      {pendingRequirements.length > 3 ? "..." : ""}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {overview.setup_wizard.has_blocking_missing ? (
+                    <>
+                      <button
+                        onClick={() => openWizard(true)}
+                        className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800"
+                      >
+                        Continue Setup
+                      </button>
+                      <button
+                        onClick={() => navigate("/admin/restaurant-profile")}
+                        className="rounded-md border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                      >
+                        Open Profile Settings
+                      </button>
+                    </>
+                  ) : recommendedLane ? (
+                    <>
+                      <button
+                        onClick={() => navigate(recommendedLane.path)}
+                        className="rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800"
+                      >
+                        Open {recommendedLane.label}
+                      </button>
+                      {pendingRequirements.length > 0 && (
+                        <button
+                          onClick={() => navigate("/admin/restaurant-profile")}
+                          className="rounded-md border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700 hover:bg-sky-100"
+                        >
+                          Review Profile Settings
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => navigate("/admin/restaurant-profile")}
+                      className="rounded-md bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800"
+                    >
+                      Open Profile Settings
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
               <MetricCard label="Pending Orders" value={overview.metrics.pending_orders} />
               <MetricCard label="Overdue Orders" value={overview.metrics.overdue_orders} />
@@ -345,16 +449,30 @@ export default function Dashboard() {
                   </p>
                 )}
 
-                {visibleLanes.map((lane) => (
-                  <button
-                    key={lane.key}
-                    onClick={() => navigate(lane.path)}
-                    className="rounded-lg border border-gray-200 px-4 py-3 text-left transition-colors hover:bg-gray-50"
-                  >
-                    <p className="text-sm font-semibold text-gray-800">{lane.label}</p>
-                    <p className="mt-1 text-xs text-gray-500">Lane key: {lane.key}</p>
-                  </button>
-                ))}
+                {visibleLanes.map((lane) => {
+                  const isRecommended = lane.key === recommendedLane?.key;
+                  return (
+                    <button
+                      key={lane.key}
+                      onClick={() => navigate(lane.path)}
+                      className={`rounded-lg border px-4 py-3 text-left transition-colors ${
+                        isRecommended
+                          ? "border-sky-300 bg-sky-50 hover:bg-sky-100"
+                          : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-semibold text-gray-800">{lane.label}</p>
+                        {isRecommended && (
+                          <span className="rounded-full bg-sky-200 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
+                            Recommended
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">{getLaneDescription(lane.key)}</p>
+                    </button>
+                  );
+                })}
               </div>
               <p className="mt-4 text-xs text-gray-500">
                 SLA priority: {overview.sla_priority_model.join(" > ")}
@@ -532,10 +650,10 @@ function WizardModal({
           >
             {saving
               ? "Saving..."
-                : isLastStep
-                  ? hasPendingRequirements
-                    ? "Review Pending"
-                    : "Finish Setup"
+              : isLastStep
+                ? hasPendingRequirements
+                  ? "Review Pending"
+                  : "Finish Setup"
                 : "Save Step and Next"}
           </button>
         </div>
