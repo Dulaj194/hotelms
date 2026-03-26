@@ -4,7 +4,10 @@ import CartDrawer from "@/components/shared/CartDrawer";
 import { useCart } from "@/hooks/useCart";
 import { getGuestToken, setGuestSession } from "@/hooks/useGuestSession";
 import { publicGet, publicPost } from "@/lib/publicApi";
-import type { PublicMenuResponse } from "@/types/publicMenu";
+import type {
+  PublicItemSummaryResponse,
+  PublicMenuResponse,
+} from "@/types/publicMenu";
 import type { TableSessionStartResponse } from "@/types/session";
 
 export default function TableMenu() {
@@ -24,7 +27,7 @@ export default function TableMenu() {
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, refetch } =
     useCart();
 
-  // ── 1. Start (or reuse) a guest session ──────────────────────────────────
+  // 1. Start (or reuse) a guest session
   useEffect(() => {
     if (!restaurantId || !tableNumber) return;
 
@@ -50,7 +53,7 @@ export default function TableMenu() {
     void init();
   }, [restaurantId, tableNumber]);
 
-  // ── 2. Fetch public menu ──────────────────────────────────────────────────
+  // 2. Fetch public menu
   useEffect(() => {
     if (!restaurantId) return;
 
@@ -71,7 +74,7 @@ export default function TableMenu() {
     void fetchMenu();
   }, [restaurantId]);
 
-  // ── 3. Refetch cart once session is ready ─────────────────────────────────
+  // 3. Refetch cart once session is ready
   useEffect(() => {
     if (sessionReady) void refetch();
   }, [sessionReady, refetch]);
@@ -96,7 +99,6 @@ export default function TableMenu() {
     return orderId;
   }, [placeOrder, navigate, restaurantId, tableNumber]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   if (pageError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -108,7 +110,7 @@ export default function TableMenu() {
   if (!menu) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-400 animate-pulse">Loading menu…</p>
+        <p className="text-gray-400 animate-pulse">Loading menu...</p>
       </div>
     );
   }
@@ -116,10 +118,89 @@ export default function TableMenu() {
   const activeCategory =
     menu.categories.find((c) => c.id === activeCategoryId) ??
     menu.categories[0];
+  const visibleSubcategories =
+    activeCategory?.subcategories.filter((subcat) => subcat.items.length > 0) ?? [];
+  const hasDirectItems = (activeCategory?.items.length ?? 0) > 0;
+  const hasAnyItems = hasDirectItems || visibleSubcategories.length > 0;
+
+  const renderItemCard = (item: PublicItemSummaryResponse) => {
+    const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
+    const qtyInCart = cartItem?.quantity ?? 0;
+    const isAdding = addingItemId === item.id;
+
+    return (
+      <div
+        key={item.id}
+        className={`bg-white rounded-xl border overflow-hidden flex flex-col ${
+          !item.is_available ? "opacity-60" : ""
+        }`}
+      >
+        {item.image_path && (
+          <img
+            src={item.image_path}
+            alt={item.name}
+            className="w-full h-36 object-cover"
+          />
+        )}
+        <div className="p-3 flex flex-col gap-2 flex-1">
+          <div className="flex-1">
+            <p className="font-semibold text-sm">{item.name}</p>
+            {item.description && (
+              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                {item.description}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mt-1">
+            <span className="font-bold text-sm text-orange-600">
+              ${item.price.toFixed(2)}
+            </span>
+
+            {!item.is_available ? (
+              <span className="text-xs text-gray-400">Unavailable</span>
+            ) : qtyInCart > 0 ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    qtyInCart > 1
+                      ? updateItem(item.id, qtyInCart - 1)
+                      : removeItem(item.id)
+                  }
+                  className="w-7 h-7 flex items-center justify-center rounded-full border hover:bg-gray-100 transition-colors text-sm font-bold"
+                  aria-label="Decrease"
+                >
+                  -
+                </button>
+                <span className="text-sm font-semibold w-5 text-center">
+                  {qtyInCart}
+                </span>
+                <button
+                  onClick={() => updateItem(item.id, qtyInCart + 1)}
+                  className="w-7 h-7 flex items-center justify-center rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors text-sm font-bold"
+                  aria-label="Increase"
+                >
+                  +
+                </button>
+              </div>
+            ) : (
+              <button
+                disabled={isAdding || !sessionReady}
+                onClick={() => handleAddToCart(item.id)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded-full text-xs font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50"
+              >
+                {isAdding ? "Adding..." : "+ Add"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* ── Top bar ── */}
+      {/* Top bar */}
       <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
         <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
@@ -188,7 +269,7 @@ export default function TableMenu() {
         )}
       </header>
 
-      {/* ── Item grid ── */}
+      {/* Item grid */}
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-4 space-y-6">
         {activeCategory && (
           <section>
@@ -198,99 +279,47 @@ export default function TableMenu() {
               </p>
             )}
 
-            {activeCategory.items.length === 0 ? (
+            {!hasAnyItems ? (
               <p className="text-center text-gray-400 py-12">
                 No items in this category.
               </p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {activeCategory.items.map((item) => {
-                  const cartItem = cart?.items.find(
-                    (ci) => ci.item_id === item.id
-                  );
-                  const qtyInCart = cartItem?.quantity ?? 0;
-                  const isAdding = addingItemId === item.id;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className={`bg-white rounded-xl border overflow-hidden flex flex-col ${
-                        !item.is_available ? "opacity-60" : ""
-                      }`}
-                    >
-                      {item.image_path && (
-                        <img
-                          src={item.image_path}
-                          alt={item.name}
-                          className="w-full h-36 object-cover"
-                        />
-                      )}
-                      <div className="p-3 flex flex-col gap-2 flex-1">
-                        <div className="flex-1">
-                          <p className="font-semibold text-sm">{item.name}</p>
-                          {item.description && (
-                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                              {item.description}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="font-bold text-sm text-orange-600">
-                            ${item.price.toFixed(2)}
-                          </span>
-
-                          {!item.is_available ? (
-                            <span className="text-xs text-gray-400">
-                              Unavailable
-                            </span>
-                          ) : qtyInCart > 0 ? (
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() =>
-                                  qtyInCart > 1
-                                    ? updateItem(item.id, qtyInCart - 1)
-                                    : removeItem(item.id)
-                                }
-                                className="w-7 h-7 flex items-center justify-center rounded-full border hover:bg-gray-100 transition-colors text-sm font-bold"
-                                aria-label="Decrease"
-                              >
-                                −
-                              </button>
-                              <span className="text-sm font-semibold w-5 text-center">
-                                {qtyInCart}
-                              </span>
-                              <button
-                                onClick={() =>
-                                  updateItem(item.id, qtyInCart + 1)
-                                }
-                                className="w-7 h-7 flex items-center justify-center rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors text-sm font-bold"
-                                aria-label="Increase"
-                              >
-                                +
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              disabled={isAdding || !sessionReady}
-                              onClick={() => handleAddToCart(item.id)}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded-full text-xs font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50"
-                            >
-                              {isAdding ? "Adding…" : "+ Add"}
-                            </button>
-                          )}
-                        </div>
-                      </div>
+              <div className="space-y-6">
+                {hasDirectItems && (
+                  <div>
+                    {visibleSubcategories.length > 0 && (
+                      <h2 className="text-sm font-semibold text-gray-700 mb-3">
+                        Other items
+                      </h2>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {activeCategory.items.map(renderItemCard)}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                {visibleSubcategories.map((subcategory) => (
+                  <div key={subcategory.id}>
+                    <h2 className="text-sm font-semibold text-gray-800">
+                      {subcategory.name}
+                    </h2>
+                    {subcategory.description && (
+                      <p className="text-xs text-gray-500 mt-1 mb-3">
+                        {subcategory.description}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                      {subcategory.items.map(renderItemCard)}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </section>
         )}
       </main>
 
-      {/* ── Cart FAB for mobile ── */}
+      {/* Cart FAB for mobile */}
       {(cart?.item_count ?? 0) > 0 && !cartOpen && (
         <div className="fixed bottom-4 left-0 right-0 px-4 z-30">
           <button
@@ -305,7 +334,7 @@ export default function TableMenu() {
         </div>
       )}
 
-      {/* ── Cart drawer ── */}
+      {/* Cart drawer */}
       <CartDrawer
         open={cartOpen}
         onClose={() => setCartOpen(false)}

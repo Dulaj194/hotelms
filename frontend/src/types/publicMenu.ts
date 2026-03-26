@@ -1,4 +1,4 @@
-// ─── Restaurant ───────────────────────────────────────────────────────────────
+// --- Restaurant --------------------------------------------------------------
 
 export interface PublicRestaurantInfoResponse {
   id: number;
@@ -9,7 +9,7 @@ export interface PublicRestaurantInfoResponse {
   is_active: boolean;
 }
 
-// ─── Items ────────────────────────────────────────────────────────────────────
+// --- Items -------------------------------------------------------------------
 
 export interface PublicItemSummaryResponse {
   id: number;
@@ -19,6 +19,7 @@ export interface PublicItemSummaryResponse {
   image_path: string | null;
   is_available: boolean;
   category_id: number;
+  subcategory_id: number | null;
 }
 
 export interface PublicItemDetailResponse {
@@ -29,12 +30,11 @@ export interface PublicItemDetailResponse {
   image_path: string | null;
   is_available: boolean;
   category_id: number;
+  subcategory_id: number | null;
   category_name: string | null;
 }
 
-// ─── Categories ───────────────────────────────────────────────────────────────
-
-export interface PublicCategoryResponse {
+export interface PublicSubcategoryResponse {
   id: number;
   name: string;
   description: string | null;
@@ -43,14 +43,38 @@ export interface PublicCategoryResponse {
   items: PublicItemSummaryResponse[];
 }
 
-// ─── Menu (composite) ────────────────────────────────────────────────────────
+// --- Categories --------------------------------------------------------------
 
-export interface PublicMenuResponse {
-  restaurant: PublicRestaurantInfoResponse;
+export interface PublicCategoryResponse {
+  id: number;
+  name: string;
+  description: string | null;
+  image_path: string | null;
+  sort_order: number;
+  menu_id: number | null;
+  items: PublicItemSummaryResponse[];
+  subcategories: PublicSubcategoryResponse[];
+}
+
+export interface PublicMenuSectionResponse {
+  id: number;
+  name: string;
+  description: string | null;
+  image_path: string | null;
+  sort_order: number;
   categories: PublicCategoryResponse[];
 }
 
-// ─── QR ───────────────────────────────────────────────────────────────────────
+// --- Menu (composite) --------------------------------------------------------
+
+export interface PublicMenuResponse {
+  restaurant: PublicRestaurantInfoResponse;
+  menus: PublicMenuSectionResponse[];
+  uncategorized_categories: PublicCategoryResponse[];
+  categories: PublicCategoryResponse[];
+}
+
+// --- QR ----------------------------------------------------------------------
 
 export interface QRCodeResponse {
   qr_type: string;
