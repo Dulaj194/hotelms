@@ -19,6 +19,7 @@ from app.modules.qr.router import router as qr_router
 from app.modules.realtime.router import router as realtime_router
 from app.modules.reports.router import router as reports_router
 from app.modules.restaurants.router import router as restaurants_router
+from app.modules.settings.router import router as settings_router
 from app.modules.subcategories.router import router as subcategories_router
 from app.modules.subscriptions.router import router as subscriptions_router
 from app.modules.room_sessions.router import (
@@ -52,6 +53,7 @@ router.include_router(orders_router, prefix="/orders", tags=["orders"])
 router.include_router(offers_router, prefix="/offers", tags=["offers"])
 router.include_router(payments_router, prefix="/payments", tags=["payments"])
 router.include_router(reports_router, prefix="/reports", tags=["reports"])
+router.include_router(settings_router, prefix="/settings", tags=["settings"])
 router.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
 router.include_router(realtime_router, prefix="/ws", tags=["websocket"])
 router.include_router(billing_router, prefix="/billing", tags=["billing"])

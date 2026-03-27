@@ -4,7 +4,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -67,11 +67,15 @@ class HousekeepingRequest(Base):
     room_number_snapshot: Mapped[str] = mapped_column(String(50), nullable=False)
     guest_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    request_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    priority: Mapped[str] = mapped_column(
-        String(20),
+    request_type: Mapped[RequestType] = mapped_column(
+        Enum(RequestType, native_enum=False),
         nullable=False,
-        default=RequestPriority.normal.value,
+        index=True,
+    )
+    priority: Mapped[RequestPriority] = mapped_column(
+        Enum(RequestPriority, native_enum=False),
+        nullable=False,
+        default=RequestPriority.normal,
         server_default=RequestPriority.normal.value,
         index=True,
     )
@@ -81,10 +85,10 @@ class HousekeepingRequest(Base):
     audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     photo_proof_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
-    status: Mapped[str] = mapped_column(
-        String(32),
+    status: Mapped[RequestStatus] = mapped_column(
+        Enum(RequestStatus, native_enum=False),
         nullable=False,
-        default=RequestStatus.pending_assignment.value,
+        default=RequestStatus.pending_assignment,
         server_default=RequestStatus.pending_assignment.value,
         index=True,
     )

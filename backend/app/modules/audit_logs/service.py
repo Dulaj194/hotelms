@@ -1,6 +1,6 @@
 import json
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.logging import get_logger
 from app.modules.audit_logs.model import AuditLog
@@ -29,8 +29,10 @@ def write_audit_log(
             user_agent=user_agent,
             metadata_json=json.dumps(metadata) if metadata else None,
         )
-        db.add(log)
-        db.commit()
+        bind = db.get_bind()
+        audit_session_factory = sessionmaker(bind=bind, autocommit=False, autoflush=False)
+        with audit_session_factory() as audit_db:
+            audit_db.add(log)
+            audit_db.commit()
     except Exception as exc:
-        db.rollback()
         logger.warning("Audit log write failed [%s]: %s", event_type, exc)

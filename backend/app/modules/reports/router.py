@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_restaurant_id, get_db, require_privilege, require_roles
 from app.modules.reports import service
 from app.modules.reports.schemas import SalesReportResponse
+from app.modules.users.model import User
 
 router = APIRouter()
 
@@ -23,7 +24,7 @@ def get_sales_report(
     to_date: date | None = None,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    _=Depends(require_roles(*_STAFF_ROLES)),
+    current_user: User = Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_privilege("QR_MENU")),
 ) -> SalesReportResponse:
     return service.get_sales_report(
@@ -33,6 +34,7 @@ def get_sales_report(
         selected_date=date_value,
         from_date=from_date,
         to_date=to_date,
+        generated_by_user_id=current_user.id,
     )
 
 
@@ -44,7 +46,7 @@ def export_sales_report_csv(
     to_date: date | None = None,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    _=Depends(require_roles(*_STAFF_ROLES)),
+    current_user: User = Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_privilege("QR_MENU")),
 ):
     csv_text = service.export_sales_report_csv(
@@ -54,6 +56,7 @@ def export_sales_report_csv(
         selected_date=date_value,
         from_date=from_date,
         to_date=to_date,
+        generated_by_user_id=current_user.id,
     )
     return StreamingResponse(
         iter([csv_text]),

@@ -15,6 +15,7 @@ from app.modules.offers.model import Offer  # noqa: F401
 from app.modules.packages.model import Package, PackagePrivilege  # noqa: F401
 from app.modules.payments.model import BillingTransaction, Payment, ProcessedWebhookEvent  # noqa: F401
 from app.modules.qr.model import QRCode  # noqa: F401
+from app.modules.reports.model import ReportHistory  # noqa: F401
 from app.modules.restaurants.model import Restaurant  # noqa: F401
 from app.modules.housekeeping.model import HousekeepingRequest  # noqa: F401
 from app.modules.settings.model import SettingsRequest  # noqa: F401

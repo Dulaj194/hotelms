@@ -9,7 +9,13 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.modules.orders.model import ALLOWED_TRANSITIONS, OrderHeader, OrderItem, OrderStatus
+from app.modules.orders.model import (
+    ALLOWED_TRANSITIONS,
+    OrderHeader,
+    OrderItem,
+    OrderSource,
+    OrderStatus,
+)
 
 
 # ── Creation ──────────────────────────────────────────────────────────────────
@@ -20,7 +26,7 @@ def create_order_header(
     session_id: str,
     restaurant_id: int,
     table_number: str | None,
-    order_source: str = "table",
+    order_source: OrderSource | str = OrderSource.table,
     room_id: int | None = None,
     room_number: str | None = None,
     initial_status: OrderStatus = OrderStatus.pending,
@@ -33,6 +39,11 @@ def create_order_header(
     customer_phone: str | None,
 ) -> OrderHeader:
     now = datetime.now(UTC)
+    source_value = (
+        order_source
+        if isinstance(order_source, OrderSource)
+        else OrderSource(str(order_source))
+    )
     lifecycle_timestamps: dict[str, datetime] = {}
     if initial_status == OrderStatus.confirmed:
         lifecycle_timestamps["confirmed_at"] = now
@@ -49,7 +60,7 @@ def create_order_header(
         session_id=session_id,
         restaurant_id=restaurant_id,
         table_number=table_number,
-        order_source=order_source,
+        order_source=source_value,
         room_id=room_id,
         room_number=room_number,
         status=initial_status,

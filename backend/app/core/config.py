@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # ── Database / Cache ─────────────────────────────────────────────────────
     database_url: str = "mysql+pymysql://root:@localhost:3306/hotelms"
     redis_url: str = "redis://localhost:6379"
+    # Legacy fallback for local development only.
+    # Keep disabled by default and use Alembic migrations instead.
+    db_auto_schema_sync: bool = False
 
     # ── JWT / Auth ───────────────────────────────────────────────────────────
     secret_key: str = "change-this-in-production"

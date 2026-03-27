@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import json
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from app.modules.categories.model import Category
 from app.modules.items.model import Item
 from app.modules.orders.model import OrderHeader, OrderItem
 from app.modules.payments.model import Payment, PaymentStatus
+from app.modules.reports.model import ReportHistory
 
 
 def list_sales_rows(
@@ -74,3 +76,31 @@ def list_available_sales_dates(db: Session, restaurant_id: int) -> list[date]:
         .all()
     )
     return [row.sales_date for row in rows if row.sales_date is not None]
+
+
+def create_report_history(
+    db: Session,
+    *,
+    restaurant_id: int,
+    report_type: str,
+    generated_by_user_id: int | None,
+    output_format: str,
+    status: str,
+    report_params: dict | None,
+    report_data: dict | None,
+    file_url: str | None = None,
+) -> ReportHistory:
+    row = ReportHistory(
+        restaurant_id=restaurant_id,
+        generated_by_user_id=generated_by_user_id,
+        report_type=report_type,
+        output_format=output_format,
+        status=status,
+        file_url=file_url,
+        report_params_json=json.dumps(report_params) if report_params else None,
+        report_data_json=json.dumps(report_data) if report_data else None,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row

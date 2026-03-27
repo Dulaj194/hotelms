@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.logging import get_logger
 from app.modules.reports import repository
 from app.modules.reports.schemas import (
     SalesCategorySummaryResponse,
@@ -14,6 +15,8 @@ from app.modules.reports.schemas import (
     SalesReportResponse,
     SalesReportRowResponse,
 )
+
+logger = get_logger(__name__)
 
 
 def _normalize_date_range(
@@ -56,6 +59,8 @@ def get_sales_report(
     selected_date: date | None = None,
     from_date: date | None = None,
     to_date: date | None = None,
+    generated_by_user_id: int | None = None,
+    persist_history: bool = True,
 ) -> SalesReportResponse:
     filter_type, selected_date, from_date, to_date = _normalize_date_range(
         filter_type,
@@ -142,7 +147,7 @@ def get_sales_report(
         for key, value in sorted(payment_summary.items(), key=lambda item: item[0].lower())
     ]
 
-    return SalesReportResponse(
+    response = SalesReportResponse(
         filter_type=filter_type,
         selected_date=selected_date,
         from_date=from_date,
@@ -156,6 +161,33 @@ def get_sales_report(
         rows=mapped_rows,
         available_dates=available_dates,
     )
+    if persist_history:
+        try:
+            repository.create_report_history(
+                db,
+                restaurant_id=restaurant_id,
+                report_type="sales",
+                generated_by_user_id=generated_by_user_id,
+                output_format="json",
+                status="generated",
+                report_params={
+                    "filter_type": filter_type,
+                    "selected_date": selected_date.isoformat() if selected_date else None,
+                    "from_date": from_date.isoformat() if from_date else None,
+                    "to_date": to_date.isoformat() if to_date else None,
+                },
+                report_data={
+                    "total_sales": response.total_sales,
+                    "total_quantity": response.total_quantity,
+                    "total_items": response.total_items,
+                    "total_orders": response.total_orders,
+                    "row_count": len(response.rows),
+                },
+            )
+        except Exception as exc:  # pragma: no cover - non-blocking audit path
+            logger.warning("Failed to persist sales report history: %s", exc)
+            db.rollback()
+    return response
 
 
 def export_sales_report_csv(
@@ -166,6 +198,7 @@ def export_sales_report_csv(
     selected_date: date | None = None,
     from_date: date | None = None,
     to_date: date | None = None,
+    generated_by_user_id: int | None = None,
 ) -> str:
     report = get_sales_report(
         db,
@@ -174,6 +207,8 @@ def export_sales_report_csv(
         selected_date=selected_date,
         from_date=from_date,
         to_date=to_date,
+        generated_by_user_id=generated_by_user_id,
+        persist_history=False,
     )
 
     output = io.StringIO()
@@ -205,4 +240,32 @@ def export_sales_report_csv(
             row.customer_name or "",
         ])
 
-    return output.getvalue()
+    csv_text = output.getvalue()
+    try:
+        repository.create_report_history(
+            db,
+            restaurant_id=restaurant_id,
+            report_type="sales",
+            generated_by_user_id=generated_by_user_id,
+            output_format="csv",
+            status="generated",
+            report_params={
+                "filter_type": filter_type,
+                "selected_date": selected_date.isoformat() if selected_date else None,
+                "from_date": from_date.isoformat() if from_date else None,
+                "to_date": to_date.isoformat() if to_date else None,
+            },
+            report_data={
+                "total_sales": report.total_sales,
+                "total_quantity": report.total_quantity,
+                "total_items": report.total_items,
+                "total_orders": report.total_orders,
+                "row_count": len(report.rows),
+            },
+            file_url=None,
+        )
+    except Exception as exc:  # pragma: no cover - non-blocking audit path
+        logger.warning("Failed to persist sales report CSV history: %s", exc)
+        db.rollback()
+
+    return csv_text

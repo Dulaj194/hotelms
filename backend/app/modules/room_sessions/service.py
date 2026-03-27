@@ -315,7 +315,7 @@ def _build_room_order_detail(order) -> RoomOrderDetailResponse:
         order_number=order.order_number,
         session_id=order.session_id,
         restaurant_id=order.restaurant_id,
-        order_source=order.order_source,
+        order_source=order.order_source.value,
         room_id=order.room_id,
         room_number=order.room_number,
         customer_name=order.customer_name,

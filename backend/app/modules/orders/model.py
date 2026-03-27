@@ -34,7 +34,12 @@ class OrderStatus(str, enum.Enum):
     rejected = "rejected"
 
 
-# Explicit allowed status transitions — all others are forbidden.
+class OrderSource(str, enum.Enum):
+    table = "table"
+    room = "room"
+
+
+# Explicit allowed status transitions - all others are forbidden.
 ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
     OrderStatus.pending: {OrderStatus.confirmed, OrderStatus.rejected},
     OrderStatus.confirmed: {OrderStatus.processing, OrderStatus.rejected},
@@ -72,9 +77,12 @@ class OrderHeader(Base):
         index=True,
     )
 
-    # Order source: "table" (default) or "room"
-    order_source: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="table", server_default="table"
+    # Order source: table (default) or room
+    order_source: Mapped[OrderSource] = mapped_column(
+        Enum(OrderSource),
+        nullable=False,
+        default=OrderSource.table,
+        server_default=OrderSource.table.value,
     )
 
     # Table context (null for room orders)
@@ -97,7 +105,7 @@ class OrderHeader(Base):
         Enum(OrderStatus), nullable=False, default=OrderStatus.pending, index=True
     )
 
-    # Financial snapshot — server-calculated, never client-supplied
+    # Financial snapshot - server-calculated, never client-supplied
     subtotal_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     tax_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     discount_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
@@ -152,9 +160,14 @@ class OrderItem(Base):
         nullable=False,
         index=True,
     )
-    item_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    item_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("items.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
 
-    # Snapshots at the time of placement — DB authoritative
+    # Snapshots at the time of placement - DB authoritative
     item_name_snapshot: Mapped[str] = mapped_column(String(255), nullable=False)
     unit_price_snapshot: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
 

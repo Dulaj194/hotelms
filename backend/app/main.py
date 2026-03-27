@@ -33,15 +33,19 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     (upload_root / "videos").mkdir(parents=True, exist_ok=True)
     logger.info("Upload directories ready at %s", upload_root.resolve())
 
-    if settings.app_env == "development":
+    if settings.app_env == "development" and settings.db_auto_schema_sync:
         import time
-        import app.db.init_models  # noqa: F401 — registers all models with Base
+        import app.db.init_models  # noqa: F401 - registers all models with Base
         from app.db.base import Base
         from app.db.schema_sync import ensure_development_schema_compatibility
         from app.db.session import engine
         from sqlalchemy import text
 
-        # Retry connecting to MySQL — healthcheck passes before MySQL fully accepts connections
+        logger.warning(
+            "DB auto schema sync is enabled. Prefer Alembic migrations for predictable schema changes."
+        )
+
+        # Retry connecting to MySQL - healthcheck passes before MySQL fully accepts connections
         for attempt in range(1, 11):
             try:
                 with engine.connect() as conn:
@@ -55,7 +59,11 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
 
         Base.metadata.create_all(bind=engine)
         ensure_development_schema_compatibility(engine, logger)
-        logger.info("Database tables created / verified")
+        logger.info("Database tables created / verified (legacy fallback mode)")
+    elif settings.app_env == "development":
+        logger.info(
+            "DB auto schema sync is disabled. Apply migrations with Alembic before running the API."
+        )
 
     # Start background worker: mark overdue subscriptions as expired hourly.
     expiry_task = asyncio.create_task(run_subscription_expiry_loop())
