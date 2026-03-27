@@ -17,6 +17,7 @@ from app.modules.payments.model import BillingTransaction, Payment, ProcessedWeb
 from app.modules.qr.model import QRCode  # noqa: F401
 from app.modules.restaurants.model import Restaurant  # noqa: F401
 from app.modules.housekeeping.model import HousekeepingRequest  # noqa: F401
+from app.modules.settings.model import SettingsRequest  # noqa: F401
 from app.modules.subcategories.model import Subcategory  # noqa: F401
 from app.modules.subscriptions.model import RestaurantSubscription  # noqa: F401
 from app.modules.room_sessions.model import RoomSession  # noqa: F401
