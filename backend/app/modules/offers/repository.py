@@ -68,6 +68,9 @@ def update_by_id(
         return None
 
     updates = data.model_dump(exclude_unset=True)
+    if not updates:
+        return offer
+
     if "product_type" in updates and updates["product_type"] is not None:
         updates["product_type"] = OfferTargetType(updates["product_type"])
 

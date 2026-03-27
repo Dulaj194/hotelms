@@ -255,8 +255,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const isHousekeepingGroupActive = housekeepingPaths.some((path) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
-  const isOfferGroupVisible =
-    (role === "owner" || role === "admin") && !privilegesLoading && hasPrivilege("OFFERS");
+  const offerPrivilegeEnabled = hasPrivilege("OFFERS");
+  const isOfferGroupVisible = role === "owner" || role === "admin";
   const isOfferGroupActive = offerPaths.some((path) =>
     path === "/admin/offers"
       ? location.pathname === "/admin/offers" || location.pathname.startsWith("/admin/offers/")
@@ -693,8 +693,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               >
                 <span className="flex items-center">
                   <ShieldCheck className="h-4 w-4 mr-2 shrink-0" />
-                  Special Offers
+                  Offers
                 </span>
+                {!privilegesLoading && !offerPrivilegeEnabled && (
+                  <span className="ml-auto mr-2 inline-flex items-center justify-center rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                    Locked
+                  </span>
+                )}
                 <div className="flex items-center gap-2">
                   <ChevronDown
                     className={`h-4 w-4 transition-transform ${offersOpen ? "rotate-180" : ""}`}

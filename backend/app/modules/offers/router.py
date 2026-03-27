@@ -15,74 +15,65 @@ from app.modules.users.model import User
 router = APIRouter()
 
 
-@router.get("", response_model=OfferListResponse)
-def list_offers(
+def _require_offers_restaurant_id(
     current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("OFFERS")),
-    db: Session = Depends(get_db),
-) -> OfferListResponse:
+    _: None = Depends(require_privilege("OFFERS")),
+) -> int:
     if current_user.restaurant_id is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return service.list_offers(db, current_user.restaurant_id)
+    return current_user.restaurant_id
+
+
+@router.get("", response_model=OfferListResponse)
+def list_offers(
+    restaurant_id: int = Depends(_require_offers_restaurant_id),
+    db: Session = Depends(get_db),
+) -> OfferListResponse:
+    return service.list_offers(db, restaurant_id)
 
 
 @router.post("", response_model=OfferResponse, status_code=status.HTTP_201_CREATED)
 def add_offer(
     payload: OfferCreateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("OFFERS")),
+    restaurant_id: int = Depends(_require_offers_restaurant_id),
     db: Session = Depends(get_db),
 ) -> OfferResponse:
-    if current_user.restaurant_id is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return service.add_offer(db, current_user.restaurant_id, payload)
+    return service.add_offer(db, restaurant_id, payload)
 
 
 @router.get("/{offer_id}", response_model=OfferResponse)
 def get_offer(
     offer_id: int,
-    current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("OFFERS")),
+    restaurant_id: int = Depends(_require_offers_restaurant_id),
     db: Session = Depends(get_db),
 ) -> OfferResponse:
-    if current_user.restaurant_id is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return service.get_offer(db, offer_id, current_user.restaurant_id)
+    return service.get_offer(db, offer_id, restaurant_id)
 
 
 @router.patch("/{offer_id}", response_model=OfferResponse)
 def update_offer(
     offer_id: int,
     payload: OfferUpdateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("OFFERS")),
+    restaurant_id: int = Depends(_require_offers_restaurant_id),
     db: Session = Depends(get_db),
 ) -> OfferResponse:
-    if current_user.restaurant_id is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return service.update_offer(db, offer_id, current_user.restaurant_id, payload)
+    return service.update_offer(db, offer_id, restaurant_id, payload)
 
 
 @router.delete("/{offer_id}")
 def delete_offer(
     offer_id: int,
-    current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("OFFERS")),
+    restaurant_id: int = Depends(_require_offers_restaurant_id),
     db: Session = Depends(get_db),
 ) -> dict:
-    if current_user.restaurant_id is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return service.delete_offer(db, offer_id, current_user.restaurant_id)
+    return service.delete_offer(db, offer_id, restaurant_id)
 
 
 @router.post("/{offer_id}/image", response_model=OfferImageUploadResponse)
 async def upload_offer_image(
     offer_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("owner", "admin")),
-    _=Depends(require_privilege("OFFERS")),
+    restaurant_id: int = Depends(_require_offers_restaurant_id),
     db: Session = Depends(get_db),
 ) -> OfferImageUploadResponse:
-    if current_user.restaurant_id is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return await service.upload_offer_image(db, offer_id, current_user.restaurant_id, file)
+    return await service.upload_offer_image(db, offer_id, restaurant_id, file)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Callable
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
@@ -27,6 +28,12 @@ _EXT_MAP = {
     "image/webp": ".webp",
     "image/gif": ".gif",
 }
+_MAX_OFFERS_PER_START_DATE = 3
+_TARGET_LOOKUPS: dict[str, Callable[[Session, int, int], object | None]] = {
+    "menu": menu_repo.get_by_id,
+    "category": category_repo.get_by_id,
+    "item": item_repo.get_by_id,
+}
 
 
 def _validate_dates(
@@ -49,16 +56,8 @@ def _validate_dates(
 
 
 def _validate_target(db: Session, restaurant_id: int, product_type: str, product_id: int) -> None:
-    if product_type == "menu":
-        valid = menu_repo.get_by_id(db, product_id, restaurant_id) is not None
-    elif product_type == "category":
-        valid = category_repo.get_by_id(db, product_id, restaurant_id) is not None
-    elif product_type == "item":
-        valid = item_repo.get_by_id(db, product_id, restaurant_id) is not None
-    else:
-        valid = False
-
-    if not valid:
+    lookup = _TARGET_LOOKUPS.get(product_type)
+    if lookup is None or lookup(db, product_id, restaurant_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Selected {product_type} was not found for this restaurant.",
@@ -72,11 +71,36 @@ def _enforce_daily_limit(
     exclude_offer_id: int | None = None,
 ) -> None:
     count = repository.count_by_start_date(db, restaurant_id, start_date, exclude_offer_id)
-    if count >= 3:
+    if count >= _MAX_OFFERS_PER_START_DATE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You can only add a maximum of 3 offers for the same start date.",
+            detail=(
+                f"You can only add a maximum of {_MAX_OFFERS_PER_START_DATE} "
+                "offers for the same start date."
+            ),
         )
+
+
+def _to_offer_upload_file_path(image_path: str | None) -> Path | None:
+    if not image_path or not image_path.startswith("/uploads/offers/"):
+        return None
+
+    filename = Path(image_path).name
+    if not filename:
+        return None
+
+    return Path(settings.upload_dir) / "offers" / filename
+
+
+def _safe_delete_file(path: Path | None) -> None:
+    if path is None:
+        return
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
 
 
 def list_offers(db: Session, restaurant_id: int) -> OfferListResponse:
@@ -144,6 +168,10 @@ async def upload_offer_image(
     restaurant_id: int,
     file: UploadFile,
 ) -> OfferImageUploadResponse:
+    current_offer = repository.get_by_id(db, offer_id, restaurant_id)
+    if not current_offer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found.")
+
     if file.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -162,11 +190,23 @@ async def upload_offer_image(
     filename = f"{uuid.uuid4().hex}{ext}"
     upload_path = Path(settings.upload_dir) / "offers"
     upload_path.mkdir(parents=True, exist_ok=True)
-    (upload_path / filename).write_bytes(content)
+    new_file_path = upload_path / filename
+    try:
+        new_file_path.write_bytes(content)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to store the uploaded image.",
+        ) from exc
 
     image_path = f"/uploads/offers/{filename}"
+    previous_image_file = _to_offer_upload_file_path(current_offer.image_path)
     offer = repository.update_image_path(db, offer_id, restaurant_id, image_path)
     if not offer:
+        _safe_delete_file(new_file_path)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found.")
+
+    if previous_image_file and previous_image_file != new_file_path:
+        _safe_delete_file(previous_image_file)
 
     return OfferImageUploadResponse(image_path=image_path)
