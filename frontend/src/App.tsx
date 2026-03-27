@@ -23,7 +23,7 @@ import RoomMenu from "@/pages/public/RoomMenu";
 import Landing from "@/pages/public/Landing";
 import ServiceRequest from "@/pages/room/ServiceRequest";
 import Rooms from "@/pages/admin/Rooms";
-import Housekeeping from "@/pages/admin/Housekeeping";
+import Housekeeping from "@/pages/admin/housekeeping/HousekeepingPage";
 import AllRoomQRCodes from "@/pages/admin/AllRoomQRCodes";
 import GenerateRoomQRCodes from "@/pages/admin/GenerateRoomQRCodes";
 import Menus from "@/pages/admin/Menus";
