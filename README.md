@@ -141,6 +141,20 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+#### Database Migrations (Alembic)
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+To create a new migration after model changes:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "describe_change"
+```
+
 #### Frontend
 
 ```bash

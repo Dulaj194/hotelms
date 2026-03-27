@@ -6,8 +6,8 @@ services:
     image: mysql:8
     container_name: hotelms-mysql
     environment:
-      MYSQL_DATABASE: hotelms
-      MYSQL_ROOT_PASSWORD: "Dulaj@"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-hotelms}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
     ports:
       - "3307:3306"
     volumes:
@@ -52,8 +52,8 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: mysql+pymysql://root:Dulaj%40@mysql:3306/hotelms
-      REDIS_URL: redis://redis:6379
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
     depends_on:
       mysql:
         condition: service_healthy

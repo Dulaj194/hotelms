@@ -26,13 +26,21 @@ if (-not $dockerOk) {
 }
 
 Write-Step "Preparing .env files (if missing)"
+Ensure-EnvFile ".env" @"
+MYSQL_DATABASE=hotelms
+MYSQL_ROOT_PASSWORD=hotelms123
+DATABASE_URL=mysql+pymysql://root:hotelms123@mysql:3306/hotelms
+REDIS_URL=redis://redis:6379
+"@
+
 Ensure-EnvFile "backend/.env" @"
 APP_NAME=hotelms-backend
 APP_ENV=development
 API_V1_PREFIX=/api/v1
 FRONTEND_URL=http://localhost:5173
-DATABASE_URL=mysql+pymysql://root:@mysql:3306/hotelms
+DATABASE_URL=mysql+pymysql://root:hotelms123@mysql:3306/hotelms
 REDIS_URL=redis://redis:6379
+DB_AUTO_SCHEMA_SYNC=false
 SECRET_KEY=change-this-to-a-long-random-string
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=15
