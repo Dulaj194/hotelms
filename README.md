@@ -155,6 +155,18 @@ cd backend
 alembic revision --autogenerate -m "describe_change"
 ```
 
+#### Standardization Pass
+
+```bash
+# Fast pass (no live DB check)
+backend/venv/Scripts/python.exe backend/scripts/standardization_pass.py --skip-db
+
+# Full pass (checks live DB schema drift via DATABASE_URL)
+backend/venv/Scripts/python.exe backend/scripts/standardization_pass.py
+```
+
+See `STANDARDIZATION_PASS.md` for architecture and workflow standards.
+
 #### Frontend
 
 ```bash

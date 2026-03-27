@@ -17,6 +17,7 @@ from app.modules.reports.schemas import (
 )
 
 logger = get_logger(__name__)
+VALID_FILTER_TYPES = {"single", "range"}
 
 
 def _normalize_date_range(
@@ -25,18 +26,21 @@ def _normalize_date_range(
     from_date: date | None,
     to_date: date | None,
 ) -> tuple[str, date | None, date | None, date | None]:
-    if filter_type not in ("single", "range"):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid filter type.")
+    if filter_type not in VALID_FILTER_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Invalid filter type.",
+        )
 
     if filter_type == "range":
         if from_date is None or to_date is None:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Both from_date and to_date are required for range filters.",
             )
         if to_date < from_date:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="to_date cannot be earlier than from_date.",
             )
         if to_date - from_date > timedelta(days=366):
@@ -118,7 +122,11 @@ def get_sales_report(
         order_ids.add(row.order_id)
 
         if category_name not in category_summary:
-            category_summary[category_name] = {"total_quantity": 0, "line_count": 0, "total_sales": 0.0}
+            category_summary[category_name] = {
+                "total_quantity": 0,
+                "line_count": 0,
+                "total_sales": 0.0,
+            }
         category_summary[category_name]["total_quantity"] += row.quantity
         category_summary[category_name]["line_count"] += 1
         category_summary[category_name]["total_sales"] += total_price

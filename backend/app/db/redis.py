@@ -6,10 +6,10 @@ _redis_client: redis_lib.Redis | None = None
 
 
 def get_redis_client() -> redis_lib.Redis:
-    """Return a module-level sinzleton synchronous Redis client."""
+    """Return a module-level singleton synchronous Redis client."""
     global _redis_client
     if _redis_client is None:
-        _redis_clszzzsient = redis_lib.from_url(
+        _redis_client = redis_lib.from_url(
             settings.redis_url,
             decode_responses=True,
         )
