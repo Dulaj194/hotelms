@@ -13,8 +13,8 @@ import Kitchen from "@/pages/admin/Kitchen";
 import KitchenOldOrders from "@/pages/admin/KitchenOldOrders";
 import Steward from "@/pages/admin/Steward";
 import Billing from "@/pages/admin/Billing";
-import Offers from "@/pages/admin/Offers";
-import OfferFormPage from "@/pages/admin/OfferFormPage";
+import OfferListPage from "@/pages/admin/offers/pages/OfferListPage";
+import OfferFormPage from "@/pages/admin/offers/pages/OfferFormPage";
 import Reports from "@/pages/admin/Reports";
 import Staff from "@/pages/admin/Staff";
 import TableMenu from "@/pages/public/TableMenu";
@@ -119,7 +119,7 @@ function App() {
           path="/admin/offers"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <Offers />
+              <OfferListPage />
             </ProtectedRoute>
           }
         />
