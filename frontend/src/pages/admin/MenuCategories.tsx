@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
+import {
+  TenantContextBadge,
+  TenantScopeEmptyState,
+} from "@/components/shared/TenantScopeNotice";
+import { useTenantContext } from "@/hooks/useTenantContext";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
 import type { Category, Menu } from "@/types/menu";
@@ -26,6 +31,7 @@ const CARDS_PER_PAGE = 6;
 
 export default function MenuCategories() {
   const navigate = useNavigate();
+  const { tenantContext, error: tenantContextError } = useTenantContext();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -261,14 +267,15 @@ export default function MenuCategories() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Menu Categories</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Standard view: 6 cards per page with the same menu card style.
+            Standard view: paginated category cards with the same menu-card style.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-            6 Cards / Page
+            Total: {sortedVisibleCategories.length}
           </span>
+          <TenantContextBadge tenantContext={tenantContext} />
           <select
             value={filterMenuId}
             onChange={(event) =>
@@ -304,9 +311,13 @@ export default function MenuCategories() {
 
       {loading && <p className="text-sm text-gray-500">Loading...</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}
+      {tenantContextError && <p className="text-sm text-amber-600">{tenantContextError}</p>}
 
       {!loading && !error && visibleCategories.length === 0 && (
-        <p className="text-sm text-gray-400">No categories found for the current menu filter.</p>
+        <TenantScopeEmptyState
+          tenantContext={tenantContext}
+          message="No categories found for the current menu filter."
+        />
       )}
 
       {!loading && visibleCategories.length > 0 && (

@@ -15,6 +15,7 @@ from app.modules.auth.schemas import (
     RegisterRestaurantRequest,
     RegisterRestaurantResponse,
     ResetPasswordRequest,
+    TenantContextResponse,
     TokenResponse,
     UserMeResponse,
 )
@@ -172,6 +173,14 @@ def change_initial_password(
 @router.get("/me", response_model=UserMeResponse)
 def get_me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.get("/tenant-context", response_model=TenantContextResponse)
+def get_tenant_context(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TenantContextResponse:
+    return service.get_tenant_context_snapshot(db, current_user)
 
 
 @router.post("/register-restaurant", response_model=RegisterRestaurantResponse)
