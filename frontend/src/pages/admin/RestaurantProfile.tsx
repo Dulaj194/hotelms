@@ -13,6 +13,10 @@ import type {
 import type {
   RestaurantLogoUploadResponse,
   RestaurantMeResponse,
+  CountryLookupListResponse,
+  CountryLookupItem,
+  CurrencyLookupListResponse,
+  CurrencyLookupItem,
   RestaurantUpdateRequest,
 } from "@/types/restaurant";
 
@@ -28,8 +32,8 @@ interface BusinessFormState {
   email: string;
   phone: string;
   address: string;
-  country: string;
-  currency: string;
+  country_id: string;
+  currency_id: string;
   billing_email: string;
   tax_id: string;
 }
@@ -62,6 +66,8 @@ export default function RestaurantProfile() {
   const [subscriptionSummary, setSubscriptionSummary] = useState<DashboardSubscriptionSummary | null>(null);
   const [setupRequirements, setSetupRequirements] = useState<DashboardSetupRequirement[]>([]);
   const [setupProgress, setSetupProgress] = useState<number | null>(null);
+  const [countryOptions, setCountryOptions] = useState<CountryLookupItem[]>([]);
+  const [currencyOptions, setCurrencyOptions] = useState<CurrencyLookupItem[]>([]);
 
   const [editingBusiness, setEditingBusiness] = useState(false);
   const [savingBusiness, setSavingBusiness] = useState(false);
@@ -70,8 +76,8 @@ export default function RestaurantProfile() {
     email: "",
     phone: "",
     address: "",
-    country: "",
-    currency: "",
+    country_id: "",
+    currency_id: "",
     billing_email: "",
     tax_id: "",
   });
@@ -113,6 +119,7 @@ export default function RestaurantProfile() {
       setRestaurant(profileData);
       resetBusinessForm(profileData);
       resetScheduleForm(profileData);
+      await loadReferenceLookups();
     } catch (err) {
       if (!aliveRef.current) {
         return;
@@ -123,6 +130,8 @@ export default function RestaurantProfile() {
       setSubscriptionSummary(null);
       setSetupRequirements([]);
       setSetupProgress(null);
+      setCountryOptions([]);
+      setCurrencyOptions([]);
 
       if (showLoader) {
         setLoading(false);
@@ -159,14 +168,36 @@ export default function RestaurantProfile() {
     }
   }
 
+  async function loadReferenceLookups() {
+    try {
+      const [countryData, currencyData] = await Promise.all([
+        api.get<CountryLookupListResponse>("/reference-data/countries"),
+        api.get<CurrencyLookupListResponse>("/reference-data/currencies"),
+      ]);
+      if (!aliveRef.current) {
+        return;
+      }
+
+      setCountryOptions(countryData.items);
+      setCurrencyOptions(currencyData.items);
+    } catch {
+      if (!aliveRef.current) {
+        return;
+      }
+      // Non-blocking: profile editing still works with existing values.
+      setCountryOptions([]);
+      setCurrencyOptions([]);
+    }
+  }
+
   function resetBusinessForm(data: RestaurantMeResponse) {
     setBusinessForm({
       name: data.name,
       email: data.email ?? "",
       phone: data.phone ?? "",
       address: data.address ?? "",
-      country: data.country ?? "",
-      currency: data.currency ?? "",
+      country_id: data.country_id ? String(data.country_id) : "",
+      currency_id: data.currency_id ? String(data.currency_id) : "",
       billing_email: data.billing_email ?? "",
       tax_id: data.tax_id ?? "",
     });
@@ -240,8 +271,8 @@ export default function RestaurantProfile() {
         email: toNullable(businessForm.email),
         phone: toNullable(businessForm.phone),
         address: toNullable(businessForm.address),
-        country: toNullable(businessForm.country),
-        currency: toUpperNullable(businessForm.currency),
+        country_id: toNullableNumber(businessForm.country_id),
+        currency_id: toNullableNumber(businessForm.currency_id),
         billing_email: toNullable(businessForm.billing_email),
         tax_id: toNullable(businessForm.tax_id),
       },
@@ -393,6 +424,32 @@ export default function RestaurantProfile() {
 
   const pendingRequirements = setupRequirements.filter((item) => !item.completed);
   const blockingRequirements = pendingRequirements.filter((item) => item.severity === "blocking");
+  const countrySelectOptions = countryOptions.map((item) => ({
+    value: String(item.id),
+    label: item.name,
+  }));
+  const currencySelectOptions = currencyOptions.map((item) => ({
+    value: String(item.id),
+    label: `${item.code} - ${item.name}`,
+  }));
+  if (
+    businessForm.country_id &&
+    !countrySelectOptions.some((item) => item.value === businessForm.country_id)
+  ) {
+    countrySelectOptions.unshift({
+      value: businessForm.country_id,
+      label: restaurant.country ?? `Country #${businessForm.country_id}`,
+    });
+  }
+  if (
+    businessForm.currency_id &&
+    !currencySelectOptions.some((item) => item.value === businessForm.currency_id)
+  ) {
+    currencySelectOptions.unshift({
+      value: businessForm.currency_id,
+      label: restaurant.currency ?? `Currency #${businessForm.currency_id}`,
+    });
+  }
 
   return (
     <DashboardLayout>
@@ -611,15 +668,19 @@ export default function RestaurantProfile() {
                   value={businessForm.phone}
                   onChange={(value) => setBusinessForm((prev) => ({ ...prev, phone: value }))}
                 />
-                <InputField
+                <SelectField
                   label="Country"
-                  value={businessForm.country}
-                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, country: value }))}
+                  value={businessForm.country_id}
+                  options={countrySelectOptions}
+                  placeholder="Select country"
+                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, country_id: value }))}
                 />
-                <InputField
+                <SelectField
                   label="Currency"
-                  value={businessForm.currency}
-                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, currency: value }))}
+                  value={businessForm.currency_id}
+                  options={currencySelectOptions}
+                  placeholder="Select currency"
+                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, currency_id: value }))}
                 />
                 <InputField
                   label="Billing Email"
@@ -808,6 +869,38 @@ function InputField({
   );
 }
 
+function SelectField({
+  label,
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+      >
+        <option value="">{placeholder}</option>
+        {options.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function TextAreaField({
   label,
   value,
@@ -852,9 +945,12 @@ function toNullable(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
-function toUpperNullable(value: string): string | null {
+function toNullableNumber(value: string): number | null {
   const normalized = toNullable(value);
-  return normalized ? normalized.toUpperCase() : null;
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {

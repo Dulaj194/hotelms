@@ -9,6 +9,8 @@ class RestaurantResponse(BaseModel):
     email: str | None
     phone: str | None
     address: str | None
+    country_id: int | None
+    currency_id: int | None
     country: str | None
     currency: str | None
     billing_email: str | None
@@ -39,6 +41,8 @@ class RestaurantUpdateRequest(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=50)
     address: str | None = Field(None, max_length=500)
+    country_id: int | None = Field(None, ge=1)
+    currency_id: int | None = Field(None, ge=1)
     country: str | None = Field(None, max_length=120)
     currency: str | None = Field(None, max_length=12)
     billing_email: EmailStr | None = None
@@ -54,6 +58,8 @@ class RestaurantCreateRequest(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=50)
     address: str | None = Field(None, max_length=500)
+    country_id: int | None = Field(None, ge=1)
+    currency_id: int | None = Field(None, ge=1)
     country: str | None = Field(None, max_length=120)
     currency: str | None = Field(None, max_length=12)
     billing_email: EmailStr | None = None
@@ -69,6 +75,8 @@ class RestaurantAdminUpdateRequest(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=50)
     address: str | None = Field(None, max_length=500)
+    country_id: int | None = Field(None, ge=1)
+    currency_id: int | None = Field(None, ge=1)
     country: str | None = Field(None, max_length=120)
     currency: str | None = Field(None, max_length=12)
     billing_email: EmailStr | None = None
