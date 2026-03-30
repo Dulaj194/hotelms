@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.standardization_checks import (  # noqa: E402
+    check_active_track_clarity,
     check_compose_secret_injection,
     check_metadata_naming,
     check_production_guardrails,
@@ -23,6 +24,10 @@ class StandardizationChecksTests(unittest.TestCase):
 
     def test_compose_secret_injection_passes(self) -> None:
         result = check_compose_secret_injection()
+        self.assertTrue(result.ok, "\n".join(result.details))
+
+    def test_active_track_clarity_passes(self) -> None:
+        result = check_active_track_clarity()
         self.assertTrue(result.ok, "\n".join(result.details))
 
     def test_production_guardrails_fail_for_weak_values(self) -> None:
@@ -45,4 +50,3 @@ class StandardizationChecksTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
