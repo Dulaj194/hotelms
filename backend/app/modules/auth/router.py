@@ -48,6 +48,57 @@ def login(
     )
 
 
+@router.post("/login/restaurant-admin", response_model=TokenResponse)
+def login_restaurant_admin(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    redis_client: redis_lib.Redis = Depends(get_redis),
+    refresh_token: str | None = Cookie(default=None),
+) -> TokenResponse:
+    return service.login_restaurant_admin(
+        db, redis_client, response,
+        payload.email, payload.password,
+        _client_ip(request), _user_agent(request),
+        refresh_token,
+    )
+
+
+@router.post("/login/staff", response_model=TokenResponse)
+def login_staff(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    redis_client: redis_lib.Redis = Depends(get_redis),
+    refresh_token: str | None = Cookie(default=None),
+) -> TokenResponse:
+    return service.login_staff(
+        db, redis_client, response,
+        payload.email, payload.password,
+        _client_ip(request), _user_agent(request),
+        refresh_token,
+    )
+
+
+@router.post("/login/super-admin", response_model=TokenResponse)
+def login_super_admin(
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    redis_client: redis_lib.Redis = Depends(get_redis),
+    refresh_token: str | None = Cookie(default=None),
+) -> TokenResponse:
+    return service.login_super_admin(
+        db, redis_client, response,
+        payload.email, payload.password,
+        _client_ip(request), _user_agent(request),
+        refresh_token,
+    )
+
+
 @router.post("/refresh", response_model=TokenResponse)
 def refresh(
     request: Request,

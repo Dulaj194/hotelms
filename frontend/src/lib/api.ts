@@ -14,6 +14,9 @@ const BASE_URL =
 const REFRESH_PATH = "/auth/refresh";
 const NO_REFRESH_RETRY_PATHS = new Set([
   "/auth/login",
+  "/auth/login/restaurant-admin",
+  "/auth/login/staff",
+  "/auth/login/super-admin",
   "/auth/forgot-password",
   "/auth/reset-password",
   "/auth/register-restaurant",
