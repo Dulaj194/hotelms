@@ -200,6 +200,97 @@ def check_compose_secret_injection(compose_file: Path | None = None) -> CheckRes
     )
 
 
+def _parse_compose_service_names(compose_path: Path) -> set[str]:
+    services: set[str] = set()
+    in_services = False
+
+    for line in compose_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+
+        if not in_services:
+            if stripped == "services:":
+                in_services = True
+            continue
+
+        # Stop when leaving the top-level services block.
+        if re.fullmatch(r"[A-Za-z0-9_-]+:\s*", line):
+            break
+
+        match = re.fullmatch(r"\s{2}([A-Za-z0-9_-]+):\s*", line)
+        if match:
+            services.add(match.group(1))
+
+    return services
+
+
+def check_active_track_clarity(
+    compose_file: Path | None = None,
+    run_script: Path | None = None,
+    legacy_start_script: Path | None = None,
+) -> CheckResult:
+    compose_path = compose_file or (_project_root() / "docker-compose.yml")
+    run_script_path = run_script or (_project_root() / "run.ps1")
+    legacy_script_path = legacy_start_script or (_project_root() / "restaurant-app" / "START_SERVER.bat")
+
+    failures: list[str] = []
+
+    expected_services = {"mysql", "redis", "backend", "frontend"}
+    if not compose_path.exists():
+        failures.append(f"Missing compose file: {compose_path}")
+    else:
+        actual_services = _parse_compose_service_names(compose_path)
+        missing_services = sorted(expected_services - actual_services)
+        extra_services = sorted(actual_services - expected_services)
+        if missing_services:
+            failures.append(
+                "docker-compose.yml is missing primary active services: " + ", ".join(missing_services)
+            )
+        if extra_services:
+            failures.append(
+                "docker-compose.yml contains non-primary services (drift risk): " + ", ".join(extra_services)
+            )
+
+    if not run_script_path.exists():
+        failures.append(f"Missing startup script: {run_script_path}")
+    else:
+        run_text = run_script_path.read_text(encoding="utf-8")
+        if "PRIMARY_ACTIVE_SYSTEM=hotelms_root_stack" not in run_text:
+            failures.append("run.ps1 must declare PRIMARY_ACTIVE_SYSTEM=hotelms_root_stack.")
+        if "hotel-saas" not in run_text:
+            failures.append("run.ps1 must mention hotel-saas as a secondary prototype track.")
+        if "restaurant-app" not in run_text:
+            failures.append("run.ps1 must mention restaurant-app as legacy reference-only.")
+
+    legacy_script_checked = False
+    if legacy_script_path.exists():
+        legacy_script_checked = True
+        legacy_text = legacy_script_path.read_text(encoding="utf-8")
+        if "LEGACY_REFERENCE_ONLY=1" not in legacy_text:
+            failures.append("restaurant-app/START_SERVER.bat must be marked LEGACY_REFERENCE_ONLY=1.")
+        if "ALLOW_LEGACY_RUNTIME" not in legacy_text:
+            failures.append("restaurant-app/START_SERVER.bat must require ALLOW_LEGACY_RUNTIME override.")
+
+    if failures:
+        return CheckResult(
+            name="Active track clarity",
+            ok=False,
+            details=failures,
+        )
+
+    return CheckResult(
+        name="Active track clarity",
+        ok=True,
+        details=[
+            "Compose stack and startup scripts clearly enforce the primary active system.",
+            "Legacy runtime script guard verified."
+            if legacy_script_checked
+            else "Legacy runtime script not present in tracked tree; root stack guard is enforced.",
+        ],
+    )
+
+
 def check_production_guardrails(
     app_env: str | None = None,
     secret_key: str | None = None,
@@ -309,6 +400,7 @@ def run_all_checks(database_url: str | None, skip_db: bool = False) -> list[Chec
         check_metadata_naming(),
         check_router_registration(),
         check_compose_secret_injection(),
+        check_active_track_clarity(),
         check_production_guardrails(),
     ]
     if not skip_db:

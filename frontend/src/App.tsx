@@ -36,6 +36,7 @@ import SubscriptionPaymentSuccess from "@/pages/admin/SubscriptionPaymentSuccess
 import SubscriptionPaymentCancel from "@/pages/admin/SubscriptionPaymentCancel";
 import Pricing from "@/pages/public/Pricing";
 import SuperAdminRestaurants from "@/pages/super-admin/Restaurants";
+import SuperAdminSettingsRequests from "@/pages/super-admin/SettingsRequests";
 import { getUser, getRoleRedirect, isAuthenticated } from "@/lib/auth";
 import { HOUSEKEEPING_TASK_ROLES, QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
 
@@ -310,6 +311,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["super_admin"]}>
               <SuperAdminRestaurants />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/settings-requests"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminSettingsRequests />
             </ProtectedRoute>
           }
         />

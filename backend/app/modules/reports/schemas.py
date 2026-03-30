@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -49,3 +49,23 @@ class SalesReportResponse(BaseModel):
     payment_methods: list[SalesPaymentSummaryResponse]
     rows: list[SalesReportRowResponse]
     available_dates: list[date]
+
+
+class SalesReportHistoryItemResponse(BaseModel):
+    id: int
+    report_type: str
+    output_format: str
+    status: str
+    file_url: str | None
+    generated_by_user_id: int | None
+    generated_at: datetime
+    filter_type: str | None
+    selected_date: date | None
+    from_date: date | None
+    to_date: date | None
+    report_summary: dict[str, Any]
+
+
+class SalesReportHistoryListResponse(BaseModel):
+    items: list[SalesReportHistoryItemResponse]
+    total: int

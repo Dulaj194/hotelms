@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.modules.categories.model import Category
     from app.modules.items.model import Item
     from app.modules.menus.model import Menu
+    from app.modules.reference_data.model import Country, CurrencyType
     from app.modules.subcategories.model import Subcategory
     from app.modules.users.model import User
 
@@ -26,6 +27,18 @@ class Restaurant(Base):
     email: Mapped[str | None] = mapped_column(String(191), unique=True, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     address: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    country_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("countries.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    currency_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("currency_types.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     country: Mapped[str | None] = mapped_column(String(120), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(12), nullable=True)
     billing_email: Mapped[str | None] = mapped_column(String(191), nullable=True)
@@ -52,3 +65,14 @@ class Restaurant(Base):
     categories: Mapped[list[Category]] = relationship("Category", back_populates="restaurant")
     subcategories: Mapped[list[Subcategory]] = relationship("Subcategory", back_populates="restaurant")
     items: Mapped[list[Item]] = relationship("Item", back_populates="restaurant")
+
+    country_ref: Mapped[Country | None] = relationship(
+        "Country",
+        back_populates="restaurants",
+        foreign_keys=[country_id],
+    )
+    currency_ref: Mapped[CurrencyType | None] = relationship(
+        "CurrencyType",
+        back_populates="restaurants",
+        foreign_keys=[currency_id],
+    )

@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
-import { api, ApiError } from "@/lib/api";
-import type { ReportFilterType, SalesReportResponse } from "@/types/report";
+import { api, ApiError, refreshAccessToken } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth";
+import type {
+  SalesReportHistoryItemResponse,
+  SalesReportHistoryListResponse,
+  SalesReportResponse,
+} from "@/types/report";
 
-type ReportViewMode = "daily" | "monthly" | "range";
+type ReportViewMode = "daily" | "monthly" | "range" | "history";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
 function formatDate(value: string | null): string {
   if (!value) return "-";
@@ -17,6 +24,76 @@ function formatDateTime(value: string): string {
 
 function money(value: number): string {
   return value.toFixed(2);
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    return error.detail || fallback;
+  }
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+  return fallback;
+}
+
+function parseMonthInput(selectedMonth: string): { year: number; month: number } {
+  const [yearRaw, monthRaw] = selectedMonth.split("-").map(Number);
+  const currentDate = new Date();
+  const year = Number.isFinite(yearRaw) ? yearRaw : currentDate.getFullYear();
+  const month = Number.isFinite(monthRaw) ? monthRaw : currentDate.getMonth() + 1;
+  return { year, month };
+}
+
+function buildMonthRange(selectedMonth: string): { fromDate: string; toDate: string } {
+  const { year, month } = parseMonthInput(selectedMonth);
+  const monthStart = `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-01`;
+  const monthEndDate = new Date(year, month, 0);
+  const monthEnd = `${year.toString().padStart(4, "0")}-${month
+    .toString()
+    .padStart(2, "0")}-${monthEndDate.getDate().toString().padStart(2, "0")}`;
+  return { fromDate: monthStart, toDate: monthEnd };
+}
+
+function readContentDispositionFilename(contentDisposition: string | null): string | null {
+  if (!contentDisposition) return null;
+  const match = contentDisposition.match(/filename="?([^"]+)"?/i);
+  return match?.[1] ?? null;
+}
+
+function formatHistoryPeriod(item: SalesReportHistoryItemResponse): string {
+  if (item.filter_type === "single" && item.selected_date) {
+    return formatDate(item.selected_date);
+  }
+  if (item.from_date || item.to_date) {
+    return `${formatDate(item.from_date)} - ${formatDate(item.to_date)}`;
+  }
+  return "-";
+}
+
+function numberFromSummary(summary: Record<string, unknown>, key: string): number | null {
+  const value = summary[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+async function fetchCsvWithAuthRetry(pathWithQuery: string): Promise<Response> {
+  const requestOnce = async (token: string | null): Promise<Response> => {
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return fetch(`${API_BASE_URL}${pathWithQuery}`, {
+      method: "GET",
+      headers,
+      credentials: "include",
+    });
+  };
+
+  let token = getAccessToken();
+  let response = await requestOnce(token);
+  if (response.status !== 401) return response;
+
+  const nextToken = await refreshAccessToken();
+  if (!nextToken) return response;
+  response = await requestOnce(nextToken);
+  return response;
 }
 
 export default function Reports() {
@@ -34,94 +111,106 @@ export default function Reports() {
   const [toDate, setToDate] = useState(today);
 
   const [report, setReport] = useState<SalesReportResponse | null>(null);
+  const [reportHistory, setReportHistory] = useState<SalesReportHistoryItemResponse[]>([]);
+
   const [loading, setLoading] = useState(true);
+  const [downloadBusy, setDownloadBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const buildSalesRequest = useCallback(() => {
+    if (viewMode === "daily") {
+      const query = `filter_type=single&date_value=${encodeURIComponent(selectedDate)}`;
+      return {
+        dataPath: `/reports/sales?${query}`,
+        exportPath: `/reports/sales/export.csv?${query}`,
+      };
+    }
+
+    if (viewMode === "monthly") {
+      const { year, month } = parseMonthInput(selectedMonth);
+      const monthApiQuery = `year=${encodeURIComponent(String(year))}&month=${encodeURIComponent(
+        String(month),
+      )}`;
+      const monthRange = buildMonthRange(selectedMonth);
+      const exportQuery = `filter_type=range&from_date=${encodeURIComponent(
+        monthRange.fromDate,
+      )}&to_date=${encodeURIComponent(monthRange.toDate)}`;
+      return {
+        dataPath: `/reports/sales/monthly?${monthApiQuery}`,
+        exportPath: `/reports/sales/export.csv?${exportQuery}`,
+      };
+    }
+
+    const query = `filter_type=range&from_date=${encodeURIComponent(
+      fromDate,
+    )}&to_date=${encodeURIComponent(toDate)}`;
+    return {
+      dataPath: `/reports/sales?${query}`,
+      exportPath: `/reports/sales/export.csv?${query}`,
+    };
+  }, [fromDate, selectedDate, selectedMonth, toDate, viewMode]);
 
   const loadReport = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      let queryFilterType: ReportFilterType = "single";
-      let path = "";
-
-      if (viewMode === "daily") {
-        queryFilterType = "single";
-        path = `/reports/sales?filter_type=single&date_value=${encodeURIComponent(selectedDate)}`;
-      } else if (viewMode === "monthly") {
-        queryFilterType = "range";
-        const [yearRaw, monthRaw] = selectedMonth.split("-").map(Number);
-        const year = Number.isFinite(yearRaw) ? yearRaw : new Date().getFullYear();
-        const month = Number.isFinite(monthRaw) ? monthRaw : new Date().getMonth() + 1;
-        const monthStart = `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-01`;
-        const monthEndDate = new Date(year, month, 0);
-        const monthEnd = `${year.toString().padStart(4, "0")}-${month
-          .toString()
-          .padStart(2, "0")}-${monthEndDate.getDate().toString().padStart(2, "0")}`;
-        path = `/reports/sales?filter_type=${queryFilterType}&from_date=${encodeURIComponent(monthStart)}&to_date=${encodeURIComponent(monthEnd)}`;
-      } else {
-        queryFilterType = "range";
-        path = `/reports/sales?filter_type=${queryFilterType}&from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`;
+      if (viewMode === "history") {
+        const data = await api.get<SalesReportHistoryListResponse>("/reports/sales/history?limit=150");
+        setReportHistory(data.items);
+        setReport(null);
+        return;
       }
 
-      const data = await api.get<SalesReportResponse>(path);
+      const { dataPath } = buildSalesRequest();
+      const data = await api.get<SalesReportResponse>(dataPath);
       setReport(data);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.detail || "Failed to load sales report.");
-      } else {
-        setError("Failed to load sales report.");
-      }
+      setError(getErrorMessage(err, "Failed to load sales report."));
     } finally {
       setLoading(false);
     }
-  }, [fromDate, selectedDate, selectedMonth, toDate, viewMode]);
+  }, [buildSalesRequest, viewMode]);
 
   useEffect(() => {
     void loadReport();
   }, [loadReport]);
 
-  function downloadCsv() {
-    if (!report) return;
+  async function downloadCsv() {
+    if (viewMode === "history") return;
 
-    const header = [
-      "Sales At",
-      "Order Number",
-      "Category",
-      "Item Name",
-      "Quantity",
-      "Unit Price",
-      "Total Price",
-      "Payment Method",
-      "Location",
-      "Customer",
-    ];
+    setDownloadBusy(true);
+    setError(null);
+    try {
+      const { exportPath } = buildSalesRequest();
+      const response = await fetchCsvWithAuthRetry(exportPath);
+      if (!response.ok) {
+        let detail = "Failed to export CSV report.";
+        try {
+          const payload = (await response.json()) as { detail?: string };
+          detail = payload.detail || detail;
+        } catch {
+          detail = response.statusText || detail;
+        }
+        throw new Error(detail);
+      }
 
-    const rows = report.rows.map((row) => [
-      row.sales_at,
-      row.order_number,
-      row.category_name ?? "",
-      row.item_name,
-      String(row.quantity),
-      money(row.unit_price),
-      money(row.total_price),
-      row.payment_method,
-      row.location_label,
-      row.customer_name ?? "",
-    ]);
+      const blob = await response.blob();
+      const filenameFromHeader = readContentDispositionFilename(
+        response.headers.get("content-disposition"),
+      );
+      const filename = filenameFromHeader || "sales-report.csv";
 
-    const csv = [header, ...rows]
-      .map((columns) =>
-        columns.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")
-      )
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "sales-report.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to export CSV report."));
+    } finally {
+      setDownloadBusy(false);
+    }
   }
 
   return (
@@ -132,16 +221,16 @@ export default function Reports() {
             <div>
               <h1 className="app-section-title text-gray-900">Reports</h1>
               <p className="app-muted-text mt-1 text-gray-600">
-                Review paid sales, filter by date, and export operational summaries.
+                Review daily and monthly sales, browse history, and download server-generated reports.
               </p>
             </div>
             <div className="app-form-actions">
               <button
-                onClick={downloadCsv}
-                disabled={!report}
-                className="app-btn-base w-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 sm:w-auto"
+                onClick={() => void downloadCsv()}
+                disabled={viewMode === "history" || downloadBusy}
+                className="app-btn-base w-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
-                Download CSV
+                {downloadBusy ? "Downloading..." : "Download CSV"}
               </button>
               <button
                 onClick={() => window.print()}
@@ -184,6 +273,16 @@ export default function Reports() {
               }`}
             >
               Date Range
+            </button>
+            <button
+              onClick={() => setViewMode("history")}
+              className={`app-btn-compact w-full sm:w-auto ${
+                viewMode === "history"
+                  ? "bg-blue-600 text-white"
+                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Report History
             </button>
           </div>
 
@@ -250,7 +349,7 @@ export default function Reports() {
                 Apply
               </button>
             </div>
-          ) : (
+          ) : viewMode === "range" ? (
             <div className="app-form-grid items-end">
               <div>
                 <label className="app-muted-text mb-1 block font-medium text-gray-700">
@@ -281,6 +380,19 @@ export default function Reports() {
                 Apply
               </button>
             </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-blue-100 bg-blue-50 px-4 py-3">
+              <p className="text-sm text-blue-800">
+                Showing generated report history from server-side report logs.
+              </p>
+              <button
+                type="button"
+                onClick={() => void loadReport()}
+                className="rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700"
+              >
+                Refresh History
+              </button>
+            </div>
           )}
         </section>
 
@@ -294,7 +406,88 @@ export default function Reports() {
           </div>
         )}
 
-        {report && !loading && (
+        {!loading && viewMode === "history" && (
+          <section className="rounded-xl border bg-white p-6 shadow-sm">
+            <h2 className="app-section-title text-gray-900">Generated Report History</h2>
+            {reportHistory.length === 0 ? (
+              <p className="mt-4 text-sm text-gray-500">No report history found yet.</p>
+            ) : (
+              <>
+                <div className="mt-4 space-y-3 md:hidden">
+                  {reportHistory.map((item) => {
+                    const totalSales = numberFromSummary(item.report_summary, "total_sales");
+                    const totalQuantity = numberFromSummary(item.report_summary, "total_quantity");
+                    const totalOrders = numberFromSummary(item.report_summary, "total_orders");
+                    return (
+                      <article key={item.id} className="rounded-lg border border-gray-200 p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-semibold text-gray-900">#{item.id}</p>
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
+                            {item.output_format.toUpperCase()}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-gray-600">Generated: {formatDateTime(item.generated_at)}</p>
+                        <p className="mt-1 text-xs text-gray-600">Period: {formatHistoryPeriod(item)}</p>
+                        <p className="mt-2 text-xs text-gray-700">
+                          Total Sales: {totalSales !== null ? money(totalSales) : "-"}
+                        </p>
+                        <p className="text-xs text-gray-700">
+                          Qty: {totalQuantity !== null ? totalQuantity : "-"} | Orders:{" "}
+                          {totalOrders !== null ? totalOrders : "-"}
+                        </p>
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="app-table-scroll hidden md:block">
+                  <table className="mt-4 w-full min-w-[920px] text-sm">
+                    <thead className="text-left text-gray-500">
+                      <tr>
+                        <th className="pb-2">ID</th>
+                        <th className="pb-2">Generated At</th>
+                        <th className="pb-2">Filter</th>
+                        <th className="pb-2">Period</th>
+                        <th className="pb-2">Format</th>
+                        <th className="pb-2">Status</th>
+                        <th className="pb-2 text-right">Total Sales</th>
+                        <th className="pb-2 text-right">Quantity</th>
+                        <th className="pb-2 text-right">Orders</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {reportHistory.map((item) => {
+                        const totalSales = numberFromSummary(item.report_summary, "total_sales");
+                        const totalQuantity = numberFromSummary(item.report_summary, "total_quantity");
+                        const totalOrders = numberFromSummary(item.report_summary, "total_orders");
+                        return (
+                          <tr key={item.id}>
+                            <td className="py-2 pr-3">{item.id}</td>
+                            <td className="py-2 pr-3">{formatDateTime(item.generated_at)}</td>
+                            <td className="py-2 pr-3">{item.filter_type ?? "-"}</td>
+                            <td className="py-2 pr-3">{formatHistoryPeriod(item)}</td>
+                            <td className="py-2 pr-3">{item.output_format.toUpperCase()}</td>
+                            <td className="py-2 pr-3">{item.status}</td>
+                            <td className="py-2 pr-3 text-right">
+                              {totalSales !== null ? money(totalSales) : "-"}
+                            </td>
+                            <td className="py-2 pr-3 text-right">
+                              {totalQuantity !== null ? totalQuantity : "-"}
+                            </td>
+                            <td className="py-2 pr-3 text-right">
+                              {totalOrders !== null ? totalOrders : "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        {report && !loading && viewMode !== "history" && (
           <>
             <section className="grid gap-4 md:grid-cols-3">
               <div className="rounded-xl border bg-white p-5 shadow-sm">

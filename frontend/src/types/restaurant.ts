@@ -4,6 +4,8 @@ export interface RestaurantResponse {
   email: string | null;
   phone: string | null;
   address: string | null;
+  country_id: number | null;
+  currency_id: number | null;
   country: string | null;
   currency: string | null;
   billing_email: string | null;
@@ -28,6 +30,8 @@ export interface RestaurantUpdateRequest {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  country_id?: number | null;
+  currency_id?: number | null;
   country?: string | null;
   currency?: string | null;
   billing_email?: string | null;
@@ -46,6 +50,8 @@ export interface RestaurantCreateRequest {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  country_id?: number | null;
+  currency_id?: number | null;
   country?: string | null;
   currency?: string | null;
   billing_email?: string | null;
@@ -59,6 +65,8 @@ export interface RestaurantAdminUpdateRequest {
   email?: string | null;
   phone?: string | null;
   address?: string | null;
+  country_id?: number | null;
+  currency_id?: number | null;
   country?: string | null;
   currency?: string | null;
   billing_email?: string | null;
@@ -71,4 +79,27 @@ export interface RestaurantAdminUpdateRequest {
 export interface RestaurantDeleteResponse {
   message: string;
   restaurant_id: number;
+}
+
+export interface CountryLookupItem {
+  id: number;
+  name: string;
+  iso2: string | null;
+}
+
+export interface CountryLookupListResponse {
+  items: CountryLookupItem[];
+  total: number;
+}
+
+export interface CurrencyLookupItem {
+  id: number;
+  code: string;
+  name: string;
+  symbol: string | null;
+}
+
+export interface CurrencyLookupListResponse {
+  items: CurrencyLookupItem[];
+  total: number;
 }

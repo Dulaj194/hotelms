@@ -12,6 +12,8 @@ from app.core.config import settings
 from app.modules.packages import repository as packages_repo
 from app.modules.payments import repository as payment_repo
 from app.modules.payments.model import BillingTransactionStatus
+from app.modules.promo_codes import service as promo_codes_service
+from app.modules.promo_codes.schemas import PromoCodeConsumeRequest, PromoCodeValidateRequest
 from app.modules.payments.schemas import (
     BillingTransactionListResponse,
     BillingTransactionResponse,
@@ -59,6 +61,7 @@ def create_checkout_session(
     *,
     restaurant_id: int,
     package_id: int,
+    promo_code: str | None = None,
 ) -> CheckoutSessionResponse:
     package = packages_repo.get_package_by_id(db, package_id)
     if package is None or not package.is_active:
@@ -73,13 +76,36 @@ def create_checkout_session(
     stripe = _get_stripe_module()
     stripe.api_key = settings.stripe_secret_key
 
+    promo_code_value: str | None = None
+    discount_percent = 0.0
+    final_amount = float(package.price)
+    if promo_code:
+        validation = promo_codes_service.validate_promo_for_restaurant(
+            db,
+            restaurant_id=restaurant_id,
+            payload=PromoCodeValidateRequest(code=promo_code),
+        )
+        if not validation.valid or validation.discount_percent is None or not validation.code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=validation.message,
+            )
+        promo_code_value = validation.code
+        discount_percent = float(validation.discount_percent)
+        final_amount = max(0.0, final_amount - (final_amount * (discount_percent / 100)))
+
     transaction = payment_repo.create_billing_transaction(
         db,
         restaurant_id=restaurant_id,
         package_id=package.id,
-        amount=float(package.price),
+        amount=final_amount,
         currency=settings.stripe_currency,
-        metadata={"source": "stripe_checkout", "package_code": package.code},
+        metadata={
+            "source": "stripe_checkout",
+            "package_code": package.code,
+            "promo_code": promo_code_value,
+            "discount_percent": discount_percent,
+        },
     )
 
     success_url = settings.stripe_checkout_success_url.format(CHECKOUT_SESSION_ID="{CHECKOUT_SESSION_ID}")
@@ -96,7 +122,7 @@ def create_checkout_session(
                     "quantity": 1,
                     "price_data": {
                         "currency": settings.stripe_currency,
-                        "unit_amount": _to_cents(package.price),
+                        "unit_amount": _to_cents(final_amount),
                         "product_data": {
                             "name": f"{package.name} subscription",
                             "description": package.description or f"{package.billing_period_days}-day plan",
@@ -108,6 +134,7 @@ def create_checkout_session(
                 "restaurant_id": str(restaurant_id),
                 "package_id": str(package.id),
                 "billing_transaction_id": str(transaction.id),
+                "promo_code": promo_code_value or "",
             },
         )
     except Exception as exc:
@@ -189,6 +216,7 @@ def _handle_checkout_completed(db: Session, event: dict[str, Any]) -> None:
     transaction_id_value = metadata.get("billing_transaction_id")
     package_id_value = metadata.get("package_id")
     restaurant_id_value = metadata.get("restaurant_id")
+    promo_code_value = (metadata.get("promo_code") or "").strip().upper()
 
     transaction = payment_repo.get_billing_transaction_by_checkout_session(db, checkout_session_id)
     if transaction is None and transaction_id_value and transaction_id_value.isdigit():
@@ -234,6 +262,17 @@ def _handle_checkout_completed(db: Session, event: dict[str, Any]) -> None:
         stripe_customer_id=obj.get("customer"),
         subscription_id=subscription.id,
     )
+
+    if promo_code_value:
+        try:
+            promo_codes_service.consume_promo_for_restaurant(
+                db,
+                restaurant_id=restaurant_id,
+                payload=PromoCodeConsumeRequest(code=promo_code_value, increment=1),
+            )
+        except Exception:
+            # Billing transaction is already successful. Promo usage update is best-effort.
+            pass
 
 
 def _handle_checkout_expired(db: Session, event: dict[str, Any]) -> None:
