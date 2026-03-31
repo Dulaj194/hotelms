@@ -42,7 +42,6 @@ class Restaurant(Base):
     country: Mapped[str | None] = mapped_column(String(120), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(12), nullable=True)
     billing_email: Mapped[str | None] = mapped_column(String(191), nullable=True)
-    tax_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     opening_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
     closing_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

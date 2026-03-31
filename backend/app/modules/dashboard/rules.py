@@ -83,13 +83,7 @@ SETUP_REQUIREMENT_MATRIX = [
         "key": "billing_email",
         "label": "Billing email",
         "severity": "later",
-        "description": "Recommended for billing notifications.",
-    },
-    {
-        "key": "tax_id",
-        "label": "Tax ID",
-        "severity": "later",
-        "description": "Recommended for invoicing and tax reports.",
+        "description": "Recommended for invoices and subscription notices.",
     },
     {
         "key": "logo_url",

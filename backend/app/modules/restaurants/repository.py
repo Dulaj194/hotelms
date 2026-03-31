@@ -1,7 +1,6 @@
 from sqlalchemy.orm import Session
 
 from app.modules.restaurants.model import Restaurant
-from app.modules.restaurants.schemas import RestaurantUpdateRequest
 
 # ─── Tenant-safe access ───────────────────────────────────────────────────────
 #
@@ -22,14 +21,13 @@ def get_by_id(db: Session, restaurant_id: int) -> Restaurant | None:
 def update_profile(
     db: Session,
     restaurant_id: int,
-    payload: RestaurantUpdateRequest,
+    update_data: dict,
 ) -> Restaurant | None:
     """Update allowed profile fields. Only fields in the payload are changed."""
     restaurant = get_by_id(db, restaurant_id)
     if not restaurant:
         return None
 
-    update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(restaurant, field, value)
 
@@ -81,7 +79,6 @@ def create_restaurant(
     country: str | None,
     currency: str | None,
     billing_email: str | None,
-    tax_id: str | None,
     opening_time: str | None,
     closing_time: str | None,
 ) -> Restaurant:
@@ -96,7 +93,6 @@ def create_restaurant(
         country=country,
         currency=currency,
         billing_email=billing_email,
-        tax_id=tax_id,
         opening_time=opening_time,
         closing_time=closing_time,
     )

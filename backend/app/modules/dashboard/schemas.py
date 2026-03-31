@@ -15,7 +15,6 @@ class DashboardRestaurantSummary(BaseModel):
     country: str | None
     currency: str | None
     billing_email: str | None
-    tax_id: str | None
     opening_time: str | None
     closing_time: str | None
 

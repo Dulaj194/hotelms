@@ -35,7 +35,6 @@ interface BusinessFormState {
   country_id: string;
   currency_id: string;
   billing_email: string;
-  tax_id: string;
 }
 
 interface ScheduleFormState {
@@ -47,7 +46,6 @@ const SETUP_SECTION_LABELS: Record<string, string> = {
   country: "Business Details",
   currency: "Business Details",
   billing_email: "Business Details",
-  tax_id: "Business Details",
   logo_url: "Branding",
   opening_time: "Operating Schedule",
   closing_time: "Operating Schedule",
@@ -79,7 +77,6 @@ export default function RestaurantProfile() {
     country_id: "",
     currency_id: "",
     billing_email: "",
-    tax_id: "",
   });
 
   const [editingSchedule, setEditingSchedule] = useState(false);
@@ -198,8 +195,7 @@ export default function RestaurantProfile() {
       address: data.address ?? "",
       country_id: data.country_id ? String(data.country_id) : "",
       currency_id: data.currency_id ? String(data.currency_id) : "",
-      billing_email: data.billing_email ?? "",
-      tax_id: data.tax_id ?? "",
+      billing_email: data.billing_email ?? data.email ?? "",
     });
   }
 
@@ -265,16 +261,18 @@ export default function RestaurantProfile() {
     setSavingBusiness(true);
     setProfileNotice(null);
 
+    const primaryEmail = toNullable(businessForm.email);
+    const billingEmail = toNullable(businessForm.billing_email) ?? primaryEmail;
+
     const updated = await saveProfileChanges(
       {
         name: trimmedName,
-        email: toNullable(businessForm.email),
+        email: primaryEmail,
         phone: toNullable(businessForm.phone),
         address: toNullable(businessForm.address),
         country_id: toNullableNumber(businessForm.country_id),
         currency_id: toNullableNumber(businessForm.currency_id),
-        billing_email: toNullable(businessForm.billing_email),
-        tax_id: toNullable(businessForm.tax_id),
+        billing_email: billingEmail,
       },
       {
         success: "Business details updated successfully.",
@@ -450,6 +448,9 @@ export default function RestaurantProfile() {
       label: restaurant.currency ?? `Currency #${businessForm.currency_id}`,
     });
   }
+  const billingEmailSuggestion = toNullable(businessForm.email);
+  const billingEmailValue = toNullable(businessForm.billing_email);
+  const billingEmailMatchesPrimary = emailsEqual(billingEmailSuggestion, billingEmailValue);
 
   return (
     <DashboardLayout>
@@ -686,15 +687,39 @@ export default function RestaurantProfile() {
                   label="Billing Email"
                   type="email"
                   value={businessForm.billing_email}
+                  placeholder={billingEmailSuggestion ?? "Use the main email for billing notices"}
                   onChange={(value) =>
                     setBusinessForm((prev) => ({ ...prev, billing_email: value }))
                   }
-                />
-                <InputField
-                  label="Tax ID"
-                  value={businessForm.tax_id}
-                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, tax_id: value }))}
-                />
+                >
+                  {billingEmailSuggestion ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span>
+                        {billingEmailMatchesPrimary
+                          ? "Billing notices will use the same email as the primary contact."
+                          : `Suggested from the main email: ${billingEmailSuggestion}`}
+                      </span>
+                      {!billingEmailMatchesPrimary && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBusinessForm((prev) => ({
+                              ...prev,
+                              billing_email: billingEmailSuggestion,
+                            }))
+                          }
+                          className="font-semibold text-blue-600 hover:text-blue-700"
+                        >
+                          Use main email
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Add the main email above to reuse it for invoices and subscription notices.
+                    </p>
+                  )}
+                </InputField>
               </div>
 
               <TextAreaField
@@ -704,8 +729,8 @@ export default function RestaurantProfile() {
               />
 
               <p className="text-xs text-slate-500">
-                Country and currency are required to clear setup blockers. Billing email and tax ID
-                help with invoices and subscription notifications.
+                Country and currency are required to clear setup blockers. Billing email defaults
+                to the main email and is used for invoices and subscription notifications.
               </p>
 
               <div className="flex flex-wrap gap-2">
@@ -734,7 +759,6 @@ export default function RestaurantProfile() {
               <DetailItem label="Country" value={restaurant.country} />
               <DetailItem label="Currency" value={restaurant.currency} />
               <DetailItem label="Billing Email" value={restaurant.billing_email} />
-              <DetailItem label="Tax ID" value={restaurant.tax_id} />
               <DetailItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
               <DetailItem label="Address" value={restaurant.address} fullWidth />
             </dl>
@@ -849,11 +873,15 @@ function InputField({
   label,
   value,
   type = "text",
+  placeholder,
+  children,
   onChange,
 }: {
   label: string;
   value: string;
   type?: string;
+  placeholder?: string;
+  children?: ReactNode;
   onChange: (value: string) => void;
 }) {
   return (
@@ -862,9 +890,11 @@ function InputField({
       <input
         type={type}
         value={value}
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
       />
+      {children}
     </div>
   );
 }
@@ -943,6 +973,13 @@ function DetailItem({
 function toNullable(value: string): string | null {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function emailsEqual(left: string | null, right: string | null): boolean {
+  if (!left || !right) {
+    return false;
+  }
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
 }
 
 function toNullableNumber(value: string): number | null {

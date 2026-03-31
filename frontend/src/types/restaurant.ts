@@ -9,7 +9,6 @@ export interface RestaurantResponse {
   country: string | null;
   currency: string | null;
   billing_email: string | null;
-  tax_id: string | null;
   opening_time: string | null;
   closing_time: string | null;
   logo_url: string | null;
@@ -35,7 +34,6 @@ export interface RestaurantUpdateRequest {
   country?: string | null;
   currency?: string | null;
   billing_email?: string | null;
-  tax_id?: string | null;
   opening_time?: string | null;
   closing_time?: string | null;
 }
@@ -55,7 +53,6 @@ export interface RestaurantCreateRequest {
   country?: string | null;
   currency?: string | null;
   billing_email?: string | null;
-  tax_id?: string | null;
   opening_time?: string | null;
   closing_time?: string | null;
 }
@@ -70,7 +67,6 @@ export interface RestaurantAdminUpdateRequest {
   country?: string | null;
   currency?: string | null;
   billing_email?: string | null;
-  tax_id?: string | null;
   opening_time?: string | null;
   closing_time?: string | null;
   is_active?: boolean;

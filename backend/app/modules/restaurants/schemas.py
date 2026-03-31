@@ -14,7 +14,6 @@ class RestaurantResponse(BaseModel):
     country: str | None
     currency: str | None
     billing_email: str | None
-    tax_id: str | None
     opening_time: str | None
     closing_time: str | None
     logo_url: str | None
@@ -46,7 +45,6 @@ class RestaurantUpdateRequest(BaseModel):
     country: str | None = Field(None, max_length=120)
     currency: str | None = Field(None, max_length=12)
     billing_email: EmailStr | None = None
-    tax_id: str | None = Field(None, max_length=100)
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
 
@@ -63,7 +61,6 @@ class RestaurantCreateRequest(BaseModel):
     country: str | None = Field(None, max_length=120)
     currency: str | None = Field(None, max_length=12)
     billing_email: EmailStr | None = None
-    tax_id: str | None = Field(None, max_length=100)
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
 
@@ -80,7 +77,6 @@ class RestaurantAdminUpdateRequest(BaseModel):
     country: str | None = Field(None, max_length=120)
     currency: str | None = Field(None, max_length=12)
     billing_email: EmailStr | None = None
-    tax_id: str | None = Field(None, max_length=100)
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
     is_active: bool | None = None

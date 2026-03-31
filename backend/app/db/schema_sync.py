@@ -145,10 +145,6 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             "ALTER TABLE restaurants ADD COLUMN billing_email VARCHAR(191) NULL",
         ),
         (
-            "tax_id",
-            "ALTER TABLE restaurants ADD COLUMN tax_id VARCHAR(100) NULL",
-        ),
-        (
             "opening_time",
             "ALTER TABLE restaurants ADD COLUMN opening_time VARCHAR(8) NULL",
         ),
@@ -342,6 +338,24 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 "Applied development schema patch: restaurants.%s was missing and has been added.",
                 column_name,
             )
+
+        if _column_exists(conn, "restaurants", "billing_email") and _column_exists(conn, "restaurants", "email"):
+            result = conn.execute(
+                text(
+                    """
+                    UPDATE restaurants
+                    SET billing_email = email
+                    WHERE (billing_email IS NULL OR billing_email = '')
+                      AND email IS NOT NULL
+                      AND email <> ''
+                    """
+                )
+            )
+            if result.rowcount and result.rowcount > 0:
+                logger.warning(
+                    "Applied development schema patch: backfilled restaurants.billing_email from restaurants.email for %s row(s).",
+                    result.rowcount,
+                )
 
         for column_name, alter_sql in category_column_patches:
             if _column_exists(conn, "categories", column_name):

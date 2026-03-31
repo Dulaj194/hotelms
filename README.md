@@ -1,7 +1,7 @@
 # HotelMS
 
-`hotelms` is organized as a source-first monorepo with separate backend and frontend apps.
-The structure follows the same modular separation used in `Anawuma-Resturant-App-` (reference only), adapted to this FastAPI + React stack.
+`hotelms` is a self-contained source-first monorepo with separate backend and frontend
+apps for the active localhost runtime.
 
 ## Project Structure
 
@@ -40,5 +40,5 @@ hotelms/
 ## Local Start
 
 1. Configure env files from the provided `.env.example` files.
-2. Start services with `docker compose up --build` from repo root.
+2. Start the active HotelMS stack with `docker compose up --build` from repo root.
 3. Frontend runs on `http://localhost:5173`, backend on `http://localhost:8000`.

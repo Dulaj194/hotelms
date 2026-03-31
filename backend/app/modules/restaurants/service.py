@@ -29,6 +29,81 @@ _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 
 
+def _effective_billing_email(
+    *,
+    primary_email: str | None,
+    billing_email: str | None,
+) -> str | None:
+    return billing_email or primary_email or None
+
+
+def _apply_billing_email_defaults(
+    update_data: dict,
+    *,
+    existing_primary_email: str | None = None,
+    existing_billing_email: str | None = None,
+) -> dict:
+    normalized = dict(update_data)
+    next_primary_email = (
+        str(normalized.get("email")) if normalized.get("email") else None
+        if "email" in normalized
+        else existing_primary_email
+    )
+
+    if "billing_email" in normalized:
+        explicit_billing_email = (
+            str(normalized.get("billing_email")) if normalized.get("billing_email") else None
+        )
+        normalized["billing_email"] = _effective_billing_email(
+            primary_email=next_primary_email,
+            billing_email=explicit_billing_email,
+        )
+        return normalized
+
+    if existing_primary_email is None and existing_billing_email is None:
+        if next_primary_email:
+            normalized["billing_email"] = next_primary_email
+        return normalized
+
+    if "email" in normalized:
+        current_effective_billing = _effective_billing_email(
+            primary_email=existing_primary_email,
+            billing_email=existing_billing_email,
+        )
+        if current_effective_billing == existing_primary_email:
+            normalized["billing_email"] = next_primary_email
+
+    return normalized
+
+
+def _build_profile_update_data(
+    db: Session,
+    payload: RestaurantUpdateRequest | RestaurantCreateRequest | RestaurantAdminUpdateRequest,
+    *,
+    existing_primary_email: str | None = None,
+    existing_billing_email: str | None = None,
+) -> dict:
+    normalized_payload = _with_normalized_reference_fields(db, payload)
+    update_data = normalized_payload.model_dump(exclude_unset=True)
+    return _apply_billing_email_defaults(
+        update_data,
+        existing_primary_email=existing_primary_email,
+        existing_billing_email=existing_billing_email,
+    )
+
+
+def _serialize_restaurant(restaurant) -> RestaurantMeResponse:
+    response = RestaurantMeResponse.model_validate(restaurant)
+    return response.model_copy(
+        update={
+            "billing_email": _effective_billing_email(
+                primary_email=response.email,
+                billing_email=response.billing_email,
+            )
+        }
+    )
+
+
 def get_my_restaurant(db: Session, restaurant_id: int) -> RestaurantMeResponse:
     """Return the authenticated tenant's restaurant profile.
 
@@ -41,7 +116,7 @@ def get_my_restaurant(db: Session, restaurant_id: int) -> RestaurantMeResponse:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
-    return RestaurantMeResponse.model_validate(restaurant)
+    return _serialize_restaurant(restaurant)
 
 
 def update_my_restaurant(
@@ -50,14 +125,25 @@ def update_my_restaurant(
     payload: RestaurantUpdateRequest,
 ) -> RestaurantMeResponse:
     """Update the authenticated tenant's restaurant profile."""
-    normalized_payload = _with_normalized_reference_fields(db, payload)
-    restaurant = repository.update_profile(db, restaurant_id, normalized_payload)
+    current_restaurant = repository.get_by_id(db, restaurant_id)
+    if current_restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+    update_data = _build_profile_update_data(
+        db,
+        payload,
+        existing_primary_email=current_restaurant.email,
+        existing_billing_email=current_restaurant.billing_email,
+    )
+    restaurant = repository.update_profile(db, restaurant_id, update_data)
     if not restaurant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
-    return RestaurantMeResponse.model_validate(restaurant)
+    return _serialize_restaurant(restaurant)
 
 
 async def upload_logo(
@@ -119,13 +205,13 @@ def get_restaurant_for_super_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
-    return RestaurantMeResponse.model_validate(restaurant)
+    return _serialize_restaurant(restaurant)
 
 
 def list_all_restaurants(db: Session) -> list[RestaurantMeResponse]:
     """List all restaurants. Restricted to super_admin use only."""
     restaurants = repository.list_all_for_super_admin(db)
-    return [RestaurantMeResponse.model_validate(r) for r in restaurants]
+    return [_serialize_restaurant(r) for r in restaurants]
 
 
 def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> RestaurantMeResponse:
@@ -136,22 +222,21 @@ def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> Restaura
             detail="A user with this restaurant email already exists.",
         )
 
-    normalized_payload = _with_normalized_reference_fields(db, payload)
+    create_data = _build_profile_update_data(db, payload)
 
     restaurant = repository.create_restaurant(
         db,
-        name=normalized_payload.name,
-        email=str(normalized_payload.email) if normalized_payload.email else None,
-        phone=normalized_payload.phone,
-        address=normalized_payload.address,
-        country_id=normalized_payload.country_id,
-        currency_id=normalized_payload.currency_id,
-        country=normalized_payload.country,
-        currency=normalized_payload.currency,
-        billing_email=str(normalized_payload.billing_email) if normalized_payload.billing_email else None,
-        tax_id=normalized_payload.tax_id,
-        opening_time=normalized_payload.opening_time,
-        closing_time=normalized_payload.closing_time,
+        name=str(create_data["name"]),
+        email=str(create_data["email"]) if create_data.get("email") else None,
+        phone=str(create_data["phone"]) if create_data.get("phone") else None,
+        address=str(create_data["address"]) if create_data.get("address") else None,
+        country_id=create_data.get("country_id"),
+        currency_id=create_data.get("currency_id"),
+        country=str(create_data["country"]) if create_data.get("country") else None,
+        currency=str(create_data["currency"]) if create_data.get("currency") else None,
+        billing_email=str(create_data["billing_email"]) if create_data.get("billing_email") else None,
+        opening_time=str(create_data["opening_time"]) if create_data.get("opening_time") else None,
+        closing_time=str(create_data["closing_time"]) if create_data.get("closing_time") else None,
     )
 
     subscription_service.assign_initial_trial_subscription(db, restaurant.id)
@@ -188,7 +273,7 @@ def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> Restaura
             },
         )
 
-    return RestaurantMeResponse.model_validate(restaurant)
+    return _serialize_restaurant(restaurant)
 
 
 def update_restaurant_for_super_admin(
@@ -197,15 +282,25 @@ def update_restaurant_for_super_admin(
     payload: RestaurantAdminUpdateRequest,
 ) -> RestaurantMeResponse:
     """Update any restaurant by ID. Restricted to super_admin use only."""
-    normalized_payload = _with_normalized_reference_fields(db, payload)
-    update_data = normalized_payload.model_dump(exclude_unset=True)
+    current_restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if current_restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+    update_data = _build_profile_update_data(
+        db,
+        payload,
+        existing_primary_email=current_restaurant.email,
+        existing_billing_email=current_restaurant.billing_email,
+    )
     restaurant = repository.update_for_super_admin(db, restaurant_id, update_data)
     if not restaurant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
-    return RestaurantMeResponse.model_validate(restaurant)
+    return _serialize_restaurant(restaurant)
 
 
 def delete_restaurant_for_super_admin(

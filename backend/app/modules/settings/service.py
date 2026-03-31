@@ -25,7 +25,6 @@ _ALLOWED_SETTING_KEYS = {
     "country",
     "currency",
     "billing_email",
-    "tax_id",
     "opening_time",
     "closing_time",
     "logo_url",
@@ -33,10 +32,13 @@ _ALLOWED_SETTING_KEYS = {
 
 
 def _snapshot_current_settings(restaurant) -> dict[str, Any]:
-    return {
-        key: getattr(restaurant, key, None)
-        for key in sorted(_ALLOWED_SETTING_KEYS)
-    }
+    snapshot: dict[str, Any] = {}
+    for key in sorted(_ALLOWED_SETTING_KEYS):
+        value = getattr(restaurant, key, None)
+        if key == "billing_email" and not value:
+            value = restaurant.email
+        snapshot[key] = value
+    return snapshot
 
 
 def _filter_requested_changes(
@@ -169,6 +171,8 @@ def review_settings_request(
             )
         for key, value in request.requested_changes.items():
             if key in _ALLOWED_SETTING_KEYS:
+                if key == "billing_email" and not value:
+                    value = restaurant.email
                 setattr(restaurant, key, value)
 
     db.commit()
