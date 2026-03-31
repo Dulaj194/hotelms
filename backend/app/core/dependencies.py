@@ -264,6 +264,19 @@ def get_current_guest_session(
     if session is None:
         raise credentials_exception
 
+    # Defense in depth: token context must match persisted session context.
+    try:
+        token_restaurant_id = int(payload.get("restaurant_id"))
+    except (TypeError, ValueError):
+        raise credentials_exception
+    token_table_number = str(payload.get("table_number", "")).strip()
+
+    if (
+        token_restaurant_id != session.restaurant_id
+        or token_table_number != session.table_number
+    ):
+        raise credentials_exception
+
     return session
 
 
