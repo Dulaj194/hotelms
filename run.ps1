@@ -24,7 +24,6 @@ function Ensure-EnvFile([string]$path, [string]$content) {
 
 function Show-TrackClarityBanner() {
   Write-Host "[Track] Primary active system: root Docker stack (mysql + redis + backend + frontend)." -ForegroundColor Green
-  Write-Host "[Track] Secondary prototype: ./hotel-saas (not part of the primary runtime)." -ForegroundColor Yellow
   Write-Host "[Track] Legacy reference: ./restaurant-app (reference-only, do not use as active runtime)." -ForegroundColor Yellow
   Write-Step $primaryStackMarker
 }

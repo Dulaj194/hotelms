@@ -258,8 +258,6 @@ def check_active_track_clarity(
         run_text = run_script_path.read_text(encoding="utf-8")
         if "PRIMARY_ACTIVE_SYSTEM=hotelms_root_stack" not in run_text:
             failures.append("run.ps1 must declare PRIMARY_ACTIVE_SYSTEM=hotelms_root_stack.")
-        if "hotel-saas" not in run_text:
-            failures.append("run.ps1 must mention hotel-saas as a secondary prototype track.")
         if "restaurant-app" not in run_text:
             failures.append("run.ps1 must mention restaurant-app as legacy reference-only.")
 
