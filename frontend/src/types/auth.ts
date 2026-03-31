@@ -19,6 +19,23 @@ export interface UserMeResponse {
   must_change_password: boolean;
 }
 
+export interface TenantDataCountsResponse {
+  menus: number;
+  categories: number;
+  subcategories: number;
+  items: number;
+}
+
+export interface TenantContextResponse {
+  user_id: number;
+  email: string;
+  role: string;
+  restaurant_id: number | null;
+  restaurant_name: string | null;
+  counts: TenantDataCountsResponse;
+  note?: string | null;
+}
+
 export interface ForgotPasswordRequest {
   email: string;
 }

@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
+import {
+  TenantContextBadge,
+  TenantScopeEmptyState,
+} from "@/components/shared/TenantScopeNotice";
+import { useTenantContext } from "@/hooks/useTenantContext";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
 import type { Category, Subcategory } from "@/types/menu";
@@ -26,6 +31,7 @@ const CARDS_PER_PAGE = 6;
 
 export default function Subcategories() {
   const navigate = useNavigate();
+  const { tenantContext, error: tenantContextError } = useTenantContext();
   const [searchParams] = useSearchParams();
 
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
@@ -261,14 +267,15 @@ export default function Subcategories() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Subcategories</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Standard view: 6 cards per page with the same menu card style.
+            Standard view: paginated subcategory cards with the same menu-card style.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-            6 Cards / Page
+            Total: {sortedSubcategories.length}
           </span>
+          <TenantContextBadge tenantContext={tenantContext} />
           <select
             value={filterCategoryId}
             onChange={(event) =>
@@ -304,9 +311,13 @@ export default function Subcategories() {
 
       {loading && <p className="text-sm text-gray-500">Loading...</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}
+      {tenantContextError && <p className="text-sm text-amber-600">{tenantContextError}</p>}
 
       {!loading && !error && filteredSubcategories.length === 0 && (
-        <p className="text-sm text-gray-400">No subcategories found for the current filter.</p>
+        <TenantScopeEmptyState
+          tenantContext={tenantContext}
+          message="No subcategories found for the current filter."
+        />
       )}
 
       {!loading && filteredSubcategories.length > 0 && (

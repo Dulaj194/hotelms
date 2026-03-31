@@ -146,6 +146,34 @@ def decode_room_session_token(token: str) -> dict:
     return payload
 
 
+def create_table_qr_access_token(
+    *,
+    restaurant_id: int,
+    table_number: str,
+    expire_days: int,
+) -> str:
+    """Create a signed credential embedded inside table QR URLs.
+
+    This token is not a session token. It proves that the QR context
+    (restaurant + table number) is authentic when starting a table session.
+    """
+    payload = {
+        "type": "table_qr_access",
+        "restaurant_id": restaurant_id,
+        "table_number": table_number,
+        "exp": datetime.now(UTC) + timedelta(days=expire_days),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
+def decode_table_qr_access_token(token: str) -> dict:
+    """Decode and verify a table QR access token."""
+    payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+    if payload.get("type") != "table_qr_access":
+        raise ValueError("Token type is not table_qr_access")
+    return payload
+
+
 def create_room_qr_access_token(
     *,
     restaurant_id: int,

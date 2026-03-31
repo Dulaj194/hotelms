@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
-from app.core.security import create_guest_session_token
+from app.core.security import create_guest_session_token, decode_table_qr_access_token
 from app.modules.restaurants.repository import get_by_id as get_restaurant
 from app.modules.table_sessions import repository
 from app.modules.table_sessions.schemas import (
@@ -50,6 +50,25 @@ def start_table_session(
             detail="Restaurant is not currently available.",
         )
 
+    try:
+        qr_payload = decode_table_qr_access_token(data.qr_access_key)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired table QR credential. Please scan the table QR again.",
+        )
+
+    try:
+        payload_restaurant_id = int(qr_payload.get("restaurant_id", -1))
+    except (TypeError, ValueError):
+        payload_restaurant_id = -1
+    payload_table_number = str(qr_payload.get("table_number", "")).strip()
+    if payload_restaurant_id != data.restaurant_id or payload_table_number != table_number:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Table QR credential does not match this table context.",
+        )
+
     session_id = uuid.uuid4().hex
     expire_minutes = settings.guest_session_expire_minutes
     expires_at = datetime.now(UTC) + timedelta(minutes=expire_minutes)
@@ -80,7 +99,7 @@ def start_table_session(
     guest_token = create_guest_session_token(
         session_id=session_id,
         restaurant_id=data.restaurant_id,
-        table_number=data.table_number,
+        table_number=table_number,
         expire_minutes=expire_minutes,
     )
 

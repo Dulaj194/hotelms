@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { getGuestToken } from "@/hooks/useGuestSession";
 import type { OrderDetailResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
@@ -24,11 +24,13 @@ const POLL_INTERVAL_MS = 15_000; // refresh every 15 s
 const FINALIZED: Set<string> = new Set(["completed", "paid", "rejected"]);
 
 export default function TableOrderStatus() {
+  const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber, orderId } = useParams<{
     restaurantId: string;
     tableNumber: string;
     orderId: string;
   }>();
+  const qrAccessKey = searchParams.get("k")?.trim() ?? "";
 
   const [order, setOrder] = useState<OrderDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -165,7 +167,11 @@ export default function TableOrderStatus() {
         {restaurantId && tableNumber && (
           <div className="text-center">
             <Link
-              to={`/menu/${restaurantId}/table/${tableNumber}`}
+              to={
+                qrAccessKey
+                  ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                  : `/menu/${restaurantId}/table/${tableNumber}`
+              }
               className="text-sm text-orange-600 hover:underline"
             >
               ← Back to menu

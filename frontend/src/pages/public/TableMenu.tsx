@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import CartDrawer from "@/components/shared/CartDrawer";
 import { useCart } from "@/hooks/useCart";
-import { getGuestToken, setGuestSession } from "@/hooks/useGuestSession";
+import { setGuestSession } from "@/hooks/useGuestSession";
 import { publicGet, publicPost } from "@/lib/publicApi";
 import type {
   PublicItemSummaryResponse,
@@ -11,10 +11,12 @@ import type {
 import type { TableSessionStartResponse } from "@/types/session";
 
 export default function TableMenu() {
+  const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber } = useParams<{
     restaurantId: string;
     tableNumber: string;
   }>();
+  const qrAccessKey = searchParams.get("k")?.trim() ?? "";
   const navigate = useNavigate();
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
@@ -27,23 +29,25 @@ export default function TableMenu() {
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, refetch } =
     useCart();
 
-  // 1. Start (or reuse) a guest session
+  // 1. Start a guest session using signed table QR credential
   useEffect(() => {
     if (!restaurantId || !tableNumber) return;
 
     const init = async () => {
+      if (!qrAccessKey) {
+        setPageError("Invalid table QR link. Please scan the table QR code again.");
+        return;
+      }
       try {
-        // Re-use existing token if already present
-        if (!getGuestToken()) {
-          const session = await publicPost<TableSessionStartResponse>(
-            "/table-sessions/start",
-            {
-              restaurant_id: Number(restaurantId),
-              table_number: tableNumber,
-            }
-          );
-          setGuestSession(session);
-        }
+        const session = await publicPost<TableSessionStartResponse>(
+          "/table-sessions/start",
+          {
+            restaurant_id: Number(restaurantId),
+            table_number: tableNumber,
+            qr_access_key: qrAccessKey,
+          }
+        );
+        setGuestSession(session);
         setSessionReady(true);
       } catch {
         setPageError("Could not start a guest session. Please scan the QR code again.");
@@ -51,7 +55,7 @@ export default function TableMenu() {
     };
 
     void init();
-  }, [restaurantId, tableNumber]);
+  }, [restaurantId, tableNumber, qrAccessKey]);
 
   // 2. Fetch public menu
   useEffect(() => {
@@ -95,9 +99,11 @@ export default function TableMenu() {
     const result = await placeOrder({});
     const orderId = result.order.id;
     setCartOpen(false);
-    navigate(`/menu/${restaurantId}/table/${tableNumber}/order/${orderId}`);
+    const basePath = `/menu/${restaurantId}/table/${tableNumber}/order/${orderId}`;
+    const nextPath = qrAccessKey ? `${basePath}?k=${encodeURIComponent(qrAccessKey)}` : basePath;
+    navigate(nextPath);
     return orderId;
-  }, [placeOrder, navigate, restaurantId, tableNumber]);
+  }, [placeOrder, navigate, restaurantId, tableNumber, qrAccessKey]);
 
   if (pageError) {
     return (
