@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 IGNORED_EXTRA_TABLES = {"alembic_version"}
+MAX_CONSTRAINT_DETAIL_ITEMS = 15
 
 
 @dataclass
@@ -342,6 +343,97 @@ def check_production_guardrails(
     )
 
 
+def _normalized_fk_signature(
+    *,
+    table_name: str,
+    constrained_columns: list[str] | tuple[str, ...],
+    referred_table: str,
+    referred_columns: list[str] | tuple[str, ...],
+) -> tuple[str, tuple[str, ...], str, tuple[str, ...]]:
+    return (
+        table_name.lower(),
+        tuple(column.lower() for column in constrained_columns),
+        referred_table.lower(),
+        tuple(column.lower() for column in referred_columns),
+    )
+
+
+def _expected_foreign_keys(
+    metadata: sa.MetaData,
+    table_names: set[str],
+) -> set[tuple[str, tuple[str, ...], str, tuple[str, ...]]]:
+    expected: set[tuple[str, tuple[str, ...], str, tuple[str, ...]]] = set()
+    for table_name in table_names:
+        table = metadata.tables.get(table_name)
+        if table is None:
+            continue
+        for fk_constraint in table.foreign_key_constraints:
+            constrained_columns = [column.name for column in fk_constraint.columns]
+            referred_columns = [element.column.name for element in fk_constraint.elements]
+            referred_table = (
+                fk_constraint.referred_table.name if fk_constraint.referred_table is not None else ""
+            )
+            if not constrained_columns or not referred_columns or not referred_table:
+                continue
+            expected.add(
+                _normalized_fk_signature(
+                    table_name=table_name,
+                    constrained_columns=constrained_columns,
+                    referred_table=referred_table,
+                    referred_columns=referred_columns,
+                )
+            )
+    return expected
+
+
+def _actual_foreign_keys(
+    inspector,
+    table_names: set[str],
+) -> set[tuple[str, tuple[str, ...], str, tuple[str, ...]]]:
+    actual: set[tuple[str, tuple[str, ...], str, tuple[str, ...]]] = set()
+    for table_name in table_names:
+        for fk in inspector.get_foreign_keys(table_name):
+            constrained_columns = fk.get("constrained_columns") or []
+            referred_columns = fk.get("referred_columns") or []
+            referred_table = fk.get("referred_table") or ""
+            if not constrained_columns or not referred_columns or not referred_table:
+                continue
+            actual.add(
+                _normalized_fk_signature(
+                    table_name=table_name,
+                    constrained_columns=constrained_columns,
+                    referred_table=referred_table,
+                    referred_columns=referred_columns,
+                )
+            )
+    return actual
+
+
+def _format_fk_signature(
+    signature: tuple[str, tuple[str, ...], str, tuple[str, ...]],
+) -> str:
+    table_name, constrained_columns, referred_table, referred_columns = signature
+    constrained = ",".join(constrained_columns)
+    referred = ",".join(referred_columns)
+    return f"{table_name}({constrained}) -> {referred_table}({referred})"
+
+
+def _append_constraint_detail(
+    details: list[str],
+    *,
+    label: str,
+    signatures: list[tuple[str, tuple[str, ...], str, tuple[str, ...]]],
+) -> None:
+    if not signatures:
+        return
+    shown = signatures[:MAX_CONSTRAINT_DETAIL_ITEMS]
+    rendered = ", ".join(_format_fk_signature(signature) for signature in shown)
+    hidden_count = len(signatures) - len(shown)
+    if hidden_count > 0:
+        rendered = f"{rendered}, ... (+{hidden_count} more)"
+    details.append(f"{label}: {rendered}")
+
+
 def check_schema_drift(database_url: str | None) -> CheckResult:
     if not database_url:
         return CheckResult(
@@ -358,6 +450,9 @@ def check_schema_drift(database_url: str | None) -> CheckResult:
         with engine.connect() as connection:
             inspector = sa.inspect(connection)
             actual_tables = set(inspector.get_table_names())
+            comparable_tables = expected_tables & actual_tables
+            expected_foreign_keys = _expected_foreign_keys(metadata, comparable_tables)
+            actual_foreign_keys = _actual_foreign_keys(inspector, comparable_tables)
     except Exception as exc:  # pragma: no cover - depends on runtime DB availability
         return CheckResult(
             name="Schema drift",
@@ -370,19 +465,33 @@ def check_schema_drift(database_url: str | None) -> CheckResult:
 
     missing = sorted(expected_tables - actual_tables)
     unexpected = sorted(actual_tables - expected_tables - IGNORED_EXTRA_TABLES)
+    missing_foreign_keys = sorted(expected_foreign_keys - actual_foreign_keys)
+    unexpected_foreign_keys = sorted(actual_foreign_keys - expected_foreign_keys)
 
     details = [
         f"Expected tables: {len(expected_tables)}",
         f"Actual tables: {len(actual_tables)}",
+        f"Expected foreign keys: {len(expected_foreign_keys)}",
+        f"Actual foreign keys: {len(actual_foreign_keys)}",
     ]
     if missing:
         details.append("Missing tables: " + ", ".join(missing))
     if unexpected:
         details.append("Unexpected tables: " + ", ".join(unexpected))
+    _append_constraint_detail(
+        details,
+        label="Missing foreign keys",
+        signatures=missing_foreign_keys,
+    )
+    _append_constraint_detail(
+        details,
+        label="Unexpected foreign keys",
+        signatures=unexpected_foreign_keys,
+    )
 
-    ok = not missing and not unexpected
+    ok = not missing and not unexpected and not missing_foreign_keys and not unexpected_foreign_keys
     if ok:
-        details.append("Database schema matches ORM metadata.")
+        details.append("Database schema and foreign key integrity match ORM metadata.")
     else:
         details.append("Run 'alembic upgrade head' against this DATABASE_URL to reconcile drift.")
 

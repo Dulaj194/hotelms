@@ -24,6 +24,52 @@ def _column_exists(conn: Connection, table_name: str, column_name: str) -> bool:
     return row is not None
 
 
+def _table_exists(conn: Connection, table_name: str) -> bool:
+    query = text(
+        """
+        SELECT 1
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = :table_name
+        LIMIT 1
+        """
+    )
+    row = conn.execute(query, {"table_name": table_name}).first()
+    return row is not None
+
+
+def _foreign_key_exists(
+    conn: Connection,
+    *,
+    table_name: str,
+    column_name: str,
+    referenced_table: str,
+    referenced_column: str,
+) -> bool:
+    query = text(
+        """
+        SELECT 1
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = :table_name
+          AND COLUMN_NAME = :column_name
+          AND REFERENCED_TABLE_NAME = :referenced_table
+          AND REFERENCED_COLUMN_NAME = :referenced_column
+        LIMIT 1
+        """
+    )
+    row = conn.execute(
+        query,
+        {
+            "table_name": table_name,
+            "column_name": column_name,
+            "referenced_table": referenced_table,
+            "referenced_column": referenced_column,
+        },
+    ).first()
+    return row is not None
+
+
 def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
     """Patch critical missing columns in legacy development databases.
 
@@ -248,6 +294,27 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
         ),
     )
 
+    restaurant_fk_patches: Sequence[tuple[str, str, str, str, str]] = (
+        (
+            "country_id",
+            "countries",
+            "id",
+            "fk_restaurants_country_id",
+            "ALTER TABLE restaurants "
+            "ADD CONSTRAINT fk_restaurants_country_id "
+            "FOREIGN KEY (country_id) REFERENCES countries(id) ON DELETE SET NULL",
+        ),
+        (
+            "currency_id",
+            "currency_types",
+            "id",
+            "fk_restaurants_currency_id",
+            "ALTER TABLE restaurants "
+            "ADD CONSTRAINT fk_restaurants_currency_id "
+            "FOREIGN KEY (currency_id) REFERENCES currency_types(id) ON DELETE SET NULL",
+        ),
+    )
+
     with engine.begin() as conn:
         for column_name, alter_sql in order_header_column_patches:
             if _column_exists(conn, "order_headers", column_name):
@@ -311,3 +378,46 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 "Applied development schema patch: rooms.%s was missing and has been added.",
                 column_name,
             )
+
+        for (
+            column_name,
+            referenced_table,
+            referenced_column,
+            constraint_name,
+            alter_sql,
+        ) in restaurant_fk_patches:
+            if not _column_exists(conn, "restaurants", column_name):
+                continue
+            if not _table_exists(conn, referenced_table):
+                logger.warning(
+                    "Skipped development schema FK patch: restaurants.%s -> %s.%s because referenced table is missing.",
+                    column_name,
+                    referenced_table,
+                    referenced_column,
+                )
+                continue
+            if _foreign_key_exists(
+                conn,
+                table_name="restaurants",
+                column_name=column_name,
+                referenced_table=referenced_table,
+                referenced_column=referenced_column,
+            ):
+                continue
+
+            try:
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: added FK %s on restaurants.%s -> %s.%s.",
+                    constraint_name,
+                    column_name,
+                    referenced_table,
+                    referenced_column,
+                )
+            except Exception as exc:  # pragma: no cover - depends on live DB data quality
+                logger.warning(
+                    "Skipped development schema FK patch %s (%s): %s",
+                    constraint_name,
+                    column_name,
+                    exc,
+                )
