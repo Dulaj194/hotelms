@@ -1,81 +1,64 @@
-# Local legacy/reference project - keep out of git history
+# Reference / local-only directories
 /Anawuma-Resturant-App-/
 /restaurant-app/
-# Nested local clone/reference copy
 /hotelms/
+
+# Backend runtime data
+/backend/uploads/*
+!/backend/uploads/.gitkeep
+/backend/data/*
+!/backend/data/.gitkeep
+/backend/*.db
+
 # Python
-# ──────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-dist/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 *.egg
 *.egg-info/
 .eggs/
-env/
-venv/
+pip-wheel-metadata/
 .venv/
+venv/
+env/
 ENV/
-.env.backup
 
-# ──────────────────────────────────────────────
-# Node / Frontend
-# ──────────────────────────────────────────────
-node_modules/
+# Node / frontend
+**/node_modules/
+**/.pnpm-store/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-.pnpm-store/
-dist/
-.next/
-out/
-build/
+**/dist/
+**/build/
+**/.next/
+**/out/
+coverage/
 
-# ──────────────────────────────────────────────
-# Environment files (never commit secrets)
-# ──────────────────────────────────────────────
+# Environment files
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!.env.*.example
 
-# ──────────────────────────────────────────────
-# IDEs / Editors
-# ──────────────────────────────────────────────
+# IDE / OS
+.vscode/
 .idea/
 *.swp
 *.swo
 .DS_Store
 Thumbs.db
 
-# ──────────────────────────────────────────────
-# Testing / Coverage
-# ──────────────────────────────────────────────
-.pytest_cache/
-.mypy_cache/
-.coverage
-htmlcov/
-coverage.xml
-
-# ──────────────────────────────────────────────
-# Docker
-# ──────────────────────────────────────────────
-*.dockerignore
-
-# ──────────────────────────────────────────────
-# Logs
-# ──────────────────────────────────────────────
+# Logs / temp
 *.log
 logs/
-
-# ──────────────────────────────────────────────
-# Misc
-# ──────────────────────────────────────────────
-*.tar.gz
-*.zip
+*.tmp
 .cache/
+*.dockerignore

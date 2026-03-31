@@ -40,7 +40,7 @@ export class ApiError extends Error {
   detail: string;
 
   constructor(status: number, detail: string, method: string, path: string) {
-    super(`${method} ${path} failed — ${status} ${detail}`);
+    super(`${method} ${path} failed - ${status} ${detail}`);
     this.name = "ApiError";
     this.status = status;
     this.detail = detail;

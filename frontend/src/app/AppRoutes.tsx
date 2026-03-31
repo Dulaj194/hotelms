@@ -1,0 +1,327 @@
+import { Suspense, lazy } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+
+import PrivilegeRoute from "@/components/shared/PrivilegeRoute";
+import ProtectedRoute from "@/components/shared/ProtectedRoute";
+import { getRoleRedirect, getUser, isAuthenticated } from "@/lib/auth";
+import { HOUSEKEEPING_TASK_ROLES, QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
+
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const AllRoomQRCodes = lazy(() => import("@/pages/admin/AllRoomQRCodes"));
+const Billing = lazy(() => import("@/pages/admin/Billing"));
+const GenerateRoomQRCodes = lazy(() => import("@/pages/admin/GenerateRoomQRCodes"));
+const Kitchen = lazy(() => import("@/pages/admin/Kitchen"));
+const KitchenOldOrders = lazy(() => import("@/pages/admin/KitchenOldOrders"));
+const MenuCategories = lazy(() => import("@/pages/admin/MenuCategories"));
+const MenuItems = lazy(() => import("@/pages/admin/MenuItems"));
+const Menus = lazy(() => import("@/pages/admin/Menus"));
+const Reports = lazy(() => import("@/pages/admin/Reports"));
+const AdminRestaurantProfile = lazy(() => import("@/pages/admin/RestaurantProfile"));
+const Rooms = lazy(() => import("@/pages/admin/Rooms"));
+const Staff = lazy(() => import("@/pages/admin/Staff"));
+const Steward = lazy(() => import("@/pages/admin/Steward"));
+const Subcategories = lazy(() => import("@/pages/admin/Subcategories"));
+const SubscriptionPage = lazy(() => import("@/pages/admin/Subscription"));
+const SubscriptionPaymentCancel = lazy(() => import("@/pages/admin/SubscriptionPaymentCancel"));
+const SubscriptionPaymentSuccess = lazy(() => import("@/pages/admin/SubscriptionPaymentSuccess"));
+const Tables = lazy(() => import("@/pages/admin/Tables"));
+const Housekeeping = lazy(() => import("@/pages/admin/housekeeping/HousekeepingPage"));
+const OfferFormPage = lazy(() => import("@/pages/admin/offers/pages/OfferFormPage"));
+const OfferListPage = lazy(() => import("@/pages/admin/offers/pages/OfferListPage"));
+const FirstTimePasswordChange = lazy(() => import("@/pages/auth/FirstTimePasswordChange"));
+const ForgotPassword = lazy(() => import("@/pages/auth/ForgotPassword"));
+const Login = lazy(() => import("@/pages/auth/Login"));
+const Register = lazy(() => import("@/pages/auth/Register"));
+const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
+const Landing = lazy(() => import("@/pages/public/Landing"));
+const Pricing = lazy(() => import("@/pages/public/Pricing"));
+const RoomMenu = lazy(() => import("@/pages/public/RoomMenu"));
+const TableMenu = lazy(() => import("@/pages/public/TableMenu"));
+const TableOrderStatus = lazy(() => import("@/pages/public/TableOrderStatus"));
+const ServiceRequest = lazy(() => import("@/pages/room/ServiceRequest"));
+const SuperAdminRestaurants = lazy(() => import("@/pages/super-admin/Restaurants"));
+const SuperAdminSettingsRequests = lazy(() => import("@/pages/super-admin/SettingsRequests"));
+
+function RootRedirect() {
+  if (!isAuthenticated()) return <Navigate to="/login" replace />;
+  const user = getUser();
+  if (user?.must_change_password) {
+    return <Navigate to="/first-time-password" replace />;
+  }
+  const redirectPath = getRoleRedirect(user?.role ?? "");
+  return <Navigate to={redirectPath || "/dashboard"} replace />;
+}
+
+const routeFallback = (
+  <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">
+    Loading...
+  </div>
+);
+
+function AppRoutes() {
+  return (
+    <Suspense fallback={routeFallback}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route
+          path="/first-time-password"
+          element={
+            <ProtectedRoute>
+              <FirstTimePasswordChange />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+
+        <Route path="/menu/:restaurantId/table/:tableNumber" element={<TableMenu />} />
+        <Route
+          path="/menu/:restaurantId/table/:tableNumber/order/:orderId"
+          element={<TableOrderStatus />}
+        />
+        <Route path="/menu/:restaurantId/room/:roomNumber" element={<RoomMenu />} />
+        <Route
+          path="/menu/:restaurantId/room/:roomNumber/service-request"
+          element={<ServiceRequest />}
+        />
+        <Route path="/pricing" element={<Pricing />} />
+
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/dashnord" element={<Navigate to="/dashboard" replace />} />
+
+        <Route path="/restaurant" element={<RootRedirect />} />
+
+        <Route
+          path="/admin/restaurant-profile"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <AdminRestaurantProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/staff"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Staff />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/offers"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <OfferListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/offers/new"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <OfferFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/offers/:offerId/edit"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <OfferFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/steward"
+          element={
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <Steward />
+              </PrivilegeRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <Reports />
+              </PrivilegeRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/admin/kitchen" element={<Navigate to="/admin/kitchen/orders" replace />} />
+        <Route
+          path="/admin/kitchen/orders"
+          element={
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <Kitchen />
+              </PrivilegeRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/kitchen/old-orders"
+          element={
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <KitchenOldOrders />
+              </PrivilegeRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/billing"
+          element={
+            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <Billing />
+              </PrivilegeRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/admin/rooms" element={<Navigate to="/admin/housekeeping/rooms" replace />} />
+        <Route
+          path="/admin/housekeeping/rooms"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin", "housekeeper"]}>
+              <Rooms />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/rooms/qr/all"
+          element={<Navigate to="/admin/housekeeping/rooms/qr/all" replace />}
+        />
+        <Route
+          path="/admin/housekeeping/rooms/qr/all"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <AllRoomQRCodes />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/rooms/qr/generate"
+          element={<Navigate to="/admin/housekeeping/rooms/qr/generate" replace />}
+        />
+        <Route
+          path="/admin/housekeeping/rooms/qr/generate"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <GenerateRoomQRCodes />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/tables"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Tables />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/housekeeping"
+          element={
+            <ProtectedRoute allowedRoles={[...HOUSEKEEPING_TASK_ROLES]}>
+              <PrivilegeRoute requiredPrivilege="HOUSEKEEPING">
+                <Housekeeping />
+              </PrivilegeRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/menu/menus"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Menus />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/menu/categories"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <MenuCategories />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/menu/subcategories"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <Subcategories />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/menu/items"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <MenuItems />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/subscription"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <SubscriptionPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/subscription/payment/success"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <SubscriptionPaymentSuccess />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/subscription/payment/cancel"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <SubscriptionPaymentCancel />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/super-admin/restaurants"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminRestaurants />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/settings-requests"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminSettingsRequests />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/super-admin" element={<Navigate to="/super-admin/restaurants" replace />} />
+
+        <Route path="/admin" element={<RootRedirect />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="*" element={<RootRedirect />} />
+      </Routes>
+    </Suspense>
+  );
+}
+
+export default AppRoutes;

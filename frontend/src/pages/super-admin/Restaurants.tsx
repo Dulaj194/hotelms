@@ -541,8 +541,8 @@ export default function SuperAdminRestaurants() {
                     </span>
                   </div>
                   <div className="mt-2 space-y-1 text-xs text-gray-600">
-                    <p>Email: {r.email ?? "â€”"}</p>
-                    <p>Phone: {r.phone ?? "â€”"}</p>
+                    <p>Email: {r.email ?? "-"}</p>
+                    <p>Phone: {r.phone ?? "-"}</p>
                     <p>
                       Subscription:{" "}
                       {formatSubscriptionStatusLabel(subscriptionStatusByHotel[r.id])}
@@ -569,7 +569,7 @@ export default function SuperAdminRestaurants() {
                       disabled={deletingId === r.id}
                       className="w-full rounded border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:w-auto"
                     >
-                      {deletingId === r.id ? "Deletingâ€¦" : "Delete"}
+                      {deletingId === r.id ? "Deleting..." : "Delete"}
                     </button>
                   </div>
                 </article>
@@ -908,7 +908,7 @@ export default function SuperAdminRestaurants() {
                                   : "border-green-200 text-green-700 hover:bg-green-50"
                               }`}
                             >
-                              {togglingUserId === u.id ? "â€¦" : u.is_active ? "Disable" : "Enable"}
+                              {togglingUserId === u.id ? "..." : u.is_active ? "Disable" : "Enable"}
                             </button>
                             <button
                               type="button"
@@ -916,7 +916,7 @@ export default function SuperAdminRestaurants() {
                               disabled={deletingUserId === u.id}
                               className="w-full rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:w-auto"
                             >
-                              {deletingUserId === u.id ? "â€¦" : "Remove"}
+                              {deletingUserId === u.id ? "..." : "Remove"}
                             </button>
                           </div>
                         </article>

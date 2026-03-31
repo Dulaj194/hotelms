@@ -356,7 +356,7 @@ export default function Staff() {
         </div>
 
         {loading ? (
-          <p className="text-gray-500 text-sm">Loadingâ€¦</p>
+          <p className="text-gray-500 text-sm">Loading...</p>
         ) : fetchError ? (
           <p className="text-red-600 text-sm">{fetchError}</p>
         ) : filteredStaff.length === 0 ? (
@@ -377,16 +377,16 @@ export default function Staff() {
                     </span>
                   </div>
                   <div className="mt-2 space-y-1 text-xs text-slate-600">
-                    <p>Username: {s.username ?? "Ã¢â‚¬â€"}</p>
-                    <p>Contact: {s.phone ?? "Ã¢â‚¬â€"}</p>
+                    <p>Username: {s.username ?? "-"}</p>
+                    <p>Contact: {s.phone ?? "-"}</p>
                     <p>Email: {s.email}</p>
                     <p>Role: {ROLE_LABELS[s.role]}</p>
-                    <p>Area: {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "Ã¢â‚¬â€"}</p>
+                    <p>Area: {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "-"}</p>
                     <p>
                       Load:{" "}
                       {s.pending_tasks_count > 0
                         ? `${s.pending_tasks_count} / ${s.load_per_staff.toFixed(2)}`
-                        : "Ã¢â‚¬â€"}
+                        : "-"}
                     </p>
                   </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -447,8 +447,8 @@ export default function Staff() {
                 {filteredStaff.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">{s.full_name}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.username ?? "â€”"}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.phone ?? "â€”"}</td>
+                    <td className="px-4 py-3 text-gray-600">{s.username ?? "-"}</td>
+                    <td className="px-4 py-3 text-gray-600">{s.phone ?? "-"}</td>
                     <td className="px-4 py-3 text-gray-500">{s.email}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
@@ -456,12 +456,12 @@ export default function Staff() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "â€”"}
+                      {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "-"}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {s.pending_tasks_count > 0
                         ? `${s.pending_tasks_count} / ${s.load_per_staff.toFixed(2)}`
-                        : "â€”"}
+                        : "-"}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -612,7 +612,7 @@ export default function Staff() {
                 disabled={submitting}
                 className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:w-auto"
               >
-                {submitting ? "Savingâ€¦" : dialog.type === "add" ? "Add member" : "Save changes"}
+                {submitting ? "Saving..." : dialog.type === "add" ? "Add member" : "Save changes"}
               </button>
               <button
                 onClick={closeDialog}
