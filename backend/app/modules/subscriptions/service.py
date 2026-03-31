@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ def _normalize_datetime(value: datetime | None) -> datetime | None:
         return None
     if value.tzinfo is None:
         return value
-    return value.replace(tzinfo=None)
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _effective_status(subscription: RestaurantSubscription | None) -> str:
@@ -428,11 +428,7 @@ def update_subscription_for_super_admin(
             ) from None
 
     if payload.expires_at is not None:
-        naive_expiry = (
-            payload.expires_at.replace(tzinfo=None)
-            if payload.expires_at.tzinfo
-            else payload.expires_at
-        )
+        naive_expiry = _normalize_datetime(payload.expires_at)
         update_data["expires_at"] = naive_expiry
         # Keep trial_expires_at in sync for trial subscriptions.
         if subscription.is_trial:

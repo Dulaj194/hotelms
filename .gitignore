@@ -1,4 +1,5 @@
-# ──────────────────────────────────────────────
+# Local legacy/reference project - keep out of git history
+/Anawuma-Resturant-App-/
 # Python
 # ──────────────────────────────────────────────
 __pycache__/
