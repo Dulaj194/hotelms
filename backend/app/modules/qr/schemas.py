@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 
 class QRCodeResponse(BaseModel):
@@ -7,11 +9,12 @@ class QRCodeResponse(BaseModel):
     frontend_url: str
     qr_image_url: str
     restaurant_id: int
+    created_at: datetime
 
 
 class BulkQRRequest(BaseModel):
-    start: int
-    end: int
+    start: int = Field(..., ge=1)
+    end: int = Field(..., ge=1)
 
 
 class RoomBulkQRRequest(BaseModel):
@@ -23,7 +26,7 @@ class BulkQRCodeResponse(BaseModel):
     count: int
 
 
-class RoomQRCodeListResponse(BaseModel):
+class QRCodeListResponse(BaseModel):
     qrcodes: list[QRCodeResponse]
     total: int
 

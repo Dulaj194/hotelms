@@ -82,6 +82,7 @@ export interface QRCodeResponse {
   frontend_url: string;
   qr_image_url: string;
   restaurant_id: number;
+  created_at: string;
 }
 
 export interface BulkQRCodeResponse {
@@ -89,7 +90,7 @@ export interface BulkQRCodeResponse {
   count: number;
 }
 
-export interface RoomQRCodeListResponse {
+export interface QRCodeListResponse {
   qrcodes: QRCodeResponse[];
   total: number;
 }

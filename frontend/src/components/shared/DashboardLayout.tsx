@@ -189,7 +189,36 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   );
 
   const qrSubItems: MenuSubItem[] = useMemo(
-    () => [{ path: "/admin/tables", label: "Table QR Codes", icon: LayoutGrid }],
+    () => [
+      {
+        path: "/admin/qr/tables",
+        label: "All Table QR Codes",
+        icon: QrCode,
+        roles: ["owner", "admin"],
+        privilege: "QR_MENU",
+      },
+      {
+        path: "/admin/qr/tables/generate",
+        label: "Generate Table QR Codes",
+        icon: LayoutGrid,
+        roles: ["owner", "admin"],
+        privilege: "QR_MENU",
+      },
+      {
+        path: "/admin/qr/rooms",
+        label: "All Room QR Codes",
+        icon: QrCode,
+        roles: ["owner", "admin"],
+        privilege: "QR_MENU",
+      },
+      {
+        path: "/admin/qr/rooms/generate",
+        label: "Generate Room QR Codes",
+        icon: LayoutGrid,
+        roles: ["owner", "admin"],
+        privilege: "QR_MENU",
+      },
+    ],
     []
   );
 
@@ -208,18 +237,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         roles: ["owner", "admin", "housekeeper"],
         privilege: "HOUSEKEEPING",
       },
-      {
-        path: "/admin/housekeeping/rooms/qr/all",
-        label: "All Room QR Codes",
-        icon: QrCode,
-        roles: ["owner", "admin"],
-      },
-      {
-        path: "/admin/housekeeping/rooms/qr/generate",
-        label: "Generate Room QR Codes",
-        icon: LayoutGrid,
-        roles: ["owner", "admin"],
-      },
     ],
     []
   );
@@ -236,6 +253,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       ),
     [kitchenSubItems, privileges, role]
   );
+  const visibleQrSubItems = useMemo(
+    () =>
+      qrSubItems.filter((item) =>
+        canAccessModuleItem(role, privileges, item.roles, item.privilege)
+      ),
+    [privileges, qrSubItems, role]
+  );
   const visibleHousekeepingSubItems = useMemo(
     () =>
       housekeepingSubItems.filter((item) =>
@@ -248,8 +272,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const isKitchenGroupVisible = !privilegesLoading && visibleKitchenSubItems.length > 0;
   const isKitchenGroupActive =
     location.pathname.startsWith("/admin/kitchen") || location.pathname === "/admin/steward";
-  const isQrGroupVisible = role === "owner" || role === "admin";
-  const isQrGroupActive = qrPaths.some((path) => location.pathname === path);
+  const isQrGroupVisible = !privilegesLoading && visibleQrSubItems.length > 0;
+  const isQrGroupActive =
+    location.pathname === "/admin/qr" ||
+    qrPaths.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
   const isHousekeepingGroupVisible = visibleHousekeepingSubItems.length > 0;
   const housekeepingTasksEnabled = canAccessHousekeepingTasks(role, privileges);
   const isHousekeepingGroupActive = housekeepingPaths.some((path) =>
@@ -576,7 +602,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               {qrOpen && (
                 <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
-                  {qrSubItems.map((subItem) => {
+                  {visibleQrSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
                     return (

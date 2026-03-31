@@ -7,8 +7,10 @@ import { getRoleRedirect, getUser, isAuthenticated } from "@/lib/auth";
 import { HOUSEKEEPING_TASK_ROLES, QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const AllTableQRCodes = lazy(() => import("@/pages/admin/AllTableQRCodes"));
 const AllRoomQRCodes = lazy(() => import("@/pages/admin/AllRoomQRCodes"));
 const Billing = lazy(() => import("@/pages/admin/Billing"));
+const GenerateTableQRCodes = lazy(() => import("@/pages/admin/GenerateTableQRCodes"));
 const GenerateRoomQRCodes = lazy(() => import("@/pages/admin/GenerateRoomQRCodes"));
 const Kitchen = lazy(() => import("@/pages/admin/Kitchen"));
 const KitchenOldOrders = lazy(() => import("@/pages/admin/KitchenOldOrders"));
@@ -24,7 +26,6 @@ const Subcategories = lazy(() => import("@/pages/admin/Subcategories"));
 const SubscriptionPage = lazy(() => import("@/pages/admin/Subscription"));
 const SubscriptionPaymentCancel = lazy(() => import("@/pages/admin/SubscriptionPaymentCancel"));
 const SubscriptionPaymentSuccess = lazy(() => import("@/pages/admin/SubscriptionPaymentSuccess"));
-const Tables = lazy(() => import("@/pages/admin/Tables"));
 const Housekeeping = lazy(() => import("@/pages/admin/housekeeping/HousekeepingPage"));
 const OfferFormPage = lazy(() => import("@/pages/admin/offers/pages/OfferFormPage"));
 const OfferListPage = lazy(() => import("@/pages/admin/offers/pages/OfferListPage"));
@@ -201,33 +202,62 @@ function AppRoutes() {
         />
         <Route
           path="/admin/rooms/qr/all"
-          element={<Navigate to="/admin/housekeeping/rooms/qr/all" replace />}
+          element={<Navigate to="/admin/qr/rooms" replace />}
         />
         <Route
           path="/admin/housekeeping/rooms/qr/all"
+          element={<Navigate to="/admin/qr/rooms" replace />}
+        />
+        <Route
+          path="/admin/qr/rooms"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <AllRoomQRCodes />
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <AllRoomQRCodes />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/rooms/qr/generate"
-          element={<Navigate to="/admin/housekeeping/rooms/qr/generate" replace />}
+          element={<Navigate to="/admin/qr/rooms/generate" replace />}
         />
         <Route
           path="/admin/housekeeping/rooms/qr/generate"
+          element={<Navigate to="/admin/qr/rooms/generate" replace />}
+        />
+        <Route
+          path="/admin/qr/rooms/generate"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <GenerateRoomQRCodes />
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <GenerateRoomQRCodes />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
         <Route
           path="/admin/tables"
+          element={<Navigate to="/admin/qr/tables" replace />}
+        />
+        <Route path="/admin/qr" element={<Navigate to="/admin/qr/tables" replace />} />
+        <Route
+          path="/admin/qr/tables"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <Tables />
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <AllTableQRCodes />
+              </PrivilegeRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/qr/tables/generate"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin"]}>
+              <PrivilegeRoute requiredPrivilege="QR_MENU">
+                <GenerateTableQRCodes />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />

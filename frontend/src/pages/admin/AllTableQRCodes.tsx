@@ -24,7 +24,7 @@ type ConfirmActionState = {
   onConfirm: () => Promise<void>;
 } | null;
 
-export default function AllRoomQRCodes() {
+export default function AllTableQRCodes() {
   const [qrcodes, setQRCodes] = useState<QRCodeResponse[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -52,15 +52,15 @@ export default function AllRoomQRCodes() {
     setNotice(null);
   }, []);
 
-  const loadRoomQRCodes = useCallback(async () => {
+  const loadTableQRCodes = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const data = await api.get<QRCodeListResponse>("/qr/rooms");
+      const data = await api.get<QRCodeListResponse>("/qr/tables");
       setQRCodes(data.qrcodes);
     } catch (loadError) {
-      setError(getApiErrorMessage(loadError, "Failed to load room QR codes."));
+      setError(getApiErrorMessage(loadError, "Failed to load table QR codes."));
     } finally {
       setLoading(false);
     }
@@ -80,28 +80,28 @@ export default function AllRoomQRCodes() {
       try {
         const data = await api.delete<QRCodeDeleteResponse>(endpoint);
         setNotice(data.message);
-        await loadRoomQRCodes();
+        await loadTableQRCodes();
       } catch (deleteError) {
         throw new Error(getApiErrorMessage(deleteError, fallbackErrorMessage));
       } finally {
         setWorking(false);
       }
     },
-    [clearMessages, loadRoomQRCodes],
+    [clearMessages, loadTableQRCodes],
   );
 
   const openDeleteSingleConfirm = useCallback(
-    (roomNumber: string) => {
+    (tableNumber: string) => {
       setConfirmError(null);
       setConfirmAction({
-        title: `Delete Room ${roomNumber} QR`,
+        title: `Delete Table ${tableNumber} QR`,
         description:
-          "This QR code will no longer be available for room login until regenerated.",
+          "Guests will not be able to scan this table until the QR is generated again.",
         confirmLabel: "Delete QR",
         onConfirm: () =>
           executeDelete({
-            endpoint: `/qr/room/${encodeURIComponent(roomNumber)}`,
-            fallbackErrorMessage: "Failed to delete room QR.",
+            endpoint: `/qr/table/${encodeURIComponent(tableNumber)}`,
+            fallbackErrorMessage: "Failed to delete table QR.",
           }),
       });
     },
@@ -111,14 +111,14 @@ export default function AllRoomQRCodes() {
   const openDeleteAllConfirm = useCallback(() => {
     setConfirmError(null);
     setConfirmAction({
-      title: "Delete All Room QR Codes",
+      title: "Delete All Table QR Codes",
       description:
-        "This will remove every generated room QR code from the system.",
+        "This will remove every generated table QR code from the system.",
       confirmLabel: "Delete All",
       onConfirm: () =>
         executeDelete({
-          endpoint: "/qr/rooms",
-          fallbackErrorMessage: "Failed to delete room QR codes.",
+          endpoint: "/qr/tables",
+          fallbackErrorMessage: "Failed to delete table QR codes.",
         }),
     });
   }, [executeDelete]);
@@ -148,31 +148,31 @@ export default function AllRoomQRCodes() {
   }, [confirmAction]);
 
   useEffect(() => {
-    void loadRoomQRCodes();
-  }, [loadRoomQRCodes]);
+    void loadTableQRCodes();
+  }, [loadTableQRCodes]);
 
   return (
     <DashboardLayout>
       <div className="app-page-stack mx-auto max-w-6xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="app-page-title text-gray-900">All Room QR Codes</h1>
+            <h1 className="app-page-title text-gray-900">All Table QR Codes</h1>
             <p className="app-muted-text mt-1 text-gray-500">
-              View, search, download, and retire room QR codes for guest operations.
+              View, search, download, and retire table QR codes from one place.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              to="/admin/qr/rooms/generate"
+              to="/admin/qr/tables/generate"
               className="app-btn-base bg-orange-500 text-white hover:bg-orange-600"
             >
-              Generate Room QRs
+              Generate Table QRs
             </Link>
 
             <button
               type="button"
-              onClick={() => void loadRoomQRCodes()}
+              onClick={() => void loadTableQRCodes()}
               disabled={loading || working}
               className="app-btn-base border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
             >
@@ -210,7 +210,7 @@ export default function AllRoomQRCodes() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="app-section-title text-gray-900">
-                Generated Room QRs
+                Generated Table QRs
               </h2>
               <p className="app-muted-text mt-1 text-gray-500">
                 {filteredQRCodes.length} shown of {qrcodes.length} total
@@ -219,12 +219,12 @@ export default function AllRoomQRCodes() {
 
             <div className="w-full max-w-sm">
               <label className="mb-1 block text-sm font-medium text-gray-700">
-                Search Room
+                Search Table
               </label>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Room number"
+                placeholder="Table number"
                 className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
               />
             </div>
@@ -232,13 +232,13 @@ export default function AllRoomQRCodes() {
 
           {loading ? (
             <div className="py-12 text-center text-gray-400">
-              Loading room QR codes...
+              Loading table QR codes...
             </div>
           ) : filteredQRCodes.length === 0 ? (
             <div className="py-12 text-center text-gray-400">
               {qrcodes.length === 0
-                ? "No room QR codes found. Generate room QR codes first."
-                : "No room QR codes match your search."}
+                ? "No table QR codes found. Generate table QR codes first."
+                : "No table QR codes match your search."}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -246,7 +246,7 @@ export default function AllRoomQRCodes() {
                 <QRCodeCard
                   key={`${qr.qr_type}-${qr.target_number}`}
                   qr={qr}
-                  labelPrefix="Room"
+                  labelPrefix="Table"
                   working={working}
                   onDelete={openDeleteSingleConfirm}
                 />
