@@ -1,6 +1,8 @@
-/restaurant-app/
+# External reference project snapshot (kept out of the main repo history)
+/Anawuma-Resturant-App-/
 *.md
-*.txt
+*.txt  
+*.png
 # ──────────────────────────────────────────────
 # Python
 # ──────────────────────────────────────────────

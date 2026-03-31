@@ -3,9 +3,11 @@ from pathlib import Path
 import asyncio
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from app.api.router import router
 from app.core.config import settings
@@ -14,6 +16,18 @@ from app.workers.subscription_expiry import run_subscription_expiry_loop
 
 configure_logging()
 logger = get_logger(__name__)
+
+
+def _get_allowed_cors_origins() -> list[str]:
+    """Build allowed origins list from FRONTEND_URL and local dev defaults."""
+    origins = {
+        origin.strip().rstrip("/")
+        for origin in settings.frontend_url.split(",")
+        if origin.strip()
+    }
+    if settings.app_env == "development":
+        origins.update({"http://localhost:5173", "http://127.0.0.1:5173"})
+    return sorted(origins)
 
 # Ensure upload directory exists at startup (required before StaticFiles mount)
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
@@ -62,8 +76,16 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Database tables created / verified (legacy fallback mode)")
     elif settings.app_env == "development":
         logger.info(
-            "DB auto schema sync is disabled. Apply migrations with Alembic before running the API."
+            "DB auto schema sync is disabled. Running compatibility checks for legacy development schemas."
         )
+        try:
+            from app.db.schema_sync import ensure_development_schema_compatibility
+            from app.db.session import engine
+
+            ensure_development_schema_compatibility(engine, logger)
+            logger.info("Development schema compatibility checks completed.")
+        except Exception as exc:
+            logger.warning("Development schema compatibility checks skipped: %s", exc)
 
     # Start background worker: mark overdue subscriptions as expired hourly.
     expiry_task = asyncio.create_task(run_subscription_expiry_loop())
@@ -86,13 +108,37 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+allowed_origins = _get_allowed_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+logger.info("CORS allow_origins=%s", allowed_origins)
+
+
+@app.exception_handler(OperationalError)
+async def handle_operational_error(_request: Request, exc: OperationalError) -> JSONResponse:
+    logger.exception("Database operational error: %s", exc)
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "detail": (
+                "Database operation failed. Verify DATABASE_URL/MySQL availability and apply schema migrations."
+            )
+        },
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def handle_sqlalchemy_error(_request: Request, exc: SQLAlchemyError) -> JSONResponse:
+    logger.exception("Database error: %s", exc)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Database query failed. Verify migrations and schema state."},
+    )
 
 # Serve uploaded files (logos, etc.) at /uploads
 # In production replace with CDN/S3 pre-signed URL flow.

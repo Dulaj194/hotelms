@@ -214,8 +214,6 @@ def _handle_checkout_completed(db: Session, event: dict[str, Any]) -> None:
 
     metadata = obj.get("metadata", {}) or {}
     transaction_id_value = metadata.get("billing_transaction_id")
-    package_id_value = metadata.get("package_id")
-    restaurant_id_value = metadata.get("restaurant_id")
     promo_code_value = (metadata.get("promo_code") or "").strip().upper()
 
     transaction = payment_repo.get_billing_transaction_by_checkout_session(db, checkout_session_id)
@@ -228,29 +226,10 @@ def _handle_checkout_completed(db: Session, event: dict[str, Any]) -> None:
     if transaction.status == BillingTransactionStatus.paid:
         return
 
-    if not package_id_value or not restaurant_id_value:
-        payment_repo.mark_billing_transaction_failed(
-            db,
-            transaction=transaction,
-            failure_reason="Missing metadata in Stripe checkout session.",
-        )
-        return
-
-    try:
-        package_id = int(package_id_value)
-        restaurant_id = int(restaurant_id_value)
-    except ValueError:
-        payment_repo.mark_billing_transaction_failed(
-            db,
-            transaction=transaction,
-            failure_reason="Invalid metadata values in Stripe checkout session.",
-        )
-        return
-
     subscription = subscriptions_service.activate_paid_subscription(
         db,
-        restaurant_id=restaurant_id,
-        package_id=package_id,
+        restaurant_id=transaction.restaurant_id,
+        package_id=transaction.package_id,
     )
 
     paid_at = _normalize_to_naive_utc(datetime.now(UTC))
@@ -267,7 +246,7 @@ def _handle_checkout_completed(db: Session, event: dict[str, Any]) -> None:
         try:
             promo_codes_service.consume_promo_for_restaurant(
                 db,
-                restaurant_id=restaurant_id,
+                restaurant_id=transaction.restaurant_id,
                 payload=PromoCodeConsumeRequest(code=promo_code_value, increment=1),
             )
         except Exception:

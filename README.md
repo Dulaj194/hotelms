@@ -120,6 +120,29 @@ Batch shortcuts are also available:
 .\stop.bat
 ```
 
+### Standard Build Verification
+
+Before pushing changes, run the standardized verification flow:
+
+```powershell
+cd d:\in_project\hotelms
+
+# Primary system checks (backend standards + frontend production build)
+.\build-standard.ps1
+
+# Also include live DB drift verification
+.\build-standard.ps1 -CheckDb
+
+# Include reference app build verification (Anawuma-Resturant-App-)
+.\build-standard.ps1 -IncludeReference
+```
+
+Use `-InstallDeps` when dependencies are not yet installed:
+
+```powershell
+.\build-standard.ps1 -InstallDeps
+```
+
 ---
 
 ### Run Locally (without Docker)
