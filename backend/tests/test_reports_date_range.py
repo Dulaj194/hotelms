@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from fastapi import HTTPException
 
-from app.modules.reports.service import _normalize_date_range
+from app.modules.reports.service import _normalize_date_range, resolve_month_date_range
 
 
 class ReportsDateRangeTests(unittest.TestCase):
@@ -32,6 +32,15 @@ class ReportsDateRangeTests(unittest.TestCase):
         end = start + timedelta(days=367)
         with self.assertRaises(HTTPException):
             _normalize_date_range("range", None, start, end)
+
+    def test_month_range_resolution_for_feb_leap_year(self) -> None:
+        from_date, to_date = resolve_month_date_range(2024, 2)
+        self.assertEqual(from_date, date(2024, 2, 1))
+        self.assertEqual(to_date, date(2024, 2, 29))
+
+    def test_month_range_rejects_invalid_month(self) -> None:
+        with self.assertRaises(HTTPException):
+            resolve_month_date_range(2026, 13)
 
 
 if __name__ == "__main__":

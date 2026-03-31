@@ -30,6 +30,7 @@ class SessionPaymentHistoryResponse(BaseModel):
 
 class CheckoutSessionRequest(BaseModel):
     package_id: int = Field(..., gt=0)
+    promo_code: str | None = Field(default=None, min_length=1, max_length=50)
 
 
 class CheckoutSessionResponse(BaseModel):

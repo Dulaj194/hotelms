@@ -79,6 +79,14 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
 
     restaurant_column_patches: Sequence[tuple[str, str]] = (
         (
+            "country_id",
+            "ALTER TABLE restaurants ADD COLUMN country_id INT NULL",
+        ),
+        (
+            "currency_id",
+            "ALTER TABLE restaurants ADD COLUMN currency_id INT NULL",
+        ),
+        (
             "country",
             "ALTER TABLE restaurants ADD COLUMN country VARCHAR(120) NULL",
         ),

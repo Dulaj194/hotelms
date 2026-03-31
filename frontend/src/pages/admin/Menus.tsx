@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
+import {
+  TenantContextBadge,
+  TenantScopeEmptyState,
+} from "@/components/shared/TenantScopeNotice";
+import { useTenantContext } from "@/hooks/useTenantContext";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
 import type { Menu } from "@/types/menu";
@@ -24,6 +29,7 @@ const CARDS_PER_PAGE = 6;
 
 export default function Menus() {
   const navigate = useNavigate();
+  const { tenantContext, error: tenantContextError } = useTenantContext();
   const [menus, setMenus] = useState<Menu[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -236,13 +242,14 @@ export default function Menus() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Menus</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Standard view: 6 cards per page with a clean action layout.
+            Standard view: paginated menu cards with a clean action layout.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-            6 Cards / Page
+            Total: {sortedMenus.length}
           </span>
+          <TenantContextBadge tenantContext={tenantContext} />
           <button
             onClick={openCreate}
             className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
@@ -262,12 +269,14 @@ export default function Menus() {
 
       {loading && <p className="text-sm text-gray-500">Loading...</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}
+      {tenantContextError && <p className="text-sm text-amber-600">{tenantContextError}</p>}
       {successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
 
       {!loading && !error && menus.length === 0 && (
-        <p className="text-sm text-gray-400">
-          No menus yet. Add a menu (e.g. Breakfast, Lunch, Dinner) to organize your categories.
-        </p>
+        <TenantScopeEmptyState
+          tenantContext={tenantContext}
+          message="No menus found for the current tenant context."
+        />
       )}
 
       {!loading && menus.length > 0 && (

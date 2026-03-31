@@ -26,6 +26,7 @@ def create_checkout_session(
 		db,
 		restaurant_id=restaurant_id,
 		package_id=payload.package_id,
+		promo_code=payload.promo_code,
 	)
 
 

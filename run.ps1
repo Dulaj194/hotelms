@@ -8,6 +8,9 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
 
+# PRIMARY_ACTIVE_SYSTEM=hotelms_root_stack
+$primaryStackMarker = "PRIMARY_ACTIVE_SYSTEM=hotelms_root_stack"
+
 function Write-Step([string]$message) {
   Write-Host "[HotelMS] $message" -ForegroundColor Cyan
 }
@@ -18,6 +21,15 @@ function Ensure-EnvFile([string]$path, [string]$content) {
     Write-Step "Created $path"
   }
 }
+
+function Show-TrackClarityBanner() {
+  Write-Host "[Track] Primary active system: root Docker stack (mysql + redis + backend + frontend)." -ForegroundColor Green
+  Write-Host "[Track] Secondary prototype: ./hotel-saas (not part of the primary runtime)." -ForegroundColor Yellow
+  Write-Host "[Track] Legacy reference: ./restaurant-app (reference-only, do not use as active runtime)." -ForegroundColor Yellow
+  Write-Step $primaryStackMarker
+}
+
+Show-TrackClarityBanner
 
 Write-Step "Checking Docker CLI"
 $dockerOk = Get-Command docker -ErrorAction SilentlyContinue

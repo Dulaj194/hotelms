@@ -42,3 +42,23 @@ export interface SalesReportResponse {
   rows: SalesReportRowResponse[];
   available_dates: string[];
 }
+
+export interface SalesReportHistoryItemResponse {
+  id: number;
+  report_type: string;
+  output_format: string;
+  status: string;
+  file_url: string | null;
+  generated_by_user_id: number | null;
+  generated_at: string;
+  filter_type: string | null;
+  selected_date: string | null;
+  from_date: string | null;
+  to_date: string | null;
+  report_summary: Record<string, unknown>;
+}
+
+export interface SalesReportHistoryListResponse {
+  items: SalesReportHistoryItemResponse[];
+  total: number;
+}

@@ -7,7 +7,10 @@ import {
   clearInAppNavigationHistory,
 } from "@/lib/navigationHistory";
 
-const SUPER_ADMIN_NAV = [{ path: "/super-admin/restaurants", label: "Hotels" }];
+const SUPER_ADMIN_NAV = [
+  { path: "/super-admin/restaurants", label: "Hotels" },
+  { path: "/super-admin/settings-requests", label: "Settings Requests" },
+];
 
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.superAdmin";
 

@@ -24,6 +24,7 @@ export interface SessionPaymentHistoryResponse {
 
 export interface CheckoutSessionRequest {
   package_id: number;
+  promo_code?: string | null;
 }
 
 export interface CheckoutSessionResponse {

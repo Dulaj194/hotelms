@@ -1,5 +1,8 @@
 # Local legacy/reference project - keep out of git history
 /Anawuma-Resturant-App-/
+/restaurant-app/
+# Nested local clone/reference copy
+/hotelms/
 # Python
 # ──────────────────────────────────────────────
 __pycache__/

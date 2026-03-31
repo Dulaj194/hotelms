@@ -104,3 +104,25 @@ def create_report_history(
     db.commit()
     db.refresh(row)
     return row
+
+
+def list_report_history(
+    db: Session,
+    *,
+    restaurant_id: int,
+    report_type: str = "sales",
+    limit: int = 100,
+    output_format: str | None = None,
+) -> list[ReportHistory]:
+    query = db.query(ReportHistory).filter(
+        ReportHistory.restaurant_id == restaurant_id,
+        ReportHistory.report_type == report_type,
+    )
+    if output_format:
+        query = query.filter(ReportHistory.output_format == output_format)
+
+    return (
+        query.order_by(ReportHistory.generated_at.desc(), ReportHistory.id.desc())
+        .limit(limit)
+        .all()
+    )

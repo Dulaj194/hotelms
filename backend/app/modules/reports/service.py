@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import calendar
 import csv
 import io
+import json
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -10,6 +13,8 @@ from sqlalchemy.orm import Session
 from app.core.logging import get_logger
 from app.modules.reports import repository
 from app.modules.reports.schemas import (
+    SalesReportHistoryItemResponse,
+    SalesReportHistoryListResponse,
     SalesCategorySummaryResponse,
     SalesPaymentSummaryResponse,
     SalesReportResponse,
@@ -53,6 +58,43 @@ def _normalize_date_range(
     if selected_date is None:
         selected_date = datetime.now(UTC).date()
     return "single", selected_date, None, None
+
+
+def resolve_month_date_range(year: int, month: int) -> tuple[date, date]:
+    """Return inclusive date range for a specific year/month."""
+    if month < 1 or month > 12:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="month must be between 1 and 12.",
+        )
+
+    if year < 2000 or year > 2100:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="year must be between 2000 and 2100.",
+        )
+
+    last_day = calendar.monthrange(year, month)[1]
+    return date(year, month, 1), date(year, month, last_day)
+
+
+def _safe_json_dict(raw: str | None) -> dict[str, Any]:
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _parse_iso_date(raw: Any) -> date | None:
+    if not raw or not isinstance(raw, str):
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None
 
 
 def get_sales_report(
@@ -198,6 +240,28 @@ def get_sales_report(
     return response
 
 
+def get_monthly_sales_report(
+    db: Session,
+    restaurant_id: int,
+    *,
+    year: int,
+    month: int,
+    generated_by_user_id: int | None = None,
+    persist_history: bool = True,
+) -> SalesReportResponse:
+    from_date, to_date = resolve_month_date_range(year, month)
+    return get_sales_report(
+        db,
+        restaurant_id,
+        filter_type="range",
+        selected_date=None,
+        from_date=from_date,
+        to_date=to_date,
+        generated_by_user_id=generated_by_user_id,
+        persist_history=persist_history,
+    )
+
+
 def export_sales_report_csv(
     db: Session,
     restaurant_id: int,
@@ -277,3 +341,45 @@ def export_sales_report_csv(
         db.rollback()
 
     return csv_text
+
+
+def list_sales_report_history(
+    db: Session,
+    restaurant_id: int,
+    *,
+    limit: int = 100,
+    output_format: str | None = None,
+) -> SalesReportHistoryListResponse:
+    rows = repository.list_report_history(
+        db,
+        restaurant_id=restaurant_id,
+        report_type="sales",
+        limit=limit,
+        output_format=output_format,
+    )
+
+    items: list[SalesReportHistoryItemResponse] = []
+    for row in rows:
+        params = _safe_json_dict(row.report_params_json)
+        summary = _safe_json_dict(row.report_data_json)
+        selected_date_raw = params.get("selected_date")
+        from_date_raw = params.get("from_date")
+        to_date_raw = params.get("to_date")
+
+        item = SalesReportHistoryItemResponse(
+            id=row.id,
+            report_type=row.report_type,
+            output_format=row.output_format,
+            status=row.status,
+            file_url=row.file_url,
+            generated_by_user_id=row.generated_by_user_id,
+            generated_at=row.generated_at,
+            filter_type=str(params.get("filter_type")) if params.get("filter_type") else None,
+            selected_date=_parse_iso_date(selected_date_raw),
+            from_date=_parse_iso_date(from_date_raw),
+            to_date=_parse_iso_date(to_date_raw),
+            report_summary=summary,
+        )
+        items.append(item)
+
+    return SalesReportHistoryListResponse(items=items, total=len(items))

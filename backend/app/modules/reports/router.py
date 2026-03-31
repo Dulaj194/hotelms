@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_restaurant_id, get_db, require_privilege, require_roles
 from app.modules.reports import service
-from app.modules.reports.schemas import SalesReportResponse
+from app.modules.reports.schemas import SalesReportHistoryListResponse, SalesReportResponse
 from app.modules.users.model import User
 
 router = APIRouter()
@@ -38,6 +38,24 @@ def get_sales_report(
     )
 
 
+@router.get("/sales/monthly", response_model=SalesReportResponse)
+def get_monthly_sales_report(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_privilege("QR_MENU")),
+) -> SalesReportResponse:
+    return service.get_monthly_sales_report(
+        db,
+        restaurant_id,
+        year=year,
+        month=month,
+        generated_by_user_id=current_user.id,
+    )
+
+
 @router.get("/sales/export.csv")
 def export_sales_report_csv(
     filter_type: str = "single",
@@ -62,4 +80,27 @@ def export_sales_report_csv(
         iter([csv_text]),
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="sales-report.csv"'},
+    )
+
+
+@router.get("/sales/history", response_model=SalesReportHistoryListResponse)
+def get_sales_report_history(
+    limit: int = Query(default=100, ge=1, le=500),
+    output_format: str | None = Query(default=None),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_privilege("QR_MENU")),
+) -> SalesReportHistoryListResponse:
+    normalized_format = output_format.strip().lower() if output_format else None
+    if normalized_format not in {None, "json", "csv"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="output_format must be one of: json, csv",
+        )
+    return service.list_sales_report_history(
+        db,
+        restaurant_id,
+        limit=limit,
+        output_format=normalized_format,
     )

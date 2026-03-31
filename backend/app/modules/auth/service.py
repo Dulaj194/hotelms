@@ -27,8 +27,20 @@ from app.modules.auth.repository import (
     mark_token_used,
 )
 from app.modules.auth import registration_repository
-from app.modules.auth.schemas import ForgotPasswordResponse, TokenResponse
+from app.modules.auth.login_scope import (
+    RESTAURANT_ADMIN_LOGIN_ROLES,
+    STAFF_LOGIN_ROLES,
+    SUPER_ADMIN_LOGIN_ROLES,
+    is_login_scope_allowed,
+)
+from app.modules.auth.schemas import (
+    ForgotPasswordResponse,
+    TenantContextResponse,
+    TenantDataCountsResponse,
+    TokenResponse,
+)
 from app.modules.subscriptions import service as subscription_service
+from app.modules.users.model import UserRole
 from app.modules.users.repository import (
     get_by_id_global,
     get_user_by_email,
@@ -185,6 +197,57 @@ def _build_access_payload(
         "restaurant_id": restaurant_id,
         "must_change_password": must_change_password,
     }
+
+
+def _get_restaurant_name(db: Session, restaurant_id: int) -> str | None:
+    from app.modules.restaurants.model import Restaurant
+
+    return db.query(Restaurant.name).filter(Restaurant.id == restaurant_id).scalar()
+
+
+def _count_model_rows(db: Session, model, restaurant_id: int) -> int:
+    from sqlalchemy import func
+
+    count_value = db.query(func.count(model.id)).filter(model.restaurant_id == restaurant_id).scalar()
+    return int(count_value or 0)
+
+
+def get_tenant_context_snapshot(db: Session, current_user) -> TenantContextResponse:
+    """Return authenticated tenant context + tenant-scoped catalog counts.
+
+    This makes tenant isolation explicit in the UI and helps operators verify
+    whether data belongs to the currently signed-in restaurant account.
+    """
+    if current_user.restaurant_id is None:
+        return TenantContextResponse(
+            user_id=current_user.id,
+            email=current_user.email,
+            role=current_user.role.value,
+            restaurant_id=None,
+            restaurant_name=None,
+            counts=TenantDataCountsResponse(),
+            note="This account has no restaurant context. Tenant-scoped data is not available.",
+        )
+
+    from app.modules.categories.model import Category
+    from app.modules.items.model import Item
+    from app.modules.menus.model import Menu
+    from app.modules.subcategories.model import Subcategory
+
+    restaurant_id = int(current_user.restaurant_id)
+    return TenantContextResponse(
+        user_id=current_user.id,
+        email=current_user.email,
+        role=current_user.role.value,
+        restaurant_id=restaurant_id,
+        restaurant_name=_get_restaurant_name(db, restaurant_id),
+        counts=TenantDataCountsResponse(
+            menus=_count_model_rows(db, Menu, restaurant_id),
+            categories=_count_model_rows(db, Category, restaurant_id),
+            subcategories=_count_model_rows(db, Subcategory, restaurant_id),
+            items=_count_model_rows(db, Item, restaurant_id),
+        ),
+    )
 
 
 async def _save_logo_file(file: UploadFile) -> str:
@@ -426,6 +489,8 @@ def login(
     ip: str,
     user_agent: str,
     existing_refresh_token: str | None = None,
+    allowed_roles: set[UserRole] | None = None,
+    require_restaurant_context: bool = False,
 ) -> TokenResponse:
     _check_rate_limit(redis_client, ip)
 
@@ -461,6 +526,32 @@ def login(
             detail=GENERIC_AUTH_ERROR_DETAIL,
         )
 
+    if not is_login_scope_allowed(
+        user_role=user.role,
+        user_restaurant_id=user.restaurant_id,
+        allowed_roles=allowed_roles,
+        require_restaurant_context=require_restaurant_context,
+    ):
+        allowed_role_values = sorted(role.value for role in allowed_roles) if allowed_roles else None
+        write_audit_log(
+            db,
+            event_type="login_failed",
+            user_id=user.id,
+            ip_address=ip,
+            user_agent=user_agent,
+            metadata={
+                "reason": "login_scope_mismatch",
+                "user_role": user.role.value,
+                "has_restaurant_context": user.restaurant_id is not None,
+                "required_roles": allowed_role_values,
+                "require_restaurant_context": require_restaurant_context,
+            },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=GENERIC_AUTH_ERROR_DETAIL,
+        )
+
     _revoke_presented_refresh_session(redis_client, existing_refresh_token)
 
     session_id = str(uuid.uuid4())
@@ -490,6 +581,78 @@ def login(
     )
 
     return TokenResponse(access_token=access_token, must_change_password=user.must_change_password)
+
+
+def login_restaurant_admin(
+    db: Session,
+    redis_client: redis_lib.Redis,
+    response: Response,
+    email: str,
+    password: str,
+    ip: str,
+    user_agent: str,
+    existing_refresh_token: str | None = None,
+) -> TokenResponse:
+    return login(
+        db,
+        redis_client,
+        response,
+        email,
+        password,
+        ip,
+        user_agent,
+        existing_refresh_token,
+        allowed_roles=RESTAURANT_ADMIN_LOGIN_ROLES,
+        require_restaurant_context=True,
+    )
+
+
+def login_staff(
+    db: Session,
+    redis_client: redis_lib.Redis,
+    response: Response,
+    email: str,
+    password: str,
+    ip: str,
+    user_agent: str,
+    existing_refresh_token: str | None = None,
+) -> TokenResponse:
+    return login(
+        db,
+        redis_client,
+        response,
+        email,
+        password,
+        ip,
+        user_agent,
+        existing_refresh_token,
+        allowed_roles=STAFF_LOGIN_ROLES,
+        require_restaurant_context=True,
+    )
+
+
+def login_super_admin(
+    db: Session,
+    redis_client: redis_lib.Redis,
+    response: Response,
+    email: str,
+    password: str,
+    ip: str,
+    user_agent: str,
+    existing_refresh_token: str | None = None,
+) -> TokenResponse:
+    return login(
+        db,
+        redis_client,
+        response,
+        email,
+        password,
+        ip,
+        user_agent,
+        existing_refresh_token,
+        allowed_roles=SUPER_ADMIN_LOGIN_ROLES,
+        require_restaurant_context=False,
+    )
 
 
 def refresh(

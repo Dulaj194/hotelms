@@ -26,6 +26,23 @@ class UserMeResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TenantDataCountsResponse(BaseModel):
+    menus: int = 0
+    categories: int = 0
+    subcategories: int = 0
+    items: int = 0
+
+
+class TenantContextResponse(BaseModel):
+    user_id: int
+    email: EmailStr
+    role: str
+    restaurant_id: int | None
+    restaurant_name: str | None = None
+    counts: TenantDataCountsResponse
+    note: str | None = None
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
