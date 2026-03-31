@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import create_room_qr_access_token
+from app.core.security import create_room_qr_access_token, create_table_qr_access_token
 from app.modules.qr import repository
 from app.modules.qr.schemas import (
     BulkQRCodeResponse,
@@ -27,6 +27,13 @@ def _build_frontend_url(restaurant_id: int, qr_type: str, target_number: str) ->
     """Build the public menu URL that gets encoded into the QR image."""
     base = settings.frontend_url.rstrip("/")
     safe_target = quote(target_number, safe="")
+    if qr_type == "table":
+        qr_access_key = create_table_qr_access_token(
+            restaurant_id=restaurant_id,
+            table_number=target_number,
+            expire_days=settings.room_qr_key_expire_days,
+        )
+        return f"{base}/menu/{restaurant_id}/{qr_type}/{safe_target}?{urlencode({'k': qr_access_key})}"
     if qr_type == "room":
         qr_access_key = create_room_qr_access_token(
             restaurant_id=restaurant_id,
@@ -132,9 +139,9 @@ def generate_qr(
     # Check DB first — if record exists, reuse (file should already be on disk)
     existing = repository.get_qr(db, restaurant_id, qr_type, target_number)
     if existing:
-        has_secure_room_key = qr_type != "room" or "k=" in (existing.frontend_url or "")
-        # Re-generate if file is missing or if this is a legacy room QR without secure key.
-        if not file_path.exists() or not has_secure_room_key:
+        has_secure_qr_key = "k=" in (existing.frontend_url or "")
+        # Re-generate if file is missing or if this is a legacy QR without secure key.
+        if not file_path.exists() or not has_secure_qr_key:
             _generate_qr_image(frontend_url, file_path)
             existing = repository.upsert_qr(
                 db,

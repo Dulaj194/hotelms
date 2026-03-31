@@ -8,13 +8,13 @@ from pydantic import BaseModel, Field
 class TableSessionStartRequest(BaseModel):
     """Body for POST /table-sessions/start.
 
-    SECURITY: This endpoint accepts restaurant_id + table_number to issue
-    a signed guest session token. These values alone are never used for cart
-    authorization. The returned signed token is the authorization credential.
+    SECURITY: Requires a signed qr_access_key that binds restaurant + table.
+    restaurant_id + table_number alone are never sufficient to issue a session.
     """
 
     restaurant_id: int
     table_number: str = Field(..., min_length=1, max_length=50)
+    qr_access_key: str = Field(..., min_length=16, max_length=2000)
 
 
 class TableSessionStartResponse(BaseModel):

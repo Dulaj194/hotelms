@@ -3,6 +3,7 @@
 export interface TableSessionStartRequest {
   restaurant_id: number;
   table_number: string;
+  qr_access_key: string;
 }
 
 export interface TableSessionStartResponse {
