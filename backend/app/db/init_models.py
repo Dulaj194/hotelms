@@ -21,6 +21,7 @@ from app.modules.reports.model import ReportHistory  # noqa: F401
 from app.modules.restaurants.model import Restaurant, RestaurantWebhookDelivery  # noqa: F401
 from app.modules.housekeeping.model import HousekeepingRequest  # noqa: F401
 from app.modules.settings.model import SettingsRequest  # noqa: F401
+from app.modules.site_content.model import ContactLead, SiteBlogPost, SitePage  # noqa: F401
 from app.modules.subcategories.model import Subcategory  # noqa: F401
 from app.modules.subscriptions.model import RestaurantSubscription, SubscriptionChangeLog  # noqa: F401
 from app.modules.room_sessions.model import RoomSession  # noqa: F401

@@ -1,30 +1,20 @@
 import { CheckCircle2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 
-import {
-  audiences,
-  benefitCards,
-  blogs,
-  ctaContent,
-  features,
-  footerContent,
-  heroContent,
-  mockups,
-  stats,
-  steps,
-  testimonial,
-  useCases,
-} from "./landing/content";
+import { publicGet } from "@/lib/publicApi";
+import type { BlogPostSummary, LandingPageContent } from "@/types/siteContent";
+
+import { landingFallbackBlogs, landingFallbackContent } from "./landing/content";
 import {
   AudienceCard,
   BenefitCard,
   BlogCard,
   CTASection,
   FeatureCard,
-  FooterColumn,
   HeroBlock,
   MockupStrip,
   Navbar,
+  PublicFooter,
   SectionHeader,
   StatCard,
   StepCard,
@@ -33,15 +23,42 @@ import {
 } from "./landing/components";
 
 export default function Landing() {
+  const [content, setContent] = useState<LandingPageContent>(landingFallbackContent);
+  const [blogs, setBlogs] = useState<BlogPostSummary[]>(landingFallbackBlogs);
+
+  useEffect(() => {
+    let active = true;
+
+    const load = async () => {
+      try {
+        const [landing, recentBlogs] = await Promise.all([
+          publicGet<LandingPageContent>("/public/site/landing"),
+          publicGet<BlogPostSummary[]>("/public/site/blogs/recent"),
+        ]);
+        if (!active) return;
+        setContent(landing);
+        setBlogs(recentBlogs);
+      } catch {
+        // Keep the baked-in fallback content so the public site still renders.
+      }
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900">
       <Navbar />
 
-      <HeroBlock {...heroContent} />
+      <HeroBlock {...content} />
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((item) => (
+          {content.stats.map((item) => (
             <StatCard key={item.label} item={item} />
           ))}
         </div>
@@ -54,7 +71,7 @@ export default function Landing() {
             subtitle="Designed for hotel and restaurant teams that need faster operations and clearer visibility."
           />
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {audiences.map((item) => (
+            {content.audiences.map((item) => (
               <AudienceCard key={item.title} item={item} />
             ))}
           </div>
@@ -68,7 +85,7 @@ export default function Landing() {
             subtitle="Clear business pain points mapped to measurable operational outcomes."
           />
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
-            {benefitCards.map((item) => (
+            {content.benefits.map((item) => (
               <BenefitCard key={item.title} item={item} />
             ))}
           </div>
@@ -82,7 +99,7 @@ export default function Landing() {
             subtitle="A simple flow from guest action to staff execution and delivery."
           />
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {steps.map((step, index) => (
+            {content.steps.map((step, index) => (
               <StepCard key={step} step={step} index={index} />
             ))}
           </div>
@@ -96,7 +113,7 @@ export default function Landing() {
         />
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {features.map((item) => (
+          {content.features.map((item) => (
             <FeatureCard key={item.capability} item={item} />
           ))}
         </div>
@@ -109,15 +126,15 @@ export default function Landing() {
             subtitle="Built to support real workflows across restaurant floors and hotel operations."
           />
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {useCases.map((item) => (
+            {content.use_cases.map((item) => (
               <UseCaseCard key={item.title} item={item} />
             ))}
           </div>
         </div>
       </section>
 
-      <MockupStrip items={mockups} />
-      <TestimonialBlock item={testimonial} />
+      <MockupStrip items={content.mockups} />
+      <TestimonialBlock item={content.testimonial} />
 
       <section id="blog" className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <SectionHeader
@@ -126,46 +143,21 @@ export default function Landing() {
         />
         <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {blogs.map((item) => (
-            <BlogCard key={item.title} item={item} />
+            <BlogCard key={item.slug} item={item} />
           ))}
         </div>
       </section>
 
-      <CTASection {...ctaContent} />
+      <CTASection {...content.cta} />
 
       <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           <CheckCircle2 className="h-4 w-4" />
-          Unified for both restaurants and hotels with onboarding support available.
+          {content.trust_message}
         </div>
       </section>
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
-          <div>
-            <p className="text-lg font-bold text-emerald-700">R.Luminuous</p>
-            <p className="mt-3 text-sm text-slate-600">{footerContent.trustInfo}</p>
-          </div>
-
-          <FooterColumn title="Product">
-            <a href="#features" className="block">Features</a>
-            <a href="#how-it-works" className="block">How it works</a>
-            <Link to="/pricing" className="block">Pricing</Link>
-          </FooterColumn>
-
-          <FooterColumn title="Company">
-            <a href="#benefits" className="block">About</a>
-            <a href="#blog" className="block">Blog</a>
-            <a href="#contact" className="block">Contact</a>
-          </FooterColumn>
-
-          <FooterColumn title="Contact">
-            {footerContent.contactPoints.map((point) => (
-              <p key={point}>{point}</p>
-            ))}
-          </FooterColumn>
-        </div>
-      </footer>
+      <PublicFooter footer={content.footer} />
     </main>
   );
 }

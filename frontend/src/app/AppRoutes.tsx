@@ -38,6 +38,10 @@ const ForgotPassword = lazy(() => import("@/pages/auth/ForgotPassword"));
 const Login = lazy(() => import("@/pages/auth/Login"));
 const Register = lazy(() => import("@/pages/auth/Register"));
 const ResetPassword = lazy(() => import("@/pages/auth/ResetPassword"));
+const About = lazy(() => import("@/pages/public/About"));
+const Blog = lazy(() => import("@/pages/public/Blog"));
+const BlogArticle = lazy(() => import("@/pages/public/BlogArticle"));
+const Contact = lazy(() => import("@/pages/public/Contact"));
 const Landing = lazy(() => import("@/pages/public/Landing"));
 const Pricing = lazy(() => import("@/pages/public/Pricing"));
 const RoomMenu = lazy(() => import("@/pages/public/RoomMenu"));
@@ -104,6 +108,10 @@ function AppRoutes() {
           path="/menu/:restaurantId/room/:roomNumber/service-request"
           element={<ServiceRequest />}
         />
+        <Route path="/about" element={<About />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogArticle />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/pricing" element={<Pricing />} />
 
         <Route
