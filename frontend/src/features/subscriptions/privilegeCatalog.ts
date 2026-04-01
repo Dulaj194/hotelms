@@ -2,56 +2,47 @@ import type {
   SubscriptionAccessModuleResponse,
   SubscriptionAccessPrivilegeResponse,
 } from "@/types/subscription";
+import { MODULE_ACCESS_CATALOG } from "@/features/access/catalog";
 
-const ACCESS_MODULES: Record<string, SubscriptionAccessModuleResponse> = {
-  ORDERS: {
-    key: "orders",
-    label: "Orders",
-    description: "Kitchen, steward, and service order operations.",
-  },
-  REPORTS: {
-    key: "reports",
-    label: "Reports",
-    description: "Operational and sales reporting dashboards.",
-  },
-  BILLING: {
-    key: "billing",
-    label: "Billing",
-    description: "Invoice capture and bill settlement workflows.",
-  },
-  HOUSEKEEPING: {
-    key: "housekeeping",
-    label: "Housekeeping",
-    description: "Room service tasks, requests, and housekeeping boards.",
-  },
-  OFFERS: {
-    key: "offers",
-    label: "Offers",
-    description: "Promotional offers, discount campaigns, and marketing content.",
-  },
-};
+function withDefaultAccessState(
+  moduleKey: keyof typeof MODULE_ACCESS_CATALOG,
+): SubscriptionAccessModuleResponse {
+  const definition = MODULE_ACCESS_CATALOG[moduleKey];
+  return {
+    key: definition.key,
+    label: definition.label,
+    description: definition.description,
+    package_privileges: [],
+    feature_flags: [],
+    enabled_by_package: true,
+    enabled_by_feature_flags: true,
+    is_enabled: true,
+  };
+}
 
 const PRIVILEGE_CATALOG: Record<
   string,
-  Omit<SubscriptionAccessPrivilegeResponse, "modules"> & { moduleKeys: string[] }
+  Omit<SubscriptionAccessPrivilegeResponse, "modules"> & {
+    moduleKeys: Array<keyof typeof MODULE_ACCESS_CATALOG>;
+  }
 > = {
   QR_MENU: {
     code: "QR_MENU",
     label: "QR Menu",
     description: "Enables table and room QR ordering operations.",
-    moduleKeys: ["ORDERS", "REPORTS", "BILLING"],
+    moduleKeys: ["orders", "qr", "kds", "reports", "billing"],
   },
   HOUSEKEEPING: {
     code: "HOUSEKEEPING",
     label: "Housekeeping",
     description: "Enables housekeeping workflows and room task management.",
-    moduleKeys: ["HOUSEKEEPING"],
+    moduleKeys: ["housekeeping"],
   },
   OFFERS: {
     code: "OFFERS",
     label: "Offers",
     description: "Enables promotional offers and discount campaign tools.",
-    moduleKeys: ["OFFERS"],
+    moduleKeys: ["offers"],
   },
 };
 
@@ -79,7 +70,7 @@ export function buildPrivilegeSummary(code: string): SubscriptionAccessPrivilege
     code: definition.code,
     label: definition.label,
     description: definition.description,
-    modules: definition.moduleKeys.map((moduleKey) => ACCESS_MODULES[moduleKey]),
+    modules: definition.moduleKeys.map((moduleKey) => withDefaultAccessState(moduleKey)),
   };
 }
 

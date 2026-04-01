@@ -224,6 +224,7 @@ export default function SuperAdminRestaurants() {
         email: restaurant.email,
         phone: restaurant.phone,
         address: restaurant.address,
+        feature_flags: restaurant.feature_flags,
         is_active: restaurant.is_active,
       });
       void fetchHotelExtras(restaurantId);
@@ -266,8 +267,10 @@ export default function SuperAdminRestaurants() {
     setActionMsg(null);
     try {
       const updated = await updateRestaurant(editingId, editForm);
+      const accessSummary = await getRestaurantPackageAccess(editingId);
       setList((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       setSelected(updated);
+      setSelectedAccess(accessSummary);
       setEditingId(null);
       setActionMsg({ type: "ok", text: `Hotel "${updated.name}" updated.` });
     } catch (error) {

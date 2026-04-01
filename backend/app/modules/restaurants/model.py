@@ -52,6 +52,11 @@ class Restaurant(Base):
     opening_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
     closing_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    enable_housekeeping: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    enable_kds: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    enable_reports: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    enable_accountant: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    enable_cashier: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     registration_status: Mapped[RegistrationStatus] = mapped_column(
         Enum(RegistrationStatus),
@@ -106,3 +111,9 @@ class Restaurant(Base):
         back_populates="restaurants",
         foreign_keys=[currency_id],
     )
+
+    @property
+    def feature_flags(self) -> dict[str, bool]:
+        from app.modules.access import catalog as access_catalog
+
+        return access_catalog.build_feature_flag_snapshot(self)

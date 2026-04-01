@@ -2,12 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
-@dataclass(frozen=True)
-class PackageAccessModuleDefinition:
-    key: str
-    label: str
-    description: str
+from app.modules.access import catalog as access_catalog
 
 
 @dataclass(frozen=True)
@@ -15,36 +10,7 @@ class PackagePrivilegeDefinition:
     code: str
     label: str
     description: str
-    modules: tuple[PackageAccessModuleDefinition, ...]
-
-
-_ACCESS_MODULES = {
-    "ORDERS": PackageAccessModuleDefinition(
-        key="orders",
-        label="Orders",
-        description="Kitchen, steward, and service order operations.",
-    ),
-    "REPORTS": PackageAccessModuleDefinition(
-        key="reports",
-        label="Reports",
-        description="Operational and sales reporting dashboards.",
-    ),
-    "BILLING": PackageAccessModuleDefinition(
-        key="billing",
-        label="Billing",
-        description="Invoice capture and bill settlement workflows.",
-    ),
-    "HOUSEKEEPING": PackageAccessModuleDefinition(
-        key="housekeeping",
-        label="Housekeeping",
-        description="Room service tasks, requests, and housekeeping boards.",
-    ),
-    "OFFERS": PackageAccessModuleDefinition(
-        key="offers",
-        label="Offers",
-        description="Promotional offers, discount campaigns, and marketing content.",
-    ),
-}
+    modules: tuple[access_catalog.AccessModuleDefinition | None, ...]
 
 _PRIVILEGE_DEFINITIONS = {
     "QR_MENU": PackagePrivilegeDefinition(
@@ -52,22 +18,24 @@ _PRIVILEGE_DEFINITIONS = {
         label="QR Menu",
         description="Enables table and room QR ordering operations.",
         modules=(
-            _ACCESS_MODULES["ORDERS"],
-            _ACCESS_MODULES["REPORTS"],
-            _ACCESS_MODULES["BILLING"],
+            access_catalog.get_module_definition("orders"),
+            access_catalog.get_module_definition("qr"),
+            access_catalog.get_module_definition("kds"),
+            access_catalog.get_module_definition("reports"),
+            access_catalog.get_module_definition("billing"),
         ),
     ),
     "HOUSEKEEPING": PackagePrivilegeDefinition(
         code="HOUSEKEEPING",
         label="Housekeeping",
         description="Enables housekeeping workflows and room task management.",
-        modules=(_ACCESS_MODULES["HOUSEKEEPING"],),
+        modules=(access_catalog.get_module_definition("housekeeping"),),
     ),
     "OFFERS": PackagePrivilegeDefinition(
         code="OFFERS",
         label="Offers",
         description="Enables promotional offers and discount campaign tools.",
-        modules=(_ACCESS_MODULES["OFFERS"],),
+        modules=(access_catalog.get_module_definition("offers"),),
     ),
 }
 
@@ -89,8 +57,8 @@ def get_invalid_privilege_codes(privileges: list[str]) -> list[str]:
     return sorted({value for value in privileges if value not in _PRIVILEGE_DEFINITIONS})
 
 
-def list_modules_for_privileges(privileges: list[str]) -> list[PackageAccessModuleDefinition]:
-    modules: list[PackageAccessModuleDefinition] = []
+def list_modules_for_privileges(privileges: list[str]) -> list[access_catalog.AccessModuleDefinition]:
+    modules: list[access_catalog.AccessModuleDefinition] = []
     seen_keys: set[str] = set()
 
     for code in normalize_privilege_codes(privileges):
@@ -98,6 +66,8 @@ def list_modules_for_privileges(privileges: list[str]) -> list[PackageAccessModu
         if definition is None:
             continue
         for module in definition.modules:
+            if module is None:
+                continue
             if module.key in seen_keys:
                 continue
             seen_keys.add(module.key)

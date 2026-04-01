@@ -1,5 +1,6 @@
 import type { MutableRefObject } from "react";
 
+import { getFeatureFlagEntries } from "@/features/access/catalog";
 import type { RestaurantAdminUpdateRequest, RestaurantMeResponse } from "@/types/restaurant";
 
 import { getRestaurantLogoUrl } from "@/features/super-admin/restaurants/helpers";
@@ -42,6 +43,13 @@ export function RestaurantProfilePanel({
   onLogoUpload,
 }: RestaurantProfilePanelProps) {
   const logoUrl = getRestaurantLogoUrl(selected?.logo_url);
+  const editableFeatureFlags = {
+    ...(selected?.feature_flags ?? {}),
+    ...(editForm.feature_flags ?? {}),
+  };
+  const featureFlagEntries = getFeatureFlagEntries(
+    editingId === selected?.id ? editableFeatureFlags : selected?.feature_flags,
+  );
 
   return (
     <div className="rounded-lg border bg-white p-5 space-y-4">
@@ -146,6 +154,36 @@ export function RestaurantProfilePanel({
               />
               Active hotel
             </label>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <p className="text-sm font-medium text-slate-900">Feature Toggles</p>
+              <p className="mt-1 text-xs text-slate-500">
+                These hotel-level toggles work on top of package access.
+              </p>
+              <div className="mt-3 space-y-3">
+                {featureFlagEntries.map((flag) => (
+                  <label key={flag.key} className="flex items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={flag.enabled}
+                      onChange={(event) =>
+                        onStartEditChange({
+                          ...editForm,
+                          feature_flags: {
+                            ...(editForm.feature_flags ?? selected?.feature_flags ?? {}),
+                            [flag.key]: event.target.checked,
+                          },
+                        })
+                      }
+                    />
+                    <span>
+                      <span className="block font-medium text-slate-900">{flag.label}</span>
+                      <span className="block text-xs text-slate-500">{flag.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
             {actionMsg && (
               <p
                 className={`text-xs ${
@@ -202,6 +240,30 @@ export function RestaurantProfilePanel({
                 value={new Date(selected.updated_at).toLocaleDateString()}
               />
             </dl>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Feature Toggles
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {featureFlagEntries.map((flag) => (
+                  <div key={flag.key} className="rounded-md border border-white bg-white px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-slate-900">{flag.label}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          flag.enabled
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {flag.enabled ? "Enabled" : "Disabled"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{flag.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )
       ) : null}

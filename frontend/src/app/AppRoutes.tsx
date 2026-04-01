@@ -127,7 +127,9 @@ function AppRoutes() {
           path="/admin/offers"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <OfferListPage />
+              <PrivilegeRoute requiredModuleKey="offers">
+                <OfferListPage />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
@@ -135,7 +137,9 @@ function AppRoutes() {
           path="/admin/offers/new"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <OfferFormPage />
+              <PrivilegeRoute requiredModuleKey="offers">
+                <OfferFormPage />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
@@ -143,7 +147,9 @@ function AppRoutes() {
           path="/admin/offers/:offerId/edit"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <OfferFormPage />
+              <PrivilegeRoute requiredModuleKey="offers">
+                <OfferFormPage />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
@@ -151,7 +157,7 @@ function AppRoutes() {
           path="/admin/steward"
           element={
             <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
-              <PrivilegeRoute requiredPrivilege="QR_MENU">
+              <PrivilegeRoute requiredModuleKey="kds">
                 <Steward />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -161,7 +167,7 @@ function AppRoutes() {
           path="/admin/reports"
           element={
             <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
-              <PrivilegeRoute requiredPrivilege="QR_MENU">
+              <PrivilegeRoute requiredModuleKey="reports">
                 <Reports />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -172,7 +178,7 @@ function AppRoutes() {
           path="/admin/kitchen/orders"
           element={
             <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
-              <PrivilegeRoute requiredPrivilege="QR_MENU">
+              <PrivilegeRoute requiredModuleKey="kds">
                 <Kitchen />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -182,7 +188,7 @@ function AppRoutes() {
           path="/admin/kitchen/old-orders"
           element={
             <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
-              <PrivilegeRoute requiredPrivilege="QR_MENU">
+              <PrivilegeRoute requiredModuleKey="kds">
                 <KitchenOldOrders />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -192,7 +198,7 @@ function AppRoutes() {
           path="/admin/billing"
           element={
             <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
-              <PrivilegeRoute requiredPrivilege="QR_MENU">
+              <PrivilegeRoute requiredModuleKey="billing">
                 <Billing />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -203,7 +209,9 @@ function AppRoutes() {
           path="/admin/housekeeping/rooms"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin", "housekeeper"]}>
-              <Rooms />
+              <PrivilegeRoute requiredModuleKey="housekeeping">
+                <Rooms />
+              </PrivilegeRoute>
             </ProtectedRoute>
           }
         />
@@ -219,7 +227,7 @@ function AppRoutes() {
           path="/admin/qr/rooms"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <PrivilegeRoute requiredPrivilege="QR_MENU">
+              <PrivilegeRoute requiredModuleKey="qr">
                 <AllRoomQRCodes />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -237,7 +245,7 @@ function AppRoutes() {
           path="/admin/qr/rooms/generate"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <PrivilegeRoute requiredPrivilege="QR_MENU">
+              <PrivilegeRoute requiredModuleKey="qr">
                 <GenerateRoomQRCodes />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -252,7 +260,7 @@ function AppRoutes() {
           path="/admin/qr/tables"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <PrivilegeRoute requiredPrivilege="QR_MENU">
+              <PrivilegeRoute requiredModuleKey="qr">
                 <AllTableQRCodes />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -262,7 +270,7 @@ function AppRoutes() {
           path="/admin/qr/tables/generate"
           element={
             <ProtectedRoute allowedRoles={["owner", "admin"]}>
-              <PrivilegeRoute requiredPrivilege="QR_MENU">
+              <PrivilegeRoute requiredModuleKey="qr">
                 <GenerateTableQRCodes />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -272,7 +280,7 @@ function AppRoutes() {
           path="/admin/housekeeping"
           element={
             <ProtectedRoute allowedRoles={[...HOUSEKEEPING_TASK_ROLES]}>
-              <PrivilegeRoute requiredPrivilege="HOUSEKEEPING">
+              <PrivilegeRoute requiredModuleKey="housekeeping">
                 <Housekeeping />
               </PrivilegeRoute>
             </ProtectedRoute>

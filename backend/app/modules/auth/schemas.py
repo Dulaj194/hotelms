@@ -14,6 +14,24 @@ class TokenResponse(BaseModel):
     must_change_password: bool = False
 
 
+class UserFeatureFlagResponse(BaseModel):
+    housekeeping: bool = False
+    kds: bool = False
+    reports: bool = False
+    accountant: bool = False
+    cashier: bool = False
+
+
+class UserModuleAccessResponse(BaseModel):
+    orders: bool = False
+    qr: bool = False
+    kds: bool = False
+    reports: bool = False
+    billing: bool = False
+    housekeeping: bool = False
+    offers: bool = False
+
+
 class UserMeResponse(BaseModel):
     id: int
     full_name: str
@@ -22,8 +40,13 @@ class UserMeResponse(BaseModel):
     restaurant_id: int | None
     is_active: bool
     must_change_password: bool = False
-
-    model_config = {"from_attributes": True}
+    package_id: int | None = None
+    package_name: str | None = None
+    package_code: str | None = None
+    subscription_status: str | None = None
+    privileges: list[str] = Field(default_factory=list)
+    feature_flags: UserFeatureFlagResponse = Field(default_factory=UserFeatureFlagResponse)
+    module_access: UserModuleAccessResponse = Field(default_factory=UserModuleAccessResponse)
 
 
 class TenantDataCountsResponse(BaseModel):

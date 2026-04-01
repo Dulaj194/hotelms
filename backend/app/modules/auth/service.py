@@ -38,8 +38,12 @@ from app.modules.auth.schemas import (
     TenantContextResponse,
     TenantDataCountsResponse,
     TokenResponse,
+    UserFeatureFlagResponse,
+    UserMeResponse,
+    UserModuleAccessResponse,
 )
 from app.modules.restaurants.model import RegistrationStatus
+from app.modules.subscriptions import service as subscription_service
 from app.modules.users.model import UserRole
 from app.modules.users.repository import (
     get_by_id_global,
@@ -214,6 +218,14 @@ def _get_restaurant_for_user(db: Session, restaurant_id: int | None):
     return db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
 
 
+def _empty_feature_flag_snapshot() -> UserFeatureFlagResponse:
+    return UserFeatureFlagResponse()
+
+
+def _empty_module_access_snapshot() -> UserModuleAccessResponse:
+    return UserModuleAccessResponse()
+
+
 def _ensure_restaurant_login_allowed(db: Session, restaurant_id: int | None) -> None:
     if restaurant_id is None:
         return
@@ -286,6 +298,56 @@ def get_tenant_context_snapshot(db: Session, current_user) -> TenantContextRespo
             subcategories=_count_model_rows(db, Subcategory, restaurant_id),
             items=_count_model_rows(db, Item, restaurant_id),
         ),
+    )
+
+
+def get_user_me_snapshot(db: Session, current_user) -> UserMeResponse:
+    package_id: int | None = None
+    package_name: str | None = None
+    package_code: str | None = None
+    subscription_status: str | None = None
+    privileges: list[str] = []
+    feature_flags = _empty_feature_flag_snapshot()
+    module_access = _empty_module_access_snapshot()
+
+    if current_user.restaurant_id is not None:
+        access_summary = subscription_service.get_package_access_summary(
+            db,
+            current_user.restaurant_id,
+        )
+        package_id = access_summary.package_id
+        package_name = access_summary.package_name
+        package_code = access_summary.package_code
+        subscription_status = access_summary.status
+        privileges = [item.code for item in access_summary.privileges]
+        feature_flags = UserFeatureFlagResponse.model_validate(
+            {
+                item.key: item.enabled
+                for item in access_summary.feature_flags
+            }
+        )
+        module_access = UserModuleAccessResponse.model_validate(
+            {
+                item.key: item.is_enabled
+                for item in access_summary.module_access
+            }
+        )
+
+    return UserMeResponse(
+        id=current_user.id,
+        full_name=current_user.full_name,
+        email=current_user.email,
+        role=current_user.role.value,
+        restaurant_id=current_user.restaurant_id,
+        is_active=current_user.is_active,
+        must_change_password=current_user.must_change_password,
+        package_id=package_id,
+        package_name=package_name,
+        package_code=package_code,
+        subscription_status=subscription_status,
+        privileges=privileges,
+        feature_flags=feature_flags,
+        module_access=module_access,
     )
 
 

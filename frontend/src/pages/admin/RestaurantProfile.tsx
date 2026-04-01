@@ -4,7 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Star } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
+import { getFeatureFlagEntries } from "@/features/access/catalog";
 import { ApiError, api } from "@/lib/api";
+import type { SettingsRequestResponse } from "@/types/settings";
 import type {
   AdminDashboardOverviewResponse,
   DashboardSetupRequirement,
@@ -89,6 +91,10 @@ export default function RestaurantProfile() {
 
   const [uploading, setUploading] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<NoticeMessage | null>(null);
+  const [accessRequestFlags, setAccessRequestFlags] = useState(restaurantFeatureFlagDefaults());
+  const [accessRequestReason, setAccessRequestReason] = useState("");
+  const [submittingAccessRequest, setSubmittingAccessRequest] = useState(false);
+  const [accessRequestNotice, setAccessRequestNotice] = useState<NoticeMessage | null>(null);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -116,6 +122,7 @@ export default function RestaurantProfile() {
       setRestaurant(profileData);
       resetBusinessForm(profileData);
       resetScheduleForm(profileData);
+      setAccessRequestFlags(profileData.feature_flags);
       await loadReferenceLookups();
     } catch (err) {
       if (!aliveRef.current) {
@@ -204,6 +211,62 @@ export default function RestaurantProfile() {
       opening_time: data.opening_time ?? "",
       closing_time: data.closing_time ?? "",
     });
+  }
+
+  async function handleAccessRequestSubmit() {
+    if (!restaurant) {
+      return;
+    }
+
+    const requestedChanges = Object.entries(accessRequestFlags).reduce<Record<string, boolean>>(
+      (accumulator, [key, value]) => {
+        const typedKey = key as keyof typeof accessRequestFlags;
+        if (restaurant.feature_flags[typedKey] !== value) {
+          accumulator[key] = value;
+        }
+        return accumulator;
+      },
+      {},
+    );
+
+    if (Object.keys(requestedChanges).length === 0) {
+      setAccessRequestNotice({
+        tone: "error",
+        text: "Adjust at least one feature toggle before submitting a request.",
+      });
+      return;
+    }
+
+    setSubmittingAccessRequest(true);
+    setAccessRequestNotice(null);
+    try {
+      const response = await api.post<SettingsRequestResponse>("/settings/requests", {
+        requested_changes: requestedChanges,
+        request_reason: toNullable(accessRequestReason),
+      });
+
+      if (!aliveRef.current) {
+        return;
+      }
+
+      setAccessRequestNotice({
+        tone: "success",
+        text: `Access request #${response.request_id} submitted for super admin review.`,
+      });
+      setAccessRequestReason("");
+    } catch (error) {
+      if (!aliveRef.current) {
+        return;
+      }
+      setAccessRequestNotice({
+        tone: "error",
+        text: getErrorMessage(error, "Failed to submit the access request."),
+      });
+    } finally {
+      if (aliveRef.current) {
+        setSubmittingAccessRequest(false);
+      }
+    }
   }
 
   async function handleRefresh() {
@@ -451,6 +514,7 @@ export default function RestaurantProfile() {
   const billingEmailSuggestion = toNullable(businessForm.email);
   const billingEmailValue = toNullable(businessForm.billing_email);
   const billingEmailMatchesPrimary = emailsEqual(billingEmailSuggestion, billingEmailValue);
+  const featureFlagEntries = getFeatureFlagEntries(accessRequestFlags);
 
   return (
     <DashboardLayout>
@@ -833,6 +897,84 @@ export default function RestaurantProfile() {
             </dl>
           )}
         </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SectionHeader
+            title="Module Access Requests"
+            description="Request hotel-level feature toggle changes. Package access must still exist for each module."
+          />
+
+          {accessRequestNotice && (
+            <div className="mt-4">
+              <NoticeBanner tone={accessRequestNotice.tone} text={accessRequestNotice.text} />
+            </div>
+          )}
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {featureFlagEntries.map((flag) => (
+              <label
+                key={flag.key}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={flag.enabled}
+                    onChange={(event) =>
+                      setAccessRequestFlags((prev) => ({
+                        ...prev,
+                        [flag.key]: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-900">{flag.label}</span>
+                    <span className="mt-1 block text-xs text-slate-500">{flag.description}</span>
+                    <span className="mt-2 inline-flex rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                      Current: {restaurant.feature_flags[flag.key] ? "Enabled" : "Disabled"}
+                    </span>
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Request Reason
+            </label>
+            <textarea
+              rows={3}
+              value={accessRequestReason}
+              onChange={(event) => setAccessRequestReason(event.target.value)}
+              placeholder="Explain why this access change is needed..."
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleAccessRequestSubmit()}
+              disabled={submittingAccessRequest}
+              className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submittingAccessRequest ? "Submitting..." : "Submit Access Request"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAccessRequestFlags(restaurant.feature_flags);
+                setAccessRequestReason("");
+                setAccessRequestNotice(null);
+              }}
+              className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Reset
+            </button>
+          </div>
+        </section>
       </div>
     </DashboardLayout>
   );
@@ -988,6 +1130,16 @@ function toNullableNumber(value: string): number | null {
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return parsed;
+}
+
+function restaurantFeatureFlagDefaults() {
+  return {
+    housekeeping: false,
+    kds: false,
+    reports: false,
+    accountant: false,
+    cashier: false,
+  };
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {

@@ -20,7 +20,7 @@ from app.core.dependencies import (
     get_current_restaurant_id,
     get_db,
     get_redis,
-    require_privilege,
+    require_module_access,
     require_roles,
 )
 from app.modules.orders import service
@@ -79,7 +79,7 @@ def list_pending_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> KitchenOrderListResponse:
     """List pending orders with item summaries for the kitchen dashboard."""
     return service.list_pending_orders(db, restaurant_id)
@@ -90,7 +90,7 @@ def list_processing_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> KitchenOrderListResponse:
     """List confirmed + processing orders with item summaries for the kitchen."""
     return service.list_processing_orders(db, restaurant_id)
@@ -101,7 +101,7 @@ def list_completed_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> KitchenOrderListResponse:
     """List recently completed orders for the kitchen completed section."""
     return service.list_kitchen_completed_orders(db, restaurant_id)
@@ -114,7 +114,7 @@ def list_active_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> ActiveOrderListResponse:
     """List all non-finalized orders (pending / confirmed / processing)."""
     return service.list_active_orders(db, restaurant_id)
@@ -125,7 +125,7 @@ def list_history_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> ActiveOrderListResponse:
     """List completed / paid / rejected orders for the restaurant."""
     return service.list_history_orders(db, restaurant_id)
@@ -137,7 +137,7 @@ def get_order_detail(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> OrderDetailResponse:
     """Return full order details for staff/admin, scoped to their restaurant."""
     return service.get_order_for_staff(db, order_id, restaurant_id)
@@ -151,7 +151,7 @@ def update_order_status(
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> OrderStatusResponse:
     """Update order status with transition validation.
 

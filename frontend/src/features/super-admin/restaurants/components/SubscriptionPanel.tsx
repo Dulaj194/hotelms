@@ -50,6 +50,8 @@ export function SubscriptionPanel({
     : buildEnabledModules(currentPackage?.privileges ?? []);
   const draftPrivileges = buildPrivilegeSummaries(draftPackage?.privileges ?? []);
   const draftModules = buildEnabledModules(draftPackage?.privileges ?? []);
+  const featureFlags = accessSummary?.feature_flags ?? [];
+  const moduleAccess = accessSummary?.module_access ?? activeModules;
 
   return (
     <div className="rounded-lg border bg-white p-5 space-y-4">
@@ -91,6 +93,9 @@ export function SubscriptionPanel({
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
                   {draftPackage?.description || "Select a package to preview its unlocked access."}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  Hotel-level feature toggles still apply after the package is changed.
                 </p>
               </div>
               {draftPackage && (
@@ -266,7 +271,7 @@ export function SubscriptionPanel({
 
             <div className="mt-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Enabled Modules
+                Active Modules
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {activeModules.map((module) => (
@@ -280,6 +285,81 @@ export function SubscriptionPanel({
                 {activeModules.length === 0 && (
                   <span className="text-xs text-slate-500">No package-gated modules are active.</span>
                 )}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Hotel Feature Toggles
+              </p>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                {featureFlags.map((flag) => (
+                  <div key={flag.key} className="rounded-lg border border-white bg-white p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{flag.label}</p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          flag.enabled
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {flag.enabled ? "Enabled" : "Disabled"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{flag.description}</p>
+                  </div>
+                ))}
+                {featureFlags.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-slate-300 bg-white p-3 text-xs text-slate-500 md:col-span-2">
+                    No hotel-level feature toggles are configured.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Effective Module Gates
+              </p>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                {moduleAccess.map((module) => (
+                  <div key={module.key} className="rounded-lg border border-white bg-white p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{module.label}</p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          module.is_enabled
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {module.is_enabled ? "Available" : "Blocked"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{module.description}</p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-medium">
+                      <span
+                        className={`rounded-full px-2 py-0.5 ${
+                          module.enabled_by_package
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        Package: {module.enabled_by_package ? "On" : "Off"}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 ${
+                          module.enabled_by_feature_flags
+                            ? "bg-purple-100 text-purple-700"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        Toggle: {module.enabled_by_feature_flags ? "On" : "Off"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.notifications import send_onboarding_email
+from app.modules.access import catalog as access_catalog
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.reference_data import service as reference_data_service
 from app.modules.restaurants import repository
@@ -92,6 +93,9 @@ def _build_profile_update_data(
 ) -> dict:
     normalized_payload = _with_normalized_reference_fields(db, payload)
     update_data = normalized_payload.model_dump(exclude_unset=True)
+    feature_flag_updates = update_data.pop("feature_flags", None)
+    if isinstance(feature_flag_updates, dict):
+        update_data.update(access_catalog.flatten_feature_flag_updates(feature_flag_updates))
     return _apply_billing_email_defaults(
         update_data,
         existing_primary_email=existing_primary_email,
@@ -103,6 +107,7 @@ def _serialize_restaurant(restaurant) -> RestaurantMeResponse:
     response = RestaurantMeResponse.model_validate(restaurant)
     return response.model_copy(
         update={
+            "feature_flags": access_catalog.build_feature_flag_snapshot(restaurant),
             "billing_email": _effective_billing_email(
                 primary_email=response.email,
                 billing_email=response.billing_email,

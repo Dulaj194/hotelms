@@ -1,3 +1,5 @@
+import type { FeatureFlagSnapshot, ModuleAccessSnapshot } from "@/types/access";
+
 /**
  * Lightweight auth state helpers.
  *
@@ -37,6 +39,14 @@ export interface StoredUser {
   role: string;
   restaurant_id: number | null;
   must_change_password: boolean;
+  is_active?: boolean;
+  package_id?: number | null;
+  package_name?: string | null;
+  package_code?: string | null;
+  subscription_status?: string | null;
+  privileges?: string[];
+  feature_flags?: FeatureFlagSnapshot;
+  module_access?: ModuleAccessSnapshot;
 }
 
 export function normalizeRole(role: string | null | undefined): string {
@@ -76,7 +86,29 @@ export function getUser(): StoredUser | null {
 }
 
 export function setUser(user: StoredUser): void {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem(
+    USER_KEY,
+    JSON.stringify({
+      ...user,
+      privileges: user.privileges ?? [],
+      feature_flags: user.feature_flags ?? {
+        housekeeping: false,
+        kds: false,
+        reports: false,
+        accountant: false,
+        cashier: false,
+      },
+      module_access: user.module_access ?? {
+        orders: false,
+        qr: false,
+        kds: false,
+        reports: false,
+        billing: false,
+        housekeeping: false,
+        offers: false,
+      },
+    }),
+  );
 }
 
 export function clearUser(): void {

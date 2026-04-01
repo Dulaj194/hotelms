@@ -238,6 +238,27 @@ def require_privilege(privilege_code: str):
     return _check
 
 
+def require_module_access(module_key: str):
+    """Dependency factory to enforce effective module access for tenant routes."""
+
+    def _check(
+        db: Session = Depends(get_db),
+        restaurant_id: int = Depends(get_current_restaurant_id),
+    ):
+        if restaurant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No restaurant context available for module access check.",
+            )
+
+        from app.modules.subscriptions import service as subscription_service
+
+        subscription_service.assert_module_access(db, restaurant_id, module_key)
+        return True
+
+    return _check
+
+
 def require_room_session_privilege(privilege_code: str):
     """Dependency factory for guest room-session routes that need privilege gates."""
 
@@ -248,6 +269,21 @@ def require_room_session_privilege(privilege_code: str):
         from app.modules.subscriptions import service as subscription_service
 
         subscription_service.assert_privilege(db, session.restaurant_id, privilege_code)
+        return True
+
+    return _check
+
+
+def require_room_module_access(module_key: str):
+    """Dependency factory for guest room-session routes that need module gates."""
+
+    def _check(
+        db: Session = Depends(get_db),
+        session=Depends(get_current_room_session),
+    ):
+        from app.modules.subscriptions import service as subscription_service
+
+        subscription_service.assert_module_access(db, session.restaurant_id, module_key)
         return True
 
     return _check

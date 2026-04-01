@@ -6,6 +6,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.modules.access import catalog as access_catalog
 from app.modules.restaurants import repository as restaurant_repository
 from app.modules.settings import repository
 from app.modules.settings.model import SettingsRequestStatus
@@ -17,7 +18,7 @@ from app.modules.settings.schemas import (
     SettingsRequestReviewResponse,
 )
 
-_ALLOWED_SETTING_KEYS = {
+_PROFILE_SETTING_KEYS = {
     "name",
     "email",
     "phone",
@@ -29,15 +30,20 @@ _ALLOWED_SETTING_KEYS = {
     "closing_time",
     "logo_url",
 }
+_FEATURE_FLAG_KEYS = {
+    definition.key for definition in access_catalog.list_feature_flag_definitions()
+}
+_ALLOWED_SETTING_KEYS = _PROFILE_SETTING_KEYS | _FEATURE_FLAG_KEYS
 
 
 def _snapshot_current_settings(restaurant) -> dict[str, Any]:
     snapshot: dict[str, Any] = {}
-    for key in sorted(_ALLOWED_SETTING_KEYS):
+    for key in sorted(_PROFILE_SETTING_KEYS):
         value = getattr(restaurant, key, None)
         if key == "billing_email" and not value:
             value = restaurant.email
         snapshot[key] = value
+    snapshot.update(access_catalog.build_feature_flag_snapshot(restaurant))
     return snapshot
 
 
@@ -194,10 +200,15 @@ def review_settings_request(
                 detail="Restaurant not found for this request.",
             )
         for key, value in request.requested_changes.items():
-            if key in _ALLOWED_SETTING_KEYS:
+            if key in _PROFILE_SETTING_KEYS:
                 if key == "billing_email" and not value:
                     value = restaurant.email
                 setattr(restaurant, key, value)
+                continue
+
+            feature_flag = access_catalog.get_feature_flag_definition(key)
+            if feature_flag is not None:
+                setattr(restaurant, feature_flag.column_name, bool(value))
 
     db.commit()
     db.refresh(request)

@@ -1,5 +1,10 @@
 export type SettingsRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
+export interface SettingsRequestCreateRequest {
+  requested_changes: Record<string, unknown>;
+  request_reason?: string | null;
+}
+
 export interface SettingsRequestResponse {
   request_id: number;
   restaurant_id: number;

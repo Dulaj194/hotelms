@@ -5,16 +5,18 @@ import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 
 interface PrivilegeRouteProps {
   children: ReactNode;
-  requiredPrivilege: string;
+  requiredPrivilege?: string;
+  requiredModuleKey?: string;
   fallbackPath?: string;
 }
 
 export default function PrivilegeRoute({
   children,
   requiredPrivilege,
+  requiredModuleKey,
   fallbackPath = "/dashboard",
 }: PrivilegeRouteProps) {
-  const { loading, hasPrivilege } = useSubscriptionPrivileges();
+  const { loading, hasModuleAccess, hasPrivilege } = useSubscriptionPrivileges();
 
   if (loading) {
     return (
@@ -24,7 +26,11 @@ export default function PrivilegeRoute({
     );
   }
 
-  if (!hasPrivilege(requiredPrivilege)) {
+  if (requiredPrivilege && !hasPrivilege(requiredPrivilege)) {
+    return <Navigate to={fallbackPath} replace />;
+  }
+
+  if (requiredModuleKey && !hasModuleAccess(requiredModuleKey)) {
     return <Navigate to={fallbackPath} replace />;
   }
 

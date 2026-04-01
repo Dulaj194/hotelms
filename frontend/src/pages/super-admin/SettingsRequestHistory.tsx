@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
+import { formatSettingFieldLabel, formatSettingFieldValue } from "@/features/access/catalog";
 import { api } from "@/lib/api";
 import { formatDateTime, getApiErrorMessage } from "@/pages/super-admin/utils";
 import type { SettingsRequestListResponse, SettingsRequestResponse, SettingsRequestStatus } from "@/types/settings";
@@ -166,8 +167,8 @@ function SettingsHistoryCard({
         <div className="mt-3 space-y-2">
           {changes.map(([key, value]) => (
             <div key={key} className="flex flex-wrap justify-between gap-2 text-sm">
-              <span className="font-medium text-slate-700">{key}</span>
-              <span className="text-slate-500">{formatUnknown(value)}</span>
+              <span className="font-medium text-slate-700">{formatSettingFieldLabel(key)}</span>
+              <span className="text-slate-500">{formatSettingFieldValue(value)}</span>
             </div>
           ))}
         </div>
@@ -193,15 +194,4 @@ function StatusBadge({
       {status.charAt(0) + status.slice(1).toLowerCase()}
     </span>
   );
-}
-
-function formatUnknown(value: unknown): string {
-  if (value === null || value === undefined) return "-";
-  if (typeof value === "string") return value || "-";
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
 }

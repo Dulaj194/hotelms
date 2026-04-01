@@ -6,6 +6,22 @@ from pydantic import BaseModel, EmailStr, Field
 RegistrationStatusValue = Literal["PENDING", "APPROVED", "REJECTED"]
 
 
+class RestaurantFeatureFlagsResponse(BaseModel):
+    housekeeping: bool
+    kds: bool
+    reports: bool
+    accountant: bool
+    cashier: bool
+
+
+class RestaurantFeatureFlagsUpdateRequest(BaseModel):
+    housekeeping: bool | None = None
+    kds: bool | None = None
+    reports: bool | None = None
+    accountant: bool | None = None
+    cashier: bool | None = None
+
+
 class RestaurantResponse(BaseModel):
     id: int
     name: str
@@ -20,6 +36,7 @@ class RestaurantResponse(BaseModel):
     opening_time: str | None
     closing_time: str | None
     logo_url: str | None
+    feature_flags: RestaurantFeatureFlagsResponse
     is_active: bool
     registration_status: RegistrationStatusValue
     registration_reviewed_by_id: int | None
@@ -86,6 +103,7 @@ class RestaurantAdminUpdateRequest(BaseModel):
     billing_email: EmailStr | None = None
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
+    feature_flags: RestaurantFeatureFlagsUpdateRequest | None = None
     is_active: bool | None = None
 
 

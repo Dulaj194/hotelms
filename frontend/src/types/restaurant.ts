@@ -1,4 +1,8 @@
+import type { FeatureFlagSnapshot } from "@/types/access";
+
 export type RestaurantRegistrationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface RestaurantFeatureFlags extends FeatureFlagSnapshot {}
 
 export interface RestaurantResponse {
   id: number;
@@ -14,6 +18,7 @@ export interface RestaurantResponse {
   opening_time: string | null;
   closing_time: string | null;
   logo_url: string | null;
+  feature_flags: RestaurantFeatureFlags;
   is_active: boolean;
   registration_status: RestaurantRegistrationStatus;
   registration_reviewed_by_id: number | null;
@@ -116,6 +121,7 @@ export interface RestaurantAdminUpdateRequest {
   billing_email?: string | null;
   opening_time?: string | null;
   closing_time?: string | null;
+  feature_flags?: Partial<RestaurantFeatureFlags> | null;
   is_active?: boolean;
 }
 

@@ -1,3 +1,5 @@
+import type { FeatureFlagSnapshot, ModuleAccessSnapshot } from "@/types/access";
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -17,6 +19,13 @@ export interface UserMeResponse {
   restaurant_id: number | null;
   is_active: boolean;
   must_change_password: boolean;
+  package_id: number | null;
+  package_name: string | null;
+  package_code: string | null;
+  subscription_status: string | null;
+  privileges: string[];
+  feature_flags: FeatureFlagSnapshot;
+  module_access: ModuleAccessSnapshot;
 }
 
 export interface TenantDataCountsResponse {

@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.modules.access import catalog as access_catalog
 from app.modules.packages import catalog as packages_catalog
 from app.modules.packages import repository as packages_repo
 from app.modules.packages import service as packages_service
@@ -15,6 +16,7 @@ from app.modules.subscriptions.schemas import (
     ActivateSubscriptionResponse,
     CancelSubscriptionResponse,
     StartTrialResponse,
+    SubscriptionAccessFeatureFlagResponse,
     SubscriptionAccessModuleResponse,
     SubscriptionAccessPrivilegeResponse,
     SubscriptionAccessSummaryResponse,
@@ -87,12 +89,22 @@ def _prettify_code(value: str) -> str:
 
 
 def _serialize_access_module(
-    module: packages_catalog.PackageAccessModuleDefinition,
+    module: access_catalog.AccessModuleDefinition,
+    *,
+    enabled_by_package: bool,
+    enabled_by_feature_flags: bool,
 ) -> SubscriptionAccessModuleResponse:
     return SubscriptionAccessModuleResponse(
         key=module.key,
         label=module.label,
         description=module.description,
+        package_privileges=list(module.package_privileges),
+        feature_flags=[
+            access_catalog.get_feature_flag_key(code) for code in module.feature_flags
+        ],
+        enabled_by_package=enabled_by_package,
+        enabled_by_feature_flags=enabled_by_feature_flags,
+        is_enabled=enabled_by_package and enabled_by_feature_flags,
     )
 
 
@@ -110,8 +122,50 @@ def _serialize_access_privilege(code: str) -> SubscriptionAccessPrivilegeRespons
         code=definition.code,
         label=definition.label,
         description=definition.description,
-        modules=[_serialize_access_module(module) for module in definition.modules],
+        modules=[
+            _serialize_access_module(
+                module,
+                enabled_by_package=True,
+                enabled_by_feature_flags=True,
+            )
+            for module in definition.modules
+            if module is not None
+        ],
     )
+
+
+def _serialize_feature_flag(
+    definition: access_catalog.RestaurantFeatureFlagDefinition,
+    *,
+    enabled: bool,
+) -> SubscriptionAccessFeatureFlagResponse:
+    return SubscriptionAccessFeatureFlagResponse(
+        code=definition.code,
+        key=definition.key,
+        label=definition.label,
+        description=definition.description,
+        enabled=enabled,
+        modules=[
+            _serialize_access_module(
+                module,
+                enabled_by_package=True,
+                enabled_by_feature_flags=enabled,
+            )
+            for module_key in definition.modules
+            if (module := access_catalog.get_module_definition(module_key)) is not None
+        ],
+    )
+
+
+def _is_module_enabled_by_package(
+    module: access_catalog.AccessModuleDefinition,
+    privilege_codes: list[str],
+) -> bool:
+    if not module.package_privileges:
+        return True
+
+    normalized_privileges = {code.strip().upper() for code in privilege_codes}
+    return any(code.upper() in normalized_privileges for code in module.package_privileges)
 
 
 def get_current_subscription_entity(
@@ -184,13 +238,38 @@ def get_package_access_summary(
     subscription = get_current_subscription_entity(db, restaurant_id)
     status_response = get_current_subscription_status(db, restaurant_id)
     privilege_response = get_effective_privileges(db, restaurant_id)
+    restaurant = restaurants_repo.get_by_id(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    feature_flag_snapshot = access_catalog.build_feature_flag_snapshot(restaurant)
+    module_access = [
+        _serialize_access_module(
+            module,
+            enabled_by_package=_is_module_enabled_by_package(module, privilege_response.privileges),
+            enabled_by_feature_flags=access_catalog.is_module_enabled_by_feature_flags(
+                module,
+                feature_flag_snapshot,
+            ),
+        )
+        for module in access_catalog.list_module_definitions()
+    ]
 
     enabled_modules = [
-        _serialize_access_module(module)
-        for module in packages_catalog.list_modules_for_privileges(privilege_response.privileges)
+        module for module in module_access if module.is_enabled
     ]
     privileges = [
         _serialize_access_privilege(code) for code in privilege_response.privileges
+    ]
+    feature_flags = [
+        _serialize_feature_flag(
+            definition,
+            enabled=feature_flag_snapshot[definition.key],
+        )
+        for definition in access_catalog.list_feature_flag_definitions()
     ]
 
     return SubscriptionAccessSummaryResponse(
@@ -201,6 +280,8 @@ def get_package_access_summary(
         package_name=subscription.package.name if subscription and subscription.package else None,
         package_code=subscription.package.code if subscription and subscription.package else None,
         privileges=privileges,
+        feature_flags=feature_flags,
+        module_access=module_access,
         enabled_modules=enabled_modules,
     )
 
@@ -243,6 +324,72 @@ def assert_privilege(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Your current package does not include '{privilege_code.upper()}'.",
+        )
+
+
+def has_module_access(
+    db: Session,
+    restaurant_id: int,
+    module_key: str,
+) -> bool:
+    normalized_key = module_key.strip().lower()
+    summary = get_package_access_summary(db, restaurant_id)
+    return any(item.key == normalized_key and item.is_enabled for item in summary.module_access)
+
+
+def assert_module_access(
+    db: Session,
+    restaurant_id: int,
+    module_key: str,
+) -> None:
+    definition = access_catalog.get_module_definition(module_key)
+    if definition is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Unknown module '{module_key}'.",
+        )
+
+    status_response = get_current_subscription_status(db, restaurant_id)
+    if definition.package_privileges:
+        if status_response.status == "none":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No subscription found for this restaurant.",
+            )
+
+        if status_response.is_expired:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your subscription has expired. Please activate a package.",
+            )
+
+        if status_response.status == SubscriptionStatus.cancelled.value:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your subscription is cancelled. Please activate a package.",
+            )
+
+    summary = get_package_access_summary(db, restaurant_id)
+    module = next(
+        (item for item in summary.module_access if item.key == definition.key),
+        None,
+    )
+    if module is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Unknown module '{module_key}'.",
+        )
+
+    if not module.enabled_by_package:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Your current package does not include access to '{module.label}'.",
+        )
+
+    if not module.enabled_by_feature_flags:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"The '{module.label}' module is disabled for this restaurant.",
         )
 
 

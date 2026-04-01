@@ -92,12 +92,26 @@ export interface SubscriptionAccessModuleResponse {
   key: string;
   label: string;
   description: string;
+  package_privileges: string[];
+  feature_flags: string[];
+  enabled_by_package: boolean;
+  enabled_by_feature_flags: boolean;
+  is_enabled: boolean;
 }
 
 export interface SubscriptionAccessPrivilegeResponse {
   code: string;
   label: string;
   description: string;
+  modules: SubscriptionAccessModuleResponse[];
+}
+
+export interface SubscriptionAccessFeatureFlagResponse {
+  code: string;
+  key: string;
+  label: string;
+  description: string;
+  enabled: boolean;
   modules: SubscriptionAccessModuleResponse[];
 }
 
@@ -109,6 +123,8 @@ export interface SubscriptionAccessSummaryResponse {
   package_name: string | null;
   package_code: string | null;
   privileges: SubscriptionAccessPrivilegeResponse[];
+  feature_flags: SubscriptionAccessFeatureFlagResponse[];
+  module_access: SubscriptionAccessModuleResponse[];
   enabled_modules: SubscriptionAccessModuleResponse[];
 }
 

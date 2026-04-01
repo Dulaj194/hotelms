@@ -10,6 +10,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
 import app.db.init_models  # noqa: F401
+from app.modules.auth import service as auth_service  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.modules.packages import service as packages_service  # noqa: E402
@@ -97,6 +98,20 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.db.commit()
         self.db.refresh(restaurant)
         return restaurant
+
+    def _create_owner_for_restaurant(self, restaurant: Restaurant) -> User:
+        owner = User(
+            full_name=f"{restaurant.name} Owner",
+            email=f"owner.{restaurant.id}@example.com",
+            password_hash=hash_password("Password1"),
+            role=UserRole.owner,
+            restaurant_id=restaurant.id,
+            is_active=True,
+        )
+        self.db.add(owner)
+        self.db.commit()
+        self.db.refresh(owner)
+        return owner
 
     def test_package_crud_flow_supports_privileges(self) -> None:
         created = packages_service.create_package_for_super_admin(
@@ -187,7 +202,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         )
         self.assertEqual(
             [module.key for module in access_summary.enabled_modules],
-            ["housekeeping", "orders", "reports", "billing"],
+            ["orders", "qr", "kds", "reports", "billing", "housekeeping"],
         )
 
         updated = subscriptions_service.update_subscription_for_super_admin(
@@ -204,6 +219,67 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.assertEqual(expired_access.status, "expired")
         self.assertEqual(expired_access.privileges, [])
         self.assertEqual(expired_access.enabled_modules, [])
+
+    def test_feature_toggles_update_effective_access_and_auth_snapshot(self) -> None:
+        restaurant = self._create_active_restaurant()
+        owner = self._create_owner_for_restaurant(restaurant)
+        packages_service.ensure_default_packages(self.db)
+        standard_package = packages_repository.get_package_by_code(self.db, "standard")
+        self.assertIsNotNone(standard_package)
+
+        subscriptions_service.activate_paid_subscription(
+            self.db,
+            restaurant_id=restaurant.id,
+            package_id=standard_package.id,  # type: ignore[union-attr]
+        )
+        self.db.commit()
+
+        settings_request = settings_service.create_settings_request(
+            self.db,
+            restaurant_id=restaurant.id,
+            requested_by=owner.id,
+            payload=SettingsRequestCreateRequest(
+                requested_changes={"reports": False, "cashier": False},
+                request_reason="Temporarily disable these modules.",
+            ),
+        )
+
+        settings_service.review_settings_request(
+            self.db,
+            request_id=settings_request.request_id,
+            reviewer_user_id=self.current_super_admin.id,
+            payload=SettingsRequestReviewRequest(
+                status="APPROVED",
+                review_notes="Approved module toggle change.",
+            ),
+        )
+
+        self.db.refresh(restaurant)
+        self.assertFalse(restaurant.enable_reports)
+        self.assertFalse(restaurant.enable_cashier)
+
+        access_summary = subscriptions_service.get_package_access_summary(self.db, restaurant.id)
+        module_access_map = {
+            module.key: module.is_enabled for module in access_summary.module_access
+        }
+        feature_flag_map = {
+            feature_flag.key: feature_flag.enabled for feature_flag in access_summary.feature_flags
+        }
+
+        self.assertEqual(access_summary.package_code, "standard")
+        self.assertFalse(feature_flag_map["reports"])
+        self.assertFalse(feature_flag_map["cashier"])
+        self.assertFalse(module_access_map["reports"])
+        self.assertTrue(module_access_map["billing"])
+
+        me_snapshot = auth_service.get_user_me_snapshot(self.db, owner)
+        self.assertEqual(me_snapshot.package_code, "standard")
+        self.assertEqual(me_snapshot.subscription_status, "active")
+        self.assertIn("QR_MENU", me_snapshot.privileges)
+        self.assertFalse(me_snapshot.feature_flags.reports)
+        self.assertFalse(me_snapshot.feature_flags.cashier)
+        self.assertFalse(me_snapshot.module_access.reports)
+        self.assertTrue(me_snapshot.module_access.billing)
 
     def test_review_history_lists_reviewed_records(self) -> None:
         restaurant, owner = self._create_pending_restaurant()

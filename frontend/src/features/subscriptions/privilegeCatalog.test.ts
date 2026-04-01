@@ -12,6 +12,8 @@ describe("privilegeCatalog", () => {
     expect(modules.map((module) => module.key)).toEqual([
       "housekeeping",
       "orders",
+      "qr",
+      "kds",
       "reports",
       "billing",
     ]);

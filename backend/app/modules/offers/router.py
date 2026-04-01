@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_privilege, require_roles
+from app.core.dependencies import get_db, require_module_access, require_roles
 from app.modules.offers import service
 from app.modules.offers.schemas import (
     OfferCreateRequest,
@@ -17,7 +17,7 @@ router = APIRouter()
 
 def _require_offers_restaurant_id(
     current_user: User = Depends(require_roles("owner", "admin")),
-    _: None = Depends(require_privilege("OFFERS")),
+    _: None = Depends(require_module_access("offers")),
 ) -> int:
     if current_user.restaurant_id is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")

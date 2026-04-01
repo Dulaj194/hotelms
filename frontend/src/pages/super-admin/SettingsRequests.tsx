@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import ActionDialog from "@/components/shared/ActionDialog";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
+import { formatSettingFieldLabel, formatSettingFieldValue } from "@/features/access/catalog";
 import { ApiError, api } from "@/lib/api";
 import type {
   SettingsRequestListResponse,
@@ -25,17 +26,6 @@ type ReviewDialogState = {
 function formatDateTime(value: string | null): string {
   if (!value) return "-";
   return new Date(value).toLocaleString();
-}
-
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) return "-";
-  if (typeof value === "string") return value || "-";
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -362,12 +352,14 @@ export default function SuperAdminSettingsRequests() {
                           <tbody className="divide-y">
                             {changeRows.map((row) => (
                               <tr key={row.key}>
-                                <td className="px-3 py-2 font-medium text-gray-900">{row.key}</td>
+                                <td className="px-3 py-2 font-medium text-gray-900">
+                                  {formatSettingFieldLabel(row.key)}
+                                </td>
                                 <td className="px-3 py-2 text-gray-700">
-                                  {formatValue(row.currentValue)}
+                                  {formatSettingFieldValue(row.currentValue)}
                                 </td>
                                 <td className="px-3 py-2 text-gray-900">
-                                  {formatValue(row.requestedValue)}
+                                  {formatSettingFieldValue(row.requestedValue)}
                                 </td>
                               </tr>
                             ))}

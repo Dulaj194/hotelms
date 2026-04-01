@@ -171,8 +171,11 @@ def change_initial_password(
 
 
 @router.get("/me", response_model=UserMeResponse)
-def get_me(current_user: User = Depends(get_current_user)) -> User:
-    return current_user
+def get_me(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserMeResponse:
+    return service.get_user_me_snapshot(db, current_user)
 
 
 @router.get("/tenant-context", response_model=TenantContextResponse)

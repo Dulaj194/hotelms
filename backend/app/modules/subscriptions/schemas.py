@@ -37,12 +37,26 @@ class SubscriptionAccessModuleResponse(BaseModel):
     key: str
     label: str
     description: str
+    package_privileges: list[str] = Field(default_factory=list)
+    feature_flags: list[str] = Field(default_factory=list)
+    enabled_by_package: bool = False
+    enabled_by_feature_flags: bool = True
+    is_enabled: bool = False
 
 
 class SubscriptionAccessPrivilegeResponse(BaseModel):
     code: str
     label: str
     description: str
+    modules: list[SubscriptionAccessModuleResponse]
+
+
+class SubscriptionAccessFeatureFlagResponse(BaseModel):
+    code: str
+    key: str
+    label: str
+    description: str
+    enabled: bool
     modules: list[SubscriptionAccessModuleResponse]
 
 
@@ -54,6 +68,8 @@ class SubscriptionAccessSummaryResponse(BaseModel):
     package_name: str | None
     package_code: str | None
     privileges: list[SubscriptionAccessPrivilegeResponse]
+    feature_flags: list[SubscriptionAccessFeatureFlagResponse]
+    module_access: list[SubscriptionAccessModuleResponse]
     enabled_modules: list[SubscriptionAccessModuleResponse]
 
 

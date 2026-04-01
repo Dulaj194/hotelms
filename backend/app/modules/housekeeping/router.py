@@ -11,8 +11,8 @@ from app.core.dependencies import (
     get_current_restaurant_id,
     get_current_room_session,
     get_db,
-    require_privilege,
-    require_room_session_privilege,
+    require_module_access,
+    require_room_module_access,
     require_roles,
 )
 from app.modules.housekeeping import service
@@ -49,7 +49,7 @@ _SUPERVISOR_ROLES = ("owner", "admin")
 def submit_housekeeping_request(
     payload: HousekeepingRequestCreateRequest,
     session: RoomSession = Depends(get_current_room_session),
-    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
+    _=Depends(require_room_module_access("housekeeping")),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestCreateResponse:
     return service.submit_request(db, session, payload)
@@ -58,7 +58,7 @@ def submit_housekeeping_request(
 @router.get("/my-requests", response_model=HousekeepingRequestListResponse)
 def list_my_requests(
     session: RoomSession = Depends(get_current_room_session),
-    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
+    _=Depends(require_room_module_access("housekeeping")),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestListResponse:
     return service.list_my_requests(db, session)
@@ -68,7 +68,7 @@ def list_my_requests(
 async def upload_housekeeping_audio(
     file: UploadFile = File(...),
     session: RoomSession = Depends(get_current_room_session),
-    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
+    _=Depends(require_room_module_access("housekeeping")),
 ) -> HousekeepingAudioUploadResponse:
     return await service.upload_audio_note(room_session=session, file=file)
 
@@ -77,7 +77,7 @@ async def upload_housekeeping_audio(
 def cancel_my_request(
     request_id: int,
     session: RoomSession = Depends(get_current_room_session),
-    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
+    _=Depends(require_room_module_access("housekeeping")),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestStatusResponse:
     return service.cancel_my_request(db, request_id=request_id, room_session=session)
@@ -87,7 +87,7 @@ def cancel_my_request(
 def delete_my_request(
     request_id: int,
     session: RoomSession = Depends(get_current_room_session),
-    _=Depends(require_room_session_privilege("HOUSEKEEPING")),
+    _=Depends(require_room_module_access("housekeeping")),
     db: Session = Depends(get_db),
 ) -> GenericMessageResponse:
     service.delete_my_request(db, request_id=request_id, room_session=session)
@@ -98,7 +98,7 @@ def delete_my_request(
 def create_manual_task(
     payload: HousekeepingManualTaskCreateRequest,
     current_user: User = Depends(require_roles(*_SUPERVISOR_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestCreateResponse:
@@ -118,7 +118,7 @@ def create_manual_task(
 def get_daily_summary(
     date_value: date | None = Query(None, description="YYYY-MM-DD"),
     _=Depends(require_roles(*_SUPERVISOR_ROLES)),
-    __=Depends(require_privilege("HOUSEKEEPING")),
+    __=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingDailySummaryResponse:
@@ -129,7 +129,7 @@ def get_daily_summary(
 @router.get("/reports/pending-list", response_model=HousekeepingPendingListResponse)
 def get_pending_list(
     _=Depends(require_roles(*_SUPERVISOR_ROLES)),
-    __=Depends(require_privilege("HOUSEKEEPING")),
+    __=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingPendingListResponse:
@@ -139,7 +139,7 @@ def get_pending_list(
 @router.get("/pending-count", response_model=HousekeepingPendingCountResponse)
 def get_pending_count(
     _=Depends(require_roles(*_HK_ROLES)),
-    __=Depends(require_privilege("HOUSEKEEPING")),
+    __=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingPendingCountResponse:
@@ -150,7 +150,7 @@ def get_pending_count(
 def get_staff_performance(
     date_value: date | None = Query(None, description="YYYY-MM-DD"),
     _=Depends(require_roles(*_SUPERVISOR_ROLES)),
-    __=Depends(require_privilege("HOUSEKEEPING")),
+    __=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingStaffPerformanceResponse:
@@ -163,7 +163,7 @@ def list_request_history(
     room_number: Optional[str] = Query(None, description="Filter by room number"),
     request_type: Optional[str] = Query(None, description="Filter by request type"),
     current_user=Depends(require_roles(*_HK_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestListResponse:
@@ -184,7 +184,7 @@ def list_requests(
     priority: Optional[str] = Query(None, description="Filter by priority"),
     assigned_to_user_id: Optional[int] = Query(None, description="Filter by assignee"),
     current_user=Depends(require_roles(*_HK_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestListResponse:
@@ -203,7 +203,7 @@ def list_requests(
 def get_request(
     request_id: int,
     current_user=Depends(require_roles(*_HK_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestResponse:
@@ -215,7 +215,7 @@ def assign_request(
     request_id: int,
     payload: HousekeepingAssignRequest,
     current_user: User = Depends(require_roles(*_SUPERVISOR_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestStatusResponse:
@@ -232,7 +232,7 @@ def assign_request(
 def claim_request(
     request_id: int,
     current_user: User = Depends(require_roles(*_HK_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestStatusResponse:
@@ -248,7 +248,7 @@ def claim_request(
 def start_request(
     request_id: int,
     current_user: User = Depends(require_roles(*_HK_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestStatusResponse:
@@ -266,7 +266,7 @@ def update_checklist_item(
     item_id: int,
     payload: HousekeepingChecklistUpdateRequest,
     current_user: User = Depends(require_roles(*_HK_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestResponse:
@@ -285,7 +285,7 @@ def submit_request_for_inspection(
     request_id: int,
     payload: HousekeepingSubmitRequest,
     current_user: User = Depends(require_roles(*_HK_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestStatusResponse:
@@ -303,7 +303,7 @@ def inspect_request(
     request_id: int,
     payload: HousekeepingInspectRequest,
     current_user: User = Depends(require_roles(*_SUPERVISOR_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestStatusResponse:
@@ -321,7 +321,7 @@ def block_request(
     request_id: int,
     payload: HousekeepingBlockRequest,
     current_user: User = Depends(require_roles(*_HK_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestResponse:
@@ -339,7 +339,7 @@ def resolve_maintenance_ticket(
     request_id: int,
     payload: HousekeepingResolveTicketRequest,
     current_user: User = Depends(require_roles(*_SUPERVISOR_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestResponse:
@@ -356,7 +356,7 @@ def resolve_maintenance_ticket(
 def mark_request_done(
     request_id: int,
     current_user: User = Depends(require_roles(*_HK_ROLES)),
-    _=Depends(require_privilege("HOUSEKEEPING")),
+    _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> HousekeepingRequestStatusResponse:
@@ -372,7 +372,7 @@ def mark_request_done(
 def delete_request(
     request_id: int,
     _=Depends(require_roles(*_HK_ROLES)),
-    __=Depends(require_privilege("HOUSEKEEPING")),
+    __=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> GenericMessageResponse:
