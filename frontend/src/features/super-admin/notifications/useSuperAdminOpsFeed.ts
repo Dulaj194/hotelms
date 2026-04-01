@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 
-import { api, ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { getAccessToken, getUser, normalizeRole } from "@/lib/auth";
 import type {
-  SuperAdminNotificationListResponse,
+  SuperAdminNotificationAssigneeResponse,
   SuperAdminNotificationResponse,
+  SuperAdminNotificationUpdateRequest,
   SuperAdminRealtimeEnvelope,
 } from "@/types/audit";
+import {
+  listSuperAdminNotificationAssignees,
+  listSuperAdminNotifications,
+  updateSuperAdminNotification,
+} from "@/features/super-admin/notifications/api";
+import { mergeNotification } from "@/features/super-admin/notifications/helpers";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 const WS_BASE_URL = API_BASE_URL.replace(/^http/i, (value) =>
@@ -18,17 +25,21 @@ function buildSocketUrl(token: string): string {
   return `${normalizedBase}/ws/super-admin?token=${encodeURIComponent(token)}`;
 }
 
-function mergeNotification(
-  current: SuperAdminNotificationResponse[],
-  next: SuperAdminNotificationResponse,
-): SuperAdminNotificationResponse[] {
-  const existing = current.filter((item) => item.id !== next.id);
-  return [next, ...existing].slice(0, 100);
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) {
+    return error.detail || fallback;
+  }
+  if (error instanceof Error) {
+    return error.message || fallback;
+  }
+  return fallback;
 }
 
 export function useSuperAdminOpsFeed() {
   const [items, setItems] = useState<SuperAdminNotificationResponse[]>([]);
+  const [assignees, setAssignees] = useState<SuperAdminNotificationAssigneeResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [assigneesLoading, setAssigneesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const reconnectTimerRef = useRef<number | null>(null);
@@ -38,19 +49,34 @@ export function useSuperAdminOpsFeed() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get<SuperAdminNotificationListResponse>("/audit-logs/notifications?limit=50");
+      const response = await listSuperAdminNotifications(100);
       setItems(response.items);
     } catch (loadError) {
-      if (loadError instanceof ApiError) {
-        setError(loadError.detail || "Failed to load notification center.");
-      } else if (loadError instanceof Error) {
-        setError(loadError.message || "Failed to load notification center.");
-      } else {
-        setError("Failed to load notification center.");
-      }
+      setError(getErrorMessage(loadError, "Failed to load notification center."));
     } finally {
       setLoading(false);
     }
+  }
+
+  async function refreshAssignees() {
+    setAssigneesLoading(true);
+    try {
+      const response = await listSuperAdminNotificationAssignees();
+      setAssignees(response.items);
+    } catch (loadError) {
+      setError((current) => current ?? getErrorMessage(loadError, "Failed to load assignees."));
+    } finally {
+      setAssigneesLoading(false);
+    }
+  }
+
+  async function applyNotificationUpdate(
+    notificationId: string,
+    payload: SuperAdminNotificationUpdateRequest,
+  ): Promise<SuperAdminNotificationResponse> {
+    const updated = await updateSuperAdminNotification(notificationId, payload);
+    setItems((current) => mergeNotification(current, updated));
+    return updated;
   }
 
   useEffect(() => {
@@ -59,12 +85,15 @@ export function useSuperAdminOpsFeed() {
 
     if (!currentUser || normalizeRole(currentUser.role) !== "super_admin" || !token) {
       setLoading(false);
+      setAssigneesLoading(false);
       setConnected(false);
       setItems([]);
+      setAssignees([]);
       return;
     }
 
     void refresh();
+    void refreshAssignees();
 
     let disposed = false;
 
@@ -133,9 +162,13 @@ export function useSuperAdminOpsFeed() {
 
   return {
     items,
+    assignees,
     loading,
+    assigneesLoading,
     error,
     connected,
     refresh,
+    refreshAssignees,
+    applyNotificationUpdate,
   };
 }

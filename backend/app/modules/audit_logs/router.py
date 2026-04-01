@@ -7,7 +7,10 @@ from app.core.dependencies import get_db, require_platform_scopes
 from app.modules.audit_logs import service
 from app.modules.audit_logs.schemas import (
     AuditLogListResponse,
+    SuperAdminNotificationAssigneeListResponse,
     SuperAdminNotificationListResponse,
+    SuperAdminNotificationResponse,
+    SuperAdminNotificationUpdateRequest,
 )
 
 router = APIRouter()
@@ -40,3 +43,32 @@ def list_super_admin_notifications(
     db: Session = Depends(get_db),
 ) -> SuperAdminNotificationListResponse:
     return service.list_super_admin_notifications(db, limit=limit)
+
+
+@router.get(
+    "/notifications/assignees",
+    response_model=SuperAdminNotificationAssigneeListResponse,
+)
+def list_super_admin_notification_assignees(
+    _current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
+    db: Session = Depends(get_db),
+) -> SuperAdminNotificationAssigneeListResponse:
+    return service.list_super_admin_notification_assignees(db)
+
+
+@router.patch(
+    "/notifications/{notification_id}",
+    response_model=SuperAdminNotificationResponse,
+)
+def update_super_admin_notification(
+    notification_id: str,
+    payload: SuperAdminNotificationUpdateRequest,
+    current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
+    db: Session = Depends(get_db),
+) -> SuperAdminNotificationResponse:
+    return service.update_super_admin_notification(
+        db,
+        notification_id,
+        payload,
+        current_user,
+    )

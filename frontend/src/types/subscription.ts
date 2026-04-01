@@ -88,8 +88,10 @@ export interface SubscriptionChangeHistoryItemResponse {
   change_reason: string | null;
   previous_package_id: number | null;
   previous_package_name: string | null;
+  previous_package_code: string | null;
   next_package_id: number | null;
   next_package_name: string | null;
+  next_package_code: string | null;
   previous_status: string | null;
   next_status: string | null;
   previous_expires_at: string | null;

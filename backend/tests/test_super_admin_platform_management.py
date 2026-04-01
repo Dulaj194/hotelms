@@ -1,5 +1,6 @@
 import sys
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,6 +15,7 @@ sys.path.insert(0, str(BACKEND_ROOT))
 import app.db.init_models  # noqa: F401
 from app.modules.auth import service as auth_service  # noqa: E402
 from app.modules.audit_logs import service as audit_logs_service  # noqa: E402
+from app.modules.audit_logs.schemas import SuperAdminNotificationUpdateRequest  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.modules.packages import service as packages_service  # noqa: E402
@@ -496,6 +498,50 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.assertEqual(latest.change_reason, "Customer upgraded to a higher package.")
         self.assertEqual(latest.actor.user_id, self.current_super_admin.id)
 
+    def test_subscription_history_keeps_immutable_package_snapshots_after_package_rename(self) -> None:
+        restaurant = self._create_active_restaurant()
+        packages_service.ensure_default_packages(self.db)
+        basic_package = packages_repository.get_package_by_code(self.db, "basic")
+        standard_package = packages_repository.get_package_by_code(self.db, "standard")
+        self.assertIsNotNone(basic_package)
+        self.assertIsNotNone(standard_package)
+
+        subscriptions_service.activate_paid_subscription(
+            self.db,
+            restaurant_id=restaurant.id,
+            package_id=basic_package.id,  # type: ignore[union-attr]
+        )
+        self.db.commit()
+
+        subscriptions_service.update_subscription_for_super_admin(
+            self.db,
+            restaurant.id,
+            SuperAdminSubscriptionUpdateRequest(
+                package_id=standard_package.id,  # type: ignore[union-attr]
+                status="active",
+                change_reason="Package rename regression guard.",
+            ),
+            actor_user_id=self.current_super_admin.id,
+        )
+
+        basic_package.name = "Legacy Basic"
+        basic_package.code = "legacy-basic"
+        standard_package.name = "Premium Standard"
+        standard_package.code = "premium-standard"
+        self.db.commit()
+
+        history = subscriptions_service.get_subscription_change_history_for_super_admin(
+            self.db,
+            restaurant.id,
+            limit=10,
+        )
+
+        latest = history.items[0]
+        self.assertEqual(latest.previous_package_name, "Basic")
+        self.assertEqual(latest.previous_package_code, "basic")
+        self.assertEqual(latest.next_package_name, "Standard")
+        self.assertEqual(latest.next_package_code, "standard")
+
     def test_notification_feed_surfaces_settings_and_subscription_events(self) -> None:
         restaurant = self._create_active_restaurant()
         owner = self._create_owner_for_restaurant(restaurant)
@@ -537,6 +583,78 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
 
         self.assertIn("settings_request_submitted", event_types)
         self.assertIn("subscription_updated", event_types)
+
+    def test_notification_queue_supports_assignment_read_acknowledge_and_snooze(self) -> None:
+        restaurant = self._create_active_restaurant()
+        owner = self._create_owner_for_restaurant(restaurant)
+        assignee = users_service.create_platform_user(
+            self.db,
+            PlatformUserCreateRequest(
+                full_name="Queue Admin",
+                email="queue.admin@example.com",
+                username="queue.admin",
+                phone="0719999999",
+                password="Password1",
+                is_active=True,
+                must_change_password=False,
+                super_admin_scopes=["ops_viewer"],
+            ),
+            self.current_super_admin,
+        )
+
+        settings_service.create_settings_request(
+            self.db,
+            restaurant_id=restaurant.id,
+            requested_by=owner.id,
+            payload=SettingsRequestCreateRequest(
+                requested_changes={"reports": False},
+                request_reason="Queue action workflow coverage.",
+            ),
+        )
+
+        notifications = audit_logs_service.list_super_admin_notifications(self.db, limit=20)
+        target = next(
+            item for item in notifications.items if item.event_type == "settings_request_submitted"
+        )
+        self.assertEqual(target.queue_status, "unread")
+        self.assertFalse(target.is_read)
+
+        assigned = audit_logs_service.update_super_admin_notification(
+            self.db,
+            target.id,
+            SuperAdminNotificationUpdateRequest(
+                assigned_user_id=assignee.id,
+                is_read=True,
+            ),
+            self.current_super_admin,
+        )
+        self.assertTrue(assigned.is_read)
+        self.assertEqual(assigned.assigned_to.user_id, assignee.id)
+        self.assertEqual(assigned.queue_status, "assigned")
+
+        snoozed = audit_logs_service.update_super_admin_notification(
+            self.db,
+            target.id,
+            SuperAdminNotificationUpdateRequest(
+                snoozed_until=datetime.now(UTC) + timedelta(hours=1),
+            ),
+            self.current_super_admin,
+        )
+        self.assertTrue(snoozed.is_snoozed)
+        self.assertEqual(snoozed.queue_status, "snoozed")
+
+        acknowledged = audit_logs_service.update_super_admin_notification(
+            self.db,
+            target.id,
+            SuperAdminNotificationUpdateRequest(
+                is_acknowledged=True,
+                snoozed_until=None,
+            ),
+            self.current_super_admin,
+        )
+        self.assertTrue(acknowledged.is_acknowledged)
+        self.assertFalse(acknowledged.is_snoozed)
+        self.assertEqual(acknowledged.queue_status, "acknowledged")
 
     def test_review_history_lists_reviewed_records(self) -> None:
         restaurant, owner = self._create_pending_restaurant()

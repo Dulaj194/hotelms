@@ -33,8 +33,10 @@ class SubscriptionChangeHistoryItemResponse(BaseModel):
     change_reason: str | None
     previous_package_id: int | None
     previous_package_name: str | None
+    previous_package_code: str | None
     next_package_id: int | None
     next_package_name: str | None
+    next_package_code: str | None
     previous_status: str | None
     next_status: str | None
     previous_expires_at: datetime | None

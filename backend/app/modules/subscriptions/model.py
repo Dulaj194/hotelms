@@ -100,11 +100,15 @@ class SubscriptionChangeLog(Base):
         ForeignKey("packages.id", ondelete="SET NULL"),
         nullable=True,
     )
+    previous_package_name_snapshot: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    previous_package_code_snapshot: Mapped[str | None] = mapped_column(String(50), nullable=True)
     next_package_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("packages.id", ondelete="SET NULL"),
         nullable=True,
     )
+    next_package_name_snapshot: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    next_package_code_snapshot: Mapped[str | None] = mapped_column(String(50), nullable=True)
     previous_status: Mapped[SubscriptionStatus | None] = mapped_column(
         Enum(SubscriptionStatus),
         nullable=True,

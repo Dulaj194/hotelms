@@ -234,8 +234,14 @@ def _build_subscription_audit_metadata(
         "previous_package_name": previous_subscription.package.name
         if previous_subscription and previous_subscription.package
         else None,
+        "previous_package_code": previous_subscription.package.code
+        if previous_subscription and previous_subscription.package
+        else None,
         "next_package_id": next_subscription.package_id if next_subscription else None,
         "next_package_name": next_subscription.package.name
+        if next_subscription and next_subscription.package
+        else None,
+        "next_package_code": next_subscription.package.code
         if next_subscription and next_subscription.package
         else None,
         "previous_status": _effective_status(previous_subscription)
@@ -287,7 +293,19 @@ def _record_subscription_change(
         source=source,
         change_reason=change_reason,
         previous_package_id=previous_subscription.package_id if previous_subscription else None,
+        previous_package_name_snapshot=previous_subscription.package.name
+        if previous_subscription and previous_subscription.package
+        else None,
+        previous_package_code_snapshot=previous_subscription.package.code
+        if previous_subscription and previous_subscription.package
+        else None,
         next_package_id=next_subscription.package_id if next_subscription else None,
+        next_package_name_snapshot=next_subscription.package.name
+        if next_subscription and next_subscription.package
+        else None,
+        next_package_code_snapshot=next_subscription.package.code
+        if next_subscription and next_subscription.package
+        else None,
         previous_status=previous_subscription.status if previous_subscription else None,
         next_status=next_subscription.status if next_subscription else None,
         previous_expires_at=previous_subscription.expires_at if previous_subscription else None,
@@ -306,6 +324,33 @@ def _record_subscription_change(
             audit_log=audit_log,
             restaurant_id=restaurant_id,
         )
+
+
+def _resolve_package_snapshot_fields(
+    item: SubscriptionChangeLog,
+    package_map: dict[int, object],
+    *,
+    direction: str,
+) -> tuple[str | None, str | None]:
+    metadata = _parse_metadata_json(item.metadata_json)
+
+    if direction == "previous":
+        package_id = item.previous_package_id
+        package_name = item.previous_package_name_snapshot or metadata.get("previous_package_name")
+        package_code = item.previous_package_code_snapshot or metadata.get("previous_package_code")
+    else:
+        package_id = item.next_package_id
+        package_name = (
+            item.next_package_name_snapshot
+            or metadata.get("next_package_name")
+            or metadata.get("package_name")
+        )
+        package_code = item.next_package_code_snapshot or metadata.get("next_package_code")
+
+    package = package_map.get(package_id) if package_id is not None else None
+    resolved_name = package_name or getattr(package, "name", None)
+    resolved_code = package_code or getattr(package, "code", None)
+    return resolved_name, resolved_code
 
 
 def _serialize_subscription_change_history(
@@ -337,8 +382,19 @@ def _serialize_subscription_change_history(
             for package in db.query(Package).filter(Package.id.in_(package_ids)).all()
         }
 
-    return SubscriptionChangeHistoryResponse(
-        items=[
+    history_items: list[SubscriptionChangeHistoryItemResponse] = []
+    for item in items:
+        previous_snapshot = _resolve_package_snapshot_fields(
+            item,
+            package_map,
+            direction="previous",
+        )
+        next_snapshot = _resolve_package_snapshot_fields(
+            item,
+            package_map,
+            direction="next",
+        )
+        history_items.append(
             SubscriptionChangeHistoryItemResponse(
                 id=item.id,
                 restaurant_id=item.restaurant_id,
@@ -347,13 +403,11 @@ def _serialize_subscription_change_history(
                 source=item.source,
                 change_reason=item.change_reason,
                 previous_package_id=item.previous_package_id,
-                previous_package_name=package_map[item.previous_package_id].name
-                if item.previous_package_id in package_map
-                else None,
+                previous_package_name=previous_snapshot[0],
+                previous_package_code=previous_snapshot[1],
                 next_package_id=item.next_package_id,
-                next_package_name=package_map[item.next_package_id].name
-                if item.next_package_id in package_map
-                else None,
+                next_package_name=next_snapshot[0],
+                next_package_code=next_snapshot[1],
                 previous_status=item.previous_status.value if item.previous_status else None,
                 next_status=item.next_status.value if item.next_status else None,
                 previous_expires_at=item.previous_expires_at,
@@ -370,9 +424,11 @@ def _serialize_subscription_change_history(
                 metadata=_parse_metadata_json(item.metadata_json),
                 created_at=item.created_at,
             )
-            for item in items
-        ],
-        total=len(items),
+        )
+
+    return SubscriptionChangeHistoryResponse(
+        items=history_items,
+        total=len(history_items),
     )
 
 

@@ -345,6 +345,25 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
         ),
     )
 
+    subscription_change_log_column_patches: Sequence[tuple[str, str]] = (
+        (
+            "previous_package_name_snapshot",
+            "ALTER TABLE subscription_change_logs ADD COLUMN previous_package_name_snapshot VARCHAR(100) NULL",
+        ),
+        (
+            "previous_package_code_snapshot",
+            "ALTER TABLE subscription_change_logs ADD COLUMN previous_package_code_snapshot VARCHAR(50) NULL",
+        ),
+        (
+            "next_package_name_snapshot",
+            "ALTER TABLE subscription_change_logs ADD COLUMN next_package_name_snapshot VARCHAR(100) NULL",
+        ),
+        (
+            "next_package_code_snapshot",
+            "ALTER TABLE subscription_change_logs ADD COLUMN next_package_code_snapshot VARCHAR(50) NULL",
+        ),
+    )
+
     restaurant_fk_patches: Sequence[tuple[str, str, str, str, str]] = (
         (
             "country_id",
@@ -515,6 +534,56 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             )
             logger.warning(
                 "Applied development schema patch: subscription_change_logs table was missing and has been created.",
+            )
+
+        if _table_exists(conn, "subscription_change_logs"):
+            for column_name, alter_sql in subscription_change_log_column_patches:
+                if _column_exists(conn, "subscription_change_logs", column_name):
+                    continue
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: subscription_change_logs.%s was missing and has been added.",
+                    column_name,
+                )
+
+        if not _table_exists(conn, "super_admin_notification_states"):
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE super_admin_notification_states (
+                        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        audit_log_id INT NOT NULL,
+                        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                        read_at DATETIME NULL,
+                        read_by_user_id INT NULL,
+                        assigned_user_id INT NULL,
+                        assigned_at DATETIME NULL,
+                        acknowledged_at DATETIME NULL,
+                        acknowledged_by_user_id INT NULL,
+                        snoozed_until DATETIME NULL,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE KEY uq_super_admin_notification_states_audit_log_id (audit_log_id),
+                        INDEX ix_super_admin_notification_states_is_read (is_read),
+                        INDEX ix_super_admin_notification_states_read_by_user_id (read_by_user_id),
+                        INDEX ix_super_admin_notification_states_assigned_user_id (assigned_user_id),
+                        INDEX ix_super_admin_notification_states_acknowledged_at (acknowledged_at),
+                        INDEX ix_super_admin_notification_states_acknowledged_by_user_id (acknowledged_by_user_id),
+                        INDEX ix_super_admin_notification_states_snoozed_until (snoozed_until),
+                        CONSTRAINT fk_super_admin_notification_states_audit_log
+                            FOREIGN KEY (audit_log_id) REFERENCES audit_logs(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_super_admin_notification_states_read_by
+                            FOREIGN KEY (read_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_super_admin_notification_states_assigned_to
+                            FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_super_admin_notification_states_acknowledged_by
+                            FOREIGN KEY (acknowledged_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+                    )
+                    """
+                )
+            )
+            logger.warning(
+                "Applied development schema patch: super_admin_notification_states table was missing and has been created.",
             )
 
         for (

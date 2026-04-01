@@ -74,6 +74,13 @@ export function SubscriptionPanel({
     }
   }
 
+  function formatPackageSnapshot(name: string | null, code: string | null): string {
+    if (name && code) {
+      return `${name} (${code})`;
+    }
+    return name ?? code ?? "-";
+  }
+
   return (
     <div className="rounded-lg border bg-white p-5 space-y-4">
       <div className="flex items-center justify-between">
@@ -469,7 +476,8 @@ export function SubscriptionPanel({
                       </p>
                       <p>Source: {item.source.replace(/_/g, " ")}</p>
                       <p>
-                        Package: {item.previous_package_name ?? "-"} {"->"} {item.next_package_name ?? "-"}
+                        Package: {formatPackageSnapshot(item.previous_package_name, item.previous_package_code)} {"->"}{" "}
+                        {formatPackageSnapshot(item.next_package_name, item.next_package_code)}
                       </p>
                       <p>
                         Expiry:{" "}

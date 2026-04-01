@@ -1,24 +1,43 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Any
 
+from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.logging import get_logger
 from app.modules.audit_logs import catalog
-from app.modules.audit_logs.model import AuditLog
+from app.modules.audit_logs.model import AuditLog, SuperAdminNotificationState
 from app.modules.audit_logs.schemas import (
     AuditLogActorResponse,
     AuditLogEntryResponse,
     AuditLogListResponse,
     AuditLogRestaurantResponse,
+    SuperAdminNotificationAssigneeListResponse,
+    SuperAdminNotificationAssigneeResponse,
     SuperAdminNotificationListResponse,
     SuperAdminNotificationResponse,
+    SuperAdminNotificationUpdateRequest,
 )
+from app.modules.platform_access import catalog as platform_access_catalog
+from app.modules.users import repository as users_repository
 
 logger = get_logger(__name__)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def _normalize_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _parse_metadata(metadata_json: str | None) -> dict[str, Any]:
@@ -42,9 +61,30 @@ def _effective_restaurant_id(log: AuditLog, metadata: dict[str, Any]) -> int | N
     return log.restaurant_id or _safe_int(metadata.get("restaurant_id"))
 
 
+def _is_notification_snoozed(notification_state: SuperAdminNotificationState | None) -> bool:
+    if notification_state is None or notification_state.snoozed_until is None:
+        return False
+    return bool(_normalize_datetime(notification_state.snoozed_until) > _utcnow())
+
+
+def _build_notification_queue_status(
+    notification_state: SuperAdminNotificationState | None,
+) -> str:
+    if notification_state is not None and notification_state.acknowledged_at is not None:
+        return "acknowledged"
+    if _is_notification_snoozed(notification_state):
+        return "snoozed"
+    if notification_state is not None and notification_state.assigned_user_id is not None:
+        return "assigned"
+    if notification_state is not None and notification_state.is_read:
+        return "read"
+    return "unread"
+
+
 def _load_context_maps(
     db: Session,
     logs: list[AuditLog],
+    notification_state_map: dict[int, SuperAdminNotificationState] | None = None,
 ) -> tuple[dict[int, object], dict[int, object]]:
     from app.modules.restaurants.model import Restaurant
     from app.modules.users.model import User
@@ -56,6 +96,15 @@ def _load_context_maps(
         restaurant_id = _effective_restaurant_id(log, metadata)
         if restaurant_id is not None:
             restaurant_ids.add(restaurant_id)
+
+    for notification_state in (notification_state_map or {}).values():
+        for user_id in (
+            notification_state.read_by_user_id,
+            notification_state.assigned_user_id,
+            notification_state.acknowledged_by_user_id,
+        ):
+            if user_id is not None:
+                user_ids.add(user_id)
 
     user_map = {}
     if user_ids:
@@ -115,18 +164,38 @@ def _serialize_audit_entry(
     return entry
 
 
-def serialize_notification_entry(
-    db: Session,
+def _serialize_notification_entry(
+    *,
     log: AuditLog,
+    notification_state: SuperAdminNotificationState | None,
+    user_map: dict[int, object],
+    restaurant_map: dict[int, object],
 ) -> SuperAdminNotificationResponse:
-    user_map, restaurant_map = _load_context_maps(db, [log])
     entry = _serialize_audit_entry(
         log=log,
         user_map=user_map,
         restaurant_map=restaurant_map,
     )
+
+    read_by = (
+        user_map.get(notification_state.read_by_user_id)
+        if notification_state is not None and notification_state.read_by_user_id is not None
+        else None
+    )
+    assigned_to = (
+        user_map.get(notification_state.assigned_user_id)
+        if notification_state is not None and notification_state.assigned_user_id is not None
+        else None
+    )
+    acknowledged_by = (
+        user_map.get(notification_state.acknowledged_by_user_id)
+        if notification_state is not None and notification_state.acknowledged_by_user_id is not None
+        else None
+    )
+
     return SuperAdminNotificationResponse(
         id=f"audit:{entry.id}",
+        audit_log_id=entry.id,
         event_type=entry.event_type,
         category=entry.category,
         severity=entry.severity,
@@ -135,7 +204,131 @@ def serialize_notification_entry(
         actor=entry.actor,
         restaurant=entry.restaurant,
         metadata=entry.metadata,
+        queue_status=_build_notification_queue_status(notification_state),
+        is_read=bool(notification_state.is_read) if notification_state is not None else False,
+        read_at=notification_state.read_at if notification_state is not None else None,
+        read_by=AuditLogActorResponse(
+            user_id=getattr(read_by, "id", None),
+            full_name=getattr(read_by, "full_name", None),
+            email=getattr(read_by, "email", None),
+        ),
+        assigned_to=AuditLogActorResponse(
+            user_id=getattr(assigned_to, "id", None),
+            full_name=getattr(assigned_to, "full_name", None),
+            email=getattr(assigned_to, "email", None),
+        ),
+        assigned_at=notification_state.assigned_at if notification_state is not None else None,
+        is_acknowledged=bool(notification_state and notification_state.acknowledged_at),
+        acknowledged_at=notification_state.acknowledged_at if notification_state is not None else None,
+        acknowledged_by=AuditLogActorResponse(
+            user_id=getattr(acknowledged_by, "id", None),
+            full_name=getattr(acknowledged_by, "full_name", None),
+            email=getattr(acknowledged_by, "email", None),
+        ),
+        is_snoozed=_is_notification_snoozed(notification_state),
+        snoozed_until=notification_state.snoozed_until if notification_state is not None else None,
         created_at=entry.created_at,
+    )
+
+
+def _get_notification_state_map(
+    db: Session,
+    audit_log_ids: list[int],
+) -> dict[int, SuperAdminNotificationState]:
+    if not audit_log_ids:
+        return {}
+    states = (
+        db.query(SuperAdminNotificationState)
+        .filter(SuperAdminNotificationState.audit_log_id.in_(audit_log_ids))
+        .all()
+    )
+    return {state.audit_log_id: state for state in states}
+
+
+def _parse_notification_id(notification_id: str) -> int:
+    prefix, separator, raw_audit_log_id = notification_id.partition(":")
+    if prefix != "audit" or not separator:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found.",
+        )
+
+    audit_log_id = _safe_int(raw_audit_log_id)
+    if audit_log_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found.",
+        )
+    return audit_log_id
+
+
+def _get_notification_target(
+    db: Session,
+    notification_id: str,
+) -> tuple[AuditLog, SuperAdminNotificationState]:
+    audit_log_id = _parse_notification_id(notification_id)
+    log = (
+        db.query(AuditLog)
+        .filter(
+            AuditLog.id == audit_log_id,
+            AuditLog.event_type.in_(sorted(catalog.HIGH_SIGNAL_EVENT_TYPES)),
+        )
+        .first()
+    )
+    if log is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found.",
+        )
+
+    notification_state = (
+        db.query(SuperAdminNotificationState)
+        .filter(SuperAdminNotificationState.audit_log_id == log.id)
+        .first()
+    )
+    if notification_state is None:
+        notification_state = SuperAdminNotificationState(audit_log_id=log.id)
+        db.add(notification_state)
+        db.commit()
+        db.refresh(notification_state)
+
+    return log, notification_state
+
+
+def _get_valid_notification_assignee(db: Session, user_id: int):
+    user = users_repository.get_platform_user_by_id(db, user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Assignee must be an active platform user.",
+        )
+    if not platform_access_catalog.user_has_any_platform_scope(
+        user,
+        ("ops_viewer", "security_admin"),
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Assignee must have notification queue access.",
+        )
+    return user
+
+
+def serialize_notification_entry(
+    db: Session,
+    log: AuditLog,
+    notification_state: SuperAdminNotificationState | None = None,
+) -> SuperAdminNotificationResponse:
+    notification_state_map = (
+        {notification_state.audit_log_id: notification_state}
+        if notification_state is not None
+        else _get_notification_state_map(db, [log.id])
+    )
+    user_map, restaurant_map = _load_context_maps(db, [log], notification_state_map)
+    return _serialize_notification_entry(
+        log=log,
+        notification_state=notification_state_map.get(log.id),
+        user_map=user_map,
+        restaurant_map=restaurant_map,
     )
 
 
@@ -158,18 +351,23 @@ def write_audit_log(
         effective_restaurant_id = restaurant_id or _safe_int(
             metadata_payload.get("restaurant_id")
         )
-        log = AuditLog(
-            event_type=event_type,
-            user_id=user_id,
-            restaurant_id=effective_restaurant_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            metadata_json=json.dumps(metadata_payload) if metadata_payload else None,
-        )
         bind = db.get_bind()
         audit_session_factory = sessionmaker(bind=bind, autocommit=False, autoflush=False)
         with audit_session_factory() as audit_db:
+            log = AuditLog(
+                event_type=event_type,
+                user_id=user_id,
+                restaurant_id=effective_restaurant_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                metadata_json=json.dumps(metadata_payload) if metadata_payload else None,
+            )
             audit_db.add(log)
+            audit_db.flush()
+
+            if event_type in catalog.HIGH_SIGNAL_EVENT_TYPES:
+                audit_db.add(SuperAdminNotificationState(audit_log_id=log.id))
+
             audit_db.commit()
             audit_db.refresh(log)
             audit_db.expunge(log)
@@ -241,36 +439,156 @@ def list_super_admin_notifications(
     limit: int = 50,
 ) -> SuperAdminNotificationListResponse:
     query = (
-        db.query(AuditLog)
+        db.query(AuditLog, SuperAdminNotificationState)
+        .outerjoin(
+            SuperAdminNotificationState,
+            SuperAdminNotificationState.audit_log_id == AuditLog.id,
+        )
         .filter(AuditLog.event_type.in_(sorted(catalog.HIGH_SIGNAL_EVENT_TYPES)))
         .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
     )
-    items = query.limit(limit).all()
-    user_map, restaurant_map = _load_context_maps(db, items)
+    rows = query.limit(limit).all()
+    logs = [log for log, _notification_state in rows]
+    notification_state_map = {
+        log.id: notification_state
+        for log, notification_state in rows
+        if notification_state is not None
+    }
+    user_map, restaurant_map = _load_context_maps(db, logs, notification_state_map)
 
-    notifications = []
-    for log in items:
-        entry = _serialize_audit_entry(
+    notifications = [
+        _serialize_notification_entry(
             log=log,
+            notification_state=notification_state,
             user_map=user_map,
             restaurant_map=restaurant_map,
         )
-        notifications.append(
-            SuperAdminNotificationResponse(
-                id=f"audit:{entry.id}",
-                event_type=entry.event_type,
-                category=entry.category,
-                severity=entry.severity,
-                title=entry.title,
-                message=entry.message,
-                actor=entry.actor,
-                restaurant=entry.restaurant,
-                metadata=entry.metadata,
-                created_at=entry.created_at,
-            )
-        )
+        for log, notification_state in rows
+    ]
 
     return SuperAdminNotificationListResponse(
         items=notifications,
-        total=len(notifications),
+        total=query.count(),
     )
+
+
+def list_super_admin_notification_assignees(
+    db: Session,
+) -> SuperAdminNotificationAssigneeListResponse:
+    users = [
+        user
+        for user in users_repository.list_platform_users(db, is_active=True)
+        if platform_access_catalog.user_has_any_platform_scope(
+            user,
+            ("ops_viewer", "security_admin"),
+        )
+    ]
+    items = [
+        SuperAdminNotificationAssigneeResponse(
+            user_id=user.id,
+            full_name=user.full_name,
+            email=user.email,
+        )
+        for user in sorted(users, key=lambda user: (user.full_name.lower(), user.id))
+    ]
+    return SuperAdminNotificationAssigneeListResponse(
+        items=items,
+        total=len(items),
+    )
+
+
+def update_super_admin_notification(
+    db: Session,
+    notification_id: str,
+    payload: SuperAdminNotificationUpdateRequest,
+    current_user: object,
+) -> SuperAdminNotificationResponse:
+    log, notification_state = _get_notification_target(db, notification_id)
+    now = _utcnow()
+    current_user_id = _safe_int(getattr(current_user, "id", None))
+    provided_fields = payload.model_fields_set
+
+    if (
+        "is_read" in provided_fields
+        and payload.is_read is False
+        and notification_state.acknowledged_at is not None
+        and (
+            "is_acknowledged" not in provided_fields
+            or payload.is_acknowledged is not False
+        )
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Clear acknowledgement before marking this notification as unread.",
+        )
+
+    if "assigned_user_id" in provided_fields:
+        if payload.assigned_user_id is None:
+            notification_state.assigned_user_id = None
+            notification_state.assigned_at = None
+        else:
+            assignee = _get_valid_notification_assignee(db, payload.assigned_user_id)
+            if notification_state.assigned_user_id != assignee.id or notification_state.assigned_at is None:
+                notification_state.assigned_user_id = assignee.id
+                notification_state.assigned_at = now
+
+    if "is_read" in provided_fields:
+        if payload.is_read:
+            notification_state.is_read = True
+            notification_state.read_at = notification_state.read_at or now
+            notification_state.read_by_user_id = (
+                notification_state.read_by_user_id or current_user_id
+            )
+        else:
+            notification_state.is_read = False
+            notification_state.read_at = None
+            notification_state.read_by_user_id = None
+
+    if "is_acknowledged" in provided_fields:
+        if payload.is_acknowledged:
+            notification_state.acknowledged_at = notification_state.acknowledged_at or now
+            notification_state.acknowledged_by_user_id = (
+                notification_state.acknowledged_by_user_id or current_user_id
+            )
+            notification_state.is_read = True
+            notification_state.read_at = notification_state.read_at or now
+            notification_state.read_by_user_id = (
+                notification_state.read_by_user_id or current_user_id
+            )
+        else:
+            notification_state.acknowledged_at = None
+            notification_state.acknowledged_by_user_id = None
+
+    if "snoozed_until" in provided_fields:
+        if payload.snoozed_until is None:
+            notification_state.snoozed_until = None
+        else:
+            snoozed_until = _normalize_datetime(payload.snoozed_until)
+            if snoozed_until is None or snoozed_until <= now:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Snooze time must be in the future.",
+                )
+            notification_state.snoozed_until = snoozed_until
+            notification_state.is_read = True
+            notification_state.read_at = notification_state.read_at or now
+            notification_state.read_by_user_id = (
+                notification_state.read_by_user_id or current_user_id
+            )
+
+    db.add(notification_state)
+    db.commit()
+    db.refresh(notification_state)
+
+    response = serialize_notification_entry(db, log, notification_state)
+
+    try:
+        from app.modules.realtime import service as realtime_service
+
+        notification_payload = response.model_dump(mode="json")
+        notification_payload["event"] = "notification:updated"
+        realtime_service.publish_super_admin_notification(notification_payload)
+    except Exception:
+        pass
+
+    return response
