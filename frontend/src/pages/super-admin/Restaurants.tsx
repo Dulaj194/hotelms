@@ -11,7 +11,9 @@ import {
   deleteRestaurantUser,
   expireOverdueSubscriptions,
   generateRestaurantApiKey,
+  generateRestaurantWebhookSecret,
   getRestaurant,
+  getRestaurantIntegrationOps,
   getRestaurantPackageAccess,
   getRestaurantSubscription,
   getRestaurantSubscriptionHistory,
@@ -20,7 +22,11 @@ import {
   listRestaurantUsers,
   refreshRestaurantWebhookHealth,
   revokeRestaurantApiKey,
+  revokeRestaurantWebhookSecret,
+  retryRestaurantWebhookDelivery,
   rotateRestaurantApiKey,
+  rotateRestaurantWebhookSecret,
+  sendRestaurantWebhookTestDelivery,
   toggleRestaurantUser,
   updateRestaurant,
   updateRestaurantIntegration,
@@ -45,6 +51,7 @@ import type {
   RestaurantAdminUpdateRequest,
   RestaurantCreateRequest,
   RestaurantFeatureFlags,
+  RestaurantIntegrationOpsResponse,
   RestaurantMeResponse,
 } from "@/types/restaurant";
 import type {
@@ -70,6 +77,7 @@ const EMPTY_SUB_FORM: SubscriptionFormState = {
 const EMPTY_INTEGRATION_FORM: IntegrationFormState = {
   public_ordering_enabled: false,
   webhook_url: "",
+  webhook_secret_header_name: "",
 };
 const EMPTY_USER_FORM: AddHotelUserFormState = {
   full_name: "",
@@ -155,13 +163,22 @@ export default function SuperAdminRestaurants() {
   const [integrationForm, setIntegrationForm] = useState<IntegrationFormState>(
     EMPTY_INTEGRATION_FORM,
   );
+  const [selectedIntegrationOps, setSelectedIntegrationOps] =
+    useState<RestaurantIntegrationOpsResponse | null>(null);
+  const [integrationOpsLoading, setIntegrationOpsLoading] = useState(false);
   const [savingIntegration, setSavingIntegration] = useState(false);
   const [refreshingWebhook, setRefreshingWebhook] = useState(false);
+  const [sendingTestDelivery, setSendingTestDelivery] = useState(false);
+  const [retryingDeliveryId, setRetryingDeliveryId] = useState<number | null>(null);
   const [integrationMsg, setIntegrationMsg] = useState<InlineMessage>(null);
   const [apiKeyAction, setApiKeyAction] = useState<"generate" | "rotate" | "revoke" | null>(
     null,
   );
+  const [webhookSecretAction, setWebhookSecretAction] = useState<
+    "generate" | "rotate" | "revoke" | null
+  >(null);
   const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
+  const [revealedWebhookSecret, setRevealedWebhookSecret] = useState<string | null>(null);
 
   const [expiringOverdue, setExpiringOverdue] = useState(false);
   const [expireMsg, setExpireMsg] = useState<InlineMessage>(null);
@@ -208,11 +225,31 @@ export default function SuperAdminRestaurants() {
         ? {
             public_ordering_enabled: restaurant.integration.settings.public_ordering_enabled,
             webhook_url: restaurant.integration.settings.webhook_url ?? "",
+            webhook_secret_header_name:
+              restaurant.integration.settings.webhook_secret_header_name ?? "",
           }
         : EMPTY_INTEGRATION_FORM,
     );
+    setSelectedIntegrationOps(null);
     setIntegrationMsg(null);
     setRevealedApiKey(null);
+    setRevealedWebhookSecret(null);
+  }
+
+  async function loadIntegrationOps(restaurantId: number) {
+    if (!canManageSecurity) {
+      setSelectedIntegrationOps(null);
+      return;
+    }
+    setIntegrationOpsLoading(true);
+    try {
+      const ops = await getRestaurantIntegrationOps(restaurantId);
+      setSelectedIntegrationOps(ops);
+    } catch {
+      setSelectedIntegrationOps(null);
+    } finally {
+      setIntegrationOpsLoading(false);
+    }
   }
 
   async function loadPage() {
@@ -237,25 +274,32 @@ export default function SuperAdminRestaurants() {
   async function fetchHotelExtras(restaurantId: number) {
     setSubLoading(true);
     setUsersLoading(canManageTenants);
+    setIntegrationOpsLoading(canManageSecurity);
     setSelectedSub(null);
     setSelectedAccess(null);
     setSelectedSubHistory([]);
     setHotelUsers([]);
+    setSelectedIntegrationOps(null);
     setSubMsg(null);
     setAddUserMsg(null);
     setIntegrationMsg(null);
     setRevealedApiKey(null);
+    setRevealedWebhookSecret(null);
     setEditingSub(false);
     setShowAddUser(false);
 
-    const [subResult, accessResult, usersResult, historyResult] = await Promise.allSettled([
+    const [subResult, accessResult, integrationOpsResult, usersResult, historyResult] =
+      await Promise.allSettled([
       getRestaurantSubscription(restaurantId),
       getRestaurantPackageAccess(restaurantId),
+      canManageSecurity
+        ? getRestaurantIntegrationOps(restaurantId)
+        : Promise.resolve<RestaurantIntegrationOpsResponse | null>(null),
       canManageTenants
         ? listRestaurantUsers(restaurantId)
         : Promise.resolve<StaffDetailResponse[]>([]),
       getRestaurantSubscriptionHistory(restaurantId),
-    ]);
+      ]);
 
     if (subResult.status === "fulfilled") {
       const subscription = subResult.value;
@@ -272,6 +316,9 @@ export default function SuperAdminRestaurants() {
     if (accessResult.status === "fulfilled") {
       setSelectedAccess(accessResult.value);
     }
+    if (integrationOpsResult.status === "fulfilled") {
+      setSelectedIntegrationOps(integrationOpsResult.value);
+    }
     if (usersResult.status === "fulfilled") {
       setHotelUsers(usersResult.value);
     }
@@ -281,6 +328,7 @@ export default function SuperAdminRestaurants() {
 
     setSubLoading(false);
     setUsersLoading(false);
+    setIntegrationOpsLoading(false);
   }
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
@@ -680,12 +728,15 @@ export default function SuperAdminRestaurants() {
       const integration = await updateRestaurantIntegration(selected.id, {
         public_ordering_enabled: integrationForm.public_ordering_enabled,
         webhook_url: integrationForm.webhook_url.trim() || null,
+        webhook_secret_header_name: integrationForm.webhook_secret_header_name.trim() || null,
       });
       setSelected((current) => (current ? { ...current, integration } : current));
       setIntegrationForm({
         public_ordering_enabled: integration.settings.public_ordering_enabled,
         webhook_url: integration.settings.webhook_url ?? "",
+        webhook_secret_header_name: integration.settings.webhook_secret_header_name ?? "",
       });
+      await loadIntegrationOps(selected.id);
       setIntegrationMsg({ type: "ok", text: "Integration settings updated." });
     } catch (error) {
       setIntegrationMsg({
@@ -773,6 +824,93 @@ export default function SuperAdminRestaurants() {
     }
   }
 
+  async function handleGenerateWebhookSecret(rotate: boolean) {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to manage webhook secrets.",
+      });
+      return;
+    }
+
+    setWebhookSecretAction(rotate ? "rotate" : "generate");
+    setIntegrationMsg(null);
+    try {
+      const response = rotate
+        ? await rotateRestaurantWebhookSecret(selected.id)
+        : await generateRestaurantWebhookSecret(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                webhook_secret: response.summary,
+                settings: {
+                  ...current.integration.settings,
+                  webhook_secret_header_name:
+                    response.summary.header_name ?? current.integration.settings.webhook_secret_header_name,
+                },
+              },
+            }
+          : current,
+      );
+      setIntegrationForm((current) => ({
+        ...current,
+        webhook_secret_header_name: response.summary.header_name ?? current.webhook_secret_header_name,
+      }));
+      setRevealedWebhookSecret(response.secret_value);
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({ type: "ok", text: response.message });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to provision webhook secret.",
+      });
+    } finally {
+      setWebhookSecretAction(null);
+    }
+  }
+
+  async function handleRevokeWebhookSecret() {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to manage webhook secrets.",
+      });
+      return;
+    }
+
+    setWebhookSecretAction("revoke");
+    setIntegrationMsg(null);
+    try {
+      const summary = await revokeRestaurantWebhookSecret(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                webhook_secret: summary,
+              },
+            }
+          : current,
+      );
+      setRevealedWebhookSecret(null);
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({ type: "ok", text: "Webhook secret revoked successfully." });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to revoke webhook secret.",
+      });
+    } finally {
+      setWebhookSecretAction(null);
+    }
+  }
+
   async function handleRefreshWebhook() {
     if (!selected) return;
     if (!canManageSecurity) {
@@ -798,6 +936,7 @@ export default function SuperAdminRestaurants() {
             }
           : current,
       );
+      await loadIntegrationOps(selected.id);
       setIntegrationMsg({ type: "ok", text: response.message });
     } catch (error) {
       setIntegrationMsg({
@@ -809,6 +948,88 @@ export default function SuperAdminRestaurants() {
     }
   }
 
+  async function handleSendTestDelivery() {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to send test webhook deliveries.",
+      });
+      return;
+    }
+
+    setSendingTestDelivery(true);
+    setIntegrationMsg(null);
+    try {
+      const response = await sendRestaurantWebhookTestDelivery(selected.id);
+      const health = await refreshRestaurantWebhookHealth(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                settings: health.settings,
+              },
+            }
+          : current,
+      );
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({
+        type: response.delivery.delivery_status === "success" ? "ok" : "err",
+        text: response.message,
+      });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to send test webhook delivery.",
+      });
+    } finally {
+      setSendingTestDelivery(false);
+    }
+  }
+
+  async function handleRetryDelivery(deliveryId: number) {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to retry webhook deliveries.",
+      });
+      return;
+    }
+
+    setRetryingDeliveryId(deliveryId);
+    setIntegrationMsg(null);
+    try {
+      const response = await retryRestaurantWebhookDelivery(selected.id, deliveryId);
+      const health = await refreshRestaurantWebhookHealth(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                settings: health.settings,
+              },
+            }
+          : current,
+      );
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({
+        type: response.delivery.delivery_status === "success" ? "ok" : "err",
+        text: response.message,
+      });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to retry webhook delivery.",
+      });
+    } finally {
+      setRetryingDeliveryId(null);
+    }
+  }
+
   function closeSelectedPanel() {
     applySelectedRestaurant(null);
     setEditingId(null);
@@ -816,11 +1037,16 @@ export default function SuperAdminRestaurants() {
     setSelectedSub(null);
     setSelectedAccess(null);
     setSelectedSubHistory([]);
+    setSelectedIntegrationOps(null);
+    setIntegrationOpsLoading(false);
     setHotelUsers([]);
     setSubMsg(null);
     setAddUserMsg(null);
     setShowAddUser(false);
     setAddUserForm(EMPTY_USER_FORM);
+    setWebhookSecretAction(null);
+    setSendingTestDelivery(false);
+    setRetryingDeliveryId(null);
   }
 
   return (
@@ -937,17 +1163,28 @@ export default function SuperAdminRestaurants() {
               <IntegrationPanel
                 selected={selected}
                 form={integrationForm}
+                ops={selectedIntegrationOps}
+                opsLoading={integrationOpsLoading}
                 savingIntegration={savingIntegration}
                 refreshingWebhook={refreshingWebhook}
+                sendingTestDelivery={sendingTestDelivery}
+                retryingDeliveryId={retryingDeliveryId}
                 apiKeyAction={apiKeyAction}
+                webhookSecretAction={webhookSecretAction}
                 message={integrationMsg}
                 revealedApiKey={revealedApiKey}
+                revealedWebhookSecret={revealedWebhookSecret}
                 onFormChange={setIntegrationForm}
                 onSave={() => void handleSaveIntegration()}
                 onRefreshWebhook={() => void handleRefreshWebhook()}
                 onGenerateApiKey={() => void handleGenerateApiKey(false)}
                 onRotateApiKey={() => void handleGenerateApiKey(true)}
                 onRevokeApiKey={() => void handleRevokeApiKey()}
+                onGenerateWebhookSecret={() => void handleGenerateWebhookSecret(false)}
+                onRotateWebhookSecret={() => void handleGenerateWebhookSecret(true)}
+                onRevokeWebhookSecret={() => void handleRevokeWebhookSecret()}
+                onSendTestDelivery={() => void handleSendTestDelivery()}
+                onRetryDelivery={(deliveryId) => void handleRetryDelivery(deliveryId)}
               />
             )}
 

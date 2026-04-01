@@ -5,9 +5,13 @@ import type {
   RestaurantCreateRequest,
   RestaurantDeleteResponse,
   RestaurantIntegrationResponse,
+  RestaurantIntegrationOpsResponse,
   RestaurantIntegrationUpdateRequest,
+  RestaurantWebhookDeliveryActionResponse,
   RestaurantLogoUploadResponse,
   RestaurantMeResponse,
+  RestaurantWebhookSecretProvisionResponse,
+  RestaurantWebhookSecretSummary,
   RestaurantWebhookHealthRefreshResponse,
 } from "@/types/restaurant";
 import type {
@@ -71,6 +75,14 @@ export async function updateRestaurantIntegration(
   );
 }
 
+export async function getRestaurantIntegrationOps(
+  restaurantId: number,
+): Promise<RestaurantIntegrationOpsResponse> {
+  return api.get<RestaurantIntegrationOpsResponse>(
+    `/restaurants/${restaurantId}/integration/ops`,
+  );
+}
+
 export async function generateRestaurantApiKey(
   restaurantId: number,
 ): Promise<RestaurantApiKeyProvisionResponse> {
@@ -102,6 +114,51 @@ export async function refreshRestaurantWebhookHealth(
 ): Promise<RestaurantWebhookHealthRefreshResponse> {
   return api.post<RestaurantWebhookHealthRefreshResponse>(
     `/restaurants/${restaurantId}/integration/webhook/refresh`,
+    {},
+  );
+}
+
+export async function generateRestaurantWebhookSecret(
+  restaurantId: number,
+): Promise<RestaurantWebhookSecretProvisionResponse> {
+  return api.post<RestaurantWebhookSecretProvisionResponse>(
+    `/restaurants/${restaurantId}/integration/webhook/secret/generate`,
+    {},
+  );
+}
+
+export async function rotateRestaurantWebhookSecret(
+  restaurantId: number,
+): Promise<RestaurantWebhookSecretProvisionResponse> {
+  return api.post<RestaurantWebhookSecretProvisionResponse>(
+    `/restaurants/${restaurantId}/integration/webhook/secret/rotate`,
+    {},
+  );
+}
+
+export async function revokeRestaurantWebhookSecret(
+  restaurantId: number,
+): Promise<RestaurantWebhookSecretSummary> {
+  return api.delete<RestaurantWebhookSecretSummary>(
+    `/restaurants/${restaurantId}/integration/webhook/secret`,
+  );
+}
+
+export async function sendRestaurantWebhookTestDelivery(
+  restaurantId: number,
+): Promise<RestaurantWebhookDeliveryActionResponse> {
+  return api.post<RestaurantWebhookDeliveryActionResponse>(
+    `/restaurants/${restaurantId}/integration/webhook/deliveries/test`,
+    {},
+  );
+}
+
+export async function retryRestaurantWebhookDelivery(
+  restaurantId: number,
+  deliveryId: number,
+): Promise<RestaurantWebhookDeliveryActionResponse> {
+  return api.post<RestaurantWebhookDeliveryActionResponse>(
+    `/restaurants/${restaurantId}/integration/webhook/deliveries/${deliveryId}/retry`,
     {},
   );
 }

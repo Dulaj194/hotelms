@@ -21,6 +21,7 @@ from app.db.base import Base  # noqa: E402
 from app.modules.packages import service as packages_service  # noqa: E402
 from app.modules.packages import repository as packages_repository  # noqa: E402
 from app.modules.packages.schemas import PackageCreateRequest, PackageUpdateRequest  # noqa: E402
+from app.modules.restaurants import integration_service  # noqa: E402
 from app.modules.restaurants import service as restaurants_service  # noqa: E402
 from app.modules.restaurants.model import RegistrationStatus, Restaurant  # noqa: E402
 from app.modules.restaurants.schemas import (
@@ -458,6 +459,95 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
                 provisioned.api_key,
             )
         )
+
+    def test_webhook_delivery_ops_track_failures_retries_and_secret_summary(self) -> None:
+        restaurant = self._create_active_restaurant()
+
+        integration = restaurants_service.update_restaurant_integration_settings(
+            self.db,
+            restaurant_id=restaurant.id,
+            payload=RestaurantIntegrationUpdateRequest(
+                public_ordering_enabled=True,
+                webhook_url="https://example.com/webhooks/orders",
+                webhook_secret_header_name="X-HotelMS-Webhook-Secret",
+            ),
+            current_user_id=self.current_super_admin.id,
+        )
+        self.assertEqual(
+            integration.settings.webhook_secret_header_name,
+            "X-HotelMS-Webhook-Secret",
+        )
+
+        provisioned_secret = integration_service.provision_restaurant_webhook_secret(
+            self.db,
+            restaurant_id=restaurant.id,
+            current_user_id=self.current_super_admin.id,
+            rotate=False,
+        )
+        self.assertTrue(provisioned_secret.summary.has_secret)
+        self.assertEqual(
+            provisioned_secret.summary.header_name,
+            "X-HotelMS-Webhook-Secret",
+        )
+        self.assertTrue(provisioned_secret.secret_value.startswith("hmswh_"))
+
+        with patch(
+            "app.modules.restaurants.integration_service._send_webhook_request",
+            side_effect=[
+                (
+                    "failed",
+                    500,
+                    "Webhook returned HTTP 500.",
+                    "server error",
+                    90,
+                ),
+                (
+                    "success",
+                    200,
+                    None,
+                    "ok",
+                    65,
+                ),
+            ],
+        ):
+            failed_delivery = integration_service.send_restaurant_test_webhook_delivery(
+                self.db,
+                restaurant_id=restaurant.id,
+                current_user_id=self.current_super_admin.id,
+            )
+            retried_delivery = integration_service.retry_restaurant_webhook_delivery(
+                self.db,
+                restaurant_id=restaurant.id,
+                delivery_id=failed_delivery.delivery.id,
+                current_user_id=self.current_super_admin.id,
+            )
+
+        self.assertEqual(failed_delivery.delivery.delivery_status, "failed")
+        self.assertEqual(retried_delivery.delivery.delivery_status, "success")
+        self.assertTrue(retried_delivery.delivery.is_retry)
+        self.assertEqual(
+            retried_delivery.delivery.retried_from_delivery_id,
+            failed_delivery.delivery.id,
+        )
+
+        ops = integration_service.get_restaurant_integration_ops(
+            self.db,
+            restaurant_id=restaurant.id,
+        )
+        self.assertTrue(ops.secret.has_secret)
+        self.assertIsNotNone(ops.last_delivery)
+        self.assertEqual(ops.last_delivery.id, retried_delivery.delivery.id)
+        self.assertEqual(len(ops.recent_deliveries), 2)
+        self.assertEqual(ops.recent_deliveries[0].id, retried_delivery.delivery.id)
+        self.assertEqual(ops.recent_deliveries[1].id, failed_delivery.delivery.id)
+        self.assertGreaterEqual(
+            sum(point.failed_count for point in ops.failure_trend),
+            1,
+        )
+
+        refreshed_restaurant = self.db.get(Restaurant, restaurant.id)
+        assert refreshed_restaurant is not None
+        self.assertEqual(refreshed_restaurant.integration_webhook_status.value, "healthy")
 
     def test_subscription_history_records_actor_and_reason(self) -> None:
         restaurant = self._create_active_restaurant()

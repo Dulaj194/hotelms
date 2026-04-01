@@ -5,6 +5,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 RegistrationStatusValue = Literal["PENDING", "APPROVED", "REJECTED"]
 WebhookHealthStatusValue = Literal["not_configured", "healthy", "degraded", "disabled"]
+WebhookDeliveryStatusValue = Literal["success", "failed"]
 
 
 class RestaurantFeatureFlagsResponse(BaseModel):
@@ -32,9 +33,17 @@ class RestaurantApiKeySummaryResponse(BaseModel):
     rotated_at: datetime | None = None
 
 
+class RestaurantWebhookSecretSummaryResponse(BaseModel):
+    has_secret: bool = False
+    header_name: str | None = None
+    masked_value: str | None = None
+    rotated_at: datetime | None = None
+
+
 class RestaurantIntegrationSettingsResponse(BaseModel):
     public_ordering_enabled: bool = False
     webhook_url: str | None = None
+    webhook_secret_header_name: str | None = None
     webhook_status: WebhookHealthStatusValue = "not_configured"
     webhook_last_checked_at: datetime | None = None
     webhook_last_error: str | None = None
@@ -47,6 +56,58 @@ class RestaurantIntegrationResponse(BaseModel):
     settings: RestaurantIntegrationSettingsResponse = Field(
         default_factory=RestaurantIntegrationSettingsResponse
     )
+    webhook_secret: RestaurantWebhookSecretSummaryResponse = Field(
+        default_factory=RestaurantWebhookSecretSummaryResponse
+    )
+
+
+class RestaurantWebhookDeliveryActorResponse(BaseModel):
+    user_id: int | None = None
+    full_name: str | None = None
+    email: str | None = None
+
+
+class RestaurantWebhookDeliveryResponse(BaseModel):
+    id: int
+    event_type: str
+    request_url: str
+    delivery_status: WebhookDeliveryStatusValue
+    attempt_number: int
+    is_retry: bool
+    retried_from_delivery_id: int | None = None
+    http_status_code: int | None = None
+    error_message: str | None = None
+    response_excerpt: str | None = None
+    response_time_ms: int | None = None
+    triggered_by: RestaurantWebhookDeliveryActorResponse = Field(
+        default_factory=RestaurantWebhookDeliveryActorResponse
+    )
+    created_at: datetime
+
+
+class RestaurantWebhookFailureTrendPointResponse(BaseModel):
+    date: str
+    failed_count: int
+
+
+class RestaurantIntegrationOpsResponse(BaseModel):
+    secret: RestaurantWebhookSecretSummaryResponse = Field(
+        default_factory=RestaurantWebhookSecretSummaryResponse
+    )
+    last_delivery: RestaurantWebhookDeliveryResponse | None = None
+    recent_deliveries: list[RestaurantWebhookDeliveryResponse] = Field(default_factory=list)
+    failure_trend: list[RestaurantWebhookFailureTrendPointResponse] = Field(default_factory=list)
+
+
+class RestaurantWebhookSecretProvisionResponse(BaseModel):
+    message: str
+    secret_value: str
+    summary: RestaurantWebhookSecretSummaryResponse
+
+
+class RestaurantWebhookDeliveryActionResponse(BaseModel):
+    message: str
+    delivery: RestaurantWebhookDeliveryResponse
 
 
 class RestaurantResponse(BaseModel):
@@ -140,6 +201,7 @@ class RestaurantAdminUpdateRequest(BaseModel):
 class RestaurantIntegrationUpdateRequest(BaseModel):
     public_ordering_enabled: bool | None = None
     webhook_url: str | None = Field(default=None, max_length=500)
+    webhook_secret_header_name: str | None = Field(default=None, max_length=100)
 
 
 class RestaurantApiKeyProvisionResponse(BaseModel):

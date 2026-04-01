@@ -10,6 +10,8 @@ export type WebhookHealthStatus =
   | "degraded"
   | "disabled";
 
+export type WebhookDeliveryStatus = "success" | "failed";
+
 export interface RestaurantApiKeySummary {
   has_key: boolean;
   is_active: boolean;
@@ -17,9 +19,17 @@ export interface RestaurantApiKeySummary {
   rotated_at: string | null;
 }
 
+export interface RestaurantWebhookSecretSummary {
+  has_secret: boolean;
+  header_name: string | null;
+  masked_value: string | null;
+  rotated_at: string | null;
+}
+
 export interface RestaurantIntegrationSettings {
   public_ordering_enabled: boolean;
   webhook_url: string | null;
+  webhook_secret_header_name: string | null;
   webhook_status: WebhookHealthStatus;
   webhook_last_checked_at: string | null;
   webhook_last_error: string | null;
@@ -28,6 +38,41 @@ export interface RestaurantIntegrationSettings {
 export interface RestaurantIntegrationResponse {
   api_key: RestaurantApiKeySummary;
   settings: RestaurantIntegrationSettings;
+  webhook_secret: RestaurantWebhookSecretSummary;
+}
+
+export interface RestaurantWebhookDeliveryActor {
+  user_id: number | null;
+  full_name: string | null;
+  email: string | null;
+}
+
+export interface RestaurantWebhookDeliveryResponse {
+  id: number;
+  event_type: string;
+  request_url: string;
+  delivery_status: WebhookDeliveryStatus;
+  attempt_number: number;
+  is_retry: boolean;
+  retried_from_delivery_id: number | null;
+  http_status_code: number | null;
+  error_message: string | null;
+  response_excerpt: string | null;
+  response_time_ms: number | null;
+  triggered_by: RestaurantWebhookDeliveryActor;
+  created_at: string;
+}
+
+export interface RestaurantWebhookFailureTrendPointResponse {
+  date: string;
+  failed_count: number;
+}
+
+export interface RestaurantIntegrationOpsResponse {
+  secret: RestaurantWebhookSecretSummary;
+  last_delivery: RestaurantWebhookDeliveryResponse | null;
+  recent_deliveries: RestaurantWebhookDeliveryResponse[];
+  failure_trend: RestaurantWebhookFailureTrendPointResponse[];
 }
 
 export interface RestaurantResponse {
@@ -155,6 +200,7 @@ export interface RestaurantAdminUpdateRequest {
 export interface RestaurantIntegrationUpdateRequest {
   public_ordering_enabled?: boolean;
   webhook_url?: string | null;
+  webhook_secret_header_name?: string | null;
 }
 
 export interface RestaurantApiKeyProvisionResponse {
@@ -166,6 +212,17 @@ export interface RestaurantApiKeyProvisionResponse {
 export interface RestaurantWebhookHealthRefreshResponse {
   message: string;
   settings: RestaurantIntegrationSettings;
+}
+
+export interface RestaurantWebhookSecretProvisionResponse {
+  message: string;
+  secret_value: string;
+  summary: RestaurantWebhookSecretSummary;
+}
+
+export interface RestaurantWebhookDeliveryActionResponse {
+  message: string;
+  delivery: RestaurantWebhookDeliveryResponse;
 }
 
 export interface RestaurantDeleteResponse {

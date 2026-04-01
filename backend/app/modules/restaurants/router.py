@@ -7,6 +7,7 @@ from app.core.dependencies import (
     require_restaurant_user,
     require_roles,
 )
+from app.modules.restaurants import integration_service
 from app.modules.restaurants import service
 from app.modules.restaurants.model import RegistrationStatus
 from app.modules.restaurants.schemas import (
@@ -17,6 +18,7 @@ from app.modules.restaurants.schemas import (
     RestaurantCreateRequest,
     RestaurantDeleteResponse,
     RestaurantIntegrationResponse,
+    RestaurantIntegrationOpsResponse,
     RestaurantIntegrationUpdateRequest,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
@@ -24,6 +26,9 @@ from app.modules.restaurants.schemas import (
     RestaurantRegistrationReviewRequest,
     RestaurantRegistrationReviewResponse,
     RestaurantUpdateRequest,
+    RestaurantWebhookDeliveryActionResponse,
+    RestaurantWebhookSecretProvisionResponse,
+    RestaurantWebhookSecretSummaryResponse,
     RestaurantWebhookHealthRefreshResponse,
 )
 from app.modules.users import service as users_service
@@ -196,6 +201,21 @@ def update_restaurant_integration(
     )
 
 
+@router.get(
+    "/{restaurant_id}/integration/ops",
+    response_model=RestaurantIntegrationOpsResponse,
+)
+def get_restaurant_integration_ops(
+    restaurant_id: int,
+    _current_user: User = Depends(require_platform_scopes("security_admin", "ops_viewer")),
+    db: Session = Depends(get_db),
+) -> RestaurantIntegrationOpsResponse:
+    return integration_service.get_restaurant_integration_ops(
+        db,
+        restaurant_id=restaurant_id,
+    )
+
+
 @router.post(
     "/{restaurant_id}/integration/api-key/generate",
     response_model=RestaurantApiKeyProvisionResponse,
@@ -247,6 +267,56 @@ def revoke_restaurant_api_key(
 
 
 @router.post(
+    "/{restaurant_id}/integration/webhook/secret/generate",
+    response_model=RestaurantWebhookSecretProvisionResponse,
+)
+def generate_restaurant_webhook_secret(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookSecretProvisionResponse:
+    return integration_service.provision_restaurant_webhook_secret(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+        rotate=False,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/webhook/secret/rotate",
+    response_model=RestaurantWebhookSecretProvisionResponse,
+)
+def rotate_restaurant_webhook_secret(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookSecretProvisionResponse:
+    return integration_service.provision_restaurant_webhook_secret(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+        rotate=True,
+    )
+
+
+@router.delete(
+    "/{restaurant_id}/integration/webhook/secret",
+    response_model=RestaurantWebhookSecretSummaryResponse,
+)
+def revoke_restaurant_webhook_secret(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookSecretSummaryResponse:
+    return integration_service.revoke_restaurant_webhook_secret(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
     "/{restaurant_id}/integration/webhook/refresh",
     response_model=RestaurantWebhookHealthRefreshResponse,
 )
@@ -258,6 +328,40 @@ def refresh_restaurant_webhook_health(
     return service.refresh_restaurant_webhook_health(
         db,
         restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/webhook/deliveries/test",
+    response_model=RestaurantWebhookDeliveryActionResponse,
+)
+def send_restaurant_test_webhook_delivery(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookDeliveryActionResponse:
+    return integration_service.send_restaurant_test_webhook_delivery(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/webhook/deliveries/{delivery_id}/retry",
+    response_model=RestaurantWebhookDeliveryActionResponse,
+)
+def retry_restaurant_webhook_delivery(
+    restaurant_id: int,
+    delivery_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookDeliveryActionResponse:
+    return integration_service.retry_restaurant_webhook_delivery(
+        db,
+        restaurant_id=restaurant_id,
+        delivery_id=delivery_id,
         current_user_id=current_user.id,
     )
 

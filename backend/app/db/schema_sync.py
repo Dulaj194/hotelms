@@ -189,6 +189,22 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             "ALTER TABLE restaurants ADD COLUMN integration_webhook_url VARCHAR(500) NULL",
         ),
         (
+            "integration_webhook_secret_header_name",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_secret_header_name VARCHAR(100) NULL",
+        ),
+        (
+            "integration_webhook_secret_ciphertext",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_secret_ciphertext TEXT NULL",
+        ),
+        (
+            "integration_webhook_secret_last4",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_secret_last4 VARCHAR(4) NULL",
+        ),
+        (
+            "integration_webhook_secret_rotated_at",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_secret_rotated_at DATETIME NULL",
+        ),
+        (
             "integration_webhook_status",
             "ALTER TABLE restaurants ADD COLUMN integration_webhook_status VARCHAR(32) NOT NULL DEFAULT 'not_configured'",
         ),
@@ -584,6 +600,45 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             )
             logger.warning(
                 "Applied development schema patch: super_admin_notification_states table was missing and has been created.",
+            )
+
+        if not _table_exists(conn, "restaurant_webhook_deliveries"):
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE restaurant_webhook_deliveries (
+                        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        restaurant_id INT NOT NULL,
+                        triggered_by_user_id INT NULL,
+                        retried_from_delivery_id INT NULL,
+                        event_type VARCHAR(100) NOT NULL,
+                        request_url VARCHAR(500) NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        delivery_status VARCHAR(20) NOT NULL DEFAULT 'success',
+                        attempt_number INT NOT NULL DEFAULT 1,
+                        is_retry BOOLEAN NOT NULL DEFAULT FALSE,
+                        http_status_code INT NULL,
+                        error_message TEXT NULL,
+                        response_excerpt TEXT NULL,
+                        response_time_ms INT NULL,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        INDEX ix_restaurant_webhook_deliveries_restaurant_id (restaurant_id),
+                        INDEX ix_restaurant_webhook_deliveries_triggered_by_user_id (triggered_by_user_id),
+                        INDEX ix_restaurant_webhook_deliveries_retried_from_delivery_id (retried_from_delivery_id),
+                        INDEX ix_restaurant_webhook_deliveries_event_type (event_type),
+                        INDEX ix_restaurant_webhook_deliveries_created_at (created_at),
+                        CONSTRAINT fk_restaurant_webhook_deliveries_restaurant
+                            FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_restaurant_webhook_deliveries_triggered_by
+                            FOREIGN KEY (triggered_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_restaurant_webhook_deliveries_retried_from
+                            FOREIGN KEY (retried_from_delivery_id) REFERENCES restaurant_webhook_deliveries(id) ON DELETE SET NULL
+                    )
+                    """
+                )
+            )
+            logger.warning(
+                "Applied development schema patch: restaurant_webhook_deliveries table was missing and has been created.",
             )
 
         for (

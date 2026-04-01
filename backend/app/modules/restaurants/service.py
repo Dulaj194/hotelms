@@ -15,6 +15,7 @@ from app.core.security import hash_token
 from app.core.notifications import send_onboarding_email
 from app.modules.access import catalog as access_catalog
 from app.modules.audit_logs.service import write_audit_log
+from app.modules.restaurants.integration_service import DEFAULT_WEBHOOK_SECRET_HEADER_NAME
 from app.modules.realtime import service as realtime_service
 from app.modules.reference_data import service as reference_data_service
 from app.modules.restaurants import repository
@@ -40,6 +41,7 @@ from app.modules.restaurants.schemas import (
     RestaurantRegistrationReviewResponse,
     RestaurantRegistrationSummaryResponse,
     RestaurantUpdateRequest,
+    RestaurantWebhookSecretSummaryResponse,
     RestaurantWebhookHealthRefreshResponse,
 )
 
@@ -150,10 +152,24 @@ def _build_api_key_summary(restaurant) -> RestaurantApiKeySummaryResponse:
     )
 
 
+def _build_webhook_secret_summary(restaurant) -> RestaurantWebhookSecretSummaryResponse:
+    return RestaurantWebhookSecretSummaryResponse(
+        has_secret=bool(restaurant.integration_webhook_secret_ciphertext),
+        header_name=restaurant.integration_webhook_secret_header_name,
+        masked_value=(
+            f"****{restaurant.integration_webhook_secret_last4}"
+            if restaurant.integration_webhook_secret_last4
+            else None
+        ),
+        rotated_at=restaurant.integration_webhook_secret_rotated_at,
+    )
+
+
 def _build_integration_settings(restaurant) -> RestaurantIntegrationSettingsResponse:
     return RestaurantIntegrationSettingsResponse(
         public_ordering_enabled=restaurant.integration_public_ordering_enabled,
         webhook_url=restaurant.integration_webhook_url,
+        webhook_secret_header_name=restaurant.integration_webhook_secret_header_name,
         webhook_status=restaurant.integration_webhook_status.value,
         webhook_last_checked_at=restaurant.integration_webhook_last_checked_at,
         webhook_last_error=restaurant.integration_webhook_last_error,
@@ -164,6 +180,7 @@ def _build_integration_response(restaurant) -> RestaurantIntegrationResponse:
     return RestaurantIntegrationResponse(
         api_key=_build_api_key_summary(restaurant),
         settings=_build_integration_settings(restaurant),
+        webhook_secret=_build_webhook_secret_summary(restaurant),
     )
 
 
@@ -474,6 +491,13 @@ def update_restaurant_integration_settings(
         restaurant.integration_webhook_url = (
             str(update_data["webhook_url"]).strip() if update_data["webhook_url"] else None
         )
+    if "webhook_secret_header_name" in update_data:
+        header_name = (
+            str(update_data["webhook_secret_header_name"]).strip()
+            if update_data["webhook_secret_header_name"]
+            else None
+        )
+        restaurant.integration_webhook_secret_header_name = header_name
 
     if not restaurant.integration_public_ordering_enabled:
         restaurant.integration_webhook_status = WebhookHealthStatus.disabled
@@ -492,6 +516,12 @@ def update_restaurant_integration_settings(
             "Webhook endpoint is configured but not validated yet."
         )
 
+    if (
+        restaurant.integration_webhook_secret_ciphertext
+        and not restaurant.integration_webhook_secret_header_name
+    ):
+        restaurant.integration_webhook_secret_header_name = DEFAULT_WEBHOOK_SECRET_HEADER_NAME
+
     db.commit()
     db.refresh(restaurant)
 
@@ -503,6 +533,7 @@ def update_restaurant_integration_settings(
             "restaurant_id": restaurant.id,
             "public_ordering_enabled": restaurant.integration_public_ordering_enabled,
             "webhook_url": restaurant.integration_webhook_url,
+            "webhook_secret_header_name": restaurant.integration_webhook_secret_header_name,
         },
     )
 

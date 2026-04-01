@@ -124,6 +124,26 @@ _EVENT_DEFINITIONS: dict[str, dict[str, str]] = {
         "severity": "info",
         "title": "Webhook health checked",
     },
+    "restaurant_webhook_secret_generated": {
+        "category": "integrations",
+        "severity": "warning",
+        "title": "Webhook secret generated",
+    },
+    "restaurant_webhook_secret_rotated": {
+        "category": "integrations",
+        "severity": "warning",
+        "title": "Webhook secret rotated",
+    },
+    "restaurant_webhook_secret_revoked": {
+        "category": "integrations",
+        "severity": "danger",
+        "title": "Webhook secret revoked",
+    },
+    "restaurant_webhook_delivery_failed": {
+        "category": "integrations",
+        "severity": "danger",
+        "title": "Webhook delivery failed",
+    },
     "stripe_webhook_failed": {
         "category": "billing",
         "severity": "danger",
@@ -238,6 +258,19 @@ def build_event_message(
     if event_type == "restaurant_webhook_health_checked":
         webhook_status = metadata.get("webhook_status") or "unknown"
         return f"{hotel_label} webhook health check finished with status: {webhook_status}."
+    if event_type == "restaurant_webhook_secret_generated":
+        header_name = metadata.get("header_name") or "default header"
+        return f"{hotel_label} webhook secret was generated for {header_name}."
+    if event_type == "restaurant_webhook_secret_rotated":
+        header_name = metadata.get("header_name") or "default header"
+        return f"{hotel_label} webhook secret was rotated for {header_name}."
+    if event_type == "restaurant_webhook_secret_revoked":
+        header_name = metadata.get("header_name") or "default header"
+        return f"{hotel_label} webhook secret was revoked for {header_name}."
+    if event_type == "restaurant_webhook_delivery_failed":
+        webhook_event_type = metadata.get("webhook_event_type") or "unknown_event"
+        error_message = metadata.get("error_message") or "unknown_error"
+        return f"{hotel_label} webhook delivery failed for {webhook_event_type} ({error_message})."
     if event_type == "stripe_webhook_failed":
         reason = metadata.get("reason") or "unknown_error"
         event_name = metadata.get("stripe_event_type") or "unknown_event"

@@ -18,7 +18,7 @@ from app.modules.promo_codes.model import PromoCode, PromoCodeUsage  # noqa: F40
 from app.modules.qr.model import QRCode  # noqa: F401
 from app.modules.reference_data.model import Country, CurrencyType  # noqa: F401
 from app.modules.reports.model import ReportHistory  # noqa: F401
-from app.modules.restaurants.model import Restaurant  # noqa: F401
+from app.modules.restaurants.model import Restaurant, RestaurantWebhookDelivery  # noqa: F401
 from app.modules.housekeeping.model import HousekeepingRequest  # noqa: F401
 from app.modules.settings.model import SettingsRequest  # noqa: F401
 from app.modules.subcategories.model import Subcategory  # noqa: F401

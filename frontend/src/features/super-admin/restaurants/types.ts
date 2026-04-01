@@ -40,6 +40,7 @@ export type AddHotelUserFormState = {
 export type IntegrationFormState = {
   public_ordering_enabled: boolean;
   webhook_url: string;
+  webhook_secret_header_name: string;
 };
 
 export type SuperAdminRestaurantsState = {

@@ -32,6 +32,11 @@ class WebhookHealthStatus(str, enum.Enum):
     disabled = "disabled"
 
 
+class WebhookDeliveryStatus(str, enum.Enum):
+    success = "success"
+    failed = "failed"
+
+
 class Restaurant(Base):
     __tablename__ = "restaurants"
 
@@ -83,6 +88,22 @@ class Restaurant(Base):
         nullable=False,
     )
     integration_webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    integration_webhook_secret_header_name: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    integration_webhook_secret_ciphertext: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    integration_webhook_secret_last4: Mapped[str | None] = mapped_column(
+        String(4),
+        nullable=True,
+    )
+    integration_webhook_secret_rotated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     integration_webhook_status: Mapped[WebhookHealthStatus] = mapped_column(
         Enum(WebhookHealthStatus, native_enum=False),
         default=WebhookHealthStatus.not_configured,
@@ -126,6 +147,11 @@ class Restaurant(Base):
         back_populates="restaurant",
         foreign_keys="User.restaurant_id",
     )
+    webhook_deliveries: Mapped[list["RestaurantWebhookDelivery"]] = relationship(
+        "RestaurantWebhookDelivery",
+        back_populates="restaurant",
+        cascade="all, delete-orphan",
+    )
     registration_reviewer: Mapped[User | None] = relationship(
         "User",
         foreign_keys=[registration_reviewed_by_id],
@@ -153,3 +179,61 @@ class Restaurant(Base):
         from app.modules.access import catalog as access_catalog
 
         return access_catalog.build_feature_flag_snapshot(self)
+
+
+class RestaurantWebhookDelivery(Base):
+    __tablename__ = "restaurant_webhook_deliveries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    triggered_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    retried_from_delivery_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("restaurant_webhook_deliveries.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    request_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    delivery_status: Mapped[WebhookDeliveryStatus] = mapped_column(
+        Enum(WebhookDeliveryStatus, native_enum=False),
+        nullable=False,
+        default=WebhookDeliveryStatus.success,
+    )
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    is_retry: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    http_status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    restaurant: Mapped[Restaurant] = relationship(
+        "Restaurant",
+        back_populates="webhook_deliveries",
+    )
+    triggered_by: Mapped["User | None"] = relationship(
+        "User",
+        foreign_keys=[triggered_by_user_id],
+    )
+    retried_from: Mapped["RestaurantWebhookDelivery | None"] = relationship(
+        "RestaurantWebhookDelivery",
+        remote_side=[id],
+        foreign_keys=[retried_from_delivery_id],
+    )

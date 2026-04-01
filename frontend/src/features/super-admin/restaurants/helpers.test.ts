@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatWebhookDeliveryLabel,
   formatWebhookStatusLabel,
   formatSubscriptionStatusLabel,
   getBooleanStatusBadgeClass,
   getSubscriptionStatusBadgeClass,
+  getWebhookDeliveryBadgeClass,
   getWebhookStatusBadgeClass,
 } from "@/features/super-admin/restaurants/helpers";
 
@@ -32,5 +34,11 @@ describe("restaurant admin helpers", () => {
     expect(formatWebhookStatusLabel("degraded")).toBe("Needs Attention");
     expect(getWebhookStatusBadgeClass("healthy")).toContain("green");
     expect(getWebhookStatusBadgeClass("disabled")).toContain("slate");
+  });
+
+  it("formats webhook delivery statuses for retry history", () => {
+    expect(formatWebhookDeliveryLabel("success")).toBe("Delivered");
+    expect(getWebhookDeliveryBadgeClass("success")).toContain("green");
+    expect(getWebhookDeliveryBadgeClass("failed")).toContain("red");
   });
 });

@@ -1,7 +1,9 @@
+import base64
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 
+from cryptography.fernet import Fernet, InvalidToken
 from jose import jwt
 from passlib.context import CryptContext
 
@@ -60,6 +62,24 @@ def generate_secure_token() -> str:
 def hash_token(token: str) -> str:
     """Return a SHA-256 hex digest of the token for safe database storage."""
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _build_encryption_key() -> bytes:
+    digest = hashlib.sha256(settings.secret_key.encode()).digest()
+    return base64.urlsafe_b64encode(digest)
+
+
+def encrypt_secret_value(value: str) -> str:
+    return Fernet(_build_encryption_key()).encrypt(value.encode()).decode()
+
+
+def decrypt_secret_value(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return Fernet(_build_encryption_key()).decrypt(value.encode()).decode()
+    except InvalidToken as exc:  # pragma: no cover - depends on stored data integrity
+        raise ValueError("Unable to decrypt the stored secret value.") from exc
 
 
 # ─── Guest session token helpers ─────────────────────────────────────────────
