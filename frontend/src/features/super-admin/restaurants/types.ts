@@ -3,7 +3,11 @@ import type {
   RestaurantCreateRequest,
   RestaurantMeResponse,
 } from "@/types/restaurant";
-import type { PackageResponse, SubscriptionResponse } from "@/types/subscription";
+import type {
+  PackageDetailResponse,
+  SubscriptionAccessSummaryResponse,
+  SubscriptionResponse,
+} from "@/types/subscription";
 import type { StaffDetailResponse, UserRole } from "@/types/user";
 
 export type InlineMessage = {
@@ -35,10 +39,11 @@ export type AddHotelUserFormState = {
 export type SuperAdminRestaurantsState = {
   list: RestaurantMeResponse[];
   subscriptionStatusByHotel: Record<number, string>;
-  packages: PackageResponse[];
+  packages: PackageDetailResponse[];
   hotelUsers: StaffDetailResponse[];
   selected: RestaurantMeResponse | null;
   selectedSub: SubscriptionResponse | null;
+  selectedAccess: SubscriptionAccessSummaryResponse | null;
   form: RestaurantCreateRequest;
   editForm: RestaurantAdminUpdateRequest;
   subForm: SubscriptionFormState;

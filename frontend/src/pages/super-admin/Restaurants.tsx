@@ -9,6 +9,7 @@ import {
   deleteRestaurant,
   deleteRestaurantUser,
   expireOverdueSubscriptions,
+  getRestaurantPackageAccess,
   getRestaurant,
   getRestaurantSubscription,
   listPackages,
@@ -31,7 +32,11 @@ import type {
   SubscriptionFormState,
 } from "@/features/super-admin/restaurants/types";
 import type { RestaurantAdminUpdateRequest, RestaurantCreateRequest, RestaurantMeResponse } from "@/types/restaurant";
-import type { PackageResponse, SubscriptionResponse } from "@/types/subscription";
+import type {
+  PackageDetailResponse,
+  SubscriptionAccessSummaryResponse,
+  SubscriptionResponse,
+} from "@/types/subscription";
 import type { StaffDetailResponse } from "@/types/user";
 
 const EMPTY_CREATE_FORM: RestaurantCreateRequest = { name: "" };
@@ -47,10 +52,11 @@ const EMPTY_USER_FORM: AddHotelUserFormState = {
 export default function SuperAdminRestaurants() {
   const [list, setList] = useState<RestaurantMeResponse[]>([]);
   const [subscriptionStatusByHotel, setSubscriptionStatusByHotel] = useState<Record<number, string>>({});
-  const [packages, setPackages] = useState<PackageResponse[]>([]);
+  const [packages, setPackages] = useState<PackageDetailResponse[]>([]);
   const [hotelUsers, setHotelUsers] = useState<StaffDetailResponse[]>([]);
   const [selected, setSelected] = useState<RestaurantMeResponse | null>(null);
   const [selectedSub, setSelectedSub] = useState<SubscriptionResponse | null>(null);
+  const [selectedAccess, setSelectedAccess] = useState<SubscriptionAccessSummaryResponse | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -119,14 +125,16 @@ export default function SuperAdminRestaurants() {
     setSubLoading(true);
     setUsersLoading(true);
     setSelectedSub(null);
+    setSelectedAccess(null);
     setHotelUsers([]);
     setSubMsg(null);
     setAddUserMsg(null);
     setEditingSub(false);
     setShowAddUser(false);
 
-    const [subResult, usersResult] = await Promise.allSettled([
+    const [subResult, accessResult, usersResult] = await Promise.allSettled([
       getRestaurantSubscription(restaurantId),
+      getRestaurantPackageAccess(restaurantId),
       listRestaurantUsers(restaurantId),
     ]);
 
@@ -140,6 +148,9 @@ export default function SuperAdminRestaurants() {
           : "",
         package_id: subscription.package_id?.toString() ?? "",
       });
+    }
+    if (accessResult.status === "fulfilled") {
+      setSelectedAccess(accessResult.value);
     }
     if (usersResult.status === "fulfilled") {
       setHotelUsers(usersResult.value);
@@ -332,7 +343,9 @@ export default function SuperAdminRestaurants() {
     setSubMsg(null);
     try {
       const updated = await updateRestaurantSubscription(selected.id, payload);
+      const accessSummary = await getRestaurantPackageAccess(selected.id);
       setSelectedSub(updated);
+      setSelectedAccess(accessSummary);
       setSubscriptionStatusByHotel((current) => ({ ...current, [selected.id]: updated.status }));
       setEditingSub(false);
       setSubMsg({ type: "ok", text: "Subscription updated successfully." });
@@ -433,6 +446,7 @@ export default function SuperAdminRestaurants() {
     setSelected(null);
     setEditingId(null);
     setEditLogoMsg(null);
+    setSelectedAccess(null);
   }
 
   return (
@@ -536,6 +550,7 @@ export default function SuperAdminRestaurants() {
             {selected && (
               <SubscriptionPanel
                 selectedSub={selectedSub}
+                accessSummary={selectedAccess}
                 packages={packages}
                 subLoading={subLoading}
                 editingSub={editingSub}

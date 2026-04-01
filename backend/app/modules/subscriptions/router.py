@@ -14,6 +14,7 @@ from app.modules.subscriptions.schemas import (
     CancelSubscriptionResponse,
     ExpireOverdueResponse,
     StartTrialResponse,
+    SubscriptionAccessSummaryResponse,
     SubscriptionPrivilegeResponse,
     SubscriptionResponse,
     SubscriptionStatusResponse,
@@ -45,6 +46,14 @@ def get_my_subscription_privileges(
     db: Session = Depends(get_db),
 ) -> SubscriptionPrivilegeResponse:
     return service.get_effective_privileges(db, restaurant_user.restaurant_id)
+
+
+@router.get("/me/access", response_model=SubscriptionAccessSummaryResponse)
+def get_my_subscription_access(
+    restaurant_user=Depends(require_restaurant_user),
+    db: Session = Depends(get_db),
+) -> SubscriptionAccessSummaryResponse:
+    return service.get_package_access_summary(db, restaurant_user.restaurant_id)
 
 
 @router.post("/start-trial", response_model=StartTrialResponse)
@@ -99,6 +108,16 @@ def get_subscription_for_hotel(
 ) -> SubscriptionResponse:
     """Return the current subscription for any restaurant (super_admin only)."""
     return service.get_subscription_for_super_admin(db, restaurant_id)
+
+
+@router.get("/admin/{restaurant_id}/access", response_model=SubscriptionAccessSummaryResponse)
+def get_subscription_access_for_hotel(
+    restaurant_id: int,
+    _: object = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> SubscriptionAccessSummaryResponse:
+    """Return the effective package-access summary for any restaurant."""
+    return service.get_package_access_summary_for_super_admin(db, restaurant_id)
 
 
 @router.patch("/admin/{restaurant_id}", response_model=SubscriptionResponse)

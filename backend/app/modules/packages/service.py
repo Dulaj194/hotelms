@@ -3,6 +3,7 @@ from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.modules.packages import catalog as packages_catalog
 from app.modules.packages import repository
 from app.modules.packages.schemas import (
     PackageAdminListResponse,
@@ -12,6 +13,7 @@ from app.modules.packages.schemas import (
     PackageListResponse,
     PackagePrivilegeCatalogItem,
     PackagePrivilegeCatalogResponse,
+    PackagePrivilegeModuleItem,
     PackageResponse,
     PackageUpdateRequest,
 )
@@ -46,22 +48,6 @@ _DEFAULT_PACKAGE_DEFINITIONS = [
     },
 ]
 
-_PACKAGE_PRIVILEGE_CATALOG = {
-    "QR_MENU": {
-        "label": "QR Menu",
-        "description": "Enables table and room QR ordering operations.",
-    },
-    "HOUSEKEEPING": {
-        "label": "Housekeeping",
-        "description": "Enables housekeeping workflows and room task management.",
-    },
-    "OFFERS": {
-        "label": "Offers",
-        "description": "Enables promotional offers and discount campaign tools.",
-    },
-}
-
-
 def _serialize_package_detail(db: Session, package) -> PackageDetailResponse:
     privileges = [
         privilege.privilege_code for privilege in repository.list_package_privileges(db, package.id)
@@ -81,13 +67,14 @@ def _serialize_package_detail(db: Session, package) -> PackageDetailResponse:
 
 
 def _validate_privileges(privileges: list[str]) -> list[str]:
-    invalid = sorted({value for value in privileges if value not in _PACKAGE_PRIVILEGE_CATALOG})
+    normalized = packages_catalog.normalize_privilege_codes(privileges)
+    invalid = packages_catalog.get_invalid_privilege_codes(normalized)
     if invalid:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Unsupported privilege code(s): {', '.join(invalid)}",
         )
-    return privileges
+    return normalized
 
 
 def ensure_default_packages(db: Session, *, commit: bool = True) -> None:
@@ -137,8 +124,20 @@ def get_package_detail(db: Session, package_id: int) -> PackageDetailResponse:
 
 def list_package_privilege_catalog() -> PackagePrivilegeCatalogResponse:
     items = [
-        PackagePrivilegeCatalogItem(code=code, **metadata)
-        for code, metadata in _PACKAGE_PRIVILEGE_CATALOG.items()
+        PackagePrivilegeCatalogItem(
+            code=definition.code,
+            label=definition.label,
+            description=definition.description,
+            modules=[
+                PackagePrivilegeModuleItem(
+                    key=module.key,
+                    label=module.label,
+                    description=module.description,
+                )
+                for module in definition.modules
+            ],
+        )
+        for definition in packages_catalog.list_privilege_definitions()
     ]
     return PackagePrivilegeCatalogResponse(items=items)
 

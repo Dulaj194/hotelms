@@ -33,6 +33,30 @@ class SubscriptionPrivilegeResponse(BaseModel):
     privileges: list[str]
 
 
+class SubscriptionAccessModuleResponse(BaseModel):
+    key: str
+    label: str
+    description: str
+
+
+class SubscriptionAccessPrivilegeResponse(BaseModel):
+    code: str
+    label: str
+    description: str
+    modules: list[SubscriptionAccessModuleResponse]
+
+
+class SubscriptionAccessSummaryResponse(BaseModel):
+    restaurant_id: int
+    status: str
+    is_active: bool
+    package_id: int | None
+    package_name: str | None
+    package_code: str | None
+    privileges: list[SubscriptionAccessPrivilegeResponse]
+    enabled_modules: list[SubscriptionAccessModuleResponse]
+
+
 class ActivateSubscriptionRequest(BaseModel):
     package_id: int | None = Field(default=None)
     package_code: str | None = Field(default=None, min_length=1, max_length=50)

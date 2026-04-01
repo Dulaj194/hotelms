@@ -22,6 +22,7 @@ export interface PackagePrivilegeCatalogItem {
   code: string;
   label: string;
   description: string;
+  modules: SubscriptionAccessModuleResponse[];
 }
 
 export interface PackagePrivilegeCatalogResponse {
@@ -85,6 +86,30 @@ export interface SubscriptionPrivilegeResponse {
   restaurant_id: number;
   status: string;
   privileges: string[];
+}
+
+export interface SubscriptionAccessModuleResponse {
+  key: string;
+  label: string;
+  description: string;
+}
+
+export interface SubscriptionAccessPrivilegeResponse {
+  code: string;
+  label: string;
+  description: string;
+  modules: SubscriptionAccessModuleResponse[];
+}
+
+export interface SubscriptionAccessSummaryResponse {
+  restaurant_id: number;
+  status: string;
+  is_active: boolean;
+  package_id: number | null;
+  package_name: string | null;
+  package_code: string | null;
+  privileges: SubscriptionAccessPrivilegeResponse[];
+  enabled_modules: SubscriptionAccessModuleResponse[];
 }
 
 export interface ActivateSubscriptionRequest {

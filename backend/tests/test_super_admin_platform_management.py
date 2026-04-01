@@ -13,12 +13,15 @@ import app.db.init_models  # noqa: F401
 from app.core.security import hash_password  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.modules.packages import service as packages_service  # noqa: E402
+from app.modules.packages import repository as packages_repository  # noqa: E402
 from app.modules.packages.schemas import PackageCreateRequest, PackageUpdateRequest  # noqa: E402
 from app.modules.restaurants import service as restaurants_service  # noqa: E402
 from app.modules.restaurants.model import RegistrationStatus, Restaurant  # noqa: E402
 from app.modules.restaurants.schemas import RestaurantRegistrationReviewRequest  # noqa: E402
 from app.modules.settings import service as settings_service  # noqa: E402
 from app.modules.settings.schemas import SettingsRequestCreateRequest, SettingsRequestReviewRequest  # noqa: E402
+from app.modules.subscriptions import service as subscriptions_service  # noqa: E402
+from app.modules.subscriptions.schemas import SuperAdminSubscriptionUpdateRequest  # noqa: E402
 from app.modules.users import service as users_service  # noqa: E402
 from app.modules.users.model import User, UserRole  # noqa: E402
 from app.modules.users.schemas import PlatformUserCreateRequest  # noqa: E402
@@ -80,6 +83,20 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.db.refresh(restaurant)
         self.db.refresh(owner)
         return restaurant, owner
+
+    def _create_active_restaurant(self) -> Restaurant:
+        restaurant = Restaurant(
+            name="Access Hotel",
+            email="access.owner@example.com",
+            phone="0775556789",
+            address="No 2, Access Street",
+            is_active=True,
+            registration_status=RegistrationStatus.APPROVED,
+        )
+        self.db.add(restaurant)
+        self.db.commit()
+        self.db.refresh(restaurant)
+        return restaurant
 
     def test_package_crud_flow_supports_privileges(self) -> None:
         created = packages_service.create_package_for_super_admin(
@@ -144,6 +161,49 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
             self.current_super_admin,
         )
         self.assertEqual(deleted.message, "Platform user deleted successfully.")
+
+    def test_super_admin_access_summary_reflects_package_privileges(self) -> None:
+        restaurant = self._create_active_restaurant()
+        packages_service.ensure_default_packages(self.db)
+        standard_package = packages_repository.get_package_by_code(self.db, "standard")
+        self.assertIsNotNone(standard_package)
+
+        subscriptions_service.activate_paid_subscription(
+            self.db,
+            restaurant_id=restaurant.id,
+            package_id=standard_package.id,  # type: ignore[union-attr]
+        )
+        self.db.commit()
+
+        access_summary = subscriptions_service.get_package_access_summary_for_super_admin(
+            self.db,
+            restaurant.id,
+        )
+
+        self.assertEqual(access_summary.package_code, "standard")
+        self.assertEqual(
+            [privilege.code for privilege in access_summary.privileges],
+            ["HOUSEKEEPING", "QR_MENU"],
+        )
+        self.assertEqual(
+            [module.key for module in access_summary.enabled_modules],
+            ["housekeeping", "orders", "reports", "billing"],
+        )
+
+        updated = subscriptions_service.update_subscription_for_super_admin(
+            self.db,
+            restaurant.id,
+            SuperAdminSubscriptionUpdateRequest(status="expired"),
+        )
+        self.assertEqual(updated.status, "expired")
+
+        expired_access = subscriptions_service.get_package_access_summary_for_super_admin(
+            self.db,
+            restaurant.id,
+        )
+        self.assertEqual(expired_access.status, "expired")
+        self.assertEqual(expired_access.privileges, [])
+        self.assertEqual(expired_access.enabled_modules, [])
 
     def test_review_history_lists_reviewed_records(self) -> None:
         restaurant, owner = self._create_pending_restaurant()

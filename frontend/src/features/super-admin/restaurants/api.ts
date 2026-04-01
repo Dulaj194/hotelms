@@ -7,8 +7,9 @@ import type {
   RestaurantMeResponse,
 } from "@/types/restaurant";
 import type {
-  PackageListResponse,
-  PackageResponse,
+  PackageAdminListResponse,
+  PackageDetailResponse,
+  SubscriptionAccessSummaryResponse,
   SubscriptionResponse,
   SuperAdminSubscriptionUpdateRequest,
 } from "@/types/subscription";
@@ -18,8 +19,8 @@ export async function listRestaurants(): Promise<RestaurantMeResponse[]> {
   return api.get<RestaurantMeResponse[]>("/restaurants");
 }
 
-export async function listPackages(): Promise<PackageResponse[]> {
-  const response = await api.get<PackageListResponse>("/packages");
+export async function listPackages(): Promise<PackageDetailResponse[]> {
+  const response = await api.get<PackageAdminListResponse>("/packages/admin");
   return response.items;
 }
 
@@ -59,6 +60,14 @@ export async function getRestaurantSubscription(
   restaurantId: number,
 ): Promise<SubscriptionResponse> {
   return api.get<SubscriptionResponse>(`/subscriptions/admin/${restaurantId}`);
+}
+
+export async function getRestaurantPackageAccess(
+  restaurantId: number,
+): Promise<SubscriptionAccessSummaryResponse> {
+  return api.get<SubscriptionAccessSummaryResponse>(
+    `/subscriptions/admin/${restaurantId}/access`,
+  );
 }
 
 export async function updateRestaurantSubscription(

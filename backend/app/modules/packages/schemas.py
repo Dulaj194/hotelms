@@ -26,10 +26,17 @@ class PackageListResponse(BaseModel):
     items: list[PackageResponse]
 
 
+class PackagePrivilegeModuleItem(BaseModel):
+    key: str
+    label: str
+    description: str
+
+
 class PackagePrivilegeCatalogItem(BaseModel):
     code: str
     label: str
     description: str
+    modules: list[PackagePrivilegeModuleItem] = Field(default_factory=list)
 
 
 class PackagePrivilegeCatalogResponse(BaseModel):

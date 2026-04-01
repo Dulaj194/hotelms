@@ -4,8 +4,10 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.modules.packages import catalog as packages_catalog
 from app.modules.packages import repository as packages_repo
 from app.modules.packages import service as packages_service
+from app.modules.restaurants import repository as restaurants_repo
 from app.modules.subscriptions import repository
 from app.modules.subscriptions.model import RestaurantSubscription, SubscriptionStatus
 from app.modules.subscriptions.schemas import (
@@ -13,6 +15,9 @@ from app.modules.subscriptions.schemas import (
     ActivateSubscriptionResponse,
     CancelSubscriptionResponse,
     StartTrialResponse,
+    SubscriptionAccessModuleResponse,
+    SubscriptionAccessPrivilegeResponse,
+    SubscriptionAccessSummaryResponse,
     SubscriptionPrivilegeResponse,
     SubscriptionResponse,
     SubscriptionStatusResponse,
@@ -77,6 +82,38 @@ def _to_subscription_response(subscription: RestaurantSubscription | None) -> Su
     )
 
 
+def _prettify_code(value: str) -> str:
+    return value.replace("_", " ").title()
+
+
+def _serialize_access_module(
+    module: packages_catalog.PackageAccessModuleDefinition,
+) -> SubscriptionAccessModuleResponse:
+    return SubscriptionAccessModuleResponse(
+        key=module.key,
+        label=module.label,
+        description=module.description,
+    )
+
+
+def _serialize_access_privilege(code: str) -> SubscriptionAccessPrivilegeResponse:
+    definition = packages_catalog.get_privilege_definition(code)
+    if definition is None:
+        return SubscriptionAccessPrivilegeResponse(
+            code=code.upper(),
+            label=_prettify_code(code),
+            description="Custom privilege configured for this package.",
+            modules=[],
+        )
+
+    return SubscriptionAccessPrivilegeResponse(
+        code=definition.code,
+        label=definition.label,
+        description=definition.description,
+        modules=[_serialize_access_module(module) for module in definition.modules],
+    )
+
+
 def get_current_subscription_entity(
     db: Session,
     restaurant_id: int,
@@ -137,6 +174,34 @@ def get_effective_privileges(
         restaurant_id=restaurant_id,
         status=status_value,
         privileges=sorted(set(privileges)),
+    )
+
+
+def get_package_access_summary(
+    db: Session,
+    restaurant_id: int,
+) -> SubscriptionAccessSummaryResponse:
+    subscription = get_current_subscription_entity(db, restaurant_id)
+    status_response = get_current_subscription_status(db, restaurant_id)
+    privilege_response = get_effective_privileges(db, restaurant_id)
+
+    enabled_modules = [
+        _serialize_access_module(module)
+        for module in packages_catalog.list_modules_for_privileges(privilege_response.privileges)
+    ]
+    privileges = [
+        _serialize_access_privilege(code) for code in privilege_response.privileges
+    ]
+
+    return SubscriptionAccessSummaryResponse(
+        restaurant_id=restaurant_id,
+        status=status_response.status,
+        is_active=status_response.is_active,
+        package_id=subscription.package_id if subscription else None,
+        package_name=subscription.package.name if subscription and subscription.package else None,
+        package_code=subscription.package.code if subscription and subscription.package else None,
+        privileges=privileges,
+        enabled_modules=enabled_modules,
     )
 
 
@@ -450,3 +515,16 @@ def update_subscription_for_super_admin(
             detail="Subscription not found.",
         )
     return _to_subscription_response(updated)
+
+
+def get_package_access_summary_for_super_admin(
+    db: Session,
+    restaurant_id: int,
+) -> SubscriptionAccessSummaryResponse:
+    restaurant = restaurants_repo.get_by_id_for_super_admin(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+    return get_package_access_summary(db, restaurant_id)
