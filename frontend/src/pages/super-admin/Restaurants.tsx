@@ -12,6 +12,7 @@ import {
   generateRestaurantApiKey,
   getRestaurantPackageAccess,
   getRestaurant,
+  getRestaurantSubscriptionHistory,
   getRestaurantSubscription,
   listPackages,
   listRestaurantUsers,
@@ -42,13 +43,19 @@ import type { RestaurantAdminUpdateRequest, RestaurantCreateRequest, RestaurantM
 import type {
   PackageDetailResponse,
   SubscriptionAccessSummaryResponse,
+  SubscriptionChangeHistoryItemResponse,
   SubscriptionResponse,
 } from "@/types/subscription";
 import type { StaffDetailResponse } from "@/types/user";
 
 const EMPTY_CREATE_FORM: RestaurantCreateRequest = { name: "" };
 const EMPTY_EDIT_FORM: RestaurantAdminUpdateRequest = {};
-const EMPTY_SUB_FORM: SubscriptionFormState = { status: "", expires_at: "", package_id: "" };
+const EMPTY_SUB_FORM: SubscriptionFormState = {
+  status: "",
+  expires_at: "",
+  package_id: "",
+  change_reason: "",
+};
 const EMPTY_INTEGRATION_FORM: IntegrationFormState = {
   public_ordering_enabled: false,
   webhook_url: "",
@@ -68,6 +75,7 @@ export default function SuperAdminRestaurants() {
   const [selected, setSelected] = useState<RestaurantMeResponse | null>(null);
   const [selectedSub, setSelectedSub] = useState<SubscriptionResponse | null>(null);
   const [selectedAccess, setSelectedAccess] = useState<SubscriptionAccessSummaryResponse | null>(null);
+  const [selectedSubHistory, setSelectedSubHistory] = useState<SubscriptionChangeHistoryItemResponse[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -160,6 +168,7 @@ export default function SuperAdminRestaurants() {
     setUsersLoading(true);
     setSelectedSub(null);
     setSelectedAccess(null);
+    setSelectedSubHistory([]);
     setHotelUsers([]);
     setSubMsg(null);
     setAddUserMsg(null);
@@ -168,10 +177,11 @@ export default function SuperAdminRestaurants() {
     setEditingSub(false);
     setShowAddUser(false);
 
-    const [subResult, accessResult, usersResult] = await Promise.allSettled([
+    const [subResult, accessResult, usersResult, historyResult] = await Promise.allSettled([
       getRestaurantSubscription(restaurantId),
       getRestaurantPackageAccess(restaurantId),
       listRestaurantUsers(restaurantId),
+      getRestaurantSubscriptionHistory(restaurantId),
     ]);
 
     if (subResult.status === "fulfilled") {
@@ -183,6 +193,7 @@ export default function SuperAdminRestaurants() {
           ? new Date(subscription.expires_at).toISOString().slice(0, 10)
           : "",
         package_id: subscription.package_id?.toString() ?? "",
+        change_reason: "",
       });
     }
     if (accessResult.status === "fulfilled") {
@@ -190,6 +201,9 @@ export default function SuperAdminRestaurants() {
     }
     if (usersResult.status === "fulfilled") {
       setHotelUsers(usersResult.value);
+    }
+    if (historyResult.status === "fulfilled") {
+      setSelectedSubHistory(historyResult.value.items);
     }
 
     setSubLoading(false);
@@ -369,10 +383,11 @@ export default function SuperAdminRestaurants() {
 
   async function handleSaveSub() {
     if (!selected) return;
-    const payload: { status?: string; expires_at?: string; package_id?: number } = {};
+    const payload: { status?: string; expires_at?: string; package_id?: number; change_reason?: string | null } = {};
     if (subForm.status) payload.status = subForm.status;
     if (subForm.expires_at) payload.expires_at = new Date(subForm.expires_at).toISOString();
     if (subForm.package_id) payload.package_id = parseInt(subForm.package_id, 10);
+    if (subForm.change_reason.trim()) payload.change_reason = subForm.change_reason.trim();
     if (Object.keys(payload).length === 0) {
       setSubMsg({ type: "err", text: "No changes to save." });
       return;
@@ -382,11 +397,21 @@ export default function SuperAdminRestaurants() {
     setSubMsg(null);
     try {
       const updated = await updateRestaurantSubscription(selected.id, payload);
-      const accessSummary = await getRestaurantPackageAccess(selected.id);
+      const [accessSummary, history] = await Promise.all([
+        getRestaurantPackageAccess(selected.id),
+        getRestaurantSubscriptionHistory(selected.id),
+      ]);
       setSelectedSub(updated);
       setSelectedAccess(accessSummary);
+      setSelectedSubHistory(history.items);
       setSubscriptionStatusByHotel((current) => ({ ...current, [selected.id]: updated.status }));
       setEditingSub(false);
+      setSubForm({
+        status: updated.status,
+        expires_at: updated.expires_at ? new Date(updated.expires_at).toISOString().slice(0, 10) : "",
+        package_id: updated.package_id?.toString() ?? "",
+        change_reason: "",
+      });
       setSubMsg({ type: "ok", text: "Subscription updated successfully." });
     } catch (error) {
       setSubMsg({
@@ -601,6 +626,7 @@ export default function SuperAdminRestaurants() {
     setEditingId(null);
     setEditLogoMsg(null);
     setSelectedAccess(null);
+    setSelectedSubHistory([]);
   }
 
   return (
@@ -723,6 +749,7 @@ export default function SuperAdminRestaurants() {
               <SubscriptionPanel
                 selectedSub={selectedSub}
                 accessSummary={selectedAccess}
+                historyItems={selectedSubHistory}
                 packages={packages}
                 subLoading={subLoading}
                 editingSub={editingSub}

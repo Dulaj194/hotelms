@@ -42,6 +42,7 @@ from app.modules.auth.schemas import (
     UserMeResponse,
     UserModuleAccessResponse,
 )
+from app.modules.realtime import service as realtime_service
 from app.modules.restaurants.model import RegistrationStatus
 from app.modules.subscriptions import service as subscription_service
 from app.modules.users.model import UserRole
@@ -436,14 +437,20 @@ async def register_restaurant(
         )
 
         db.commit()
-        write_audit_log(
+        audit_log = write_audit_log(
             db,
             event_type="restaurant_registration_success",
             user_id=owner.id,
+            restaurant_id=restaurant.id,
             ip_address=ip,
             user_agent=user_agent,
             metadata={"correlation_id": correlation_id, "restaurant_id": restaurant.id},
         )
+        if audit_log is not None:
+            realtime_service.publish_super_admin_audit_notification(
+                audit_log=audit_log,
+                restaurant_id=restaurant.id,
+            )
         logger.info(
             "event=registration_success correlation_id=%s restaurant_id=%s owner_email=%s",
             correlation_id,

@@ -35,7 +35,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import decode_token
 from app.db.session import SessionLocal
-from app.modules.realtime.repository import get_order_channel
+from app.modules.realtime.repository import get_order_channel, get_super_admin_channel
 from app.modules.users.repository import get_by_id_global
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,7 @@ router = APIRouter()
 
 # Roles allowed to receive the kitchen real-time stream
 _KITCHEN_ROLES = frozenset({"owner", "admin", "steward"})
+_SUPER_ADMIN_ROLES = frozenset({"super_admin"})
 
 # Close code 4001 = auth rejection for this endpoint.
 _WS_CODE_UNAUTHORIZED = 4001
@@ -79,6 +80,26 @@ def _user_can_access_kitchen_stream(user: object, restaurant_id: int) -> bool:
     if role not in _KITCHEN_ROLES:
         return False
     if user_restaurant_id != restaurant_id:
+        return False
+
+    return True
+
+
+def _user_can_access_super_admin_stream(user: object) -> bool:
+    if user is None:
+        return False
+
+    is_active = bool(getattr(user, "is_active", False))
+    must_change_password = bool(getattr(user, "must_change_password", False))
+
+    role_obj = getattr(user, "role", None)
+    role = role_obj.value if hasattr(role_obj, "value") else str(role_obj)
+
+    if not is_active:
+        return False
+    if must_change_password:
+        return False
+    if role not in _SUPER_ADMIN_ROLES:
         return False
 
     return True
@@ -139,6 +160,43 @@ def _authenticate_kitchen_ws(token: str, restaurant_id: int) -> dict | None:
         db.close()
 
 
+def _validate_super_admin_ws_token(token: str, db: Session) -> dict | None:
+    try:
+        payload = decode_token(token)
+    except JWTError:
+        return None
+
+    if payload.get("type") != "access":
+        return None
+
+    user_id = _safe_int(payload.get("sub"))
+    if user_id is None:
+        return None
+
+    try:
+        user = get_by_id_global(db, user_id)
+    except Exception:
+        return None
+
+    if not _user_can_access_super_admin_stream(user):
+        return None
+
+    role = user.role.value if hasattr(user.role, "value") else str(user.role)
+    token_role = payload.get("role")
+    if token_role is not None and token_role != role:
+        return None
+
+    return {"user_id": user.id, "role": role}
+
+
+def _authenticate_super_admin_ws(token: str) -> dict | None:
+    db = SessionLocal()
+    try:
+        return _validate_super_admin_ws_token(token, db)
+    finally:
+        db.close()
+
+
 def _is_ws_user_access_valid(user_id: int, restaurant_id: int) -> bool:
     """Re-validate DB user state for existing WebSocket sessions."""
     db = SessionLocal()
@@ -147,6 +205,17 @@ def _is_ws_user_access_valid(user_id: int, restaurant_id: int) -> bool:
         return _user_can_access_kitchen_stream(user, restaurant_id)
     except Exception:
         # Fail closed on DB failures.
+        return False
+    finally:
+        db.close()
+
+
+def _is_super_admin_ws_user_valid(user_id: int) -> bool:
+    db = SessionLocal()
+    try:
+        user = get_by_id_global(db, user_id)
+        return _user_can_access_super_admin_stream(user)
+    except Exception:
         return False
     finally:
         db.close()
@@ -285,3 +354,100 @@ async def kitchen_websocket(
         restaurant_id,
         user_id,
     )
+
+
+@router.websocket("/super-admin")
+async def super_admin_websocket(
+    websocket: WebSocket,
+    token: str = Query(..., description="Super admin JWT access token"),
+) -> None:
+    user_payload = _authenticate_super_admin_ws(token)
+
+    if user_payload is None:
+        await websocket.accept()
+        await websocket.close(code=_WS_CODE_UNAUTHORIZED)
+        logger.warning("Super admin WS rejected: invalid token or user state")
+        return
+
+    await websocket.accept()
+    user_id = _safe_int(user_payload.get("user_id"))
+    if user_id is None:
+        await websocket.close(code=_WS_CODE_UNAUTHORIZED)
+        logger.warning("Super admin WS rejected post-auth: missing user id")
+        return
+
+    channel = get_super_admin_channel()
+    redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+    pubsub = redis_client.pubsub()
+    await pubsub.subscribe(channel)
+
+    async def _forward_to_ws() -> None:
+        try:
+            async for message in pubsub.listen():
+                if message["type"] == "message":
+                    await websocket.send_text(message["data"])
+        except asyncio.CancelledError:
+            raise
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+        except Exception as exc:
+            logger.debug("Super admin WS forward error: %s", exc)
+
+    async def _listen_ws() -> None:
+        try:
+            while True:
+                await websocket.receive_text()
+        except asyncio.CancelledError:
+            raise
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+        except Exception as exc:
+            logger.debug("Super admin WS receive error: %s", exc)
+
+    async def _monitor_user_state() -> None:
+        try:
+            while True:
+                await asyncio.sleep(_USER_STATE_RECHECK_SECONDS)
+                if not _is_super_admin_ws_user_valid(user_id):
+                    logger.warning("Super admin WS revoked: user=%s", user_id)
+                    try:
+                        await websocket.close(code=_WS_CODE_UNAUTHORIZED)
+                    except Exception:
+                        pass
+                    return
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.debug("Super admin WS user-state monitor error: %s", exc)
+            try:
+                await websocket.close(code=_WS_CODE_UNAUTHORIZED)
+            except Exception:
+                pass
+
+    forward_task = asyncio.create_task(_forward_to_ws())
+    listen_task = asyncio.create_task(_listen_ws())
+    monitor_task = asyncio.create_task(_monitor_user_state())
+
+    _done, _remaining = await asyncio.wait(
+        {forward_task, listen_task, monitor_task},
+        return_when=asyncio.FIRST_COMPLETED,
+    )
+
+    for task in _remaining:
+        task.cancel()
+        try:
+            await task
+        except (asyncio.CancelledError, Exception):
+            pass
+
+    try:
+        await pubsub.unsubscribe(channel)
+        await pubsub.aclose()
+    except Exception:
+        pass
+    try:
+        await redis_client.aclose()
+    except Exception:
+        pass
+
+    logger.info("Super admin WS disconnected: user=%s", user_id)

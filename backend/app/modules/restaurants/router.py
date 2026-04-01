@@ -134,11 +134,11 @@ def list_registration_history(
 @router.post("", response_model=RestaurantMeResponse, status_code=status.HTTP_201_CREATED)
 def create_restaurant(
     payload: RestaurantCreateRequest,
-    _current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_roles("super_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Create a new restaurant tenant. Super-admin only."""
-    return service.create_restaurant(db, payload)
+    return service.create_restaurant(db, payload, current_user_id=current_user.id)
 
 
 @router.get("/{restaurant_id}", response_model=RestaurantMeResponse)

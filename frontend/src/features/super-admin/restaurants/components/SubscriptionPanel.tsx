@@ -4,12 +4,14 @@ import type { InlineMessage, SubscriptionFormState } from "@/features/super-admi
 import type {
   PackageDetailResponse,
   SubscriptionAccessSummaryResponse,
+  SubscriptionChangeHistoryItemResponse,
   SubscriptionResponse,
 } from "@/types/subscription";
 
 type SubscriptionPanelProps = {
   selectedSub: SubscriptionResponse | null;
   accessSummary: SubscriptionAccessSummaryResponse | null;
+  historyItems: SubscriptionChangeHistoryItemResponse[];
   packages: PackageDetailResponse[];
   subLoading: boolean;
   editingSub: boolean;
@@ -24,6 +26,7 @@ type SubscriptionPanelProps = {
 export function SubscriptionPanel({
   selectedSub,
   accessSummary,
+  historyItems,
   packages,
   subLoading,
   editingSub,
@@ -52,6 +55,21 @@ export function SubscriptionPanel({
   const draftModules = buildEnabledModules(draftPackage?.privileges ?? []);
   const featureFlags = accessSummary?.feature_flags ?? [];
   const moduleAccess = accessSummary?.module_access ?? activeModules;
+
+  function formatHistoryAction(item: SubscriptionChangeHistoryItemResponse): string {
+    switch (item.action) {
+      case "trial_assigned":
+        return "Trial assigned";
+      case "activated":
+        return "Subscription activated";
+      case "cancelled":
+        return "Subscription cancelled";
+      case "expired":
+        return "Subscription expired";
+      default:
+        return "Subscription updated";
+    }
+  }
 
   return (
     <div className="rounded-lg border bg-white p-5 space-y-4">
@@ -192,6 +210,16 @@ export function SubscriptionPanel({
               </select>
             </div>
           )}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Change Reason</label>
+            <textarea
+              rows={3}
+              value={subForm.change_reason}
+              onChange={(event) => onFormChange({ ...subForm, change_reason: event.target.value })}
+              placeholder="Document why this package or subscription update is being applied..."
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
           <div className="flex gap-2 pt-1">
             <button
               type="button"
@@ -376,6 +404,82 @@ export function SubscriptionPanel({
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Access Timeline
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Track who changed package access, when it changed, and why the update happened.
+                </p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {historyItems.length} event{historyItems.length === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            {historyItems.length === 0 ? (
+              <div className="mt-3 rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                No subscription history is available for this hotel yet.
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {historyItems.map((item) => (
+                  <article key={item.id} className="rounded-lg border border-slate-200 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {formatHistoryAction(item)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {new Date(item.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          item.next_status === "active"
+                            ? "bg-green-100 text-green-700"
+                            : item.next_status === "trial"
+                              ? "bg-blue-100 text-blue-700"
+                              : item.next_status === "expired"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {item.next_status ?? item.action}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
+                      <p>
+                        Actor: {item.actor.full_name ?? item.actor.email ?? "System"}
+                      </p>
+                      <p>Source: {item.source.replace(/_/g, " ")}</p>
+                      <p>
+                        Package: {item.previous_package_name ?? "-"} {"->"} {item.next_package_name ?? "-"}
+                      </p>
+                      <p>
+                        Expiry:{" "}
+                        {item.previous_expires_at
+                          ? new Date(item.previous_expires_at).toLocaleDateString()
+                          : "-"}{" "}
+                        {"->"}{" "}
+                        {item.next_expires_at
+                          ? new Date(item.next_expires_at).toLocaleDateString()
+                          : "-"}
+                      </p>
+                    </div>
+
+                    <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+                      {item.change_reason?.trim() || "No explicit change reason was recorded."}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}

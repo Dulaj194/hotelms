@@ -1,3 +1,5 @@
+import json
+from types import SimpleNamespace
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
@@ -5,17 +7,27 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.modules.access import catalog as access_catalog
+from app.modules.audit_logs.service import write_audit_log
 from app.modules.packages import catalog as packages_catalog
 from app.modules.packages import repository as packages_repo
 from app.modules.packages import service as packages_service
+from app.modules.realtime import service as realtime_service
 from app.modules.restaurants import repository as restaurants_repo
 from app.modules.subscriptions import repository
-from app.modules.subscriptions.model import RestaurantSubscription, SubscriptionStatus
+from app.modules.subscriptions.model import (
+    RestaurantSubscription,
+    SubscriptionChangeAction,
+    SubscriptionChangeLog,
+    SubscriptionStatus,
+)
 from app.modules.subscriptions.schemas import (
     ActivateSubscriptionRequest,
     ActivateSubscriptionResponse,
     CancelSubscriptionResponse,
     StartTrialResponse,
+    SubscriptionChangeActorResponse,
+    SubscriptionChangeHistoryItemResponse,
+    SubscriptionChangeHistoryResponse,
     SubscriptionAccessFeatureFlagResponse,
     SubscriptionAccessModuleResponse,
     SubscriptionAccessPrivilegeResponse,
@@ -166,6 +178,202 @@ def _is_module_enabled_by_package(
 
     normalized_privileges = {code.strip().upper() for code in privilege_codes}
     return any(code.upper() in normalized_privileges for code in module.package_privileges)
+
+
+def _parse_metadata_json(value: str | None) -> dict:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except Exception:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _clone_subscription_state(
+    subscription: RestaurantSubscription | None,
+):
+    if subscription is None:
+        return None
+
+    package = getattr(subscription, "package", None)
+    package_snapshot = (
+        SimpleNamespace(
+            name=getattr(package, "name", None),
+            code=getattr(package, "code", None),
+        )
+        if package is not None
+        else None
+    )
+    return SimpleNamespace(
+        id=subscription.id,
+        restaurant_id=subscription.restaurant_id,
+        package_id=subscription.package_id,
+        package=package_snapshot,
+        status=subscription.status,
+        expires_at=subscription.expires_at,
+        trial_expires_at=subscription.trial_expires_at,
+        is_trial=subscription.is_trial,
+    )
+
+
+def _build_subscription_audit_metadata(
+    *,
+    restaurant_id: int,
+    previous_subscription: RestaurantSubscription | None,
+    next_subscription: RestaurantSubscription | None,
+    change_reason: str | None,
+    source: str,
+    extra_metadata: dict | None = None,
+) -> dict:
+    metadata = {
+        "restaurant_id": restaurant_id,
+        "source": source,
+        "change_reason": change_reason,
+        "previous_package_id": previous_subscription.package_id if previous_subscription else None,
+        "previous_package_name": previous_subscription.package.name
+        if previous_subscription and previous_subscription.package
+        else None,
+        "next_package_id": next_subscription.package_id if next_subscription else None,
+        "next_package_name": next_subscription.package.name
+        if next_subscription and next_subscription.package
+        else None,
+        "previous_status": _effective_status(previous_subscription)
+        if previous_subscription
+        else None,
+        "next_status": _effective_status(next_subscription)
+        if next_subscription
+        else None,
+        "previous_expires_at": previous_subscription.expires_at.isoformat()
+        if previous_subscription and previous_subscription.expires_at
+        else None,
+        "next_expires_at": next_subscription.expires_at.isoformat()
+        if next_subscription and next_subscription.expires_at
+        else None,
+    }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+    return metadata
+
+
+def _record_subscription_change(
+    db: Session,
+    *,
+    action: SubscriptionChangeAction,
+    restaurant_id: int,
+    previous_subscription: RestaurantSubscription | None,
+    next_subscription: RestaurantSubscription | None,
+    actor_user_id: int | None,
+    source: str,
+    change_reason: str | None,
+    audit_event_type: str,
+    emit_live_notification: bool = True,
+    extra_metadata: dict | None = None,
+) -> None:
+    metadata = _build_subscription_audit_metadata(
+        restaurant_id=restaurant_id,
+        previous_subscription=previous_subscription,
+        next_subscription=next_subscription,
+        change_reason=change_reason,
+        source=source,
+        extra_metadata=extra_metadata,
+    )
+    repository.create_subscription_change_log(
+        db,
+        restaurant_id=restaurant_id,
+        subscription_id=next_subscription.id if next_subscription else previous_subscription.id if previous_subscription else None,
+        actor_user_id=actor_user_id,
+        action=action,
+        source=source,
+        change_reason=change_reason,
+        previous_package_id=previous_subscription.package_id if previous_subscription else None,
+        next_package_id=next_subscription.package_id if next_subscription else None,
+        previous_status=previous_subscription.status if previous_subscription else None,
+        next_status=next_subscription.status if next_subscription else None,
+        previous_expires_at=previous_subscription.expires_at if previous_subscription else None,
+        next_expires_at=next_subscription.expires_at if next_subscription else None,
+        metadata=metadata,
+    )
+    audit_log = write_audit_log(
+        db,
+        event_type=audit_event_type,
+        user_id=actor_user_id,
+        restaurant_id=restaurant_id,
+        metadata=metadata,
+    )
+    if emit_live_notification and audit_log is not None:
+        realtime_service.publish_super_admin_audit_notification(
+            audit_log=audit_log,
+            restaurant_id=restaurant_id,
+        )
+
+
+def _serialize_subscription_change_history(
+    db: Session,
+    items: list[SubscriptionChangeLog],
+) -> SubscriptionChangeHistoryResponse:
+    from app.modules.packages.model import Package
+    from app.modules.users.model import User
+
+    user_ids = {item.actor_user_id for item in items if item.actor_user_id is not None}
+    package_ids = {
+        package_id
+        for item in items
+        for package_id in (item.previous_package_id, item.next_package_id)
+        if package_id is not None
+    }
+
+    user_map = {}
+    if user_ids:
+        user_map = {
+            user.id: user
+            for user in db.query(User).filter(User.id.in_(user_ids)).all()
+        }
+
+    package_map = {}
+    if package_ids:
+        package_map = {
+            package.id: package
+            for package in db.query(Package).filter(Package.id.in_(package_ids)).all()
+        }
+
+    return SubscriptionChangeHistoryResponse(
+        items=[
+            SubscriptionChangeHistoryItemResponse(
+                id=item.id,
+                restaurant_id=item.restaurant_id,
+                subscription_id=item.subscription_id,
+                action=item.action.value,
+                source=item.source,
+                change_reason=item.change_reason,
+                previous_package_id=item.previous_package_id,
+                previous_package_name=package_map[item.previous_package_id].name
+                if item.previous_package_id in package_map
+                else None,
+                next_package_id=item.next_package_id,
+                next_package_name=package_map[item.next_package_id].name
+                if item.next_package_id in package_map
+                else None,
+                previous_status=item.previous_status.value if item.previous_status else None,
+                next_status=item.next_status.value if item.next_status else None,
+                previous_expires_at=item.previous_expires_at,
+                next_expires_at=item.next_expires_at,
+                actor=SubscriptionChangeActorResponse(
+                    user_id=item.actor_user_id,
+                    full_name=user_map[item.actor_user_id].full_name
+                    if item.actor_user_id in user_map
+                    else None,
+                    email=user_map[item.actor_user_id].email
+                    if item.actor_user_id in user_map
+                    else None,
+                ),
+                metadata=_parse_metadata_json(item.metadata_json),
+                created_at=item.created_at,
+            )
+            for item in items
+        ],
+        total=len(items),
+    )
 
 
 def get_current_subscription_entity(
@@ -416,6 +624,10 @@ def assign_initial_trial_subscription(
     db: Session,
     restaurant_id: int,
     *,
+    actor_user_id: int | None = None,
+    change_reason: str | None = None,
+    source: str = "system",
+    emit_live_notification: bool = True,
     commit: bool = True,
 ) -> None:
     existing = repository.get_latest_subscription_by_restaurant(db, restaurant_id)
@@ -433,7 +645,7 @@ def assign_initial_trial_subscription(
     now = _utcnow_naive()
     trial_end = now + timedelta(days=settings.default_trial_days)
 
-    repository.create_subscription(
+    subscription = repository.create_subscription(
         db,
         restaurant_id=restaurant_id,
         package_id=trial_package.id,
@@ -444,6 +656,19 @@ def assign_initial_trial_subscription(
         trial_started_at=now,
         trial_expires_at=trial_end,
     )
+    _record_subscription_change(
+        db,
+        action=SubscriptionChangeAction.trial_assigned,
+        restaurant_id=restaurant_id,
+        previous_subscription=None,
+        next_subscription=subscription,
+        actor_user_id=actor_user_id,
+        source=source,
+        change_reason=change_reason,
+        audit_event_type="subscription_trial_assigned",
+        emit_live_notification=emit_live_notification,
+        extra_metadata={"package_name": trial_package.name},
+    )
     if commit:
         db.commit()
 
@@ -451,6 +676,9 @@ def assign_initial_trial_subscription(
 def start_trial(
     db: Session,
     restaurant_id: int,
+    *,
+    actor_user_id: int | None = None,
+    change_reason: str | None = None,
 ) -> StartTrialResponse:
     if repository.has_trial_history_by_restaurant(db, restaurant_id):
         raise HTTPException(
@@ -479,6 +707,9 @@ def start_trial(
     now = _utcnow_naive()
     trial_end = now + timedelta(days=settings.default_trial_days)
 
+    previous_subscription = _clone_subscription_state(
+        repository.get_latest_subscription_by_restaurant(db, restaurant_id)
+    )
     repository.close_open_subscriptions(
         db,
         restaurant_id,
@@ -497,6 +728,18 @@ def start_trial(
         trial_started_at=now,
         trial_expires_at=trial_end,
     )
+    _record_subscription_change(
+        db,
+        action=SubscriptionChangeAction.trial_assigned,
+        restaurant_id=restaurant_id,
+        previous_subscription=previous_subscription,
+        next_subscription=subscription,
+        actor_user_id=actor_user_id,
+        source="tenant",
+        change_reason=change_reason,
+        audit_event_type="subscription_trial_assigned",
+        extra_metadata={"package_name": trial_package.name},
+    )
     db.commit()
 
     return StartTrialResponse(
@@ -509,11 +752,21 @@ def activate_subscription(
     db: Session,
     restaurant_id: int,
     payload: ActivateSubscriptionRequest,
+    *,
+    actor_user_id: int | None = None,
+    change_reason: str | None = None,
 ) -> ActivateSubscriptionResponse:
     packages_service.ensure_default_packages(db)
     package = _get_active_package_by_selector(db, payload)
 
-    subscription = activate_paid_subscription(db, restaurant_id=restaurant_id, package_id=package.id)
+    subscription = activate_paid_subscription(
+        db,
+        restaurant_id=restaurant_id,
+        package_id=package.id,
+        actor_user_id=actor_user_id,
+        change_reason=change_reason,
+        source="tenant",
+    )
     db.commit()
 
     return ActivateSubscriptionResponse(
@@ -527,6 +780,10 @@ def activate_paid_subscription(
     *,
     restaurant_id: int,
     package_id: int,
+    actor_user_id: int | None = None,
+    change_reason: str | None = None,
+    source: str = "system",
+    emit_live_notification: bool = True,
 ) -> RestaurantSubscription:
     package = packages_repo.get_package_by_id(db, package_id)
     if package is None or not package.is_active:
@@ -537,6 +794,9 @@ def activate_paid_subscription(
 
     now = _utcnow_naive()
     expires_at = now + timedelta(days=package.billing_period_days)
+    previous_subscription = _clone_subscription_state(
+        repository.get_latest_subscription_by_restaurant(db, restaurant_id)
+    )
 
     repository.close_open_subscriptions(
         db,
@@ -545,7 +805,7 @@ def activate_paid_subscription(
         closed_at=now,
     )
 
-    return repository.create_subscription(
+    subscription = repository.create_subscription(
         db,
         restaurant_id=restaurant_id,
         package_id=package.id,
@@ -556,11 +816,28 @@ def activate_paid_subscription(
         trial_started_at=None,
         trial_expires_at=None,
     )
+    _record_subscription_change(
+        db,
+        action=SubscriptionChangeAction.activated,
+        restaurant_id=restaurant_id,
+        previous_subscription=previous_subscription,
+        next_subscription=subscription,
+        actor_user_id=actor_user_id,
+        source=source,
+        change_reason=change_reason,
+        audit_event_type="subscription_activated",
+        emit_live_notification=emit_live_notification,
+        extra_metadata={"package_name": package.name},
+    )
+    return subscription
 
 
 def cancel_subscription(
     db: Session,
     restaurant_id: int,
+    *,
+    actor_user_id: int | None = None,
+    change_reason: str | None = None,
 ) -> CancelSubscriptionResponse:
     current_open = repository.get_current_open_subscription_by_restaurant(db, restaurant_id)
     if current_open is None:
@@ -570,8 +847,22 @@ def cancel_subscription(
         )
 
     now = _utcnow_naive()
+    previous_snapshot = _clone_subscription_state(
+        repository.get_latest_subscription_by_restaurant(db, restaurant_id)
+    )
     current_open.status = SubscriptionStatus.cancelled
     current_open.expires_at = now
+    _record_subscription_change(
+        db,
+        action=SubscriptionChangeAction.cancelled,
+        restaurant_id=restaurant_id,
+        previous_subscription=previous_snapshot,
+        next_subscription=current_open,
+        actor_user_id=actor_user_id,
+        source="tenant",
+        change_reason=change_reason,
+        audit_event_type="subscription_cancelled",
+    )
     db.commit()
 
     return CancelSubscriptionResponse(
@@ -583,7 +874,13 @@ def cancel_subscription(
 # ─── Super-admin operations ───────────────────────────────────────────────────
 
 
-def expire_overdue_subscriptions(db: Session) -> int:
+def expire_overdue_subscriptions(
+    db: Session,
+    *,
+    actor_user_id: int | None = None,
+    source: str = "system",
+    emit_live_notification: bool = True,
+) -> int:
     """Persist expired status for all active/trial subscriptions past their expiry.
 
     Called by the background worker and the manual super_admin trigger endpoint.
@@ -591,7 +888,25 @@ def expire_overdue_subscriptions(db: Session) -> int:
     """
     overdue = repository.get_overdue_open_subscriptions(db)
     for sub in overdue:
+        previous_snapshot = _clone_subscription_state(
+            repository.get_latest_subscription_by_restaurant(
+                db,
+                sub.restaurant_id,
+            )
+        )
         sub.status = SubscriptionStatus.expired
+        _record_subscription_change(
+            db,
+            action=SubscriptionChangeAction.expired,
+            restaurant_id=sub.restaurant_id,
+            previous_subscription=previous_snapshot,
+            next_subscription=sub,
+            actor_user_id=actor_user_id,
+            source=source,
+            change_reason="Subscription expired after the billing window elapsed.",
+            audit_event_type="subscription_expired",
+            emit_live_notification=emit_live_notification,
+        )
     if overdue:
         db.commit()
     return len(overdue)
@@ -608,10 +923,32 @@ def get_subscription_for_super_admin(
     return response
 
 
+def get_subscription_change_history_for_super_admin(
+    db: Session,
+    restaurant_id: int,
+    *,
+    limit: int = 100,
+) -> SubscriptionChangeHistoryResponse:
+    restaurant = restaurants_repo.get_by_id_for_super_admin(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+    items = repository.list_subscription_change_logs(
+        db,
+        restaurant_id=restaurant_id,
+        limit=limit,
+    )
+    return _serialize_subscription_change_history(db, items)
+
+
 def update_subscription_for_super_admin(
     db: Session,
     restaurant_id: int,
     payload: "SuperAdminSubscriptionUpdateRequest",
+    *,
+    actor_user_id: int | None = None,
 ) -> SubscriptionResponse:
     """Allow super_admin to update status / expiry / package for any restaurant.
 
@@ -628,6 +965,9 @@ def update_subscription_for_super_admin(
         )
 
     update_data: dict = {}
+    previous_snapshot = _clone_subscription_state(
+        repository.get_latest_subscription_by_restaurant(db, restaurant_id)
+    )
 
     if payload.status is not None:
         try:
@@ -661,6 +1001,19 @@ def update_subscription_for_super_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Subscription not found.",
         )
+    _record_subscription_change(
+        db,
+        action=SubscriptionChangeAction.updated,
+        restaurant_id=restaurant_id,
+        previous_subscription=previous_snapshot,
+        next_subscription=updated,
+        actor_user_id=actor_user_id,
+        source="super_admin",
+        change_reason=payload.change_reason,
+        audit_event_type="subscription_updated",
+    )
+    db.commit()
+    db.refresh(updated)
     return _to_subscription_response(updated)
 
 

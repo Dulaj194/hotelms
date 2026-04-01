@@ -1,3 +1,4 @@
+import json
 from collections.abc import Sequence
 from datetime import datetime
 
@@ -5,7 +6,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.modules.packages.model import PackagePrivilege
-from app.modules.subscriptions.model import RestaurantSubscription, SubscriptionStatus
+from app.modules.subscriptions.model import (
+    RestaurantSubscription,
+    SubscriptionChangeAction,
+    SubscriptionChangeLog,
+    SubscriptionStatus,
+)
 
 
 def get_latest_subscription_by_restaurant(
@@ -145,3 +151,56 @@ def update_subscription_by_id(
     db.commit()
     db.refresh(sub)
     return sub
+
+
+def create_subscription_change_log(
+    db: Session,
+    *,
+    restaurant_id: int,
+    subscription_id: int | None,
+    actor_user_id: int | None,
+    action: SubscriptionChangeAction,
+    source: str,
+    change_reason: str | None,
+    previous_package_id: int | None,
+    next_package_id: int | None,
+    previous_status: SubscriptionStatus | None,
+    next_status: SubscriptionStatus | None,
+    previous_expires_at: datetime | None,
+    next_expires_at: datetime | None,
+    metadata: dict | None = None,
+) -> SubscriptionChangeLog:
+    log = SubscriptionChangeLog(
+        restaurant_id=restaurant_id,
+        subscription_id=subscription_id,
+        actor_user_id=actor_user_id,
+        action=action,
+        source=source,
+        change_reason=change_reason,
+        previous_package_id=previous_package_id,
+        next_package_id=next_package_id,
+        previous_status=previous_status,
+        next_status=next_status,
+        previous_expires_at=previous_expires_at,
+        next_expires_at=next_expires_at,
+        metadata_json=json.dumps(metadata) if metadata else None,
+    )
+    db.add(log)
+    db.flush()
+    db.refresh(log)
+    return log
+
+
+def list_subscription_change_logs(
+    db: Session,
+    *,
+    restaurant_id: int,
+    limit: int = 100,
+) -> list[SubscriptionChangeLog]:
+    return (
+        db.query(SubscriptionChangeLog)
+        .filter(SubscriptionChangeLog.restaurant_id == restaurant_id)
+        .order_by(SubscriptionChangeLog.created_at.desc(), SubscriptionChangeLog.id.desc())
+        .limit(limit)
+        .all()
+    )

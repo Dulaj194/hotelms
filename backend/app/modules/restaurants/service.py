@@ -15,6 +15,7 @@ from app.core.security import hash_token
 from app.core.notifications import send_onboarding_email
 from app.modules.access import catalog as access_catalog
 from app.modules.audit_logs.service import write_audit_log
+from app.modules.realtime import service as realtime_service
 from app.modules.reference_data import service as reference_data_service
 from app.modules.restaurants import repository
 from app.modules.subscriptions import service as subscription_service
@@ -346,7 +347,12 @@ def list_restaurant_registration_history(
     return RestaurantRegistrationHistoryListResponse(items=items, total=total)
 
 
-def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> RestaurantMeResponse:
+def create_restaurant(
+    db: Session,
+    payload: RestaurantCreateRequest,
+    *,
+    current_user_id: int | None = None,
+) -> RestaurantMeResponse:
     """Create a new restaurant tenant. Restricted to super_admin use only."""
     if payload.email and get_user_by_email(db, str(payload.email)):
         raise HTTPException(
@@ -371,7 +377,14 @@ def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> Restaura
         closing_time=str(create_data["closing_time"]) if create_data.get("closing_time") else None,
     )
 
-    subscription_service.assign_initial_trial_subscription(db, restaurant.id)
+    subscription_service.assign_initial_trial_subscription(
+        db,
+        restaurant.id,
+        actor_user_id=current_user_id,
+        change_reason="Initial trial assigned when the hotel was provisioned by super admin.",
+        source="super_admin",
+        emit_live_notification=bool(current_user_id),
+    )
 
     if restaurant.email:
         temporary_password = _generate_temporary_password()
@@ -680,6 +693,9 @@ def review_restaurant_registration(
         subscription_service.assign_initial_trial_subscription(
             db,
             restaurant.id,
+            actor_user_id=reviewer_user_id,
+            change_reason=payload.review_notes or "Registration approved.",
+            source="registration_review",
             commit=False,
         )
         message = "Registration approved. Trial subscription activated."
@@ -695,15 +711,21 @@ def review_restaurant_registration(
     db.commit()
     db.refresh(restaurant)
 
-    write_audit_log(
+    audit_log = write_audit_log(
         db,
         event_type=audit_event,
         user_id=reviewer_user_id,
+        restaurant_id=restaurant.id,
         metadata={
             "restaurant_id": restaurant.id,
             "review_notes": payload.review_notes,
         },
     )
+    if audit_log is not None:
+        realtime_service.publish_super_admin_audit_notification(
+            audit_log=audit_log,
+            restaurant_id=restaurant.id,
+        )
 
     return RestaurantRegistrationReviewResponse(
         message=message,

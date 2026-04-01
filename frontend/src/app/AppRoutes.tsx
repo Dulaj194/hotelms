@@ -45,6 +45,7 @@ const TableMenu = lazy(() => import("@/pages/public/TableMenu"));
 const TableOrderStatus = lazy(() => import("@/pages/public/TableOrderStatus"));
 const ServiceRequest = lazy(() => import("@/pages/room/ServiceRequest"));
 const SuperAdminOverview = lazy(() => import("@/pages/super-admin/Overview"));
+const SuperAdminNotifications = lazy(() => import("@/pages/super-admin/Notifications"));
 const SuperAdminPendingRegistrations = lazy(() => import("@/pages/super-admin/PendingRegistrations"));
 const SuperAdminRegistrationHistory = lazy(() => import("@/pages/super-admin/RegistrationHistory"));
 const SuperAdminRestaurants = lazy(() => import("@/pages/super-admin/Restaurants"));
@@ -53,6 +54,7 @@ const SuperAdminSettingsRequests = lazy(() => import("@/pages/super-admin/Settin
 const SuperAdminSettingsRequestHistory = lazy(() => import("@/pages/super-admin/SettingsRequestHistory"));
 const SuperAdminPromoCodes = lazy(() => import("@/pages/super-admin/PromoCodes"));
 const SuperAdminPlatformUsers = lazy(() => import("@/pages/super-admin/PlatformUsers"));
+const SuperAdminAuditLogs = lazy(() => import("@/pages/super-admin/AuditLogs"));
 
 function RootRedirect() {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
@@ -356,6 +358,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/super-admin/notifications"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminNotifications />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/super-admin/registrations"
           element={
             <ProtectedRoute allowedRoles={["super_admin"]}>
@@ -416,6 +426,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute allowedRoles={["super_admin"]}>
               <SuperAdminPlatformUsers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/audit-logs"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminAuditLogs />
             </ProtectedRoute>
           }
         />

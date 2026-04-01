@@ -17,6 +17,12 @@ class AuditLog(Base):
         nullable=True,
         index=True,
     )
+    restaurant_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("restaurants.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)

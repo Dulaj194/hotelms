@@ -13,6 +13,7 @@ sys.path.insert(0, str(BACKEND_ROOT))
 
 import app.db.init_models  # noqa: F401
 from app.modules.auth import service as auth_service  # noqa: E402
+from app.modules.audit_logs import service as audit_logs_service  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.modules.packages import service as packages_service  # noqa: E402
@@ -448,6 +449,87 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
                 provisioned.api_key,
             )
         )
+
+    def test_subscription_history_records_actor_and_reason(self) -> None:
+        restaurant = self._create_active_restaurant()
+        packages_service.ensure_default_packages(self.db)
+        basic_package = packages_repository.get_package_by_code(self.db, "basic")
+        standard_package = packages_repository.get_package_by_code(self.db, "standard")
+        self.assertIsNotNone(basic_package)
+        self.assertIsNotNone(standard_package)
+
+        subscriptions_service.activate_paid_subscription(
+            self.db,
+            restaurant_id=restaurant.id,
+            package_id=basic_package.id,  # type: ignore[union-attr]
+        )
+        self.db.commit()
+
+        subscriptions_service.update_subscription_for_super_admin(
+            self.db,
+            restaurant.id,
+            SuperAdminSubscriptionUpdateRequest(
+                package_id=standard_package.id,  # type: ignore[union-attr]
+                status="active",
+                change_reason="Customer upgraded to a higher package.",
+            ),
+            actor_user_id=self.current_super_admin.id,
+        )
+
+        history = subscriptions_service.get_subscription_change_history_for_super_admin(
+            self.db,
+            restaurant.id,
+            limit=10,
+        )
+
+        self.assertGreaterEqual(history.total, 2)
+        latest = history.items[0]
+        self.assertEqual(latest.action, "updated")
+        self.assertEqual(latest.next_package_name, "Standard")
+        self.assertEqual(latest.change_reason, "Customer upgraded to a higher package.")
+        self.assertEqual(latest.actor.user_id, self.current_super_admin.id)
+
+    def test_notification_feed_surfaces_settings_and_subscription_events(self) -> None:
+        restaurant = self._create_active_restaurant()
+        owner = self._create_owner_for_restaurant(restaurant)
+        packages_service.ensure_default_packages(self.db)
+        basic_package = packages_repository.get_package_by_code(self.db, "basic")
+        standard_package = packages_repository.get_package_by_code(self.db, "standard")
+        self.assertIsNotNone(basic_package)
+        self.assertIsNotNone(standard_package)
+
+        subscriptions_service.activate_paid_subscription(
+            self.db,
+            restaurant_id=restaurant.id,
+            package_id=basic_package.id,  # type: ignore[union-attr]
+        )
+        self.db.commit()
+
+        settings_service.create_settings_request(
+            self.db,
+            restaurant_id=restaurant.id,
+            requested_by=owner.id,
+            payload=SettingsRequestCreateRequest(
+                requested_changes={"reports": False},
+                request_reason="Disable reports temporarily.",
+            ),
+        )
+        subscriptions_service.update_subscription_for_super_admin(
+            self.db,
+            restaurant.id,
+            SuperAdminSubscriptionUpdateRequest(
+                package_id=standard_package.id,  # type: ignore[union-attr]
+                status="active",
+                change_reason="Align package with enterprise rollout.",
+            ),
+            actor_user_id=self.current_super_admin.id,
+        )
+
+        notifications = audit_logs_service.list_super_admin_notifications(self.db, limit=20)
+        event_types = [item.event_type for item in notifications.items]
+
+        self.assertIn("settings_request_submitted", event_types)
+        self.assertIn("subscription_updated", event_types)
 
     def test_review_history_lists_reviewed_records(self) -> None:
         restaurant, owner = self._create_pending_restaurant()

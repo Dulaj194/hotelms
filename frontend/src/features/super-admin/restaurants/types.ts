@@ -27,6 +27,7 @@ export type SubscriptionFormState = {
   status: string;
   expires_at: string;
   package_id: string;
+  change_reason: string;
 };
 
 export type AddHotelUserFormState = {

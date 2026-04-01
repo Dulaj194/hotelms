@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -16,6 +16,37 @@ class SubscriptionResponse(BaseModel):
     expires_at: datetime | None
     trial_started_at: datetime | None
     trial_expires_at: datetime | None
+
+
+class SubscriptionChangeActorResponse(BaseModel):
+    user_id: int | None = None
+    full_name: str | None = None
+    email: str | None = None
+
+
+class SubscriptionChangeHistoryItemResponse(BaseModel):
+    id: int
+    restaurant_id: int
+    subscription_id: int | None
+    action: str
+    source: str
+    change_reason: str | None
+    previous_package_id: int | None
+    previous_package_name: str | None
+    next_package_id: int | None
+    next_package_name: str | None
+    previous_status: str | None
+    next_status: str | None
+    previous_expires_at: datetime | None
+    next_expires_at: datetime | None
+    actor: SubscriptionChangeActorResponse
+    metadata: dict[str, Any]
+    created_at: datetime
+
+
+class SubscriptionChangeHistoryResponse(BaseModel):
+    items: list[SubscriptionChangeHistoryItemResponse]
+    total: int
 
 
 class SubscriptionStatusResponse(BaseModel):
@@ -117,6 +148,7 @@ class SuperAdminSubscriptionUpdateRequest(BaseModel):
     )
     expires_at: datetime | None = None
     package_id: int | None = None
+    change_reason: str | None = Field(default=None, max_length=2000)
 
     @model_validator(mode="after")
     def at_least_one_field(

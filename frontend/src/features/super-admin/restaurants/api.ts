@@ -14,6 +14,7 @@ import type {
   PackageAdminListResponse,
   PackageDetailResponse,
   SubscriptionAccessSummaryResponse,
+  SubscriptionChangeHistoryResponse,
   SubscriptionResponse,
   SuperAdminSubscriptionUpdateRequest,
 } from "@/types/subscription";
@@ -124,6 +125,14 @@ export async function updateRestaurantSubscription(
   payload: SuperAdminSubscriptionUpdateRequest,
 ): Promise<SubscriptionResponse> {
   return api.patch<SubscriptionResponse>(`/subscriptions/admin/${restaurantId}`, payload);
+}
+
+export async function getRestaurantSubscriptionHistory(
+  restaurantId: number,
+): Promise<SubscriptionChangeHistoryResponse> {
+  return api.get<SubscriptionChangeHistoryResponse>(
+    `/subscriptions/admin/${restaurantId}/history?limit=100`,
+  );
 }
 
 export async function expireOverdueSubscriptions(): Promise<{

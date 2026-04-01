@@ -7,6 +7,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.modules.access import catalog as access_catalog
+from app.modules.audit_logs.service import write_audit_log
+from app.modules.realtime import service as realtime_service
 from app.modules.restaurants import repository as restaurant_repository
 from app.modules.settings import repository
 from app.modules.settings.model import SettingsRequestStatus
@@ -108,6 +110,24 @@ def create_settings_request(
     )
     db.commit()
     db.refresh(request)
+    audit_log = write_audit_log(
+        db,
+        event_type="settings_request_submitted",
+        user_id=requested_by,
+        restaurant_id=restaurant_id,
+        metadata={
+            "restaurant_id": restaurant_id,
+            "request_id": request.request_id,
+            "requested_change_count": len(filtered_changes),
+            "requested_changes": filtered_changes,
+            "request_reason": payload.request_reason,
+        },
+    )
+    if audit_log is not None:
+        realtime_service.publish_super_admin_audit_notification(
+            audit_log=audit_log,
+            restaurant_id=restaurant_id,
+        )
     return SettingsRequestResponse.model_validate(request)
 
 
@@ -212,6 +232,29 @@ def review_settings_request(
 
     db.commit()
     db.refresh(request)
+
+    audit_event_type = (
+        "settings_request_approved"
+        if request.status == SettingsRequestStatus.APPROVED
+        else "settings_request_rejected"
+    )
+    audit_log = write_audit_log(
+        db,
+        event_type=audit_event_type,
+        user_id=reviewer_user_id,
+        restaurant_id=request.restaurant_id,
+        metadata={
+            "restaurant_id": request.restaurant_id,
+            "request_id": request.request_id,
+            "requested_change_count": len(request.requested_changes),
+            "review_notes": payload.review_notes,
+        },
+    )
+    if audit_log is not None:
+        realtime_service.publish_super_admin_audit_notification(
+            audit_log=audit_log,
+            restaurant_id=request.restaurant_id,
+        )
 
     message = (
         "Settings request approved and changes applied."

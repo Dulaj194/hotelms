@@ -241,6 +241,15 @@ export default function SuperAdminOverview() {
                 <h2 className="app-section-title text-slate-900">Quick Actions</h2>
                 <div className="mt-4 grid gap-3">
                   <Link
+                    to="/super-admin/notifications"
+                    className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    <p className="text-sm font-semibold text-slate-900">Open Notification Center</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Watch live governance and package-access events as they happen.
+                    </p>
+                  </Link>
+                  <Link
                     to="/super-admin/restaurants"
                     className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
                   >
@@ -274,6 +283,15 @@ export default function SuperAdminOverview() {
                     <p className="text-sm font-semibold text-slate-900">Manage Packages</p>
                     <p className="mt-1 text-sm text-slate-500">
                       Control pricing tiers, billing cycles, and entitlement bundles.
+                    </p>
+                  </Link>
+                  <Link
+                    to="/super-admin/audit-logs"
+                    className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    <p className="text-sm font-semibold text-slate-900">Review Audit Logs</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Search platform approvals, security events, and operational changes.
                     </p>
                   </Link>
                   <Link

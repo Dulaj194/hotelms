@@ -73,6 +73,37 @@ export interface SubscriptionResponse {
   trial_expires_at: string | null;
 }
 
+export interface SubscriptionChangeActorResponse {
+  user_id: number | null;
+  full_name: string | null;
+  email: string | null;
+}
+
+export interface SubscriptionChangeHistoryItemResponse {
+  id: number;
+  restaurant_id: number;
+  subscription_id: number | null;
+  action: string;
+  source: string;
+  change_reason: string | null;
+  previous_package_id: number | null;
+  previous_package_name: string | null;
+  next_package_id: number | null;
+  next_package_name: string | null;
+  previous_status: string | null;
+  next_status: string | null;
+  previous_expires_at: string | null;
+  next_expires_at: string | null;
+  actor: SubscriptionChangeActorResponse;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface SubscriptionChangeHistoryResponse {
+  items: SubscriptionChangeHistoryItemResponse[];
+  total: number;
+}
+
 export interface SubscriptionStatusResponse {
   status: string;
   is_active: boolean;
@@ -152,6 +183,7 @@ export interface SuperAdminSubscriptionUpdateRequest {
   status?: string;
   expires_at?: string;
   package_id?: number;
+  change_reason?: string | null;
 }
 
 export interface ExpireOverdueResponse {

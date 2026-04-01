@@ -9,12 +9,14 @@ import {
 
 const SUPER_ADMIN_NAV = [
   { path: "/super-admin", label: "Overview" },
+  { path: "/super-admin/notifications", label: "Notifications" },
   { path: "/super-admin/registrations", label: "Registrations" },
   { path: "/super-admin/restaurants", label: "Hotels" },
   { path: "/super-admin/packages", label: "Packages" },
   { path: "/super-admin/settings-requests", label: "Settings Requests" },
   { path: "/super-admin/promo-codes", label: "Promo Codes" },
   { path: "/super-admin/platform-users", label: "Platform Users" },
+  { path: "/super-admin/audit-logs", label: "Audit Logs" },
 ];
 
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.superAdmin";

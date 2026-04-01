@@ -330,6 +330,13 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
         ),
     )
 
+    audit_log_column_patches: Sequence[tuple[str, str]] = (
+        (
+            "restaurant_id",
+            "ALTER TABLE audit_logs ADD COLUMN restaurant_id INT NULL",
+        ),
+    )
+
     restaurant_fk_patches: Sequence[tuple[str, str, str, str, str]] = (
         (
             "country_id",
@@ -449,6 +456,57 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             logger.warning(
                 "Applied development schema patch: rooms.%s was missing and has been added.",
                 column_name,
+            )
+
+        for column_name, alter_sql in audit_log_column_patches:
+            if _column_exists(conn, "audit_logs", column_name):
+                continue
+            conn.execute(text(alter_sql))
+            logger.warning(
+                "Applied development schema patch: audit_logs.%s was missing and has been added.",
+                column_name,
+            )
+
+        if not _table_exists(conn, "subscription_change_logs"):
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE subscription_change_logs (
+                        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        restaurant_id INT NOT NULL,
+                        subscription_id INT NULL,
+                        actor_user_id INT NULL,
+                        action ENUM('trial_assigned', 'activated', 'updated', 'cancelled', 'expired') NOT NULL,
+                        source VARCHAR(50) NOT NULL DEFAULT 'system',
+                        change_reason TEXT NULL,
+                        previous_package_id INT NULL,
+                        next_package_id INT NULL,
+                        previous_status ENUM('trial', 'active', 'expired', 'cancelled') NULL,
+                        next_status ENUM('trial', 'active', 'expired', 'cancelled') NULL,
+                        previous_expires_at DATETIME NULL,
+                        next_expires_at DATETIME NULL,
+                        metadata_json TEXT NULL,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        INDEX ix_subscription_change_logs_restaurant_id (restaurant_id),
+                        INDEX ix_subscription_change_logs_subscription_id (subscription_id),
+                        INDEX ix_subscription_change_logs_actor_user_id (actor_user_id),
+                        INDEX ix_subscription_change_logs_created_at (created_at),
+                        CONSTRAINT fk_subscription_change_logs_restaurant
+                            FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_subscription_change_logs_subscription
+                            FOREIGN KEY (subscription_id) REFERENCES restaurant_subscriptions(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_subscription_change_logs_actor
+                            FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_subscription_change_logs_previous_package
+                            FOREIGN KEY (previous_package_id) REFERENCES packages(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_subscription_change_logs_next_package
+                            FOREIGN KEY (next_package_id) REFERENCES packages(id) ON DELETE SET NULL
+                    )
+                    """
+                )
+            )
+            logger.warning(
+                "Applied development schema patch: subscription_change_logs table was missing and has been created.",
             )
 
         for (

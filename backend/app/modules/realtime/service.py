@@ -9,6 +9,9 @@ from datetime import UTC, datetime
 
 import redis as redis_lib
 
+from app.db.redis import get_redis_client
+from app.db.session import SessionLocal
+from app.modules.audit_logs.service import serialize_notification_entry
 from app.modules.realtime import repository as realtime_repo
 
 
@@ -79,3 +82,54 @@ def publish_order_status_updated(
         },
     }
     realtime_repo.publish_event(r, restaurant_id, event)
+
+
+def _map_super_admin_event_name(event_type: str) -> str:
+    if event_type == "settings_request_submitted":
+        return "settings-request:new"
+    if event_type in {"settings_request_approved", "settings_request_rejected"}:
+        return "settings-request:reviewed"
+    if event_type == "restaurant_registration_success":
+        return "registration:new"
+    if event_type in {"restaurant_registration_approved", "restaurant_registration_rejected"}:
+        return "registration:reviewed"
+    if event_type.startswith("subscription_"):
+        return "subscription:updated"
+    if event_type.startswith("platform_user_") or event_type.startswith("staff_"):
+        return "user:updated"
+    if event_type.startswith("restaurant_api_key_") or event_type.startswith("restaurant_webhook_"):
+        return "integration:updated"
+    if event_type == "login_failed":
+        return "security:alert"
+    return "super-admin:notification"
+
+
+def publish_super_admin_notification(notification: dict) -> None:
+    redis_client = get_redis_client()
+    realtime_repo.publish_global_event(
+        redis_client,
+        realtime_repo.get_super_admin_channel(),
+        {
+            "event": notification.get("event") or "super-admin:notification",
+            "data": notification,
+        },
+    )
+
+
+def publish_super_admin_audit_notification(
+    *,
+    audit_log,
+    restaurant_id: int | None = None,
+) -> None:
+    db = SessionLocal()
+    try:
+        notification = serialize_notification_entry(db, audit_log).model_dump(mode="json")
+        if restaurant_id is not None and notification.get("restaurant", {}).get("restaurant_id") is None:
+            notification.setdefault("restaurant", {})
+            notification["restaurant"]["restaurant_id"] = restaurant_id
+        notification["event"] = _map_super_admin_event_name(notification["event_type"])
+        publish_super_admin_notification(notification)
+    except Exception:
+        return
+    finally:
+        db.close()
