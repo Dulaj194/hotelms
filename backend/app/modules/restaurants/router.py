@@ -3,12 +3,17 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_restaurant_user, require_roles
 from app.modules.restaurants import service
+from app.modules.restaurants.model import RegistrationStatus
 from app.modules.restaurants.schemas import (
+    PendingRestaurantRegistrationListResponse,
     RestaurantAdminUpdateRequest,
     RestaurantCreateRequest,
     RestaurantDeleteResponse,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
+    RestaurantRegistrationHistoryListResponse,
+    RestaurantRegistrationReviewRequest,
+    RestaurantRegistrationReviewResponse,
     RestaurantUpdateRequest,
 )
 from app.modules.users import service as users_service
@@ -78,6 +83,49 @@ def list_restaurants(
     return service.list_all_restaurants(db)
 
 
+@router.get(
+    "/registrations/pending",
+    response_model=PendingRestaurantRegistrationListResponse,
+)
+def list_pending_registrations(
+    limit: int = 100,
+    _current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> PendingRestaurantRegistrationListResponse:
+    return service.list_pending_restaurant_registrations(db, limit=limit)
+
+
+@router.get(
+    "/registrations/history",
+    response_model=RestaurantRegistrationHistoryListResponse,
+)
+def list_registration_history(
+    limit: int = 100,
+    status_filter: str | None = None,
+    _current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantRegistrationHistoryListResponse:
+    try:
+        registration_status = (
+            RegistrationStatus(status_filter.upper()) if status_filter else None
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="status_filter must be APPROVED or REJECTED.",
+        ) from exc
+    if registration_status == RegistrationStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="History view only supports APPROVED or REJECTED statuses.",
+        )
+    return service.list_restaurant_registration_history(
+        db,
+        registration_status=registration_status,
+        limit=limit,
+    )
+
+
 @router.post("", response_model=RestaurantMeResponse, status_code=status.HTTP_201_CREATED)
 def create_restaurant(
     payload: RestaurantCreateRequest,
@@ -117,6 +165,24 @@ def delete_restaurant_by_id(
 ) -> RestaurantDeleteResponse:
     """Delete any restaurant by ID. Super-admin only."""
     return service.delete_restaurant_for_super_admin(db, restaurant_id)
+
+
+@router.patch(
+    "/{restaurant_id}/registration/review",
+    response_model=RestaurantRegistrationReviewResponse,
+)
+def review_restaurant_registration(
+    restaurant_id: int,
+    payload: RestaurantRegistrationReviewRequest,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantRegistrationReviewResponse:
+    return service.review_restaurant_registration(
+        db,
+        restaurant_id=restaurant_id,
+        reviewer_user_id=current_user.id,
+        payload=payload,
+    )
 
 
 # ─── Super-admin: hotel logo ──────────────────────────────────────────────────

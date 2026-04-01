@@ -56,7 +56,9 @@ class User(Base):
     # "Restaurant" uses a string forward reference — SQLAlchemy resolves it
     # at mapper configuration time, avoiding circular imports at runtime.
     restaurant: Mapped[Optional[Restaurant]] = relationship(
-        "Restaurant", back_populates="users"
+        "Restaurant",
+        back_populates="users",
+        foreign_keys=[restaurant_id],
     )
 
     created_at: Mapped[datetime] = mapped_column(

@@ -1,6 +1,9 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
+
+RegistrationStatusValue = Literal["PENDING", "APPROVED", "REJECTED"]
 
 
 class RestaurantResponse(BaseModel):
@@ -18,6 +21,10 @@ class RestaurantResponse(BaseModel):
     closing_time: str | None
     logo_url: str | None
     is_active: bool
+    registration_status: RegistrationStatusValue
+    registration_reviewed_by_id: int | None
+    registration_review_notes: str | None
+    registration_reviewed_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -90,3 +97,44 @@ class RestaurantDeleteResponse(BaseModel):
 class RestaurantLogoUploadResponse(BaseModel):
     logo_url: str
     message: str = "Logo uploaded successfully."
+
+
+class RestaurantRegistrationSummaryResponse(BaseModel):
+    restaurant_id: int
+    name: str
+    owner_user_id: int | None
+    owner_full_name: str | None
+    owner_email: str | None
+    phone: str | None
+    address: str | None
+    country: str | None
+    currency: str | None
+    billing_email: str | None
+    opening_time: str | None
+    closing_time: str | None
+    logo_url: str | None
+    created_at: datetime
+    registration_status: RegistrationStatusValue
+    registration_reviewed_by_id: int | None
+    registration_review_notes: str | None
+    registration_reviewed_at: datetime | None
+
+
+class PendingRestaurantRegistrationListResponse(BaseModel):
+    items: list[RestaurantRegistrationSummaryResponse]
+    total: int
+
+
+class RestaurantRegistrationHistoryListResponse(BaseModel):
+    items: list[RestaurantRegistrationSummaryResponse]
+    total: int
+
+
+class RestaurantRegistrationReviewRequest(BaseModel):
+    status: Literal["APPROVED", "REJECTED"]
+    review_notes: str | None = Field(default=None, max_length=2000)
+
+
+class RestaurantRegistrationReviewResponse(BaseModel):
+    message: str
+    registration: RestaurantRegistrationSummaryResponse

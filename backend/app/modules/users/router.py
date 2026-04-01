@@ -7,6 +7,10 @@ from app.modules.users.model import User
 from app.modules.users.model import UserRole
 from app.modules.users.schemas import (
     GenericMessageResponse,
+    PlatformUserCreateRequest,
+    PlatformUserDetailResponse,
+    PlatformUserListResponse,
+    PlatformUserUpdateRequest,
     StaffCreateRequest,
     StaffDetailResponse,
     StaffListItemResponse,
@@ -19,6 +23,70 @@ router = APIRouter()
 # All staff management routes require owner or admin.
 # restaurant_id is derived from current_user.restaurant_id (authenticated context)
 # and never accepted from request body or query params.
+
+
+@router.get("/platform", response_model=PlatformUserListResponse)
+def list_platform_users(
+    is_active: bool | None = Query(default=None),
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> PlatformUserListResponse:
+    return service.list_platform_users(db, is_active=is_active)
+
+
+@router.post("/platform", response_model=PlatformUserDetailResponse, status_code=status.HTTP_201_CREATED)
+def create_platform_user(
+    payload: PlatformUserCreateRequest,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> PlatformUserDetailResponse:
+    return service.create_platform_user(db, payload, current_user)
+
+
+@router.get("/platform/{user_id}", response_model=PlatformUserDetailResponse)
+def get_platform_user(
+    user_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> PlatformUserDetailResponse:
+    return service.get_platform_user(db, user_id)
+
+
+@router.patch("/platform/{user_id}", response_model=PlatformUserDetailResponse)
+def update_platform_user(
+    user_id: int,
+    payload: PlatformUserUpdateRequest,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> PlatformUserDetailResponse:
+    return service.update_platform_user(db, user_id, payload, current_user)
+
+
+@router.patch("/platform/{user_id}/disable", response_model=StaffStatusResponse)
+def disable_platform_user(
+    user_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> StaffStatusResponse:
+    return service.disable_platform_user(db, user_id, current_user)
+
+
+@router.patch("/platform/{user_id}/enable", response_model=StaffStatusResponse)
+def enable_platform_user(
+    user_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> StaffStatusResponse:
+    return service.enable_platform_user(db, user_id, current_user)
+
+
+@router.delete("/platform/{user_id}", response_model=GenericMessageResponse)
+def delete_platform_user(
+    user_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> GenericMessageResponse:
+    return service.delete_platform_user(db, user_id, current_user)
 
 
 @router.get("", response_model=list[StaffListItemResponse])

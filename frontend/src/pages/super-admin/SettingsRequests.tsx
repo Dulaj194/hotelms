@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import ActionDialog from "@/components/shared/ActionDialog";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
@@ -176,13 +177,21 @@ export default function SuperAdminSettingsRequests() {
                 Review and approve tenant profile setting updates requested by hotels.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => void loadPendingRequests()}
-              className="rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Refresh
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/super-admin/settings-requests/history"
+                className="rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Review History
+              </Link>
+              <button
+                type="button"
+                onClick={() => void loadPendingRequests()}
+                className="rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Refresh
+              </button>
+            </div>
           </div>
 
           <div className="mt-4 flex flex-wrap items-end gap-2">

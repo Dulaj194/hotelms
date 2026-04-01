@@ -1,0 +1,131 @@
+import { api } from "@/lib/api";
+import type {
+  RestaurantAdminUpdateRequest,
+  RestaurantCreateRequest,
+  RestaurantDeleteResponse,
+  RestaurantLogoUploadResponse,
+  RestaurantMeResponse,
+} from "@/types/restaurant";
+import type {
+  PackageListResponse,
+  PackageResponse,
+  SubscriptionResponse,
+  SuperAdminSubscriptionUpdateRequest,
+} from "@/types/subscription";
+import type { GenericMessageResponse, StaffDetailResponse } from "@/types/user";
+
+export async function listRestaurants(): Promise<RestaurantMeResponse[]> {
+  return api.get<RestaurantMeResponse[]>("/restaurants");
+}
+
+export async function listPackages(): Promise<PackageResponse[]> {
+  const response = await api.get<PackageListResponse>("/packages");
+  return response.items;
+}
+
+export async function getRestaurant(restaurantId: number): Promise<RestaurantMeResponse> {
+  return api.get<RestaurantMeResponse>(`/restaurants/${restaurantId}`);
+}
+
+export async function createRestaurant(
+  payload: RestaurantCreateRequest,
+): Promise<RestaurantMeResponse> {
+  return api.post<RestaurantMeResponse>("/restaurants", payload);
+}
+
+export async function uploadRestaurantLogo(
+  restaurantId: number,
+  file: File,
+): Promise<RestaurantLogoUploadResponse> {
+  const body = new FormData();
+  body.append("file", file);
+  return api.post<RestaurantLogoUploadResponse>(`/restaurants/${restaurantId}/logo`, body);
+}
+
+export async function updateRestaurant(
+  restaurantId: number,
+  payload: RestaurantAdminUpdateRequest,
+): Promise<RestaurantMeResponse> {
+  return api.patch<RestaurantMeResponse>(`/restaurants/${restaurantId}`, payload);
+}
+
+export async function deleteRestaurant(
+  restaurantId: number,
+): Promise<RestaurantDeleteResponse> {
+  return api.delete<RestaurantDeleteResponse>(`/restaurants/${restaurantId}`);
+}
+
+export async function getRestaurantSubscription(
+  restaurantId: number,
+): Promise<SubscriptionResponse> {
+  return api.get<SubscriptionResponse>(`/subscriptions/admin/${restaurantId}`);
+}
+
+export async function updateRestaurantSubscription(
+  restaurantId: number,
+  payload: SuperAdminSubscriptionUpdateRequest,
+): Promise<SubscriptionResponse> {
+  return api.patch<SubscriptionResponse>(`/subscriptions/admin/${restaurantId}`, payload);
+}
+
+export async function expireOverdueSubscriptions(): Promise<{
+  message: string;
+  expired_count: number;
+}> {
+  return api.post<{ message: string; expired_count: number }>(
+    "/subscriptions/admin/expire-overdue",
+    {},
+  );
+}
+
+export async function listRestaurantUsers(
+  restaurantId: number,
+): Promise<StaffDetailResponse[]> {
+  return api.get<StaffDetailResponse[]>(`/restaurants/${restaurantId}/users`);
+}
+
+export async function createRestaurantUser(
+  restaurantId: number,
+  payload: {
+    full_name: string;
+    email: string;
+    password: string;
+    role: string;
+  },
+): Promise<StaffDetailResponse> {
+  return api.post<StaffDetailResponse>(`/restaurants/${restaurantId}/users`, payload);
+}
+
+export async function toggleRestaurantUser(
+  restaurantId: number,
+  userId: number,
+  nextAction: "enable" | "disable",
+): Promise<{ id: number; is_active: boolean; message: string }> {
+  return api.patch<{ id: number; is_active: boolean; message: string }>(
+    `/restaurants/${restaurantId}/users/${userId}/${nextAction}`,
+    {},
+  );
+}
+
+export async function deleteRestaurantUser(
+  restaurantId: number,
+  userId: number,
+): Promise<GenericMessageResponse> {
+  return api.delete<GenericMessageResponse>(`/restaurants/${restaurantId}/users/${userId}`);
+}
+
+export async function buildSubscriptionStatusMap(
+  restaurants: RestaurantMeResponse[],
+): Promise<Record<number, string>> {
+  const entries = await Promise.all(
+    restaurants.map(async (restaurant) => {
+      try {
+        const subscription = await getRestaurantSubscription(restaurant.id);
+        return [restaurant.id, subscription.status] as const;
+      } catch {
+        return [restaurant.id, "none"] as const;
+      }
+    }),
+  );
+  return Object.fromEntries(entries);
+}

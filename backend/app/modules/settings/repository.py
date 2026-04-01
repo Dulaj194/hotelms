@@ -69,6 +69,51 @@ def list_pending_requests(
     )
 
 
+def list_reviewed_requests(
+    db: Session,
+    *,
+    restaurant_id: int | None = None,
+    status: SettingsRequestStatus | None = None,
+    limit: int = 100,
+) -> list[SettingsRequest]:
+    query = db.query(SettingsRequest).filter(
+        SettingsRequest.status.in_(
+            [SettingsRequestStatus.APPROVED, SettingsRequestStatus.REJECTED]
+        )
+    )
+    if restaurant_id is not None:
+        query = query.filter(SettingsRequest.restaurant_id == restaurant_id)
+    if status is not None:
+        query = query.filter(SettingsRequest.status == status)
+    return (
+        query.order_by(
+            SettingsRequest.reviewed_at.desc().nullslast(),
+            SettingsRequest.updated_at.desc(),
+            SettingsRequest.request_id.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+
+def count_reviewed_requests(
+    db: Session,
+    *,
+    restaurant_id: int | None = None,
+    status: SettingsRequestStatus | None = None,
+) -> int:
+    query = db.query(SettingsRequest).filter(
+        SettingsRequest.status.in_(
+            [SettingsRequestStatus.APPROVED, SettingsRequestStatus.REJECTED]
+        )
+    )
+    if restaurant_id is not None:
+        query = query.filter(SettingsRequest.restaurant_id == restaurant_id)
+    if status is not None:
+        query = query.filter(SettingsRequest.status == status)
+    return query.count()
+
+
 def has_pending_request_for_restaurant(db: Session, *, restaurant_id: int) -> bool:
     found = (
         db.query(SettingsRequest.request_id)

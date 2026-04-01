@@ -18,6 +18,46 @@ export interface PackageDetailResponse extends PackageResponse {
   updated_at: string;
 }
 
+export interface PackagePrivilegeCatalogItem {
+  code: string;
+  label: string;
+  description: string;
+}
+
+export interface PackagePrivilegeCatalogResponse {
+  items: PackagePrivilegeCatalogItem[];
+}
+
+export interface PackageAdminListResponse {
+  items: PackageDetailResponse[];
+  total: number;
+}
+
+export interface PackageCreateRequest {
+  name: string;
+  code: string;
+  description?: string | null;
+  price: number;
+  billing_period_days: number;
+  is_active: boolean;
+  privileges: string[];
+}
+
+export interface PackageUpdateRequest {
+  name?: string;
+  code?: string;
+  description?: string | null;
+  price?: number;
+  billing_period_days?: number;
+  is_active?: boolean;
+  privileges?: string[];
+}
+
+export interface PackageDeleteResponse {
+  message: string;
+  package_id: number;
+}
+
 export interface SubscriptionResponse {
   id: number | null;
   restaurant_id: number;

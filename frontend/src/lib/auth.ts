@@ -95,7 +95,7 @@ export function isAuthenticated(): boolean {
 export function getRoleRedirect(role: string): string {
   switch (normalizeRole(role)) {
     case "super_admin":
-      return "/super-admin/restaurants";
+      return "/super-admin";
     case "owner":
     case "admin":
       return "/dashboard";

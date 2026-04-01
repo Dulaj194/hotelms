@@ -39,7 +39,7 @@ from app.modules.auth.schemas import (
     TenantDataCountsResponse,
     TokenResponse,
 )
-from app.modules.subscriptions import service as subscription_service
+from app.modules.restaurants.model import RegistrationStatus
 from app.modules.users.model import UserRole
 from app.modules.users.repository import (
     get_by_id_global,
@@ -205,6 +205,45 @@ def _get_restaurant_name(db: Session, restaurant_id: int) -> str | None:
     return db.query(Restaurant.name).filter(Restaurant.id == restaurant_id).scalar()
 
 
+def _get_restaurant_for_user(db: Session, restaurant_id: int | None):
+    if restaurant_id is None:
+        return None
+
+    from app.modules.restaurants.model import Restaurant
+
+    return db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+
+
+def _ensure_restaurant_login_allowed(db: Session, restaurant_id: int | None) -> None:
+    if restaurant_id is None:
+        return
+
+    restaurant = _get_restaurant_for_user(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your restaurant account is unavailable.",
+        )
+
+    if restaurant.registration_status == RegistrationStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your registration is pending super admin approval.",
+        )
+
+    if restaurant.registration_status == RegistrationStatus.REJECTED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your registration was rejected. Please contact support.",
+        )
+
+    if not restaurant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your restaurant account is inactive.",
+        )
+
+
 def _count_model_rows(db: Session, model, restaurant_id: int) -> int:
     from sqlalchemy import func
 
@@ -332,12 +371,6 @@ async def register_restaurant(
             email=normalized_email,
             password_hash=hash_password(password),
             restaurant_id=restaurant.id,
-        )
-
-        subscription_service.assign_initial_trial_subscription(
-            db,
-            restaurant.id,
-            commit=False,
         )
 
         db.commit()
@@ -512,20 +545,6 @@ def login(
             detail=GENERIC_AUTH_ERROR_DETAIL,
         )
 
-    if not user.is_active:
-        write_audit_log(
-            db,
-            event_type="login_failed",
-            user_id=user.id,
-            ip_address=ip,
-            user_agent=user_agent,
-            metadata={"reason": "inactive_account"},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=GENERIC_AUTH_ERROR_DETAIL,
-        )
-
     if not is_login_scope_allowed(
         user_role=user.role,
         user_restaurant_id=user.restaurant_id,
@@ -546,6 +565,22 @@ def login(
                 "required_roles": allowed_role_values,
                 "require_restaurant_context": require_restaurant_context,
             },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=GENERIC_AUTH_ERROR_DETAIL,
+        )
+
+    _ensure_restaurant_login_allowed(db, user.restaurant_id)
+
+    if not user.is_active:
+        write_audit_log(
+            db,
+            event_type="login_failed",
+            user_id=user.id,
+            ip_address=ip,
+            user_agent=user_agent,
+            metadata={"reason": "inactive_account"},
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -731,6 +766,8 @@ def refresh(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive.",
         )
+
+    _ensure_restaurant_login_allowed(db, user.restaurant_id)
 
     # Rotate: delete old session, create new one
     redis_client.delete(redis_key)

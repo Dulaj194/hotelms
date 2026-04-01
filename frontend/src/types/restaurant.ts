@@ -1,3 +1,5 @@
+export type RestaurantRegistrationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
 export interface RestaurantResponse {
   id: number;
   name: string;
@@ -13,6 +15,10 @@ export interface RestaurantResponse {
   closing_time: string | null;
   logo_url: string | null;
   is_active: boolean;
+  registration_status: RestaurantRegistrationStatus;
+  registration_reviewed_by_id: number | null;
+  registration_review_notes: string | null;
+  registration_reviewed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +47,47 @@ export interface RestaurantUpdateRequest {
 export interface RestaurantLogoUploadResponse {
   logo_url: string;
   message: string;
+}
+
+export interface RestaurantRegistrationSummaryResponse {
+  restaurant_id: number;
+  name: string;
+  owner_user_id: number | null;
+  owner_full_name: string | null;
+  owner_email: string | null;
+  phone: string | null;
+  address: string | null;
+  country: string | null;
+  currency: string | null;
+  billing_email: string | null;
+  opening_time: string | null;
+  closing_time: string | null;
+  logo_url: string | null;
+  created_at: string;
+  registration_status: RestaurantRegistrationStatus;
+  registration_reviewed_by_id: number | null;
+  registration_review_notes: string | null;
+  registration_reviewed_at: string | null;
+}
+
+export interface PendingRestaurantRegistrationListResponse {
+  items: RestaurantRegistrationSummaryResponse[];
+  total: number;
+}
+
+export interface RestaurantRegistrationHistoryListResponse {
+  items: RestaurantRegistrationSummaryResponse[];
+  total: number;
+}
+
+export interface RestaurantRegistrationReviewRequest {
+  status: Extract<RestaurantRegistrationStatus, "APPROVED" | "REJECTED">;
+  review_notes?: string | null;
+}
+
+export interface RestaurantRegistrationReviewResponse {
+  message: string;
+  registration: RestaurantRegistrationSummaryResponse;
 }
 
 export interface RestaurantCreateRequest {

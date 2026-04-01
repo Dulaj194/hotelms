@@ -133,7 +133,7 @@ export default function Register() {
             Register Your Hotel
           </h1>
           <p className="text-sm text-muted-foreground">
-            Create your R.Luminuous account and start your free trial.
+            Submit your hotel for onboarding. Access is activated after super admin approval.
           </p>
         </div>
 

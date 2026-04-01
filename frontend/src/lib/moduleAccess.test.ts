@@ -15,7 +15,7 @@ describe("auth and module access guards", () => {
   });
 
   it("resolves role redirect for normalized super admin", () => {
-    expect(getRoleRedirect("s_admin")).toBe("/super-admin/restaurants");
+    expect(getRoleRedirect("s_admin")).toBe("/super-admin");
   });
 
   it("checks role access using normalized role values", () => {

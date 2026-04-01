@@ -234,8 +234,8 @@ async def register_restaurant(
         user_agent=_user_agent(request),
     )
     return RegisterRestaurantResponse(
-        message="Restaurant registered successfully. You can now sign in.",
-        message_key="registration_success",
+        message="Registration submitted successfully. Your account will activate after super admin approval.",
+        message_key="registration_pending_approval",
         restaurant_id=restaurant_id,
         owner_email=saved_owner_email,
         correlation_id=final_correlation_id,

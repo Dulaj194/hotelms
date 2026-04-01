@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app.modules.restaurants.model import Restaurant
+from app.modules.restaurants.model import RegistrationStatus, Restaurant
+from app.modules.users.model import User, UserRole
 
 # ─── Tenant-safe access ───────────────────────────────────────────────────────
 #
@@ -66,6 +67,83 @@ def get_by_id_for_super_admin(db: Session, restaurant_id: int) -> Restaurant | N
 def list_all_for_super_admin(db: Session) -> list[Restaurant]:
     """List all restaurants across all tenants. Use ONLY in super_admin endpoints."""
     return db.query(Restaurant).order_by(Restaurant.id.desc()).all()
+
+
+def list_by_registration_status(
+    db: Session,
+    registration_status: RegistrationStatus,
+    *,
+    limit: int = 100,
+) -> list[Restaurant]:
+    return (
+        db.query(Restaurant)
+        .filter(Restaurant.registration_status == registration_status)
+        .order_by(Restaurant.created_at.desc(), Restaurant.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def count_by_registration_status(
+    db: Session,
+    registration_status: RegistrationStatus,
+) -> int:
+    return (
+        db.query(Restaurant)
+        .filter(Restaurant.registration_status == registration_status)
+        .count()
+    )
+
+
+def list_reviewed_registrations(
+    db: Session,
+    *,
+    registration_status: RegistrationStatus | None = None,
+    limit: int = 100,
+) -> list[Restaurant]:
+    query = db.query(Restaurant).filter(
+        Restaurant.registration_status.in_(
+            [RegistrationStatus.APPROVED, RegistrationStatus.REJECTED]
+        )
+    )
+    if registration_status is not None:
+        query = query.filter(Restaurant.registration_status == registration_status)
+    return (
+        query.order_by(
+            Restaurant.registration_reviewed_at.desc().nullslast(),
+            Restaurant.updated_at.desc(),
+            Restaurant.id.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+
+def count_reviewed_registrations(
+    db: Session,
+    *,
+    registration_status: RegistrationStatus | None = None,
+) -> int:
+    query = db.query(Restaurant).filter(
+        Restaurant.registration_status.in_(
+            [RegistrationStatus.APPROVED, RegistrationStatus.REJECTED]
+        )
+    )
+    if registration_status is not None:
+        query = query.filter(Restaurant.registration_status == registration_status)
+    return query.count()
+
+
+def get_owner_user(db: Session, restaurant_id: int) -> User | None:
+    return (
+        db.query(User)
+        .filter(
+            User.restaurant_id == restaurant_id,
+            User.role == UserRole.owner,
+        )
+        .order_by(User.created_at.asc(), User.id.asc())
+        .first()
+    )
 
 
 def create_restaurant(

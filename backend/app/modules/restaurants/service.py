@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 import secrets
 import string
@@ -13,15 +14,21 @@ from app.modules.audit_logs.service import write_audit_log
 from app.modules.reference_data import service as reference_data_service
 from app.modules.restaurants import repository
 from app.modules.subscriptions import service as subscription_service
+from app.modules.restaurants.model import RegistrationStatus
 from app.modules.users.model import UserRole
-from app.modules.users.repository import create_staff, get_user_by_email
+from app.modules.users.repository import create_staff, get_user_by_email, list_by_restaurant
 from app.modules.users.schemas import StaffCreateRequest
 from app.modules.restaurants.schemas import (
+    PendingRestaurantRegistrationListResponse,
     RestaurantAdminUpdateRequest,
     RestaurantCreateRequest,
     RestaurantDeleteResponse,
+    RestaurantRegistrationHistoryListResponse,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
+    RestaurantRegistrationReviewRequest,
+    RestaurantRegistrationReviewResponse,
+    RestaurantRegistrationSummaryResponse,
     RestaurantUpdateRequest,
 )
 
@@ -214,6 +221,46 @@ def list_all_restaurants(db: Session) -> list[RestaurantMeResponse]:
     return [_serialize_restaurant(r) for r in restaurants]
 
 
+def list_pending_restaurant_registrations(
+    db: Session,
+    *,
+    limit: int = 100,
+) -> PendingRestaurantRegistrationListResponse:
+    total = repository.count_by_registration_status(db, RegistrationStatus.PENDING)
+    restaurants = repository.list_by_registration_status(
+        db,
+        RegistrationStatus.PENDING,
+        limit=limit,
+    )
+    items = [
+        _serialize_registration_summary_with_db(db, restaurant)
+        for restaurant in restaurants
+    ]
+    return PendingRestaurantRegistrationListResponse(items=items, total=total)
+
+
+def list_restaurant_registration_history(
+    db: Session,
+    *,
+    registration_status: RegistrationStatus | None,
+    limit: int = 100,
+) -> RestaurantRegistrationHistoryListResponse:
+    total = repository.count_reviewed_registrations(
+        db,
+        registration_status=registration_status,
+    )
+    restaurants = repository.list_reviewed_registrations(
+        db,
+        registration_status=registration_status,
+        limit=limit,
+    )
+    items = [
+        _serialize_registration_summary_with_db(db, restaurant)
+        for restaurant in restaurants
+    ]
+    return RestaurantRegistrationHistoryListResponse(items=items, total=total)
+
+
 def create_restaurant(db: Session, payload: RestaurantCreateRequest) -> RestaurantMeResponse:
     """Create a new restaurant tenant. Restricted to super_admin use only."""
     if payload.email and get_user_by_email(db, str(payload.email)):
@@ -329,9 +376,104 @@ def delete_restaurant_for_super_admin(
     )
 
 
+def review_restaurant_registration(
+    db: Session,
+    *,
+    restaurant_id: int,
+    reviewer_user_id: int,
+    payload: RestaurantRegistrationReviewRequest,
+) -> RestaurantRegistrationReviewResponse:
+    restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    if restaurant.registration_status != RegistrationStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only pending registrations can be reviewed.",
+        )
+
+    restaurant.registration_reviewed_by_id = reviewer_user_id
+    restaurant.registration_review_notes = payload.review_notes
+    restaurant.registration_reviewed_at = datetime.now(UTC)
+
+    users = list_by_restaurant(db, restaurant.id)
+
+    if payload.status == RegistrationStatus.APPROVED.value:
+        restaurant.registration_status = RegistrationStatus.APPROVED
+        restaurant.is_active = True
+        for user in users:
+            user.is_active = True
+        subscription_service.assign_initial_trial_subscription(
+            db,
+            restaurant.id,
+            commit=False,
+        )
+        message = "Registration approved. Trial subscription activated."
+        audit_event = "restaurant_registration_approved"
+    else:
+        restaurant.registration_status = RegistrationStatus.REJECTED
+        restaurant.is_active = False
+        for user in users:
+            user.is_active = False
+        message = "Registration rejected."
+        audit_event = "restaurant_registration_rejected"
+
+    db.commit()
+    db.refresh(restaurant)
+
+    write_audit_log(
+        db,
+        event_type=audit_event,
+        user_id=reviewer_user_id,
+        metadata={
+            "restaurant_id": restaurant.id,
+            "review_notes": payload.review_notes,
+        },
+    )
+
+    return RestaurantRegistrationReviewResponse(
+        message=message,
+        registration=_serialize_registration_summary_with_db(db, restaurant),
+    )
+
+
 def _generate_temporary_password(length: int = 12) -> str:
     alphabet = string.ascii_letters + string.digits + "@#$%!"
     return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _serialize_registration_summary_with_db(
+    db: Session,
+    restaurant,
+) -> RestaurantRegistrationSummaryResponse:
+    owner = repository.get_owner_user(db, restaurant.id)
+    return RestaurantRegistrationSummaryResponse(
+        restaurant_id=restaurant.id,
+        name=restaurant.name,
+        owner_user_id=owner.id if owner else None,
+        owner_full_name=owner.full_name if owner else None,
+        owner_email=owner.email if owner else restaurant.email,
+        phone=restaurant.phone,
+        address=restaurant.address,
+        country=restaurant.country,
+        currency=restaurant.currency,
+        billing_email=_effective_billing_email(
+            primary_email=restaurant.email,
+            billing_email=restaurant.billing_email,
+        ),
+        opening_time=restaurant.opening_time,
+        closing_time=restaurant.closing_time,
+        logo_url=restaurant.logo_url,
+        created_at=restaurant.created_at,
+        registration_status=restaurant.registration_status.value,
+        registration_reviewed_by_id=restaurant.registration_reviewed_by_id,
+        registration_review_notes=restaurant.registration_review_notes,
+        registration_reviewed_at=restaurant.registration_reviewed_at,
+    )
 
 
 def _with_normalized_reference_fields(

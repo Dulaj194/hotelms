@@ -9,21 +9,34 @@ from app.modules.restaurants import repository as restaurant_repository
 from app.modules.users.model import User, UserRole
 from app.modules.users.repository import (
     count_active_owners,
+    count_active_platform_users,
     create_staff,
+    create_platform_user as repo_create_platform_user,
     create_user as repo_create_user,
     delete_by_id,
+    delete_platform_user as repo_delete_platform_user,
     disable_by_id,
+    disable_platform_user as repo_disable_platform_user,
     enable_by_id,
+    enable_platform_user as repo_enable_platform_user,
     get_by_id,
     get_by_id_global,
     get_user_by_email,
     get_user_by_phone,
     get_user_by_username,
+    get_platform_user_by_id,
     list_by_restaurant,
+    list_platform_users as repo_list_platform_users,
+    update_platform_user as repo_update_platform_user,
     update_by_id,
 )
 from app.modules.users.schemas import (
     GenericMessageResponse,
+    PlatformUserCreateRequest,
+    PlatformUserDetailResponse,
+    PlatformUserListItemResponse,
+    PlatformUserListResponse,
+    PlatformUserUpdateRequest,
     StaffCreateRequest,
     StaffDetailResponse,
     StaffListItemResponse,
@@ -408,3 +421,226 @@ def delete_staff(
     )
 
     return GenericMessageResponse(message="Staff member deleted successfully.")
+
+
+def list_platform_users(
+    db: Session,
+    *,
+    is_active: bool | None = None,
+) -> PlatformUserListResponse:
+    users = repo_list_platform_users(db, is_active=is_active)
+    return PlatformUserListResponse(
+        items=[PlatformUserListItemResponse.model_validate(user) for user in users],
+        total=len(users),
+    )
+
+
+def get_platform_user(
+    db: Session,
+    user_id: int,
+) -> PlatformUserDetailResponse:
+    user = get_platform_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+    return PlatformUserDetailResponse.model_validate(user)
+
+
+def create_platform_user(
+    db: Session,
+    data: PlatformUserCreateRequest,
+    current_user: User,
+) -> PlatformUserDetailResponse:
+    normalized_username = data.username.strip().lower() if data.username else None
+    normalized_phone = data.phone.strip() if data.phone else None
+
+    if get_user_by_email(db, data.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this email already exists.",
+        )
+    if normalized_username and get_user_by_username(db, normalized_username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this username already exists.",
+        )
+    if normalized_phone and get_user_by_phone(db, normalized_phone):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this contact number already exists.",
+        )
+
+    user = repo_create_platform_user(
+        db,
+        full_name=data.full_name,
+        email=str(data.email),
+        username=normalized_username,
+        phone=normalized_phone,
+        password=data.password,
+        is_active=data.is_active,
+        must_change_password=data.must_change_password,
+    )
+
+    write_audit_log(
+        db,
+        event_type="platform_user_created",
+        user_id=current_user.id,
+        metadata={"created_user_id": user.id},
+    )
+    return PlatformUserDetailResponse.model_validate(user)
+
+
+def update_platform_user(
+    db: Session,
+    user_id: int,
+    data: PlatformUserUpdateRequest,
+    current_user: User,
+) -> PlatformUserDetailResponse:
+    user = get_platform_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+
+    update_data = data.model_dump(exclude_unset=True)
+    if "email" in update_data and update_data["email"] != user.email:
+        if get_user_by_email(db, update_data["email"]):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this email already exists.",
+            )
+    if "username" in update_data:
+        normalized_username = update_data["username"].strip().lower() if update_data["username"] else None
+        if normalized_username != (user.username or None) and normalized_username and get_user_by_username(db, normalized_username):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this username already exists.",
+            )
+        update_data["username"] = normalized_username
+    if "phone" in update_data:
+        normalized_phone = update_data["phone"].strip() if update_data["phone"] else None
+        if normalized_phone != (user.phone or None) and normalized_phone and get_user_by_phone(db, normalized_phone):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this contact number already exists.",
+            )
+        update_data["phone"] = normalized_phone
+
+    if update_data.get("is_active") is False and user.is_active and count_active_platform_users(db) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot deactivate the last active super admin account.",
+        )
+
+    updated = repo_update_platform_user(db, user, update_data)
+    write_audit_log(
+        db,
+        event_type="platform_user_updated",
+        user_id=current_user.id,
+        metadata={"updated_user_id": user_id},
+    )
+    return PlatformUserDetailResponse.model_validate(updated)
+
+
+def disable_platform_user(
+    db: Session,
+    user_id: int,
+    current_user: User,
+) -> StaffStatusResponse:
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot disable your own platform account.",
+        )
+
+    user = get_platform_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+    if user.is_active and count_active_platform_users(db) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot disable the last active super admin account.",
+        )
+
+    updated = repo_disable_platform_user(db, user)
+    write_audit_log(
+        db,
+        event_type="platform_user_disabled",
+        user_id=current_user.id,
+        metadata={"disabled_user_id": user_id},
+    )
+    return StaffStatusResponse(
+        id=updated.id,
+        is_active=updated.is_active,
+        message="Platform user disabled.",
+    )
+
+
+def enable_platform_user(
+    db: Session,
+    user_id: int,
+    current_user: User,
+) -> StaffStatusResponse:
+    user = get_platform_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+
+    updated = repo_enable_platform_user(db, user)
+    write_audit_log(
+        db,
+        event_type="platform_user_enabled",
+        user_id=current_user.id,
+        metadata={"enabled_user_id": user_id},
+    )
+    return StaffStatusResponse(
+        id=updated.id,
+        is_active=updated.is_active,
+        message="Platform user enabled.",
+    )
+
+
+def delete_platform_user(
+    db: Session,
+    user_id: int,
+    current_user: User,
+) -> GenericMessageResponse:
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot delete your own platform account.",
+        )
+
+    user = get_platform_user_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+    if user.is_active and count_active_platform_users(db) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete the last active super admin account.",
+        )
+    if user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Deactivate the platform account before deleting it.",
+        )
+
+    repo_delete_platform_user(db, user)
+    write_audit_log(
+        db,
+        event_type="platform_user_deleted",
+        user_id=current_user.id,
+        metadata={"deleted_user_id": user_id},
+    )
+    return GenericMessageResponse(message="Platform user deleted successfully.")

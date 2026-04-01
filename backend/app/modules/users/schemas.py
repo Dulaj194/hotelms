@@ -121,3 +121,48 @@ class StaffStatusResponse(BaseModel):
 
 class GenericMessageResponse(BaseModel):
     message: str
+
+
+class PlatformUserCreateRequest(BaseModel):
+    full_name: str = Field(..., min_length=1, max_length=255)
+    email: EmailStr
+    username: str | None = Field(None, min_length=3, max_length=64)
+    phone: str | None = Field(None, min_length=7, max_length=32)
+    password: str = Field(..., min_length=8)
+    is_active: bool = True
+    must_change_password: bool = False
+
+
+class PlatformUserUpdateRequest(BaseModel):
+    full_name: str | None = Field(None, min_length=1, max_length=255)
+    email: EmailStr | None = None
+    username: str | None = Field(None, min_length=3, max_length=64)
+    phone: str | None = Field(None, min_length=7, max_length=32)
+    password: str | None = Field(None, min_length=8)
+    is_active: bool | None = None
+    must_change_password: bool | None = None
+
+
+class PlatformUserListItemResponse(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    username: str | None
+    phone: str | None
+    role: str
+    is_active: bool
+    must_change_password: bool
+    last_login_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PlatformUserDetailResponse(PlatformUserListItemResponse):
+    restaurant_id: int | None
+
+
+class PlatformUserListResponse(BaseModel):
+    items: list[PlatformUserListItemResponse]
+    total: int

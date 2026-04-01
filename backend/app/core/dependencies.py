@@ -67,6 +67,39 @@ def get_current_user(
             detail="Account is inactive.",
         )
 
+    if user.restaurant_id is not None:
+        from app.modules.restaurants.model import RegistrationStatus, Restaurant
+
+        restaurant = db.query(Restaurant).filter(Restaurant.id == user.restaurant_id).first()
+        allowed_paths = {
+            "/api/v1/auth/me",
+            "/api/v1/auth/logout",
+            "/api/v1/auth/change-initial-password",
+            "/api/v1/auth/refresh",
+        }
+        request_path = request.url.path if request else None
+        if request_path not in allowed_paths:
+            if restaurant is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your restaurant account is unavailable.",
+                )
+            if restaurant.registration_status == RegistrationStatus.PENDING:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your registration is pending super admin approval.",
+                )
+            if restaurant.registration_status == RegistrationStatus.REJECTED:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your registration was rejected. Please contact support.",
+                )
+            if not restaurant.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your restaurant account is inactive.",
+                )
+
     if user.must_change_password:
         allowed_paths = {
             "/api/v1/auth/me",

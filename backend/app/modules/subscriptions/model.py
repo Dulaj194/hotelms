@@ -54,5 +54,5 @@ class RestaurantSubscription(Base):
         nullable=False,
     )
 
-    package = relationship("Package")
+    package = relationship("Package", back_populates="subscriptions")
     restaurant = relationship("Restaurant")

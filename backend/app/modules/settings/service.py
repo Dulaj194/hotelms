@@ -137,6 +137,30 @@ def list_pending_settings_requests(
     )
 
 
+def list_reviewed_settings_requests(
+    db: Session,
+    *,
+    restaurant_id: int | None,
+    status: SettingsRequestStatus | None,
+    limit: int = 100,
+) -> SettingsRequestListResponse:
+    items = repository.list_reviewed_requests(
+        db,
+        restaurant_id=restaurant_id,
+        status=status,
+        limit=limit,
+    )
+    total = repository.count_reviewed_requests(
+        db,
+        restaurant_id=restaurant_id,
+        status=status,
+    )
+    return SettingsRequestListResponse(
+        items=[SettingsRequestResponse.model_validate(item) for item in items],
+        total=total,
+    )
+
+
 def review_settings_request(
     db: Session,
     *,

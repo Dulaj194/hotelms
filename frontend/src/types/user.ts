@@ -66,6 +66,50 @@ export interface GenericMessageResponse {
   message: string;
 }
 
+
+export interface PlatformUserListItemResponse {
+  id: number;
+  full_name: string;
+  email: string;
+  username: string | null;
+  phone: string | null;
+  role: UserRole;
+  is_active: boolean;
+  must_change_password: boolean;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformUserDetailResponse extends PlatformUserListItemResponse {
+  restaurant_id: number | null;
+}
+
+export interface PlatformUserListResponse {
+  items: PlatformUserListItemResponse[];
+  total: number;
+}
+
+export interface PlatformUserCreateRequest {
+  full_name: string;
+  email: string;
+  username?: string | null;
+  phone?: string | null;
+  password: string;
+  is_active: boolean;
+  must_change_password: boolean;
+}
+
+export interface PlatformUserUpdateRequest {
+  full_name?: string;
+  email?: string;
+  username?: string | null;
+  phone?: string | null;
+  password?: string;
+  is_active?: boolean;
+  must_change_password?: boolean;
+}
+
 export const STAFF_ROLES: UserRole[] = ["owner", "admin", "steward", "housekeeper"];
 
 export const ROLE_LABELS: Record<UserRole, string> = {

@@ -40,8 +40,15 @@ const RoomMenu = lazy(() => import("@/pages/public/RoomMenu"));
 const TableMenu = lazy(() => import("@/pages/public/TableMenu"));
 const TableOrderStatus = lazy(() => import("@/pages/public/TableOrderStatus"));
 const ServiceRequest = lazy(() => import("@/pages/room/ServiceRequest"));
+const SuperAdminOverview = lazy(() => import("@/pages/super-admin/Overview"));
+const SuperAdminPendingRegistrations = lazy(() => import("@/pages/super-admin/PendingRegistrations"));
+const SuperAdminRegistrationHistory = lazy(() => import("@/pages/super-admin/RegistrationHistory"));
 const SuperAdminRestaurants = lazy(() => import("@/pages/super-admin/Restaurants"));
+const SuperAdminPackages = lazy(() => import("@/pages/super-admin/Packages"));
 const SuperAdminSettingsRequests = lazy(() => import("@/pages/super-admin/SettingsRequests"));
+const SuperAdminSettingsRequestHistory = lazy(() => import("@/pages/super-admin/SettingsRequestHistory"));
+const SuperAdminPromoCodes = lazy(() => import("@/pages/super-admin/PromoCodes"));
+const SuperAdminPlatformUsers = lazy(() => import("@/pages/super-admin/PlatformUsers"));
 
 function RootRedirect() {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
@@ -329,10 +336,42 @@ function AppRoutes() {
         />
 
         <Route
+          path="/super-admin"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminOverview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/registrations"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminPendingRegistrations />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/registrations/history"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminRegistrationHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/super-admin/restaurants"
           element={
             <ProtectedRoute allowedRoles={["super_admin"]}>
               <SuperAdminRestaurants />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/packages"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminPackages />
             </ProtectedRoute>
           }
         />
@@ -344,7 +383,30 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="/super-admin" element={<Navigate to="/super-admin/restaurants" replace />} />
+        <Route
+          path="/super-admin/settings-requests/history"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminSettingsRequestHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/promo-codes"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminPromoCodes />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/platform-users"
+          element={
+            <ProtectedRoute allowedRoles={["super_admin"]}>
+              <SuperAdminPlatformUsers />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="/admin" element={<RootRedirect />} />
         <Route path="/" element={<Landing />} />

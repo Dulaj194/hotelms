@@ -55,7 +55,11 @@ function getLoginErrorMessage(err: unknown, invalidCredentialsMessage: string): 
     return "Login failed. Please try again.";
   }
 
-  if ([401, 403].includes(err.status)) {
+  if (err.status === 403) {
+    return err.detail || "Access denied.";
+  }
+
+  if (err.status === 401) {
     return invalidCredentialsMessage;
   }
 
@@ -84,6 +88,10 @@ export default function Login() {
 
     if (noticeKey === "registration_success") {
       setNotice("Registration successful! Please sign in to continue.");
+    }
+
+    if (noticeKey === "registration_pending_approval") {
+      setNotice("Registration submitted. Your account will activate after super admin approval.");
     }
 
     const nextParams = new URLSearchParams(searchParams);

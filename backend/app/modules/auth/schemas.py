@@ -94,7 +94,7 @@ class RegisterRestaurantRequest(BaseModel):
 
 class RegisterRestaurantResponse(BaseModel):
     message: str
-    message_key: str = "registration_success"
+    message_key: str = "registration_pending_approval"
     restaurant_id: int
     owner_email: EmailStr
     correlation_id: str | None = None

@@ -1,0 +1,202 @@
+import sys
+import unittest
+from pathlib import Path
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND_ROOT))
+
+import app.db.init_models  # noqa: F401
+from app.core.security import hash_password  # noqa: E402
+from app.db.base import Base  # noqa: E402
+from app.modules.packages import service as packages_service  # noqa: E402
+from app.modules.packages.schemas import PackageCreateRequest, PackageUpdateRequest  # noqa: E402
+from app.modules.restaurants import service as restaurants_service  # noqa: E402
+from app.modules.restaurants.model import RegistrationStatus, Restaurant  # noqa: E402
+from app.modules.restaurants.schemas import RestaurantRegistrationReviewRequest  # noqa: E402
+from app.modules.settings import service as settings_service  # noqa: E402
+from app.modules.settings.schemas import SettingsRequestCreateRequest, SettingsRequestReviewRequest  # noqa: E402
+from app.modules.users import service as users_service  # noqa: E402
+from app.modules.users.model import User, UserRole  # noqa: E402
+from app.modules.users.schemas import PlatformUserCreateRequest  # noqa: E402
+
+
+class SuperAdminPlatformManagementTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine(
+            "sqlite+pysqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        self.SessionLocal = sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=self.engine,
+            expire_on_commit=False,
+        )
+        Base.metadata.create_all(bind=self.engine)
+        self.db = self.SessionLocal()
+        self.current_super_admin = User(
+            full_name="Root Super Admin",
+            email="root.super.admin@example.com",
+            password_hash=hash_password("Password1"),
+            role=UserRole.super_admin,
+            restaurant_id=None,
+            is_active=True,
+        )
+        self.db.add(self.current_super_admin)
+        self.db.commit()
+        self.db.refresh(self.current_super_admin)
+
+    def tearDown(self) -> None:
+        self.db.close()
+        self.engine.dispose()
+
+    def _create_pending_restaurant(self) -> tuple[Restaurant, User]:
+        restaurant = Restaurant(
+            name="History Hotel",
+            email="history.owner@example.com",
+            phone="0775551212",
+            address="No 1, History Street",
+            is_active=False,
+            registration_status=RegistrationStatus.PENDING,
+        )
+        self.db.add(restaurant)
+        self.db.flush()
+
+        owner = User(
+            full_name="History Owner",
+            email="history.owner@example.com",
+            password_hash=hash_password("Password1"),
+            role=UserRole.owner,
+            restaurant_id=restaurant.id,
+            is_active=True,
+        )
+        self.db.add(owner)
+        self.db.commit()
+        self.db.refresh(restaurant)
+        self.db.refresh(owner)
+        return restaurant, owner
+
+    def test_package_crud_flow_supports_privileges(self) -> None:
+        created = packages_service.create_package_for_super_admin(
+            self.db,
+            PackageCreateRequest(
+                name="Enterprise",
+                code="enterprise",
+                description="Full platform access.",
+                price="149.00",
+                billing_period_days=30,
+                is_active=True,
+                privileges=["QR_MENU", "OFFERS"],
+            ),
+        )
+
+        self.assertEqual(created.code, "enterprise")
+        self.assertEqual(created.privileges, ["OFFERS", "QR_MENU"])
+
+        updated = packages_service.update_package_for_super_admin(
+            self.db,
+            created.id,
+            PackageUpdateRequest(
+                price="159.00",
+                privileges=["QR_MENU", "HOUSEKEEPING", "OFFERS"],
+            ),
+        )
+
+        self.assertEqual(str(updated.price), "159.00")
+        self.assertEqual(updated.privileges, ["HOUSEKEEPING", "OFFERS", "QR_MENU"])
+
+        deleted = packages_service.delete_package_for_super_admin(self.db, created.id)
+        self.assertEqual(deleted.package_id, created.id)
+
+    def test_platform_user_lifecycle_respects_super_admin_guards(self) -> None:
+        created = users_service.create_platform_user(
+            self.db,
+            PlatformUserCreateRequest(
+                full_name="Operations Admin",
+                email="ops.super.admin@example.com",
+                username="ops.admin",
+                phone="0711234567",
+                password="Password1",
+                is_active=True,
+                must_change_password=True,
+            ),
+            self.current_super_admin,
+        )
+
+        self.assertEqual(created.role, "super_admin")
+        self.assertTrue(created.must_change_password)
+
+        disabled = users_service.disable_platform_user(
+            self.db,
+            created.id,
+            self.current_super_admin,
+        )
+        self.assertFalse(disabled.is_active)
+
+        deleted = users_service.delete_platform_user(
+            self.db,
+            created.id,
+            self.current_super_admin,
+        )
+        self.assertEqual(deleted.message, "Platform user deleted successfully.")
+
+    def test_review_history_lists_reviewed_records(self) -> None:
+        restaurant, owner = self._create_pending_restaurant()
+
+        restaurants_service.review_restaurant_registration(
+            self.db,
+            restaurant_id=restaurant.id,
+            reviewer_user_id=self.current_super_admin.id,
+            payload=RestaurantRegistrationReviewRequest(
+                status="APPROVED",
+                review_notes="Verified registration details.",
+            ),
+        )
+
+        registration_history = restaurants_service.list_restaurant_registration_history(
+            self.db,
+            registration_status=RegistrationStatus.APPROVED,
+            limit=10,
+        )
+
+        self.assertEqual(registration_history.total, 1)
+        self.assertEqual(registration_history.items[0].restaurant_id, restaurant.id)
+
+        settings_request = settings_service.create_settings_request(
+            self.db,
+            restaurant_id=restaurant.id,
+            requested_by=owner.id,
+            payload=SettingsRequestCreateRequest(
+                requested_changes={"phone": "0112233445"},
+                request_reason="Switch reception line.",
+            ),
+        )
+
+        settings_service.review_settings_request(
+            self.db,
+            request_id=settings_request.request_id,
+            reviewer_user_id=self.current_super_admin.id,
+            payload=SettingsRequestReviewRequest(
+                status="APPROVED",
+                review_notes="Phone number updated after verification.",
+            ),
+        )
+
+        settings_history = settings_service.list_reviewed_settings_requests(
+            self.db,
+            restaurant_id=restaurant.id,
+            status=None,
+            limit=10,
+        )
+
+        self.assertEqual(settings_history.total, 1)
+        self.assertEqual(settings_history.items[0].request_id, settings_request.request_id)
+
+
+if __name__ == "__main__":
+    unittest.main()

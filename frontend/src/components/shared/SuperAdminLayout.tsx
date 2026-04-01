@@ -8,8 +8,13 @@ import {
 } from "@/lib/navigationHistory";
 
 const SUPER_ADMIN_NAV = [
+  { path: "/super-admin", label: "Overview" },
+  { path: "/super-admin/registrations", label: "Registrations" },
   { path: "/super-admin/restaurants", label: "Hotels" },
+  { path: "/super-admin/packages", label: "Packages" },
   { path: "/super-admin/settings-requests", label: "Settings Requests" },
+  { path: "/super-admin/promo-codes", label: "Promo Codes" },
+  { path: "/super-admin/platform-users", label: "Platform Users" },
 ];
 
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.superAdmin";
@@ -24,6 +29,13 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const user = getUser();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const sidebarNavRef = useRef<HTMLElement | null>(null);
+
+  const isNavItemActive = (path: string): boolean => {
+    if (path === "/super-admin") {
+      return location.pathname === "/super-admin";
+    }
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
 
   function handleLogout() {
     clearInAppNavigationHistory();
@@ -125,7 +137,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
           className="scrollbar-hide flex-1 overflow-y-auto space-y-0.5 px-2 py-4"
         >
           {SUPER_ADMIN_NAV.map((item) => {
-            const active = location.pathname === item.path;
+            const active = isNavItemActive(item.path);
             return (
               <Link
                 key={item.path}

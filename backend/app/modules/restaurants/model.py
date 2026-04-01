@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -16,6 +17,12 @@ if TYPE_CHECKING:
     from app.modules.reference_data.model import Country, CurrencyType
     from app.modules.subcategories.model import Subcategory
     from app.modules.users.model import User
+
+
+class RegistrationStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 
 class Restaurant(Base):
@@ -46,6 +53,22 @@ class Restaurant(Base):
     closing_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    registration_status: Mapped[RegistrationStatus] = mapped_column(
+        Enum(RegistrationStatus),
+        default=RegistrationStatus.APPROVED,
+        nullable=False,
+    )
+    registration_reviewed_by_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    registration_review_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    registration_reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -57,7 +80,15 @@ class Restaurant(Base):
     )
 
     # One restaurant has many users.
-    users: Mapped[list[User]] = relationship("User", back_populates="restaurant")
+    users: Mapped[list[User]] = relationship(
+        "User",
+        back_populates="restaurant",
+        foreign_keys="User.restaurant_id",
+    )
+    registration_reviewer: Mapped[User | None] = relationship(
+        "User",
+        foreign_keys=[registration_reviewed_by_id],
+    )
 
     # One restaurant has menus, categories, subcategories, and items.
     menus: Mapped[list[Menu]] = relationship("Menu", back_populates="restaurant")
