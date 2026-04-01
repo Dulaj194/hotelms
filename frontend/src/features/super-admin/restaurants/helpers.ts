@@ -26,3 +26,31 @@ export function getRestaurantLogoUrl(logoUrl: string | null | undefined): string
   if (!logoUrl) return null;
   return `${import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"}${logoUrl}`;
 }
+
+export function getWebhookStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "healthy":
+      return "bg-green-100 text-green-700";
+    case "disabled":
+      return "bg-slate-200 text-slate-600";
+    case "degraded":
+      return "bg-amber-100 text-amber-700";
+    default:
+      return "bg-blue-100 text-blue-700";
+  }
+}
+
+export function formatWebhookStatusLabel(status: string): string {
+  switch (status) {
+    case "not_configured":
+      return "Not Configured";
+    case "healthy":
+      return "Healthy";
+    case "degraded":
+      return "Needs Attention";
+    case "disabled":
+      return "Disabled";
+    default:
+      return status;
+  }
+}

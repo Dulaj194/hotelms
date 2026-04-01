@@ -4,6 +4,13 @@ import type { ModuleAccessSnapshot } from "@/types/access";
 export const HOUSEKEEPING_TASK_ROLES = ["owner", "admin", "housekeeper"] as const;
 export const HOUSEKEEPING_SUPERVISOR_ROLES = ["owner", "admin"] as const;
 export const QR_MENU_STAFF_ROLES = ["owner", "admin", "steward"] as const;
+export const BILLING_STAFF_ROLES = [
+  "owner",
+  "admin",
+  "steward",
+  "cashier",
+  "accountant",
+] as const;
 
 export function hasRoleAccess(
   role: string | null | undefined,

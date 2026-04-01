@@ -1,10 +1,14 @@
 import { api } from "@/lib/api";
 import type {
+  RestaurantApiKeyProvisionResponse,
   RestaurantAdminUpdateRequest,
   RestaurantCreateRequest,
   RestaurantDeleteResponse,
+  RestaurantIntegrationResponse,
+  RestaurantIntegrationUpdateRequest,
   RestaurantLogoUploadResponse,
   RestaurantMeResponse,
+  RestaurantWebhookHealthRefreshResponse,
 } from "@/types/restaurant";
 import type {
   PackageAdminListResponse,
@@ -13,7 +17,7 @@ import type {
   SubscriptionResponse,
   SuperAdminSubscriptionUpdateRequest,
 } from "@/types/subscription";
-import type { GenericMessageResponse, StaffDetailResponse } from "@/types/user";
+import type { GenericMessageResponse, StaffDetailResponse, UserRole } from "@/types/user";
 
 export async function listRestaurants(): Promise<RestaurantMeResponse[]> {
   return api.get<RestaurantMeResponse[]>("/restaurants");
@@ -54,6 +58,51 @@ export async function deleteRestaurant(
   restaurantId: number,
 ): Promise<RestaurantDeleteResponse> {
   return api.delete<RestaurantDeleteResponse>(`/restaurants/${restaurantId}`);
+}
+
+export async function updateRestaurantIntegration(
+  restaurantId: number,
+  payload: RestaurantIntegrationUpdateRequest,
+): Promise<RestaurantIntegrationResponse> {
+  return api.patch<RestaurantIntegrationResponse>(
+    `/restaurants/${restaurantId}/integration`,
+    payload,
+  );
+}
+
+export async function generateRestaurantApiKey(
+  restaurantId: number,
+): Promise<RestaurantApiKeyProvisionResponse> {
+  return api.post<RestaurantApiKeyProvisionResponse>(
+    `/restaurants/${restaurantId}/integration/api-key/generate`,
+    {},
+  );
+}
+
+export async function rotateRestaurantApiKey(
+  restaurantId: number,
+): Promise<RestaurantApiKeyProvisionResponse> {
+  return api.post<RestaurantApiKeyProvisionResponse>(
+    `/restaurants/${restaurantId}/integration/api-key/rotate`,
+    {},
+  );
+}
+
+export async function revokeRestaurantApiKey(
+  restaurantId: number,
+): Promise<RestaurantIntegrationResponse["api_key"]> {
+  return api.delete<RestaurantIntegrationResponse["api_key"]>(
+    `/restaurants/${restaurantId}/integration/api-key`,
+  );
+}
+
+export async function refreshRestaurantWebhookHealth(
+  restaurantId: number,
+): Promise<RestaurantWebhookHealthRefreshResponse> {
+  return api.post<RestaurantWebhookHealthRefreshResponse>(
+    `/restaurants/${restaurantId}/integration/webhook/refresh`,
+    {},
+  );
 }
 
 export async function getRestaurantSubscription(
@@ -99,7 +148,7 @@ export async function createRestaurantUser(
     full_name: string;
     email: string;
     password: string;
-    role: string;
+    role: UserRole;
   },
 ): Promise<StaffDetailResponse> {
   return api.post<StaffDetailResponse>(`/restaurants/${restaurantId}/users`, payload);

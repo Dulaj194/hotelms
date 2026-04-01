@@ -6,15 +6,20 @@ from app.modules.restaurants import service
 from app.modules.restaurants.model import RegistrationStatus
 from app.modules.restaurants.schemas import (
     PendingRestaurantRegistrationListResponse,
+    RestaurantApiKeyProvisionResponse,
+    RestaurantApiKeySummaryResponse,
     RestaurantAdminUpdateRequest,
     RestaurantCreateRequest,
     RestaurantDeleteResponse,
+    RestaurantIntegrationResponse,
+    RestaurantIntegrationUpdateRequest,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
     RestaurantRegistrationHistoryListResponse,
     RestaurantRegistrationReviewRequest,
     RestaurantRegistrationReviewResponse,
     RestaurantUpdateRequest,
+    RestaurantWebhookHealthRefreshResponse,
 )
 from app.modules.users import service as users_service
 from app.modules.users.model import User
@@ -155,6 +160,87 @@ def update_restaurant_by_id(
 ) -> RestaurantMeResponse:
     """Update any restaurant by ID. Super-admin only."""
     return service.update_restaurant_for_super_admin(db, restaurant_id, payload)
+
+
+@router.patch("/{restaurant_id}/integration", response_model=RestaurantIntegrationResponse)
+def update_restaurant_integration(
+    restaurant_id: int,
+    payload: RestaurantIntegrationUpdateRequest,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantIntegrationResponse:
+    return service.update_restaurant_integration_settings(
+        db,
+        restaurant_id=restaurant_id,
+        payload=payload,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/api-key/generate",
+    response_model=RestaurantApiKeyProvisionResponse,
+)
+def generate_restaurant_api_key(
+    restaurant_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantApiKeyProvisionResponse:
+    return service.provision_restaurant_api_key(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+        rotate=False,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/api-key/rotate",
+    response_model=RestaurantApiKeyProvisionResponse,
+)
+def rotate_restaurant_api_key(
+    restaurant_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantApiKeyProvisionResponse:
+    return service.provision_restaurant_api_key(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+        rotate=True,
+    )
+
+
+@router.delete(
+    "/{restaurant_id}/integration/api-key",
+    response_model=RestaurantApiKeySummaryResponse,
+)
+def revoke_restaurant_api_key(
+    restaurant_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantApiKeySummaryResponse:
+    return service.revoke_restaurant_api_key(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/webhook/refresh",
+    response_model=RestaurantWebhookHealthRefreshResponse,
+)
+def refresh_restaurant_webhook_health(
+    restaurant_id: int,
+    current_user: User = Depends(require_roles("super_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookHealthRefreshResponse:
+    return service.refresh_restaurant_webhook_health(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+    )
 
 
 @router.delete("/{restaurant_id}", response_model=RestaurantDeleteResponse)

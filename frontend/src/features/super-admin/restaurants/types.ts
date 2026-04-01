@@ -36,6 +36,11 @@ export type AddHotelUserFormState = {
   role: UserRole;
 };
 
+export type IntegrationFormState = {
+  public_ordering_enabled: boolean;
+  webhook_url: string;
+};
+
 export type SuperAdminRestaurantsState = {
   list: RestaurantMeResponse[];
   subscriptionStatusByHotel: Record<number, string>;

@@ -21,7 +21,7 @@ router = APIRouter()
 def get_admin_dashboard_overview(
     current_user=Depends(require_restaurant_user),
     db: Session = Depends(get_db),
-    _=Depends(require_roles("owner", "admin", "steward", "housekeeper")),
+    _=Depends(require_roles("owner", "admin", "steward", "housekeeper", "cashier", "accountant")),
 ) -> AdminDashboardOverviewResponse:
     restaurant_id = current_user.restaurant_id
     if restaurant_id is None:

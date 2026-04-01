@@ -18,6 +18,11 @@ describe("auth and module access guards", () => {
     expect(getRoleRedirect("s_admin")).toBe("/super-admin");
   });
 
+  it("routes billing-focused roles to the billing workspace", () => {
+    expect(getRoleRedirect("cashier")).toBe("/admin/billing");
+    expect(getRoleRedirect("accountant")).toBe("/admin/billing");
+  });
+
   it("checks role access using normalized role values", () => {
     expect(hasRoleAccess("ADMIN", ["owner", "admin"])).toBe(true);
     expect(hasRoleAccess("steward", ["owner", "admin"])).toBe(false);

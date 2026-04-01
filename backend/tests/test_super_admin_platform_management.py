@@ -1,7 +1,9 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from fastapi import Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -18,14 +20,40 @@ from app.modules.packages import repository as packages_repository  # noqa: E402
 from app.modules.packages.schemas import PackageCreateRequest, PackageUpdateRequest  # noqa: E402
 from app.modules.restaurants import service as restaurants_service  # noqa: E402
 from app.modules.restaurants.model import RegistrationStatus, Restaurant  # noqa: E402
-from app.modules.restaurants.schemas import RestaurantRegistrationReviewRequest  # noqa: E402
+from app.modules.restaurants.schemas import (
+    RestaurantIntegrationUpdateRequest,
+    RestaurantRegistrationReviewRequest,
+)  # noqa: E402
 from app.modules.settings import service as settings_service  # noqa: E402
 from app.modules.settings.schemas import SettingsRequestCreateRequest, SettingsRequestReviewRequest  # noqa: E402
 from app.modules.subscriptions import service as subscriptions_service  # noqa: E402
 from app.modules.subscriptions.schemas import SuperAdminSubscriptionUpdateRequest  # noqa: E402
 from app.modules.users import service as users_service  # noqa: E402
 from app.modules.users.model import User, UserRole  # noqa: E402
-from app.modules.users.schemas import PlatformUserCreateRequest  # noqa: E402
+from app.modules.users.schemas import PlatformUserCreateRequest, StaffCreateRequest  # noqa: E402
+
+
+class _FakeRedis:
+    def get(self, _key: str):
+        return None
+
+    def pipeline(self):
+        return self
+
+    def incr(self, _key: str):
+        return self
+
+    def expire(self, _key: str, _seconds: int):
+        return self
+
+    def execute(self):
+        return None
+
+    def delete(self, _key: str):
+        return 0
+
+    def setex(self, _key: str, _seconds: int, _value: str):
+        return True
 
 
 class SuperAdminPlatformManagementTests(unittest.TestCase):
@@ -177,6 +205,84 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         )
         self.assertEqual(deleted.message, "Platform user deleted successfully.")
 
+    def test_super_admin_can_manage_cashier_and_accountant_roles(self) -> None:
+        restaurant = self._create_active_restaurant()
+
+        cashier = users_service.add_staff(
+            self.db,
+            None,
+            StaffCreateRequest(
+                full_name="Cashier User",
+                email="cashier.user@example.com",
+                password="Password1",
+                role=UserRole.cashier,
+                restaurant_id=restaurant.id,
+            ),
+            self.current_super_admin,
+        )
+        accountant = users_service.add_staff(
+            self.db,
+            None,
+            StaffCreateRequest(
+                full_name="Accountant User",
+                email="accountant.user@example.com",
+                password="Password1",
+                role=UserRole.accountant,
+                restaurant_id=restaurant.id,
+            ),
+            self.current_super_admin,
+        )
+
+        self.assertEqual(cashier.role, "cashier")
+        self.assertEqual(cashier.assigned_area, "cashier")
+        self.assertEqual(accountant.role, "accountant")
+        self.assertEqual(accountant.assigned_area, "accounting")
+
+    def test_staff_login_supports_cashier_and_accountant_roles(self) -> None:
+        restaurant = self._create_active_restaurant()
+        cashier = User(
+            full_name="Shift Cashier",
+            email="shift.cashier@example.com",
+            password_hash=hash_password("Password1"),
+            role=UserRole.cashier,
+            assigned_area="cashier",
+            restaurant_id=restaurant.id,
+            is_active=True,
+        )
+        accountant = User(
+            full_name="Shift Accountant",
+            email="shift.accountant@example.com",
+            password_hash=hash_password("Password1"),
+            role=UserRole.accountant,
+            assigned_area="accounting",
+            restaurant_id=restaurant.id,
+            is_active=True,
+        )
+        self.db.add_all([cashier, accountant])
+        self.db.commit()
+
+        cashier_token = auth_service.login_staff(
+            self.db,
+            _FakeRedis(),
+            Response(),
+            cashier.email,
+            "Password1",
+            "127.0.0.1",
+            "unit-test",
+        )
+        accountant_token = auth_service.login_staff(
+            self.db,
+            _FakeRedis(),
+            Response(),
+            accountant.email,
+            "Password1",
+            "127.0.0.1",
+            "unit-test",
+        )
+
+        self.assertTrue(bool(cashier_token.access_token))
+        self.assertTrue(bool(accountant_token.access_token))
+
     def test_super_admin_access_summary_reflects_package_privileges(self) -> None:
         restaurant = self._create_active_restaurant()
         packages_service.ensure_default_packages(self.db)
@@ -280,6 +386,68 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.assertFalse(me_snapshot.feature_flags.cashier)
         self.assertFalse(me_snapshot.module_access.reports)
         self.assertTrue(me_snapshot.module_access.billing)
+
+    def test_restaurant_api_key_and_webhook_management_flow(self) -> None:
+        restaurant = self._create_active_restaurant()
+
+        provisioned = restaurants_service.provision_restaurant_api_key(
+            self.db,
+            restaurant_id=restaurant.id,
+            current_user_id=self.current_super_admin.id,
+            rotate=False,
+        )
+
+        self.assertTrue(provisioned.summary.has_key)
+        self.assertTrue(provisioned.summary.is_active)
+        self.assertTrue(provisioned.api_key.startswith("hmsrk_"))
+
+        looked_up = restaurants_service.find_restaurant_by_api_key(
+            self.db,
+            provisioned.api_key,
+        )
+        self.assertIsNotNone(looked_up)
+        assert looked_up is not None
+        self.assertEqual(looked_up.id, restaurant.id)
+
+        integration = restaurants_service.update_restaurant_integration_settings(
+            self.db,
+            restaurant_id=restaurant.id,
+            payload=RestaurantIntegrationUpdateRequest(
+                public_ordering_enabled=True,
+                webhook_url="https://example.com/webhooks/orders",
+            ),
+            current_user_id=self.current_super_admin.id,
+        )
+        self.assertTrue(integration.settings.public_ordering_enabled)
+        self.assertEqual(
+            integration.settings.webhook_status,
+            "degraded",
+        )
+
+        with patch(
+            "app.modules.restaurants.service._probe_webhook_url",
+            return_value=(True, None),
+        ):
+            refreshed = restaurants_service.refresh_restaurant_webhook_health(
+                self.db,
+                restaurant_id=restaurant.id,
+                current_user_id=self.current_super_admin.id,
+            )
+
+        self.assertEqual(refreshed.settings.webhook_status, "healthy")
+
+        revoked = restaurants_service.revoke_restaurant_api_key(
+            self.db,
+            restaurant_id=restaurant.id,
+            current_user_id=self.current_super_admin.id,
+        )
+        self.assertFalse(revoked.has_key)
+        self.assertIsNone(
+            restaurants_service.find_restaurant_by_api_key(
+                self.db,
+                provisioned.api_key,
+            )
+        )
 
     def test_review_history_lists_reviewed_records(self) -> None:
         restaurant, owner = self._create_pending_restaurant()

@@ -124,6 +124,13 @@ MODULE_LANES = [
         "required_privileges": ["QR_MENU"],
     },
     {
+        "key": "billing",
+        "label": "Billing",
+        "path": "/admin/billing",
+        "required_roles": ["owner", "admin", "steward", "cashier", "accountant"],
+        "required_privileges": ["QR_MENU"],
+    },
+    {
         "key": "settings",
         "label": "Settings",
         "path": "/admin/restaurant-profile",
@@ -140,9 +147,12 @@ SLA_PRIORITY_MODEL = [
 ]
 
 
-def get_default_module(privileges: list[str]) -> str:
+def get_default_module(privileges: list[str], role: str | None = None) -> str:
     """Return the recommended landing lane key for the current privilege set."""
     priv_upper = {p.upper() for p in privileges}
+
+    if role in {"cashier", "accountant"} and "QR_MENU" in priv_upper:
+        return "billing"
 
     # QR-menu work gets first priority when it is available.
     if "QR_MENU" in priv_upper:

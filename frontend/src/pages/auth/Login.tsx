@@ -30,7 +30,7 @@ const LOGIN_FLOW_CONFIGS: Record<LoginFlow, LoginFlowConfig> = {
   },
   staff: {
     title: "Staff Sign In",
-    subtitle: "Use this portal if you are a steward or housekeeper.",
+    subtitle: "Use this portal if you are a steward, housekeeper, cashier, or accountant.",
     endpoint: "/auth/login/staff",
     invalidCredentialsMessage: "Invalid staff email or password.",
     submitLabel: "Sign in as Staff",

@@ -1,4 +1,5 @@
 import type { StaffDetailResponse } from "@/types/user";
+import { ROLE_LABELS } from "@/types/user";
 
 import { FormField } from "@/features/super-admin/restaurants/components/FormField";
 import { getBooleanStatusBadgeClass } from "@/features/super-admin/restaurants/helpers";
@@ -87,6 +88,8 @@ export function StaffPanel({
               <option value="owner">Owner</option>
               <option value="steward">Steward</option>
               <option value="housekeeper">Housekeeper</option>
+              <option value="cashier">Cashier</option>
+              <option value="accountant">Accountant</option>
             </select>
           </div>
           <button
@@ -125,7 +128,7 @@ export function StaffPanel({
                 </div>
                 <div className="mt-2 space-y-1 text-xs text-gray-600">
                   <p>Email: {user.email}</p>
-                  <p>Role: {user.role}</p>
+                  <p>Role: {ROLE_LABELS[user.role]}</p>
                 </div>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <button
@@ -171,7 +174,7 @@ export function StaffPanel({
                     <td className="px-3 py-2 text-gray-500 text-xs">{user.email}</td>
                     <td className="px-3 py-2">
                       <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium capitalize">
-                        {user.role}
+                        {ROLE_LABELS[user.role]}
                       </span>
                     </td>
                     <td className="px-3 py-2">

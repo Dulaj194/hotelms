@@ -4,7 +4,11 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import PrivilegeRoute from "@/components/shared/PrivilegeRoute";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { getRoleRedirect, getUser, isAuthenticated } from "@/lib/auth";
-import { HOUSEKEEPING_TASK_ROLES, QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
+import {
+  BILLING_STAFF_ROLES,
+  HOUSEKEEPING_TASK_ROLES,
+  QR_MENU_STAFF_ROLES,
+} from "@/lib/moduleAccess";
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const AllTableQRCodes = lazy(() => import("@/pages/admin/AllTableQRCodes"));
@@ -197,7 +201,7 @@ function AppRoutes() {
         <Route
           path="/admin/billing"
           element={
-            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+            <ProtectedRoute allowedRoles={[...BILLING_STAFF_ROLES]}>
               <PrivilegeRoute requiredModuleKey="billing">
                 <Billing />
               </PrivilegeRoute>

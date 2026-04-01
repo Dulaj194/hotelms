@@ -152,6 +152,46 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             "closing_time",
             "ALTER TABLE restaurants ADD COLUMN closing_time VARCHAR(8) NULL",
         ),
+        (
+            "integration_api_key_hash",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_hash VARCHAR(128) NULL",
+        ),
+        (
+            "integration_api_key_prefix",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_prefix VARCHAR(16) NULL",
+        ),
+        (
+            "integration_api_key_last4",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_last4 VARCHAR(4) NULL",
+        ),
+        (
+            "integration_api_key_active",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_active BOOLEAN NOT NULL DEFAULT FALSE",
+        ),
+        (
+            "integration_api_key_rotated_at",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_rotated_at DATETIME NULL",
+        ),
+        (
+            "integration_public_ordering_enabled",
+            "ALTER TABLE restaurants ADD COLUMN integration_public_ordering_enabled BOOLEAN NOT NULL DEFAULT FALSE",
+        ),
+        (
+            "integration_webhook_url",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_url VARCHAR(500) NULL",
+        ),
+        (
+            "integration_webhook_status",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_status VARCHAR(32) NOT NULL DEFAULT 'not_configured'",
+        ),
+        (
+            "integration_webhook_last_checked_at",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_last_checked_at DATETIME NULL",
+        ),
+        (
+            "integration_webhook_last_error",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_last_error TEXT NULL",
+        ),
     )
 
     category_column_patches: Sequence[tuple[str, str]] = (
@@ -328,6 +368,24 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             logger.warning(
                 "Applied development schema patch: users.%s was missing and has been added.",
                 column_name,
+            )
+
+        if _table_exists(conn, "users") and _column_exists(conn, "users", "role"):
+            conn.execute(
+                text(
+                    """
+                    ALTER TABLE users
+                    MODIFY COLUMN role ENUM(
+                        'owner',
+                        'admin',
+                        'steward',
+                        'housekeeper',
+                        'cashier',
+                        'accountant',
+                        'super_admin'
+                    ) NOT NULL
+                    """
+                )
             )
 
         for column_name, alter_sql in restaurant_column_patches:

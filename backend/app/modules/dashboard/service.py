@@ -234,7 +234,7 @@ def get_admin_dashboard_overview(
     metrics = _build_metrics(db, restaurant_id=restaurant_id)
 
     module_lanes = _build_module_lanes(role=role, privileges=privileges_response.privileges)
-    default_module = get_default_module(privileges_response.privileges)
+    default_module = get_default_module(privileges_response.privileges, role=role)
 
     return AdminDashboardOverviewResponse(
         restaurant=DashboardRestaurantSummary(

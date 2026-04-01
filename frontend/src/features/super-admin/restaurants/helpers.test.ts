@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatWebhookStatusLabel,
   formatSubscriptionStatusLabel,
   getBooleanStatusBadgeClass,
   getSubscriptionStatusBadgeClass,
+  getWebhookStatusBadgeClass,
 } from "@/features/super-admin/restaurants/helpers";
 
 describe("restaurant admin helpers", () => {
@@ -23,5 +25,12 @@ describe("restaurant admin helpers", () => {
     expect(getSubscriptionStatusBadgeClass("trial")).toContain("blue");
     expect(getSubscriptionStatusBadgeClass("expired")).toContain("red");
     expect(getSubscriptionStatusBadgeClass("unknown")).toContain("amber");
+  });
+
+  it("formats webhook health statuses for the integration panel", () => {
+    expect(formatWebhookStatusLabel("not_configured")).toBe("Not Configured");
+    expect(formatWebhookStatusLabel("degraded")).toBe("Needs Attention");
+    expect(getWebhookStatusBadgeClass("healthy")).toContain("green");
+    expect(getWebhookStatusBadgeClass("disabled")).toContain("slate");
   });
 });

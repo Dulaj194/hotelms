@@ -3,7 +3,12 @@ from __future__ import annotations
 from app.modules.users.model import UserRole
 
 RESTAURANT_ADMIN_LOGIN_ROLES = {UserRole.owner, UserRole.admin}
-STAFF_LOGIN_ROLES = {UserRole.steward, UserRole.housekeeper}
+STAFF_LOGIN_ROLES = {
+    UserRole.steward,
+    UserRole.housekeeper,
+    UserRole.cashier,
+    UserRole.accountant,
+}
 SUPER_ADMIN_LOGIN_ROLES = {UserRole.super_admin}
 
 

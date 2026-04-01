@@ -16,6 +16,8 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   steward: "Steward",
   housekeeper: "Housekeeper",
+  cashier: "Cashier",
+  accountant: "Accountant",
   super_admin: "Super Admin",
 };
 
@@ -24,6 +26,7 @@ const LANE_DESCRIPTIONS: Record<string, string> = {
   orders: "Review live QR and room-service orders with the current SLA priority.",
   housekeeping: "Continue room readiness and housekeeping task execution.",
   reports: "Review performance, sales, and daily operational summaries.",
+  billing: "Handle settlements, payment capture, and billing reconciliation.",
   settings: "Maintain restaurant profile, branding, and setup details.",
 };
 

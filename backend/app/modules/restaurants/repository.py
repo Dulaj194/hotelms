@@ -198,6 +198,17 @@ def update_for_super_admin(
     return restaurant
 
 
+def get_by_active_api_key_hash(db: Session, api_key_hash: str) -> Restaurant | None:
+    return (
+        db.query(Restaurant)
+        .filter(
+            Restaurant.integration_api_key_hash == api_key_hash,
+            Restaurant.integration_api_key_active.is_(True),
+        )
+        .first()
+    )
+
+
 def delete_for_super_admin(db: Session, restaurant_id: int) -> bool:
     """Delete any restaurant by ID. Use ONLY in super_admin endpoints."""
     restaurant = get_by_id_for_super_admin(db, restaurant_id)

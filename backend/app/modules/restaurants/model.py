@@ -25,6 +25,13 @@ class RegistrationStatus(str, enum.Enum):
     REJECTED = "REJECTED"
 
 
+class WebhookHealthStatus(str, enum.Enum):
+    not_configured = "not_configured"
+    healthy = "healthy"
+    degraded = "degraded"
+    disabled = "disabled"
+
+
 class Restaurant(Base):
     __tablename__ = "restaurants"
 
@@ -57,6 +64,34 @@ class Restaurant(Base):
     enable_reports: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     enable_accountant: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     enable_cashier: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    integration_api_key_hash: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+        index=True,
+    )
+    integration_api_key_prefix: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    integration_api_key_last4: Mapped[str | None] = mapped_column(String(4), nullable=True)
+    integration_api_key_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    integration_api_key_rotated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    integration_public_ordering_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    integration_webhook_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    integration_webhook_status: Mapped[WebhookHealthStatus] = mapped_column(
+        Enum(WebhookHealthStatus, native_enum=False),
+        default=WebhookHealthStatus.not_configured,
+        nullable=False,
+    )
+    integration_webhook_last_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    integration_webhook_last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     registration_status: Mapped[RegistrationStatus] = mapped_column(
         Enum(RegistrationStatus),

@@ -19,6 +19,8 @@ class UserRole(str, enum.Enum):
     admin = "admin"
     steward = "steward"
     housekeeper = "housekeeper"
+    cashier = "cashier"
+    accountant = "accountant"
     super_admin = "super_admin"
 
 

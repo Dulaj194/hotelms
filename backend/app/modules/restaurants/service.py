@@ -3,27 +3,35 @@ from datetime import UTC, datetime
 from pathlib import Path
 import secrets
 import string
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
+from app.core.security import hash_token
 from app.core.notifications import send_onboarding_email
 from app.modules.access import catalog as access_catalog
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.reference_data import service as reference_data_service
 from app.modules.restaurants import repository
 from app.modules.subscriptions import service as subscription_service
-from app.modules.restaurants.model import RegistrationStatus
+from app.modules.restaurants.model import RegistrationStatus, WebhookHealthStatus
 from app.modules.users.model import UserRole
 from app.modules.users.repository import create_staff, get_user_by_email, list_by_restaurant
 from app.modules.users.schemas import StaffCreateRequest
 from app.modules.restaurants.schemas import (
     PendingRestaurantRegistrationListResponse,
+    RestaurantApiKeyProvisionResponse,
+    RestaurantApiKeySummaryResponse,
     RestaurantAdminUpdateRequest,
     RestaurantCreateRequest,
     RestaurantDeleteResponse,
+    RestaurantIntegrationResponse,
+    RestaurantIntegrationSettingsResponse,
+    RestaurantIntegrationUpdateRequest,
     RestaurantRegistrationHistoryListResponse,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
@@ -31,6 +39,7 @@ from app.modules.restaurants.schemas import (
     RestaurantRegistrationReviewResponse,
     RestaurantRegistrationSummaryResponse,
     RestaurantUpdateRequest,
+    RestaurantWebhookHealthRefreshResponse,
 )
 
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -108,12 +117,79 @@ def _serialize_restaurant(restaurant) -> RestaurantMeResponse:
     return response.model_copy(
         update={
             "feature_flags": access_catalog.build_feature_flag_snapshot(restaurant),
+            "integration": _build_integration_response(restaurant),
             "billing_email": _effective_billing_email(
                 primary_email=response.email,
                 billing_email=response.billing_email,
             )
         }
     )
+
+
+def _mask_api_key(prefix: str | None, last4: str | None) -> str | None:
+    if not prefix or not last4:
+        return None
+    return f"{prefix}...{last4}"
+
+
+def _build_api_key_summary(restaurant) -> RestaurantApiKeySummaryResponse:
+    has_key = bool(
+        restaurant.integration_api_key_hash
+        and restaurant.integration_api_key_prefix
+        and restaurant.integration_api_key_last4
+    )
+    return RestaurantApiKeySummaryResponse(
+        has_key=has_key,
+        is_active=bool(has_key and restaurant.integration_api_key_active),
+        masked_key=_mask_api_key(
+            restaurant.integration_api_key_prefix,
+            restaurant.integration_api_key_last4,
+        ),
+        rotated_at=restaurant.integration_api_key_rotated_at,
+    )
+
+
+def _build_integration_settings(restaurant) -> RestaurantIntegrationSettingsResponse:
+    return RestaurantIntegrationSettingsResponse(
+        public_ordering_enabled=restaurant.integration_public_ordering_enabled,
+        webhook_url=restaurant.integration_webhook_url,
+        webhook_status=restaurant.integration_webhook_status.value,
+        webhook_last_checked_at=restaurant.integration_webhook_last_checked_at,
+        webhook_last_error=restaurant.integration_webhook_last_error,
+    )
+
+
+def _build_integration_response(restaurant) -> RestaurantIntegrationResponse:
+    return RestaurantIntegrationResponse(
+        api_key=_build_api_key_summary(restaurant),
+        settings=_build_integration_settings(restaurant),
+    )
+
+
+def _generate_restaurant_api_key() -> str:
+    return f"hmsrk_{secrets.token_hex(24)}"
+
+
+def _probe_webhook_url(
+    webhook_url: str,
+    timeout_seconds: float = 5.0,
+) -> tuple[bool, str | None]:
+    last_error: str | None = None
+    for method in ("HEAD", "GET"):
+        try:
+            request = urllib_request.Request(webhook_url, method=method)
+            with urllib_request.urlopen(request, timeout=timeout_seconds) as response:
+                status_code = getattr(response, "status", 200)
+                if 200 <= status_code < 400:
+                    return True, None
+                return False, f"Webhook returned HTTP {status_code}."
+        except urllib_error.HTTPError as exc:
+            if exc.code == 405 and method == "HEAD":
+                continue
+            last_error = f"Webhook returned HTTP {exc.code}."
+        except Exception as exc:  # pragma: no cover - depends on runtime network access
+            last_error = str(exc)
+    return False, last_error or "Unable to reach the webhook endpoint."
 
 
 def get_my_restaurant(db: Session, restaurant_id: int) -> RestaurantMeResponse:
@@ -218,6 +294,10 @@ def get_restaurant_for_super_admin(
             detail="Restaurant not found.",
         )
     return _serialize_restaurant(restaurant)
+
+
+def find_restaurant_by_api_key(db: Session, api_key: str):
+    return repository.get_by_active_api_key_hash(db, hash_token(api_key))
 
 
 def list_all_restaurants(db: Session) -> list[RestaurantMeResponse]:
@@ -353,6 +433,191 @@ def update_restaurant_for_super_admin(
             detail="Restaurant not found.",
         )
     return _serialize_restaurant(restaurant)
+
+
+def update_restaurant_integration_settings(
+    db: Session,
+    *,
+    restaurant_id: int,
+    payload: RestaurantIntegrationUpdateRequest,
+    current_user_id: int,
+) -> RestaurantIntegrationResponse:
+    restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    update_data = payload.model_dump(exclude_unset=True)
+    previous_webhook_url = restaurant.integration_webhook_url
+
+    if "public_ordering_enabled" in update_data:
+        restaurant.integration_public_ordering_enabled = bool(
+            update_data["public_ordering_enabled"]
+        )
+
+    if "webhook_url" in update_data:
+        restaurant.integration_webhook_url = (
+            str(update_data["webhook_url"]).strip() if update_data["webhook_url"] else None
+        )
+
+    if not restaurant.integration_public_ordering_enabled:
+        restaurant.integration_webhook_status = WebhookHealthStatus.disabled
+        restaurant.integration_webhook_last_error = "Public ordering integration is disabled."
+    elif not restaurant.integration_webhook_url:
+        restaurant.integration_webhook_status = WebhookHealthStatus.not_configured
+        restaurant.integration_webhook_last_checked_at = None
+        restaurant.integration_webhook_last_error = None
+    elif previous_webhook_url != restaurant.integration_webhook_url:
+        restaurant.integration_webhook_status = WebhookHealthStatus.degraded
+        restaurant.integration_webhook_last_checked_at = None
+        restaurant.integration_webhook_last_error = "Webhook endpoint updated. Run a health check."
+    elif restaurant.integration_webhook_status == WebhookHealthStatus.disabled:
+        restaurant.integration_webhook_status = WebhookHealthStatus.degraded
+        restaurant.integration_webhook_last_error = (
+            "Webhook endpoint is configured but not validated yet."
+        )
+
+    db.commit()
+    db.refresh(restaurant)
+
+    write_audit_log(
+        db,
+        event_type="restaurant_integration_updated",
+        user_id=current_user_id,
+        metadata={
+            "restaurant_id": restaurant.id,
+            "public_ordering_enabled": restaurant.integration_public_ordering_enabled,
+            "webhook_url": restaurant.integration_webhook_url,
+        },
+    )
+
+    return _build_integration_response(restaurant)
+
+
+def provision_restaurant_api_key(
+    db: Session,
+    *,
+    restaurant_id: int,
+    current_user_id: int,
+    rotate: bool,
+) -> RestaurantApiKeyProvisionResponse:
+    restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    api_key = _generate_restaurant_api_key()
+    restaurant.integration_api_key_hash = hash_token(api_key)
+    restaurant.integration_api_key_prefix = api_key[:12]
+    restaurant.integration_api_key_last4 = api_key[-4:]
+    restaurant.integration_api_key_active = True
+    restaurant.integration_api_key_rotated_at = datetime.now(UTC)
+
+    db.commit()
+    db.refresh(restaurant)
+
+    write_audit_log(
+        db,
+        event_type="restaurant_api_key_rotated" if rotate else "restaurant_api_key_generated",
+        user_id=current_user_id,
+        metadata={"restaurant_id": restaurant.id},
+    )
+
+    return RestaurantApiKeyProvisionResponse(
+        message="API key rotated successfully." if rotate else "API key generated successfully.",
+        api_key=api_key,
+        summary=_build_api_key_summary(restaurant),
+    )
+
+
+def revoke_restaurant_api_key(
+    db: Session,
+    *,
+    restaurant_id: int,
+    current_user_id: int,
+) -> RestaurantApiKeySummaryResponse:
+    restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    restaurant.integration_api_key_hash = None
+    restaurant.integration_api_key_prefix = None
+    restaurant.integration_api_key_last4 = None
+    restaurant.integration_api_key_active = False
+
+    db.commit()
+    db.refresh(restaurant)
+
+    write_audit_log(
+        db,
+        event_type="restaurant_api_key_revoked",
+        user_id=current_user_id,
+        metadata={"restaurant_id": restaurant.id},
+    )
+
+    return _build_api_key_summary(restaurant)
+
+
+def refresh_restaurant_webhook_health(
+    db: Session,
+    *,
+    restaurant_id: int,
+    current_user_id: int,
+) -> RestaurantWebhookHealthRefreshResponse:
+    restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    if not restaurant.integration_webhook_url:
+        restaurant.integration_webhook_status = WebhookHealthStatus.not_configured
+        restaurant.integration_webhook_last_checked_at = None
+        restaurant.integration_webhook_last_error = None
+        message = "Webhook health reset because no endpoint is configured."
+    elif not restaurant.integration_public_ordering_enabled:
+        restaurant.integration_webhook_status = WebhookHealthStatus.disabled
+        restaurant.integration_webhook_last_checked_at = datetime.now(UTC)
+        restaurant.integration_webhook_last_error = "Public ordering integration is disabled."
+        message = "Webhook health marked as disabled while public ordering is turned off."
+    else:
+        is_healthy, error_message = _probe_webhook_url(restaurant.integration_webhook_url)
+        restaurant.integration_webhook_status = (
+            WebhookHealthStatus.healthy if is_healthy else WebhookHealthStatus.degraded
+        )
+        restaurant.integration_webhook_last_checked_at = datetime.now(UTC)
+        restaurant.integration_webhook_last_error = error_message
+        message = (
+            "Webhook endpoint is reachable."
+            if is_healthy
+            else "Webhook endpoint check failed."
+        )
+
+    db.commit()
+    db.refresh(restaurant)
+
+    write_audit_log(
+        db,
+        event_type="restaurant_webhook_health_checked",
+        user_id=current_user_id,
+        metadata={
+            "restaurant_id": restaurant.id,
+            "webhook_status": restaurant.integration_webhook_status.value,
+        },
+    )
+
+    return RestaurantWebhookHealthRefreshResponse(
+        message=message,
+        settings=_build_integration_settings(restaurant),
+    )
 
 
 def delete_restaurant_for_super_admin(

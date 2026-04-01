@@ -1,5 +1,17 @@
-export type UserRole = "owner" | "admin" | "steward" | "housekeeper" | "super_admin";
-export type AssignedArea = "kitchen" | "housekeeping" | "steward";
+export type UserRole =
+  | "owner"
+  | "admin"
+  | "steward"
+  | "housekeeper"
+  | "cashier"
+  | "accountant"
+  | "super_admin";
+export type AssignedArea =
+  | "kitchen"
+  | "housekeeping"
+  | "steward"
+  | "cashier"
+  | "accounting";
 
 export interface StaffListItemResponse {
   id: number;
@@ -110,20 +122,62 @@ export interface PlatformUserUpdateRequest {
   must_change_password?: boolean;
 }
 
-export const STAFF_ROLES: UserRole[] = ["owner", "admin", "steward", "housekeeper"];
+export const STAFF_ROLES: UserRole[] = [
+  "owner",
+  "admin",
+  "steward",
+  "housekeeper",
+  "cashier",
+  "accountant",
+];
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   owner: "Owner",
   admin: "Admin",
   steward: "Steward",
   housekeeper: "Housekeeper",
+  cashier: "Cashier",
+  accountant: "Accountant",
   super_admin: "Super Admin",
 };
 
-export const ASSIGNED_AREAS: AssignedArea[] = ["kitchen", "housekeeping", "steward"];
+export const ASSIGNED_AREAS: AssignedArea[] = [
+  "kitchen",
+  "housekeeping",
+  "steward",
+  "cashier",
+  "accounting",
+];
 
 export const ASSIGNED_AREA_LABELS: Record<AssignedArea, string> = {
   kitchen: "Kitchen",
   housekeeping: "Housekeeping",
   steward: "Steward",
+  cashier: "Cashier",
+  accounting: "Accounting",
 };
+
+const ROLE_ALLOWED_AREAS: Record<UserRole, AssignedArea[]> = {
+  owner: [],
+  admin: [],
+  steward: ["steward", "kitchen"],
+  housekeeper: ["housekeeping"],
+  cashier: ["cashier"],
+  accountant: ["accounting"],
+  super_admin: [],
+};
+
+const ROLE_DEFAULT_AREA: Partial<Record<UserRole, AssignedArea>> = {
+  steward: "steward",
+  housekeeper: "housekeeping",
+  cashier: "cashier",
+  accountant: "accounting",
+};
+
+export function getAllowedAssignedAreasForRole(role: UserRole): AssignedArea[] {
+  return ROLE_ALLOWED_AREAS[role] ?? [];
+}
+
+export function getDefaultAssignedAreaForRole(role: UserRole): AssignedArea | null {
+  return ROLE_DEFAULT_AREA[role] ?? null;
+}

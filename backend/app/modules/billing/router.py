@@ -6,7 +6,7 @@ Endpoints (prefix /api/v1/billing):
   GET  /session/{session_id}/payments  — Payment records for the session
   GET  /session/{session_id}/status    — Quick billing status snapshot
 
-All endpoints require authenticated staff with role: owner | admin | steward.
+All endpoints require authenticated staff with role: owner | admin | steward | cashier | accountant.
 The restaurant_id is derived from the JWT token, never from the client request.
 """
 from fastapi import APIRouter, Depends
@@ -25,7 +25,7 @@ from app.modules.billing.schemas import (
 
 router = APIRouter()
 
-_STAFF_ROLES = ["owner", "admin", "steward"]
+_STAFF_ROLES = ["owner", "admin", "steward", "cashier", "accountant"]
 
 
 @router.get(

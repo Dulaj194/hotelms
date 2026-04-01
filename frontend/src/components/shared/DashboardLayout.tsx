@@ -26,6 +26,7 @@ import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 import {
+  BILLING_STAFF_ROLES,
   canAccessModuleItem,
   canAccessHousekeepingTasks,
 } from "@/lib/moduleAccess";
@@ -140,7 +141,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     path: "/admin/billing",
     label: "Billing",
     icon: Ticket,
-    roles: ["owner", "admin", "steward"],
+    roles: [...BILLING_STAFF_ROLES],
     privilege: "QR_MENU",
     moduleKey: "billing",
   },

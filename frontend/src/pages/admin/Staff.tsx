@@ -10,8 +10,9 @@ import type {
   UserRole,
 } from "@/types/user";
 import {
-  ASSIGNED_AREAS,
   ASSIGNED_AREA_LABELS,
+  getAllowedAssignedAreasForRole,
+  getDefaultAssignedAreaForRole,
   ROLE_LABELS,
   STAFF_ROLES,
 } from "@/types/user";
@@ -34,7 +35,7 @@ const EMPTY_CREATE: StaffCreateRequest = {
   phone: "",
   password: "",
   role: "steward",
-  assigned_area: "steward",
+  assigned_area: getDefaultAssignedAreaForRole("steward"),
   is_active: true,
 };
 
@@ -42,8 +43,15 @@ export default function Staff() {
   const currentUserRole = normalizeRole(getUser()?.role);
 
   function canManageRole(targetRole: UserRole): boolean {
-    if (currentUserRole === "owner") return targetRole !== "owner";
-    if (currentUserRole === "admin") return targetRole === "steward" || targetRole === "housekeeper";
+    if (currentUserRole === "owner") return targetRole !== "owner" && targetRole !== "super_admin";
+    if (currentUserRole === "admin") {
+      return (
+        targetRole === "steward" ||
+        targetRole === "housekeeper" ||
+        targetRole === "cashier" ||
+        targetRole === "accountant"
+      );
+    }
     return false;
   }
 
@@ -68,10 +76,15 @@ export default function Staff() {
       return STAFF_ROLES.filter((role) => role !== "owner");
     }
     if (currentUserRole === "admin") {
-      return ["steward", "housekeeper"];
+      return ["steward", "housekeeper", "cashier", "accountant"];
     }
-    return ["steward", "housekeeper"];
+    return ["steward", "housekeeper", "cashier", "accountant"];
   }, [currentUserRole]);
+
+  const allowedAssignedAreas = useMemo(
+    () => getAllowedAssignedAreasForRole(formData.role),
+    [formData.role],
+  );
 
   function loadStaff() {
     setLoading(true);
@@ -97,7 +110,7 @@ export default function Staff() {
     setFormData({
       ...EMPTY_CREATE,
       role: allowedRoles[0] ?? "steward",
-      assigned_area: "steward",
+      assigned_area: getDefaultAssignedAreaForRole(allowedRoles[0] ?? "steward"),
     });
     setFormError(null);
     setDialog({ type: "add" });
@@ -563,7 +576,15 @@ export default function Staff() {
                 className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.role}
                 onChange={(e) =>
-                  setFormData((f) => ({ ...f, role: e.target.value as UserRole }))
+                  setFormData((f) => {
+                    const nextRole = e.target.value as UserRole;
+                    const nextAreas = getAllowedAssignedAreasForRole(nextRole);
+                    const nextAssignedArea =
+                      f.assigned_area && nextAreas.includes(f.assigned_area)
+                        ? f.assigned_area
+                        : getDefaultAssignedAreaForRole(nextRole);
+                    return { ...f, role: nextRole, assigned_area: nextAssignedArea };
+                  })
                 }
               >
                 {allowedRoles.map((r) => (
@@ -587,7 +608,7 @@ export default function Staff() {
                 }
               >
                 <option value="">Not assigned</option>
-                {ASSIGNED_AREAS.map((area) => (
+                {allowedAssignedAreas.map((area) => (
                   <option key={area} value={area}>
                     {ASSIGNED_AREA_LABELS[area]}
                   </option>

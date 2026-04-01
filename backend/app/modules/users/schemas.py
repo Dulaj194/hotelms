@@ -43,9 +43,11 @@ _STAFF_ROLES = {
     UserRole.admin,
     UserRole.steward,
     UserRole.housekeeper,
+    UserRole.cashier,
+    UserRole.accountant,
 }
 
-AssignedArea = Literal["kitchen", "housekeeping", "steward"]
+AssignedArea = Literal["kitchen", "housekeeping", "steward", "cashier", "accounting"]
 
 
 class StaffCreateRequest(BaseModel):
@@ -56,7 +58,7 @@ class StaffCreateRequest(BaseModel):
     password: str = Field(..., min_length=8)
     role: UserRole = Field(
         ...,
-        description="Must be one of: owner, admin, steward, housekeeper",
+        description="Must be one of: owner, admin, steward, housekeeper, cashier, accountant",
     )
     assigned_area: AssignedArea | None = None
     is_active: bool = True

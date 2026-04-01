@@ -4,6 +4,32 @@ export type RestaurantRegistrationStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface RestaurantFeatureFlags extends FeatureFlagSnapshot {}
 
+export type WebhookHealthStatus =
+  | "not_configured"
+  | "healthy"
+  | "degraded"
+  | "disabled";
+
+export interface RestaurantApiKeySummary {
+  has_key: boolean;
+  is_active: boolean;
+  masked_key: string | null;
+  rotated_at: string | null;
+}
+
+export interface RestaurantIntegrationSettings {
+  public_ordering_enabled: boolean;
+  webhook_url: string | null;
+  webhook_status: WebhookHealthStatus;
+  webhook_last_checked_at: string | null;
+  webhook_last_error: string | null;
+}
+
+export interface RestaurantIntegrationResponse {
+  api_key: RestaurantApiKeySummary;
+  settings: RestaurantIntegrationSettings;
+}
+
 export interface RestaurantResponse {
   id: number;
   name: string;
@@ -19,6 +45,7 @@ export interface RestaurantResponse {
   closing_time: string | null;
   logo_url: string | null;
   feature_flags: RestaurantFeatureFlags;
+  integration: RestaurantIntegrationResponse;
   is_active: boolean;
   registration_status: RestaurantRegistrationStatus;
   registration_reviewed_by_id: number | null;
@@ -123,6 +150,22 @@ export interface RestaurantAdminUpdateRequest {
   closing_time?: string | null;
   feature_flags?: Partial<RestaurantFeatureFlags> | null;
   is_active?: boolean;
+}
+
+export interface RestaurantIntegrationUpdateRequest {
+  public_ordering_enabled?: boolean;
+  webhook_url?: string | null;
+}
+
+export interface RestaurantApiKeyProvisionResponse {
+  message: string;
+  api_key: string;
+  summary: RestaurantApiKeySummary;
+}
+
+export interface RestaurantWebhookHealthRefreshResponse {
+  message: string;
+  settings: RestaurantIntegrationSettings;
 }
 
 export interface RestaurantDeleteResponse {

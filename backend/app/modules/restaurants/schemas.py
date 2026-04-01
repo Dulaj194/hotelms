@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field
 
 RegistrationStatusValue = Literal["PENDING", "APPROVED", "REJECTED"]
+WebhookHealthStatusValue = Literal["not_configured", "healthy", "degraded", "disabled"]
 
 
 class RestaurantFeatureFlagsResponse(BaseModel):
@@ -22,6 +23,30 @@ class RestaurantFeatureFlagsUpdateRequest(BaseModel):
     cashier: bool | None = None
 
 
+class RestaurantApiKeySummaryResponse(BaseModel):
+    has_key: bool = False
+    is_active: bool = False
+    masked_key: str | None = None
+    rotated_at: datetime | None = None
+
+
+class RestaurantIntegrationSettingsResponse(BaseModel):
+    public_ordering_enabled: bool = False
+    webhook_url: str | None = None
+    webhook_status: WebhookHealthStatusValue = "not_configured"
+    webhook_last_checked_at: datetime | None = None
+    webhook_last_error: str | None = None
+
+
+class RestaurantIntegrationResponse(BaseModel):
+    api_key: RestaurantApiKeySummaryResponse = Field(
+        default_factory=RestaurantApiKeySummaryResponse
+    )
+    settings: RestaurantIntegrationSettingsResponse = Field(
+        default_factory=RestaurantIntegrationSettingsResponse
+    )
+
+
 class RestaurantResponse(BaseModel):
     id: int
     name: str
@@ -37,6 +62,9 @@ class RestaurantResponse(BaseModel):
     closing_time: str | None
     logo_url: str | None
     feature_flags: RestaurantFeatureFlagsResponse
+    integration: RestaurantIntegrationResponse = Field(
+        default_factory=RestaurantIntegrationResponse
+    )
     is_active: bool
     registration_status: RegistrationStatusValue
     registration_reviewed_by_id: int | None
@@ -105,6 +133,22 @@ class RestaurantAdminUpdateRequest(BaseModel):
     closing_time: str | None = Field(None, max_length=8)
     feature_flags: RestaurantFeatureFlagsUpdateRequest | None = None
     is_active: bool | None = None
+
+
+class RestaurantIntegrationUpdateRequest(BaseModel):
+    public_ordering_enabled: bool | None = None
+    webhook_url: str | None = Field(default=None, max_length=500)
+
+
+class RestaurantApiKeyProvisionResponse(BaseModel):
+    message: str
+    api_key: str
+    summary: RestaurantApiKeySummaryResponse
+
+
+class RestaurantWebhookHealthRefreshResponse(BaseModel):
+    message: str
+    settings: RestaurantIntegrationSettingsResponse
 
 
 class RestaurantDeleteResponse(BaseModel):

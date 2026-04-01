@@ -131,6 +131,9 @@ export function getRoleRedirect(role: string): string {
     case "owner":
     case "admin":
       return "/dashboard";
+    case "cashier":
+    case "accountant":
+      return "/admin/billing";
     case "steward":
       return "/admin/kitchen";
     case "housekeeper":

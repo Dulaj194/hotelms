@@ -9,18 +9,24 @@ import {
   deleteRestaurant,
   deleteRestaurantUser,
   expireOverdueSubscriptions,
+  generateRestaurantApiKey,
   getRestaurantPackageAccess,
   getRestaurant,
   getRestaurantSubscription,
   listPackages,
   listRestaurantUsers,
   listRestaurants,
+  refreshRestaurantWebhookHealth,
+  revokeRestaurantApiKey,
+  rotateRestaurantApiKey,
   toggleRestaurantUser,
   updateRestaurant,
+  updateRestaurantIntegration,
   updateRestaurantSubscription,
   uploadRestaurantLogo,
 } from "@/features/super-admin/restaurants/api";
 import { CreateRestaurantForm } from "@/features/super-admin/restaurants/components/CreateRestaurantForm";
+import { IntegrationPanel } from "@/features/super-admin/restaurants/components/IntegrationPanel";
 import { RestaurantList } from "@/features/super-admin/restaurants/components/RestaurantList";
 import { RestaurantProfilePanel } from "@/features/super-admin/restaurants/components/RestaurantProfilePanel";
 import { StaffPanel } from "@/features/super-admin/restaurants/components/StaffPanel";
@@ -28,6 +34,7 @@ import { SubscriptionPanel } from "@/features/super-admin/restaurants/components
 import type {
   AddHotelUserFormState,
   ConfirmActionState,
+  IntegrationFormState,
   InlineMessage,
   SubscriptionFormState,
 } from "@/features/super-admin/restaurants/types";
@@ -42,6 +49,10 @@ import type { StaffDetailResponse } from "@/types/user";
 const EMPTY_CREATE_FORM: RestaurantCreateRequest = { name: "" };
 const EMPTY_EDIT_FORM: RestaurantAdminUpdateRequest = {};
 const EMPTY_SUB_FORM: SubscriptionFormState = { status: "", expires_at: "", package_id: "" };
+const EMPTY_INTEGRATION_FORM: IntegrationFormState = {
+  public_ordering_enabled: false,
+  webhook_url: "",
+};
 const EMPTY_USER_FORM: AddHotelUserFormState = {
   full_name: "",
   email: "",
@@ -82,6 +93,15 @@ export default function SuperAdminRestaurants() {
   const [savingSub, setSavingSub] = useState(false);
   const [subMsg, setSubMsg] = useState<InlineMessage>(null);
 
+  const [integrationForm, setIntegrationForm] = useState<IntegrationFormState>(
+    EMPTY_INTEGRATION_FORM,
+  );
+  const [savingIntegration, setSavingIntegration] = useState(false);
+  const [refreshingWebhook, setRefreshingWebhook] = useState(false);
+  const [integrationMsg, setIntegrationMsg] = useState<InlineMessage>(null);
+  const [apiKeyAction, setApiKeyAction] = useState<"generate" | "rotate" | "revoke" | null>(null);
+  const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
+
   const [expiringOverdue, setExpiringOverdue] = useState(false);
   const [expireMsg, setExpireMsg] = useState<InlineMessage>(null);
 
@@ -104,6 +124,20 @@ export default function SuperAdminRestaurants() {
   useEffect(() => {
     void loadPage();
   }, []);
+
+  function applySelectedRestaurant(restaurant: RestaurantMeResponse | null) {
+    setSelected(restaurant);
+    setIntegrationForm(
+      restaurant
+        ? {
+            public_ordering_enabled: restaurant.integration.settings.public_ordering_enabled,
+            webhook_url: restaurant.integration.settings.webhook_url ?? "",
+          }
+        : EMPTY_INTEGRATION_FORM,
+    );
+    setIntegrationMsg(null);
+    setRevealedApiKey(null);
+  }
 
   async function loadPage() {
     setLoading(true);
@@ -129,6 +163,8 @@ export default function SuperAdminRestaurants() {
     setHotelUsers([]);
     setSubMsg(null);
     setAddUserMsg(null);
+    setIntegrationMsg(null);
+    setRevealedApiKey(null);
     setEditingSub(false);
     setShowAddUser(false);
 
@@ -201,7 +237,7 @@ export default function SuperAdminRestaurants() {
     setEditLogoMsg(null);
     try {
       const restaurant = await getRestaurant(restaurantId);
-      setSelected(restaurant);
+      applySelectedRestaurant(restaurant);
       void fetchHotelExtras(restaurantId);
     } catch {
       setSelectedError("Failed to load hotel profile.");
@@ -217,7 +253,7 @@ export default function SuperAdminRestaurants() {
     setEditLogoMsg(null);
     try {
       const restaurant = await getRestaurant(restaurantId);
-      setSelected(restaurant);
+      applySelectedRestaurant(restaurant);
       setEditingId(restaurantId);
       setEditForm({
         name: restaurant.name,
@@ -269,7 +305,7 @@ export default function SuperAdminRestaurants() {
       const updated = await updateRestaurant(editingId, editForm);
       const accessSummary = await getRestaurantPackageAccess(editingId);
       setList((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      setSelected(updated);
+      applySelectedRestaurant(updated);
       setSelectedAccess(accessSummary);
       setEditingId(null);
       setActionMsg({ type: "ok", text: `Hotel "${updated.name}" updated.` });
@@ -309,7 +345,7 @@ export default function SuperAdminRestaurants() {
         return next;
       });
       if (selected?.id === restaurantId) {
-        setSelected(null);
+        applySelectedRestaurant(null);
         setEditingId(null);
       }
       setActionMsg({ type: "ok", text: result.message });
@@ -445,8 +481,123 @@ export default function SuperAdminRestaurants() {
     }
   }
 
+  async function handleSaveIntegration() {
+    if (!selected) return;
+    setSavingIntegration(true);
+    setIntegrationMsg(null);
+    try {
+      const integration = await updateRestaurantIntegration(selected.id, {
+        public_ordering_enabled: integrationForm.public_ordering_enabled,
+        webhook_url: integrationForm.webhook_url.trim() || null,
+      });
+      setSelected((current) =>
+        current ? { ...current, integration } : current,
+      );
+      setIntegrationForm({
+        public_ordering_enabled: integration.settings.public_ordering_enabled,
+        webhook_url: integration.settings.webhook_url ?? "",
+      });
+      setIntegrationMsg({ type: "ok", text: "Integration settings updated." });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to update integration settings.",
+      });
+    } finally {
+      setSavingIntegration(false);
+    }
+  }
+
+  async function handleGenerateApiKey(rotate: boolean) {
+    if (!selected) return;
+    setApiKeyAction(rotate ? "rotate" : "generate");
+    setIntegrationMsg(null);
+    try {
+      const response = rotate
+        ? await rotateRestaurantApiKey(selected.id)
+        : await generateRestaurantApiKey(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                api_key: response.summary,
+              },
+            }
+          : current,
+      );
+      setRevealedApiKey(response.api_key);
+      setIntegrationMsg({ type: "ok", text: response.message });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to provision API key.",
+      });
+    } finally {
+      setApiKeyAction(null);
+    }
+  }
+
+  async function handleRevokeApiKey() {
+    if (!selected) return;
+    setApiKeyAction("revoke");
+    setIntegrationMsg(null);
+    try {
+      const summary = await revokeRestaurantApiKey(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                api_key: summary,
+              },
+            }
+          : current,
+      );
+      setRevealedApiKey(null);
+      setIntegrationMsg({ type: "ok", text: "API key revoked successfully." });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to revoke API key.",
+      });
+    } finally {
+      setApiKeyAction(null);
+    }
+  }
+
+  async function handleRefreshWebhook() {
+    if (!selected) return;
+    setRefreshingWebhook(true);
+    setIntegrationMsg(null);
+    try {
+      const response = await refreshRestaurantWebhookHealth(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                settings: response.settings,
+              },
+            }
+          : current,
+      );
+      setIntegrationMsg({ type: "ok", text: response.message });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to refresh webhook health.",
+      });
+    } finally {
+      setRefreshingWebhook(false);
+    }
+  }
+
   function closeSelectedPanel() {
-    setSelected(null);
+    applySelectedRestaurant(null);
     setEditingId(null);
     setEditLogoMsg(null);
     setSelectedAccess(null);
@@ -549,6 +700,24 @@ export default function SuperAdminRestaurants() {
               }}
               onLogoUpload={(file) => void handleEditLogoUpload(file)}
             />
+
+            {selected && (
+              <IntegrationPanel
+                selected={selected}
+                form={integrationForm}
+                savingIntegration={savingIntegration}
+                refreshingWebhook={refreshingWebhook}
+                apiKeyAction={apiKeyAction}
+                message={integrationMsg}
+                revealedApiKey={revealedApiKey}
+                onFormChange={setIntegrationForm}
+                onSave={() => void handleSaveIntegration()}
+                onRefreshWebhook={() => void handleRefreshWebhook()}
+                onGenerateApiKey={() => void handleGenerateApiKey(false)}
+                onRotateApiKey={() => void handleGenerateApiKey(true)}
+                onRevokeApiKey={() => void handleRevokeApiKey()}
+              />
+            )}
 
             {selected && (
               <SubscriptionPanel

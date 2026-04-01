@@ -54,9 +54,47 @@ from app.modules.users.schemas import (
 # steward / housekeeper → no management rights (enforced at router level too)
 
 _MANAGEABLE_ROLES: dict[str, set[UserRole]] = {
-    "super_admin": {UserRole.owner, UserRole.admin, UserRole.steward, UserRole.housekeeper},
-    "owner": {UserRole.admin, UserRole.steward, UserRole.housekeeper},
-    "admin": {UserRole.steward, UserRole.housekeeper},
+    "super_admin": {
+        UserRole.owner,
+        UserRole.admin,
+        UserRole.steward,
+        UserRole.housekeeper,
+        UserRole.cashier,
+        UserRole.accountant,
+    },
+    "owner": {
+        UserRole.admin,
+        UserRole.steward,
+        UserRole.housekeeper,
+        UserRole.cashier,
+        UserRole.accountant,
+    },
+    "admin": {
+        UserRole.steward,
+        UserRole.housekeeper,
+        UserRole.cashier,
+        UserRole.accountant,
+    },
+}
+
+_DEFAULT_ASSIGNED_AREAS: dict[UserRole, str | None] = {
+    UserRole.owner: None,
+    UserRole.admin: None,
+    UserRole.steward: "steward",
+    UserRole.housekeeper: "housekeeping",
+    UserRole.cashier: "cashier",
+    UserRole.accountant: "accounting",
+    UserRole.super_admin: None,
+}
+
+_ALLOWED_ASSIGNED_AREAS: dict[UserRole, set[str | None]] = {
+    UserRole.owner: {None},
+    UserRole.admin: {None},
+    UserRole.steward: {None, "steward", "kitchen"},
+    UserRole.housekeeper: {None, "housekeeping"},
+    UserRole.cashier: {None, "cashier"},
+    UserRole.accountant: {None, "accounting"},
+    UserRole.super_admin: {None},
 }
 
 
@@ -68,6 +106,23 @@ def _assert_can_manage_role(manager: User, target_role: UserRole) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Your role '{manager.role.value}' cannot manage '{target_role.value}' users.",
         )
+
+
+def _normalize_assigned_area(
+    *,
+    role: UserRole,
+    assigned_area: str | None,
+) -> str | None:
+    allowed_areas = _ALLOWED_ASSIGNED_AREAS.get(role, {None})
+    if assigned_area not in allowed_areas:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"assigned_area '{assigned_area}' is not valid for the "
+                f"'{role.value}' role."
+            ),
+        )
+    return assigned_area if assigned_area is not None else _DEFAULT_ASSIGNED_AREAS.get(role)
 
 
 # ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -205,6 +260,10 @@ def add_staff(
     normalized_phone = data.phone.strip() if data.phone else None
     data.username = normalized_username
     data.phone = normalized_phone
+    data.assigned_area = _normalize_assigned_area(
+        role=data.role,
+        assigned_area=data.assigned_area,
+    )
 
     # Check email uniqueness globally (email is unique across all tenants)
     if get_user_by_email(db, data.email):
@@ -268,6 +327,20 @@ def update_staff(
     # If role is being changed, validate the new role is manageable
     if data.role is not None:
         _assert_can_manage_role(current_user, data.role)
+
+    next_role = data.role or existing.role
+    assigned_area_provided = "assigned_area" in data.model_fields_set
+    candidate_assigned_area = (
+        data.assigned_area
+        if assigned_area_provided
+        else existing.assigned_area if data.role is None else None
+    )
+    normalized_assigned_area = _normalize_assigned_area(
+        role=next_role,
+        assigned_area=candidate_assigned_area,
+    )
+    if assigned_area_provided or data.role is not None:
+        data.assigned_area = normalized_assigned_area
 
     # Email uniqueness: if changing email, ensure it's not taken
     if data.email and data.email != existing.email:
