@@ -274,7 +274,7 @@ def list_billable_orders_by_session(
     session_id: str,
     restaurant_id: int,
 ) -> list[OrderHeader]:
-    """Return completed, not-yet-paid orders for a table session.
+    """Return completed, not-yet-paid orders for a session.
 
     'Billable' == status is exactly OrderStatus.completed.
     Orders in paid/rejected/pending/confirmed/processing states are excluded.
@@ -291,6 +291,26 @@ def list_billable_orders_by_session(
         .order_by(OrderHeader.placed_at.asc())
         .all()
     )
+
+
+def list_orders_by_session(
+    db: Session,
+    session_id: str,
+    restaurant_id: int,
+    *,
+    statuses: list[OrderStatus] | None = None,
+) -> list[OrderHeader]:
+    query = (
+        db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
+        .filter(
+            OrderHeader.session_id == session_id,
+            OrderHeader.restaurant_id == restaurant_id,
+        )
+    )
+    if statuses:
+        query = query.filter(OrderHeader.status.in_(statuses))
+    return query.order_by(OrderHeader.placed_at.asc()).all()
 
 
 def mark_orders_paid_by_ids(

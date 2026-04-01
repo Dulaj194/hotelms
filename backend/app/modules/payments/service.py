@@ -585,7 +585,7 @@ def get_platform_commercial_overview(
                 bill_id=bill.id,
                 restaurant_id=bill.restaurant_id,
                 restaurant_name=restaurant.name,
-                table_number=bill.table_number,
+                table_number=bill.table_number or bill.room_number or "-",
                 amount=round(float(bill.total_amount), 2),
                 created_at=bill.created_at,
             )

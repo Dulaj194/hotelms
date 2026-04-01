@@ -12,7 +12,7 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { setRoomSession } from "@/hooks/useRoomSession";
 import { useRoomCart } from "@/hooks/useRoomCart";
 import { publicGet, publicPost } from "@/lib/publicApi";
@@ -24,6 +24,8 @@ import type { RoomSessionStartResponse, RoomOrderDetailResponse } from "@/types/
 interface RoomCartDrawerProps {
   open: boolean;
   onClose: () => void;
+  onContinueBrowsing: () => void;
+  onTrackOrder: () => void;
   cart: import("@/types/roomSession").RoomCartResponse | null;
   onUpdateItem: (itemId: number, quantity: number) => Promise<void>;
   onRemoveItem: (itemId: number) => Promise<void>;
@@ -36,6 +38,8 @@ interface RoomCartDrawerProps {
 function RoomCartDrawer({
   open,
   onClose,
+  onContinueBrowsing,
+  onTrackOrder,
   cart,
   onUpdateItem,
   onRemoveItem,
@@ -131,13 +135,22 @@ function RoomCartDrawer({
             <p className="text-xs text-gray-400 mb-4">
               Total: ${orderPlaced.total_amount.toFixed(2)}
             </p>
-            <button
-              onClick={onClose}
-              className="w-full py-2 bg-orange-500 text-white rounded-xl text-sm font-semibold
-                         hover:bg-orange-600 transition-colors"
-            >
-              Continue Browsing
-            </button>
+            <div className="w-full space-y-2">
+              <button
+                onClick={onTrackOrder}
+                className="w-full py-2.5 bg-orange-500 text-white rounded-xl text-sm font-semibold
+                           hover:bg-orange-600 transition-colors"
+              >
+                Track Order
+              </button>
+              <button
+                onClick={onContinueBrowsing}
+                className="w-full py-2 border border-orange-200 text-orange-600 rounded-xl text-sm font-semibold
+                           hover:bg-orange-50 transition-colors"
+              >
+                Continue Browsing
+              </button>
+            </div>
           </div>
         )}
 
@@ -259,6 +272,7 @@ function RoomCartDrawer({
 
 export default function RoomMenu() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { restaurantId, roomNumber } = useParams<{
     restaurantId: string;
     roomNumber: string;
@@ -349,6 +363,20 @@ export default function RoomMenu() {
     setPlacedOrder(result.order);
     setCartOpen(true); // keep drawer open to show confirmation
   }, [placeOrder]);
+
+  const handleTrackOrder = useCallback(() => {
+    if (!restaurantId || !roomNumber || !placedOrder) return;
+    const basePath = `/menu/${restaurantId}/room/${roomNumber}/order/${placedOrder.id}`;
+    const nextPath = qrAccessKey
+      ? `${basePath}?k=${encodeURIComponent(qrAccessKey)}`
+      : basePath;
+    navigate(nextPath);
+  }, [navigate, placedOrder, qrAccessKey, restaurantId, roomNumber]);
+
+  const handleContinueBrowsing = useCallback(() => {
+    setPlacedOrder(null);
+    setCartOpen(false);
+  }, []);
 
   // Render
 
@@ -609,7 +637,9 @@ export default function RoomMenu() {
       {/* Room cart drawer */}
       <RoomCartDrawer
         open={cartOpen}
-        onClose={() => setCartOpen(false)}
+        onClose={handleContinueBrowsing}
+        onContinueBrowsing={handleContinueBrowsing}
+        onTrackOrder={handleTrackOrder}
         cart={cart}
         onUpdateItem={updateItem}
         onRemoveItem={removeItem}
