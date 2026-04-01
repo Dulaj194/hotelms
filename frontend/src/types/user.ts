@@ -1,3 +1,5 @@
+import type { PlatformScopeValue } from "@/features/platform-access/catalog";
+
 export type UserRole =
   | "owner"
   | "admin"
@@ -88,6 +90,7 @@ export interface PlatformUserListItemResponse {
   role: UserRole;
   is_active: boolean;
   must_change_password: boolean;
+  super_admin_scopes: PlatformScopeValue[];
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
@@ -110,6 +113,7 @@ export interface PlatformUserCreateRequest {
   password: string;
   is_active: boolean;
   must_change_password: boolean;
+  super_admin_scopes: PlatformScopeValue[];
 }
 
 export interface PlatformUserUpdateRequest {
@@ -120,6 +124,7 @@ export interface PlatformUserUpdateRequest {
   password?: string;
   is_active?: boolean;
   must_change_password?: boolean;
+  super_admin_scopes?: PlatformScopeValue[];
 }
 
 export const STAFF_ROLES: UserRole[] = [

@@ -3,7 +3,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_restaurant_id, get_db, require_roles
+from app.core.dependencies import (
+    get_current_restaurant_id,
+    get_db,
+    require_platform_scopes,
+    require_roles,
+)
 from app.modules.promo_codes import service
 from app.modules.promo_codes.schemas import (
     PromoCodeConsumeRequest,
@@ -22,7 +27,7 @@ router = APIRouter()
 
 @router.get("", response_model=PromoCodeListResponse)
 def list_promo_codes(
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(require_platform_scopes("ops_viewer", "billing_admin")),
     db: Session = Depends(get_db),
 ) -> PromoCodeListResponse:
     return service.list_promo_codes(db)
@@ -31,7 +36,7 @@ def list_promo_codes(
 @router.post("", response_model=PromoCodeResponse, status_code=status.HTTP_201_CREATED)
 def create_promo_code(
     payload: PromoCodeCreateRequest,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(require_platform_scopes("billing_admin")),
     db: Session = Depends(get_db),
 ) -> PromoCodeResponse:
     return service.create_promo_code(db, payload)
@@ -69,7 +74,7 @@ def consume_promo_code(
 def update_promo_code(
     promo_code_id: int,
     payload: PromoCodeUpdateRequest,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(require_platform_scopes("billing_admin")),
     db: Session = Depends(get_db),
 ) -> PromoCodeResponse:
     return service.update_promo_code(db, promo_code_id, payload)

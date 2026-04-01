@@ -24,6 +24,7 @@ export interface UserMeResponse {
   package_code: string | null;
   subscription_status: string | null;
   privileges: string[];
+  super_admin_scopes: string[];
   feature_flags: FeatureFlagSnapshot;
   module_access: ModuleAccessSnapshot;
 }

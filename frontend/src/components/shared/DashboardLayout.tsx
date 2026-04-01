@@ -196,7 +196,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         label: "Steward Dashboard",
         icon: UserCog,
         privilege: "QR_MENU",
-        moduleKey: "kds",
+        moduleKey: "steward_ops",
       },
       {
         path: "/admin/kitchen/orders",

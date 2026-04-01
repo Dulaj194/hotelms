@@ -16,6 +16,12 @@ describe("platform user form state helpers", () => {
       password: "Password1",
       is_active: true,
       must_change_password: true,
+      super_admin_scopes: [
+        "ops_viewer",
+        "tenant_admin",
+        "billing_admin",
+        "security_admin",
+      ],
     });
 
     expect(payload).toEqual({
@@ -26,6 +32,12 @@ describe("platform user form state helpers", () => {
       password: "Password1",
       is_active: true,
       must_change_password: true,
+      super_admin_scopes: [
+        "ops_viewer",
+        "tenant_admin",
+        "billing_admin",
+        "security_admin",
+      ],
     });
   });
 
@@ -38,11 +50,13 @@ describe("platform user form state helpers", () => {
       password: "",
       is_active: false,
       must_change_password: false,
+      super_admin_scopes: ["security_admin"],
     });
 
     expect(payload.password).toBeUndefined();
     expect(payload.username).toBeNull();
     expect(payload.phone).toBeNull();
+    expect(payload.super_admin_scopes).toEqual(["security_admin"]);
   });
 
   it("maps response objects into a safe edit form state", () => {
@@ -55,6 +69,7 @@ describe("platform user form state helpers", () => {
       role: "super_admin",
       is_active: true,
       must_change_password: false,
+      super_admin_scopes: ["ops_viewer", "security_admin"],
       last_login_at: null,
       created_at: "2026-04-01T00:00:00Z",
       updated_at: "2026-04-01T00:00:00Z",
@@ -63,5 +78,6 @@ describe("platform user form state helpers", () => {
     expect(form.password).toBe("");
     expect(form.username).toBe("");
     expect(form.phone).toBe("");
+    expect(form.super_admin_scopes).toEqual(["ops_viewer", "security_admin"]);
   });
 });

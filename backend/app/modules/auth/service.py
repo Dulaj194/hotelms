@@ -42,6 +42,7 @@ from app.modules.auth.schemas import (
     UserMeResponse,
     UserModuleAccessResponse,
 )
+from app.modules.access import catalog as access_catalog
 from app.modules.realtime import service as realtime_service
 from app.modules.restaurants.model import RegistrationStatus
 from app.modules.subscriptions import service as subscription_service
@@ -227,7 +228,35 @@ def _empty_module_access_snapshot() -> UserModuleAccessResponse:
     return UserModuleAccessResponse()
 
 
-def _ensure_restaurant_login_allowed(db: Session, restaurant_id: int | None) -> None:
+def _assert_role_feature_access(user, restaurant) -> None:
+    role_obj = getattr(user, "role", None)
+    role = role_obj.value if hasattr(role_obj, "value") else str(role_obj)
+
+    required_feature_by_role = {
+        "steward": "steward",
+        "housekeeper": "housekeeping",
+        "cashier": "cashier",
+        "accountant": "accountant",
+    }
+    required_feature = required_feature_by_role.get(role)
+    if required_feature is None:
+        return
+
+    feature_flags = access_catalog.build_feature_flag_snapshot(restaurant)
+    if feature_flags.get(required_feature, True):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"The '{required_feature}' workflow is disabled for this restaurant.",
+    )
+
+
+def _ensure_restaurant_login_allowed(
+    db: Session,
+    user,
+    restaurant_id: int | None,
+) -> None:
     if restaurant_id is None:
         return
 
@@ -255,6 +284,8 @@ def _ensure_restaurant_login_allowed(db: Session, restaurant_id: int | None) -> 
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your restaurant account is inactive.",
         )
+
+    _assert_role_feature_access(user, restaurant)
 
 
 def _count_model_rows(db: Session, model, restaurant_id: int) -> int:
@@ -347,6 +378,7 @@ def get_user_me_snapshot(db: Session, current_user) -> UserMeResponse:
         package_code=package_code,
         subscription_status=subscription_status,
         privileges=privileges,
+        super_admin_scopes=current_user.super_admin_scopes,
         feature_flags=feature_flags,
         module_access=module_access,
     )
@@ -640,7 +672,7 @@ def login(
             detail=GENERIC_AUTH_ERROR_DETAIL,
         )
 
-    _ensure_restaurant_login_allowed(db, user.restaurant_id)
+    _ensure_restaurant_login_allowed(db, user, user.restaurant_id)
 
     if not user.is_active:
         write_audit_log(
@@ -836,7 +868,7 @@ def refresh(
             detail="User not found or inactive.",
         )
 
-    _ensure_restaurant_login_allowed(db, user.restaurant_id)
+    _ensure_restaurant_login_allowed(db, user, user.restaurant_id)
 
     # Rotate: delete old session, create new one
     redis_client.delete(redis_key)

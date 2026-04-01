@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_restaurant_user, require_roles
+from app.core.dependencies import (
+    get_db,
+    require_platform_scopes,
+    require_restaurant_user,
+    require_roles,
+)
 from app.modules.restaurants import service
 from app.modules.restaurants.model import RegistrationStatus
 from app.modules.restaurants.schemas import (
@@ -81,7 +86,14 @@ async def upload_logo(
 
 @router.get("", response_model=list[RestaurantMeResponse])
 def list_restaurants(
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(
+        require_platform_scopes(
+            "ops_viewer",
+            "tenant_admin",
+            "billing_admin",
+            "security_admin",
+        )
+    ),
     db: Session = Depends(get_db),
 ) -> list[RestaurantMeResponse]:
     """List all restaurants. Super-admin only."""
@@ -94,7 +106,7 @@ def list_restaurants(
 )
 def list_pending_registrations(
     limit: int = 100,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(require_platform_scopes("ops_viewer", "tenant_admin")),
     db: Session = Depends(get_db),
 ) -> PendingRestaurantRegistrationListResponse:
     return service.list_pending_restaurant_registrations(db, limit=limit)
@@ -107,7 +119,7 @@ def list_pending_registrations(
 def list_registration_history(
     limit: int = 100,
     status_filter: str | None = None,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(require_platform_scopes("ops_viewer", "tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantRegistrationHistoryListResponse:
     try:
@@ -134,7 +146,7 @@ def list_registration_history(
 @router.post("", response_model=RestaurantMeResponse, status_code=status.HTTP_201_CREATED)
 def create_restaurant(
     payload: RestaurantCreateRequest,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Create a new restaurant tenant. Super-admin only."""
@@ -144,7 +156,14 @@ def create_restaurant(
 @router.get("/{restaurant_id}", response_model=RestaurantMeResponse)
 def get_restaurant_by_id(
     restaurant_id: int,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(
+        require_platform_scopes(
+            "ops_viewer",
+            "tenant_admin",
+            "billing_admin",
+            "security_admin",
+        )
+    ),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Fetch any restaurant by ID. Super-admin only."""
@@ -155,7 +174,7 @@ def get_restaurant_by_id(
 def update_restaurant_by_id(
     restaurant_id: int,
     payload: RestaurantAdminUpdateRequest,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Update any restaurant by ID. Super-admin only."""
@@ -166,7 +185,7 @@ def update_restaurant_by_id(
 def update_restaurant_integration(
     restaurant_id: int,
     payload: RestaurantIntegrationUpdateRequest,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantIntegrationResponse:
     return service.update_restaurant_integration_settings(
@@ -183,7 +202,7 @@ def update_restaurant_integration(
 )
 def generate_restaurant_api_key(
     restaurant_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantApiKeyProvisionResponse:
     return service.provision_restaurant_api_key(
@@ -200,7 +219,7 @@ def generate_restaurant_api_key(
 )
 def rotate_restaurant_api_key(
     restaurant_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantApiKeyProvisionResponse:
     return service.provision_restaurant_api_key(
@@ -217,7 +236,7 @@ def rotate_restaurant_api_key(
 )
 def revoke_restaurant_api_key(
     restaurant_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantApiKeySummaryResponse:
     return service.revoke_restaurant_api_key(
@@ -233,7 +252,7 @@ def revoke_restaurant_api_key(
 )
 def refresh_restaurant_webhook_health(
     restaurant_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantWebhookHealthRefreshResponse:
     return service.refresh_restaurant_webhook_health(
@@ -246,7 +265,7 @@ def refresh_restaurant_webhook_health(
 @router.delete("/{restaurant_id}", response_model=RestaurantDeleteResponse)
 def delete_restaurant_by_id(
     restaurant_id: int,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantDeleteResponse:
     """Delete any restaurant by ID. Super-admin only."""
@@ -260,7 +279,7 @@ def delete_restaurant_by_id(
 def review_restaurant_registration(
     restaurant_id: int,
     payload: RestaurantRegistrationReviewRequest,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantRegistrationReviewResponse:
     return service.review_restaurant_registration(
@@ -281,7 +300,7 @@ def review_restaurant_registration(
 async def upload_logo_for_restaurant(
     restaurant_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantLogoUploadResponse:
     """Upload / replace the logo for any restaurant.  Super-admin only."""
@@ -297,7 +316,7 @@ async def upload_logo_for_restaurant(
 )
 def list_restaurant_staff(
     restaurant_id: int,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> list[StaffListItemResponse]:
     """List all staff for a specific hotel.  Super-admin only."""
@@ -313,7 +332,7 @@ def list_restaurant_staff(
 def add_restaurant_staff(
     restaurant_id: int,
     payload: StaffCreateRequest,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> StaffDetailResponse:
     """Add a staff member to a specific hotel.  Super-admin only.
@@ -332,7 +351,7 @@ def add_restaurant_staff(
 def delete_restaurant_staff(
     restaurant_id: int,
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> GenericMessageResponse:
     """Permanently remove a staff member from a hotel.  Super-admin only."""
@@ -346,7 +365,7 @@ def delete_restaurant_staff(
 def disable_restaurant_staff(
     restaurant_id: int,
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> StaffStatusResponse:
     """Deactivate a staff member in a hotel.  Super-admin only."""
@@ -360,7 +379,7 @@ def disable_restaurant_staff(
 def enable_restaurant_staff(
     restaurant_id: int,
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> StaffStatusResponse:
     """Re-activate a staff member in a hotel.  Super-admin only."""

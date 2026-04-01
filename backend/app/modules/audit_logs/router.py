@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_roles
+from app.core.dependencies import get_db, require_platform_scopes
 from app.modules.audit_logs import service
 from app.modules.audit_logs.schemas import (
     AuditLogListResponse,
@@ -20,7 +20,7 @@ def list_audit_logs(
     event_type: str | None = Query(default=None),
     restaurant_id: int | None = Query(default=None, ge=1),
     search: str | None = Query(default=None, min_length=1, max_length=200),
-    _current_user=Depends(require_roles("super_admin")),
+    _current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
     db: Session = Depends(get_db),
 ) -> AuditLogListResponse:
     return service.list_audit_logs(
@@ -36,7 +36,7 @@ def list_audit_logs(
 @router.get("/notifications", response_model=SuperAdminNotificationListResponse)
 def list_super_admin_notifications(
     limit: int = Query(default=50, ge=1, le=200),
-    _current_user=Depends(require_roles("super_admin")),
+    _current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
     db: Session = Depends(get_db),
 ) -> SuperAdminNotificationListResponse:
     return service.list_super_admin_notifications(db, limit=limit)

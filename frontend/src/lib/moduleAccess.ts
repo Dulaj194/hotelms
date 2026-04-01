@@ -66,12 +66,13 @@ export function canAccessQrMenuStaffModule(
   privileges: string[],
   moduleAccess: Partial<ModuleAccessSnapshot> | Record<string, boolean>,
 ): boolean {
+  const normalizedRole = normalizeRole(role);
   return canAccessModuleItem(
-    role,
+    normalizedRole,
     privileges,
     moduleAccess,
     QR_MENU_STAFF_ROLES,
     "QR_MENU",
-    "kds",
+    normalizedRole === "steward" ? "steward_ops" : "kds",
   );
 }

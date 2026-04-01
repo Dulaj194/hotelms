@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import ActionDialog from "@/components/shared/ActionDialog";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
+import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
 import {
   buildSubscriptionStatusMap,
   createRestaurant,
@@ -10,13 +11,13 @@ import {
   deleteRestaurantUser,
   expireOverdueSubscriptions,
   generateRestaurantApiKey,
-  getRestaurantPackageAccess,
   getRestaurant,
-  getRestaurantSubscriptionHistory,
+  getRestaurantPackageAccess,
   getRestaurantSubscription,
+  getRestaurantSubscriptionHistory,
   listPackages,
-  listRestaurantUsers,
   listRestaurants,
+  listRestaurantUsers,
   refreshRestaurantWebhookHealth,
   revokeRestaurantApiKey,
   rotateRestaurantApiKey,
@@ -35,18 +36,28 @@ import { SubscriptionPanel } from "@/features/super-admin/restaurants/components
 import type {
   AddHotelUserFormState,
   ConfirmActionState,
-  IntegrationFormState,
   InlineMessage,
+  IntegrationFormState,
   SubscriptionFormState,
 } from "@/features/super-admin/restaurants/types";
-import type { RestaurantAdminUpdateRequest, RestaurantCreateRequest, RestaurantMeResponse } from "@/types/restaurant";
+import { getUser } from "@/lib/auth";
+import type {
+  RestaurantAdminUpdateRequest,
+  RestaurantCreateRequest,
+  RestaurantFeatureFlags,
+  RestaurantMeResponse,
+} from "@/types/restaurant";
 import type {
   PackageDetailResponse,
   SubscriptionAccessSummaryResponse,
   SubscriptionChangeHistoryItemResponse,
   SubscriptionResponse,
 } from "@/types/subscription";
-import type { StaffDetailResponse } from "@/types/user";
+import {
+  STAFF_ROLES,
+  type StaffDetailResponse,
+  type UserRole,
+} from "@/types/user";
 
 const EMPTY_CREATE_FORM: RestaurantCreateRequest = { name: "" };
 const EMPTY_EDIT_FORM: RestaurantAdminUpdateRequest = {};
@@ -67,15 +78,55 @@ const EMPTY_USER_FORM: AddHotelUserFormState = {
   role: "admin",
 };
 
+function getAvailableStaffRoles(
+  featureFlags: RestaurantFeatureFlags | null | undefined,
+): UserRole[] {
+  if (!featureFlags) {
+    return [...STAFF_ROLES];
+  }
+
+  return STAFF_ROLES.filter((role) => {
+    switch (role) {
+      case "steward":
+        return featureFlags.steward;
+      case "housekeeper":
+        return featureFlags.housekeeping;
+      case "cashier":
+        return featureFlags.cashier;
+      case "accountant":
+        return featureFlags.accountant;
+      default:
+        return true;
+    }
+  });
+}
+
+function buildReadOnlySubscriptionMessage(): InlineMessage {
+  return {
+    type: "err",
+    text: "Billing Admin scope is required to change package assignments or subscription status.",
+  };
+}
+
 export default function SuperAdminRestaurants() {
+  const currentUser = getUser();
+  const canManageTenants = hasAnyPlatformScope(currentUser?.super_admin_scopes, ["tenant_admin"]);
+  const canManageBilling = hasAnyPlatformScope(currentUser?.super_admin_scopes, ["billing_admin"]);
+  const canManageSecurity = hasAnyPlatformScope(currentUser?.super_admin_scopes, ["security_admin"]);
+
   const [list, setList] = useState<RestaurantMeResponse[]>([]);
-  const [subscriptionStatusByHotel, setSubscriptionStatusByHotel] = useState<Record<number, string>>({});
+  const [subscriptionStatusByHotel, setSubscriptionStatusByHotel] = useState<
+    Record<number, string>
+  >({});
   const [packages, setPackages] = useState<PackageDetailResponse[]>([]);
   const [hotelUsers, setHotelUsers] = useState<StaffDetailResponse[]>([]);
   const [selected, setSelected] = useState<RestaurantMeResponse | null>(null);
   const [selectedSub, setSelectedSub] = useState<SubscriptionResponse | null>(null);
-  const [selectedAccess, setSelectedAccess] = useState<SubscriptionAccessSummaryResponse | null>(null);
-  const [selectedSubHistory, setSelectedSubHistory] = useState<SubscriptionChangeHistoryItemResponse[]>([]);
+  const [selectedAccess, setSelectedAccess] =
+    useState<SubscriptionAccessSummaryResponse | null>(null);
+  const [selectedSubHistory, setSelectedSubHistory] = useState<
+    SubscriptionChangeHistoryItemResponse[]
+  >([]);
 
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -107,7 +158,9 @@ export default function SuperAdminRestaurants() {
   const [savingIntegration, setSavingIntegration] = useState(false);
   const [refreshingWebhook, setRefreshingWebhook] = useState(false);
   const [integrationMsg, setIntegrationMsg] = useState<InlineMessage>(null);
-  const [apiKeyAction, setApiKeyAction] = useState<"generate" | "rotate" | "revoke" | null>(null);
+  const [apiKeyAction, setApiKeyAction] = useState<"generate" | "rotate" | "revoke" | null>(
+    null,
+  );
   const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
 
   const [expiringOverdue, setExpiringOverdue] = useState(false);
@@ -129,9 +182,24 @@ export default function SuperAdminRestaurants() {
   const createLogoRef = useRef<HTMLInputElement | null>(null);
   const editLogoRef = useRef<HTMLInputElement | null>(null);
 
+  const availableStaffRoles = useMemo(
+    () => getAvailableStaffRoles(selected?.feature_flags),
+    [selected?.feature_flags],
+  );
+
   useEffect(() => {
     void loadPage();
   }, []);
+
+  useEffect(() => {
+    if (availableStaffRoles.includes(addUserForm.role)) {
+      return;
+    }
+    setAddUserForm((current) => ({
+      ...current,
+      role: availableStaffRoles[0] ?? "admin",
+    }));
+  }, [addUserForm.role, availableStaffRoles]);
 
   function applySelectedRestaurant(restaurant: RestaurantMeResponse | null) {
     setSelected(restaurant);
@@ -150,7 +218,10 @@ export default function SuperAdminRestaurants() {
   async function loadPage() {
     setLoading(true);
     try {
-      const [restaurants, packageItems] = await Promise.all([listRestaurants(), listPackages()]);
+      const [restaurants, packageItems] = await Promise.all([
+        listRestaurants(),
+        canManageBilling ? listPackages() : Promise.resolve<PackageDetailResponse[]>([]),
+      ]);
       const statusMap = await buildSubscriptionStatusMap(restaurants);
       setList(restaurants);
       setPackages(packageItems);
@@ -165,7 +236,7 @@ export default function SuperAdminRestaurants() {
 
   async function fetchHotelExtras(restaurantId: number) {
     setSubLoading(true);
-    setUsersLoading(true);
+    setUsersLoading(canManageTenants);
     setSelectedSub(null);
     setSelectedAccess(null);
     setSelectedSubHistory([]);
@@ -180,7 +251,9 @@ export default function SuperAdminRestaurants() {
     const [subResult, accessResult, usersResult, historyResult] = await Promise.allSettled([
       getRestaurantSubscription(restaurantId),
       getRestaurantPackageAccess(restaurantId),
-      listRestaurantUsers(restaurantId),
+      canManageTenants
+        ? listRestaurantUsers(restaurantId)
+        : Promise.resolve<StaffDetailResponse[]>([]),
       getRestaurantSubscriptionHistory(restaurantId),
     ]);
 
@@ -212,6 +285,14 @@ export default function SuperAdminRestaurants() {
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canManageTenants) {
+      setCreateMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to register a hotel.",
+      });
+      return;
+    }
+
     setCreating(true);
     setCreateMsg(null);
     try {
@@ -261,6 +342,14 @@ export default function SuperAdminRestaurants() {
   }
 
   async function handleStartEdit(restaurantId: number) {
+    if (!canManageTenants) {
+      setActionMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to edit hotel profiles.",
+      });
+      return;
+    }
+
     setSelectedLoading(true);
     setSelectedError(null);
     setActionMsg(null);
@@ -287,6 +376,14 @@ export default function SuperAdminRestaurants() {
 
   async function handleEditLogoUpload(file: File) {
     if (!selected) return;
+    if (!canManageTenants) {
+      setEditLogoMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to update hotel branding.",
+      });
+      return;
+    }
+
     setUploadingEditLogo(true);
     setEditLogoMsg(null);
     try {
@@ -313,6 +410,14 @@ export default function SuperAdminRestaurants() {
 
   async function handleSaveEdit() {
     if (editingId === null) return;
+    if (!canManageTenants) {
+      setActionMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to update hotel profiles.",
+      });
+      return;
+    }
+
     setSaving(true);
     setActionMsg(null);
     try {
@@ -348,6 +453,14 @@ export default function SuperAdminRestaurants() {
   }
 
   async function deleteRestaurantRecord(restaurantId: number) {
+    if (!canManageTenants) {
+      setActionMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to delete hotels.",
+      });
+      return;
+    }
+
     setDeletingId(restaurantId);
     setActionMsg(null);
     try {
@@ -359,8 +472,7 @@ export default function SuperAdminRestaurants() {
         return next;
       });
       if (selected?.id === restaurantId) {
-        applySelectedRestaurant(null);
-        setEditingId(null);
+        closeSelectedPanel();
       }
       setActionMsg({ type: "ok", text: result.message });
     } finally {
@@ -383,7 +495,17 @@ export default function SuperAdminRestaurants() {
 
   async function handleSaveSub() {
     if (!selected) return;
-    const payload: { status?: string; expires_at?: string; package_id?: number; change_reason?: string | null } = {};
+    if (!canManageBilling) {
+      setSubMsg(buildReadOnlySubscriptionMessage());
+      return;
+    }
+
+    const payload: {
+      status?: string;
+      expires_at?: string;
+      package_id?: number;
+      change_reason?: string | null;
+    } = {};
     if (subForm.status) payload.status = subForm.status;
     if (subForm.expires_at) payload.expires_at = new Date(subForm.expires_at).toISOString();
     if (subForm.package_id) payload.package_id = parseInt(subForm.package_id, 10);
@@ -408,7 +530,9 @@ export default function SuperAdminRestaurants() {
       setEditingSub(false);
       setSubForm({
         status: updated.status,
-        expires_at: updated.expires_at ? new Date(updated.expires_at).toISOString().slice(0, 10) : "",
+        expires_at: updated.expires_at
+          ? new Date(updated.expires_at).toISOString().slice(0, 10)
+          : "",
         package_id: updated.package_id?.toString() ?? "",
         change_reason: "",
       });
@@ -424,6 +548,11 @@ export default function SuperAdminRestaurants() {
   }
 
   async function handleExpireOverdue() {
+    if (!canManageBilling) {
+      setExpireMsg(buildReadOnlySubscriptionMessage());
+      return;
+    }
+
     setExpiringOverdue(true);
     setExpireMsg(null);
     try {
@@ -443,13 +572,24 @@ export default function SuperAdminRestaurants() {
   async function handleAddUser(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected) return;
+    if (!canManageTenants) {
+      setAddUserMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to manage hotel staff.",
+      });
+      return;
+    }
+
     setAddingUser(true);
     setAddUserMsg(null);
     try {
       const newUser = await createRestaurantUser(selected.id, addUserForm);
       setHotelUsers((current) => [newUser, ...current]);
       setShowAddUser(false);
-      setAddUserForm(EMPTY_USER_FORM);
+      setAddUserForm({
+        ...EMPTY_USER_FORM,
+        role: availableStaffRoles[0] ?? EMPTY_USER_FORM.role,
+      });
       setAddUserMsg({ type: "ok", text: `"${newUser.full_name}" added successfully.` });
     } catch (error) {
       setAddUserMsg({
@@ -463,6 +603,14 @@ export default function SuperAdminRestaurants() {
 
   async function removeHotelUser(userId: number) {
     if (!selected) return;
+    if (!canManageTenants) {
+      setAddUserMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to manage hotel staff.",
+      });
+      return;
+    }
+
     setDeletingUserId(userId);
     setAddUserMsg(null);
     try {
@@ -489,12 +637,22 @@ export default function SuperAdminRestaurants() {
 
   async function handleToggleUser(userId: number, isActive: boolean) {
     if (!selected) return;
+    if (!canManageTenants) {
+      setAddUserMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to manage hotel staff.",
+      });
+      return;
+    }
+
     setTogglingUserId(userId);
     try {
       const action = isActive ? "disable" : "enable";
       const result = await toggleRestaurantUser(selected.id, userId, action);
       setHotelUsers((current) =>
-        current.map((user) => (user.id === userId ? { ...user, is_active: result.is_active } : user)),
+        current.map((user) =>
+          user.id === userId ? { ...user, is_active: result.is_active } : user,
+        ),
       );
     } catch (error) {
       setAddUserMsg({
@@ -508,6 +666,14 @@ export default function SuperAdminRestaurants() {
 
   async function handleSaveIntegration() {
     if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to update integration settings.",
+      });
+      return;
+    }
+
     setSavingIntegration(true);
     setIntegrationMsg(null);
     try {
@@ -515,9 +681,7 @@ export default function SuperAdminRestaurants() {
         public_ordering_enabled: integrationForm.public_ordering_enabled,
         webhook_url: integrationForm.webhook_url.trim() || null,
       });
-      setSelected((current) =>
-        current ? { ...current, integration } : current,
-      );
+      setSelected((current) => (current ? { ...current, integration } : current));
       setIntegrationForm({
         public_ordering_enabled: integration.settings.public_ordering_enabled,
         webhook_url: integration.settings.webhook_url ?? "",
@@ -535,6 +699,14 @@ export default function SuperAdminRestaurants() {
 
   async function handleGenerateApiKey(rotate: boolean) {
     if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to manage API keys.",
+      });
+      return;
+    }
+
     setApiKeyAction(rotate ? "rotate" : "generate");
     setIntegrationMsg(null);
     try {
@@ -566,6 +738,14 @@ export default function SuperAdminRestaurants() {
 
   async function handleRevokeApiKey() {
     if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to manage API keys.",
+      });
+      return;
+    }
+
     setApiKeyAction("revoke");
     setIntegrationMsg(null);
     try {
@@ -595,6 +775,14 @@ export default function SuperAdminRestaurants() {
 
   async function handleRefreshWebhook() {
     if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to refresh webhook health.",
+      });
+      return;
+    }
+
     setRefreshingWebhook(true);
     setIntegrationMsg(null);
     try {
@@ -625,42 +813,59 @@ export default function SuperAdminRestaurants() {
     applySelectedRestaurant(null);
     setEditingId(null);
     setEditLogoMsg(null);
+    setSelectedSub(null);
     setSelectedAccess(null);
     setSelectedSubHistory([]);
+    setHotelUsers([]);
+    setSubMsg(null);
+    setAddUserMsg(null);
+    setShowAddUser(false);
+    setAddUserForm(EMPTY_USER_FORM);
   }
 
   return (
     <SuperAdminLayout>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Hotels</h1>
+          <div>
+            <h1 className="text-2xl font-semibold">Hotels</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage tenant profiles, package access, security integrations, and scoped hotel
+              operations from one workspace.
+            </p>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             {expireMsg && (
-              <span className={`text-xs ${expireMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+              <span
+                className={`text-xs ${expireMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}
+              >
                 {expireMsg.text}
               </span>
             )}
-            <button
-              type="button"
-              onClick={() => void handleExpireOverdue()}
-              disabled={expiringOverdue}
-              className="rounded-md border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50"
-            >
-              {expiringOverdue ? "Checking..." : "Run Expiry Check"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowCreate(true);
-                setCreateMsg(null);
-              }}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              + Register Hotel
-            </button>
+            {canManageBilling && (
+              <button
+                type="button"
+                onClick={() => void handleExpireOverdue()}
+                disabled={expiringOverdue}
+                className="rounded-md border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+              >
+                {expiringOverdue ? "Checking..." : "Run Expiry Check"}
+              </button>
+            )}
+            {canManageTenants && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreate(true);
+                  setCreateMsg(null);
+                }}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                + Register Hotel
+              </button>
+            )}
           </div>
         </div>
-
         {createMsg && (
           <p className={`text-sm ${createMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
             {createMsg.text}
@@ -672,7 +877,7 @@ export default function SuperAdminRestaurants() {
           </p>
         )}
 
-        {showCreate && (
+        {showCreate && canManageTenants && (
           <CreateRestaurantForm
             form={form}
             creating={creating}
@@ -697,6 +902,7 @@ export default function SuperAdminRestaurants() {
           list={list}
           selectedId={selected?.id ?? null}
           deletingId={deletingId}
+          canManageTenants={canManageTenants}
           subscriptionStatusByHotel={subscriptionStatusByHotel}
           onView={(restaurantId) => void handleView(restaurantId)}
           onEdit={(restaurantId) => void handleStartEdit(restaurantId)}
@@ -727,7 +933,7 @@ export default function SuperAdminRestaurants() {
               onLogoUpload={(file) => void handleEditLogoUpload(file)}
             />
 
-            {selected && (
+            {selected && canManageSecurity && (
               <IntegrationPanel
                 selected={selected}
                 form={integrationForm}
@@ -751,6 +957,7 @@ export default function SuperAdminRestaurants() {
                 accessSummary={selectedAccess}
                 historyItems={selectedSubHistory}
                 packages={packages}
+                canManageBilling={canManageBilling}
                 subLoading={subLoading}
                 editingSub={editingSub}
                 savingSub={savingSub}
@@ -762,7 +969,7 @@ export default function SuperAdminRestaurants() {
               />
             )}
 
-            {selected && (
+            {selected && canManageTenants && (
               <StaffPanel
                 hotelUsers={hotelUsers}
                 usersLoading={usersLoading}
@@ -770,6 +977,7 @@ export default function SuperAdminRestaurants() {
                 addUserForm={addUserForm}
                 addingUser={addingUser}
                 addUserMsg={addUserMsg}
+                availableRoles={availableStaffRoles}
                 deletingUserId={deletingUserId}
                 togglingUserId={togglingUserId}
                 onToggleAddUser={() => {

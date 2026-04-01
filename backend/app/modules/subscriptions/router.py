@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import (
     get_current_restaurant_id,
     get_db,
+    require_platform_scopes,
     require_restaurant_user,
     require_roles,
 )
@@ -104,7 +105,7 @@ def cancel_subscription(
 
 @router.post("/admin/expire-overdue", response_model=ExpireOverdueResponse)
 def expire_overdue_subscriptions(
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("billing_admin")),
     db: Session = Depends(get_db),
 ) -> ExpireOverdueResponse:
     """Manually trigger the expiry check that the background worker also runs."""
@@ -122,7 +123,14 @@ def expire_overdue_subscriptions(
 @router.get("/admin/{restaurant_id}", response_model=SubscriptionResponse)
 def get_subscription_for_hotel(
     restaurant_id: int,
-    _: object = Depends(require_roles("super_admin")),
+    _: object = Depends(
+        require_platform_scopes(
+            "ops_viewer",
+            "tenant_admin",
+            "billing_admin",
+            "security_admin",
+        )
+    ),
     db: Session = Depends(get_db),
 ) -> SubscriptionResponse:
     """Return the current subscription for any restaurant (super_admin only)."""
@@ -132,7 +140,14 @@ def get_subscription_for_hotel(
 @router.get("/admin/{restaurant_id}/access", response_model=SubscriptionAccessSummaryResponse)
 def get_subscription_access_for_hotel(
     restaurant_id: int,
-    _: object = Depends(require_roles("super_admin")),
+    _: object = Depends(
+        require_platform_scopes(
+            "ops_viewer",
+            "tenant_admin",
+            "billing_admin",
+            "security_admin",
+        )
+    ),
     db: Session = Depends(get_db),
 ) -> SubscriptionAccessSummaryResponse:
     """Return the effective package-access summary for any restaurant."""
@@ -146,7 +161,14 @@ def get_subscription_access_for_hotel(
 def get_subscription_history_for_hotel(
     restaurant_id: int,
     limit: int = 100,
-    _: object = Depends(require_roles("super_admin")),
+    _: object = Depends(
+        require_platform_scopes(
+            "ops_viewer",
+            "tenant_admin",
+            "billing_admin",
+            "security_admin",
+        )
+    ),
     db: Session = Depends(get_db),
 ) -> SubscriptionChangeHistoryResponse:
     return service.get_subscription_change_history_for_super_admin(
@@ -160,7 +182,7 @@ def get_subscription_history_for_hotel(
 def update_subscription_for_hotel(
     restaurant_id: int,
     payload: SuperAdminSubscriptionUpdateRequest,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("billing_admin")),
     db: Session = Depends(get_db),
 ) -> SubscriptionResponse:
     """Update status, expiry, or package for any restaurant (super_admin only)."""

@@ -16,6 +16,7 @@ describe("auth and module access guards", () => {
 
   it("resolves role redirect for normalized super admin", () => {
     expect(getRoleRedirect("s_admin")).toBe("/super-admin");
+    expect(getRoleRedirect("super_admin", ["billing_admin"])).toBe("/super-admin/packages");
   });
 
   it("routes billing-focused roles to the billing workspace", () => {
@@ -73,7 +74,9 @@ describe("auth and module access guards", () => {
     expect(
       canAccessHousekeepingTasks("steward", ["HOUSEKEEPING"], { housekeeping: true }),
     ).toBe(false);
-    expect(canAccessQrMenuStaffModule("steward", ["QR_MENU"], { kds: true })).toBe(true);
+    expect(
+      canAccessQrMenuStaffModule("steward", ["QR_MENU"], { steward_ops: true }),
+    ).toBe(true);
     expect(canAccessQrMenuStaffModule("housekeeper", ["QR_MENU"], { kds: true })).toBe(false);
   });
 });

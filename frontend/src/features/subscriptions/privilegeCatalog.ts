@@ -30,7 +30,7 @@ const PRIVILEGE_CATALOG: Record<
     code: "QR_MENU",
     label: "QR Menu",
     description: "Enables table and room QR ordering operations.",
-    moduleKeys: ["orders", "qr", "kds", "reports", "billing"],
+    moduleKeys: ["orders", "qr", "kds", "steward_ops", "reports", "billing"],
   },
   HOUSEKEEPING: {
     code: "HOUSEKEEPING",

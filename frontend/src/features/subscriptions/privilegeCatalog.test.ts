@@ -14,6 +14,7 @@ describe("privilegeCatalog", () => {
       "orders",
       "qr",
       "kds",
+      "steward_ops",
       "reports",
       "billing",
     ]);

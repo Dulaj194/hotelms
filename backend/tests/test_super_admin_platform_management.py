@@ -185,12 +185,14 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
                 password="Password1",
                 is_active=True,
                 must_change_password=True,
+                super_admin_scopes=["ops_viewer", "tenant_admin"],
             ),
             self.current_super_admin,
         )
 
         self.assertEqual(created.role, "super_admin")
         self.assertTrue(created.must_change_password)
+        self.assertEqual(created.super_admin_scopes, ["ops_viewer", "tenant_admin"])
 
         disabled = users_service.disable_platform_user(
             self.db,
@@ -309,7 +311,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         )
         self.assertEqual(
             [module.key for module in access_summary.enabled_modules],
-            ["orders", "qr", "kds", "reports", "billing", "housekeeping"],
+            ["orders", "qr", "kds", "steward_ops", "reports", "billing", "housekeeping"],
         )
 
         updated = subscriptions_service.update_subscription_for_super_admin(
@@ -346,7 +348,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
             restaurant_id=restaurant.id,
             requested_by=owner.id,
             payload=SettingsRequestCreateRequest(
-                requested_changes={"reports": False, "cashier": False},
+                requested_changes={"reports": False, "cashier": False, "steward": False},
                 request_reason="Temporarily disable these modules.",
             ),
         )
@@ -364,6 +366,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.db.refresh(restaurant)
         self.assertFalse(restaurant.enable_reports)
         self.assertFalse(restaurant.enable_cashier)
+        self.assertFalse(restaurant.enable_steward)
 
         access_summary = subscriptions_service.get_package_access_summary(self.db, restaurant.id)
         module_access_map = {
@@ -376,7 +379,9 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.assertEqual(access_summary.package_code, "standard")
         self.assertFalse(feature_flag_map["reports"])
         self.assertFalse(feature_flag_map["cashier"])
+        self.assertFalse(feature_flag_map["steward"])
         self.assertFalse(module_access_map["reports"])
+        self.assertFalse(module_access_map["steward_ops"])
         self.assertTrue(module_access_map["billing"])
 
         me_snapshot = auth_service.get_user_me_snapshot(self.db, owner)
@@ -385,7 +390,9 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.assertIn("QR_MENU", me_snapshot.privileges)
         self.assertFalse(me_snapshot.feature_flags.reports)
         self.assertFalse(me_snapshot.feature_flags.cashier)
+        self.assertFalse(me_snapshot.feature_flags.steward)
         self.assertFalse(me_snapshot.module_access.reports)
+        self.assertFalse(me_snapshot.module_access.steward_ops)
         self.assertTrue(me_snapshot.module_access.billing)
 
     def test_restaurant_api_key_and_webhook_management_flow(self) -> None:

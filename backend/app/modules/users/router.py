@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_roles
+from app.core.dependencies import get_db, require_platform_scopes, require_roles
 from app.modules.users import service
 from app.modules.users.model import User
 from app.modules.users.model import UserRole
@@ -28,7 +28,7 @@ router = APIRouter()
 @router.get("/platform", response_model=PlatformUserListResponse)
 def list_platform_users(
     is_active: bool | None = Query(default=None),
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> PlatformUserListResponse:
     return service.list_platform_users(db, is_active=is_active)
@@ -37,7 +37,7 @@ def list_platform_users(
 @router.post("/platform", response_model=PlatformUserDetailResponse, status_code=status.HTTP_201_CREATED)
 def create_platform_user(
     payload: PlatformUserCreateRequest,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> PlatformUserDetailResponse:
     return service.create_platform_user(db, payload, current_user)
@@ -46,7 +46,7 @@ def create_platform_user(
 @router.get("/platform/{user_id}", response_model=PlatformUserDetailResponse)
 def get_platform_user(
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> PlatformUserDetailResponse:
     return service.get_platform_user(db, user_id)
@@ -56,7 +56,7 @@ def get_platform_user(
 def update_platform_user(
     user_id: int,
     payload: PlatformUserUpdateRequest,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> PlatformUserDetailResponse:
     return service.update_platform_user(db, user_id, payload, current_user)
@@ -65,7 +65,7 @@ def update_platform_user(
 @router.patch("/platform/{user_id}/disable", response_model=StaffStatusResponse)
 def disable_platform_user(
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> StaffStatusResponse:
     return service.disable_platform_user(db, user_id, current_user)
@@ -74,7 +74,7 @@ def disable_platform_user(
 @router.patch("/platform/{user_id}/enable", response_model=StaffStatusResponse)
 def enable_platform_user(
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> StaffStatusResponse:
     return service.enable_platform_user(db, user_id, current_user)
@@ -83,7 +83,7 @@ def enable_platform_user(
 @router.delete("/platform/{user_id}", response_model=GenericMessageResponse)
 def delete_platform_user(
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
 ) -> GenericMessageResponse:
     return service.delete_platform_user(db, user_id, current_user)

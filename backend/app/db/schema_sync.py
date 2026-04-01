@@ -114,6 +114,10 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             "ALTER TABLE users ADD COLUMN assigned_area VARCHAR(32) NULL",
         ),
         (
+            "platform_scopes_json",
+            "ALTER TABLE users ADD COLUMN platform_scopes_json TEXT NULL",
+        ),
+        (
             "must_change_password",
             "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE",
         ),
@@ -147,6 +151,10 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
         (
             "opening_time",
             "ALTER TABLE restaurants ADD COLUMN opening_time VARCHAR(8) NULL",
+        ),
+        (
+            "enable_steward",
+            "ALTER TABLE restaurants ADD COLUMN enable_steward BOOLEAN NOT NULL DEFAULT TRUE",
         ),
         (
             "closing_time",

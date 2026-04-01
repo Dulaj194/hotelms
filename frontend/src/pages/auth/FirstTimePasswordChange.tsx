@@ -37,7 +37,7 @@ export default function FirstTimePasswordChange() {
 
       const me = await api.get<UserMeResponse>("/auth/me");
       setUser(me);
-      navigate(getRoleRedirect(me.role), { replace: true });
+      navigate(getRoleRedirect(me.role, me.super_admin_scopes), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 401) {

@@ -6,6 +6,7 @@ import type { FeatureFlagSnapshot, ModuleAccessSnapshot } from "@/types/access";
 import type { UserMeResponse } from "@/types/auth";
 
 const EMPTY_FEATURE_FLAGS: FeatureFlagSnapshot = {
+  steward: false,
   housekeeping: false,
   kds: false,
   reports: false,
@@ -17,6 +18,7 @@ const EMPTY_MODULE_ACCESS: ModuleAccessSnapshot = {
   orders: false,
   qr: false,
   kds: false,
+  steward_ops: false,
   reports: false,
   billing: false,
   housekeeping: false,

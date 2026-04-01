@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
+import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
 import { api } from "@/lib/api";
+import { getUser } from "@/lib/auth";
 import type { PromoCodeListResponse } from "@/types/promo";
 import type { PackageListResponse } from "@/types/subscription";
 import type { SettingsRequestListResponse } from "@/types/settings";
@@ -28,6 +30,14 @@ type OverviewData = {
   packages: PackageListResponse;
 };
 
+const EMPTY_OVERVIEW_DATA: OverviewData = {
+  restaurants: [],
+  registrations: { items: [], total: 0 },
+  settings: { items: [], total: 0 },
+  promos: { items: [], total: 0 },
+  packages: { items: [] },
+};
+
 function StatCard({
   label,
   value,
@@ -47,6 +57,48 @@ function StatCard({
 }
 
 export default function SuperAdminOverview() {
+  const currentUser = getUser();
+  const canViewHotels = hasAnyPlatformScope(currentUser?.super_admin_scopes, [
+    "ops_viewer",
+    "tenant_admin",
+    "billing_admin",
+    "security_admin",
+  ]);
+  const canViewTenantQueue = hasAnyPlatformScope(currentUser?.super_admin_scopes, [
+    "ops_viewer",
+    "tenant_admin",
+  ]);
+  const canViewSettings = hasAnyPlatformScope(currentUser?.super_admin_scopes, [
+    "ops_viewer",
+    "tenant_admin",
+  ]);
+  const canViewPromos = hasAnyPlatformScope(currentUser?.super_admin_scopes, [
+    "ops_viewer",
+    "billing_admin",
+  ]);
+  const canViewPackages = hasAnyPlatformScope(currentUser?.super_admin_scopes, [
+    "billing_admin",
+  ]);
+  const canViewNotifications = hasAnyPlatformScope(currentUser?.super_admin_scopes, [
+    "ops_viewer",
+    "security_admin",
+  ]);
+  const canViewAudit = hasAnyPlatformScope(currentUser?.super_admin_scopes, [
+    "ops_viewer",
+    "security_admin",
+  ]);
+  const canViewPlatformUsers = hasAnyPlatformScope(currentUser?.super_admin_scopes, [
+    "security_admin",
+  ]);
+  const hasScopedAccess =
+    canViewHotels ||
+    canViewTenantQueue ||
+    canViewSettings ||
+    canViewPromos ||
+    canViewPackages ||
+    canViewNotifications ||
+    canViewAudit ||
+    canViewPlatformUsers;
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,13 +110,42 @@ export default function SuperAdminOverview() {
   async function loadOverview() {
     setLoading(true);
     setError(null);
+    if (!hasScopedAccess) {
+      setData(EMPTY_OVERVIEW_DATA);
+      setLoading(false);
+      return;
+    }
+
     try {
       const [restaurants, registrations, settings, promos, packages] = await Promise.all([
-        api.get<RestaurantMeResponse[]>("/restaurants"),
-        api.get<PendingRestaurantRegistrationListResponse>("/restaurants/registrations/pending?limit=200"),
-        api.get<SettingsRequestListResponse>("/settings/requests/pending?limit=200"),
-        api.get<PromoCodeListResponse>("/promo-codes"),
-        api.get<PackageListResponse>("/packages"),
+        canViewHotels
+          ? api.get<RestaurantMeResponse[]>("/restaurants")
+          : Promise.resolve<RestaurantMeResponse[]>([]),
+        canViewTenantQueue
+          ? api.get<PendingRestaurantRegistrationListResponse>(
+              "/restaurants/registrations/pending?limit=200",
+            )
+          : Promise.resolve<PendingRestaurantRegistrationListResponse>({
+              items: [],
+              total: 0,
+            }),
+        canViewSettings
+          ? api.get<SettingsRequestListResponse>("/settings/requests/pending?limit=200")
+          : Promise.resolve<SettingsRequestListResponse>({
+              items: [],
+              total: 0,
+            }),
+        canViewPromos
+          ? api.get<PromoCodeListResponse>("/promo-codes")
+          : Promise.resolve<PromoCodeListResponse>({
+              items: [],
+              total: 0,
+            }),
+        canViewPackages
+          ? api.get<PackageListResponse>("/packages")
+          : Promise.resolve<PackageListResponse>({
+              items: [],
+            }),
       ]);
 
       setData({
@@ -80,6 +161,78 @@ export default function SuperAdminOverview() {
       setLoading(false);
     }
   }
+
+  const quickActions = useMemo(
+    () =>
+      [
+        canViewNotifications
+          ? {
+              path: "/super-admin/notifications",
+              title: "Open Notification Center",
+              description: "Watch live governance and package-access events as they happen.",
+            }
+          : null,
+        canViewHotels
+          ? {
+              path: "/super-admin/restaurants",
+              title: "Manage Hotels",
+              description: "Open hotel profiles, package access, staff, and integration controls.",
+            }
+          : null,
+        canViewTenantQueue
+          ? {
+              path: "/super-admin/registrations",
+              title: "Review Registrations",
+              description: "Approve or reject new hotel sign-ups waiting for onboarding review.",
+            }
+          : null,
+        canViewSettings
+          ? {
+              path: "/super-admin/settings-requests",
+              title: "Review Settings Requests",
+              description: "Approve or reject tenant profile and feature-toggle requests.",
+            }
+          : null,
+        canViewPromos
+          ? {
+              path: "/super-admin/promo-codes",
+              title: "Manage Promo Codes",
+              description: "Control active campaigns and platform-wide discounts.",
+            }
+          : null,
+        canViewPackages
+          ? {
+              path: "/super-admin/packages",
+              title: "Manage Packages",
+              description: "Maintain package tiers, billing cycles, and access bundles.",
+            }
+          : null,
+        canViewAudit
+          ? {
+              path: "/super-admin/audit-logs",
+              title: "Review Audit Logs",
+              description: "Search platform approvals, security events, and operational changes.",
+            }
+          : null,
+        canViewPlatformUsers
+          ? {
+              path: "/super-admin/platform-users",
+              title: "Manage Platform Users",
+              description: "Provision super admin accounts and keep scope assignments tight.",
+            }
+          : null,
+      ].filter((item): item is { path: string; title: string; description: string } => item !== null),
+    [
+      canViewAudit,
+      canViewHotels,
+      canViewNotifications,
+      canViewPackages,
+      canViewPlatformUsers,
+      canViewPromos,
+      canViewSettings,
+      canViewTenantQueue,
+    ],
+  );
 
   const metrics = useMemo(() => {
     if (!data) {
@@ -151,38 +304,57 @@ export default function SuperAdminOverview() {
           </div>
         )}
 
-        {data && !loading && (
+        {!loading && !error && !hasScopedAccess && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            This platform account does not have any active permission scopes yet. Ask a security
+            admin to assign at least one scope such as Ops Viewer, Tenant Admin, Billing Admin, or
+            Security Admin.
+          </div>
+        )}
+
+        {data && !loading && hasScopedAccess && (
           <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <StatCard
-                label="Hotels"
-                value={metrics.totalHotels}
-                hint="All registered tenants"
-              />
-              <StatCard
-                label="Live Hotels"
-                value={metrics.activeHotels}
-                hint="Approved and active"
-              />
-              <StatCard
-                label="Pending Registrations"
-                value={data.registrations.total}
-                hint="Waiting for review"
-              />
-              <StatCard
-                label="Pending Settings"
-                value={data.settings.total}
-                hint="Profile changes to review"
-              />
-              <StatCard
-                label="Active Promos"
-                value={metrics.activePromos}
-                hint="Currently usable codes"
-              />
+              {canViewHotels && (
+                <>
+                  <StatCard
+                    label="Hotels"
+                    value={metrics.totalHotels}
+                    hint="All registered tenants"
+                  />
+                  <StatCard
+                    label="Live Hotels"
+                    value={metrics.activeHotels}
+                    hint="Approved and active"
+                  />
+                </>
+              )}
+              {canViewTenantQueue && (
+                <StatCard
+                  label="Pending Registrations"
+                  value={data.registrations.total}
+                  hint="Waiting for review"
+                />
+              )}
+              {canViewSettings && (
+                <StatCard
+                  label="Pending Settings"
+                  value={data.settings.total}
+                  hint="Profile changes to review"
+                />
+              )}
+              {canViewPromos && (
+                <StatCard
+                  label="Active Promos"
+                  value={metrics.activePromos}
+                  hint="Currently usable codes"
+                />
+              )}
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              {canViewTenantQueue && (
+                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="app-section-title text-slate-900">Registration Queue</h2>
@@ -235,80 +407,29 @@ export default function SuperAdminOverview() {
                     ))
                   )}
                 </div>
-              </section>
+                </section>
+              )}
 
               <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 className="app-section-title text-slate-900">Quick Actions</h2>
                 <div className="mt-4 grid gap-3">
-                  <Link
-                    to="/super-admin/notifications"
-                    className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <p className="text-sm font-semibold text-slate-900">Open Notification Center</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Watch live governance and package-access events as they happen.
-                    </p>
-                  </Link>
-                  <Link
-                    to="/super-admin/restaurants"
-                    className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <p className="text-sm font-semibold text-slate-900">Manage Hotels</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Create tenants, review subscriptions, and manage hotel staff.
-                    </p>
-                  </Link>
-                  <Link
-                    to="/super-admin/settings-requests"
-                    className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <p className="text-sm font-semibold text-slate-900">Review Settings Requests</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Approve or reject tenant profile updates before they go live.
-                    </p>
-                  </Link>
-                  <Link
-                    to="/super-admin/promo-codes"
-                    className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <p className="text-sm font-semibold text-slate-900">Manage Promo Codes</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Create campaign codes and control lifecycle windows platform-wide.
-                    </p>
-                  </Link>
-                  <Link
-                    to="/super-admin/packages"
-                    className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <p className="text-sm font-semibold text-slate-900">Manage Packages</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Control pricing tiers, billing cycles, and entitlement bundles.
-                    </p>
-                  </Link>
-                  <Link
-                    to="/super-admin/audit-logs"
-                    className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <p className="text-sm font-semibold text-slate-900">Review Audit Logs</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Search platform approvals, security events, and operational changes.
-                    </p>
-                  </Link>
-                  <Link
-                    to="/super-admin/platform-users"
-                    className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
-                  >
-                    <p className="text-sm font-semibold text-slate-900">Manage Platform Users</p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Provision and govern super admin accounts with safer platform access.
-                    </p>
-                  </Link>
+                  {quickActions.map((action) => (
+                    <Link
+                      key={action.path}
+                      to={action.path}
+                      className="rounded-lg border border-slate-200 p-4 transition hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      <p className="text-sm font-semibold text-slate-900">{action.title}</p>
+                      <p className="mt-1 text-sm text-slate-500">{action.description}</p>
+                    </Link>
+                  ))}
                 </div>
               </section>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              {canViewPackages && (
+                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <h2 className="app-section-title text-slate-900">Package Catalog</h2>
@@ -346,9 +467,11 @@ export default function SuperAdminOverview() {
                     </article>
                   ))}
                 </div>
-              </section>
+                </section>
+              )}
 
-              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              {canViewPromos && (
+                <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <h2 className="app-section-title text-slate-900">Promo Snapshot</h2>
@@ -404,10 +527,12 @@ export default function SuperAdminOverview() {
                     })
                   )}
                 </div>
-              </section>
+                </section>
+              )}
             </div>
 
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            {(canViewHotels || canViewSettings) && (
+              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h2 className="app-section-title text-slate-900">Operational Watchlist</h2>
@@ -480,7 +605,8 @@ export default function SuperAdminOverview() {
                   )}
                 </div>
               </div>
-            </section>
+              </section>
+            )}
           </>
         )}
       </div>

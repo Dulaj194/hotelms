@@ -21,6 +21,7 @@ _PRIVILEGE_DEFINITIONS = {
             access_catalog.get_module_definition("orders"),
             access_catalog.get_module_definition("qr"),
             access_catalog.get_module_definition("kds"),
+            access_catalog.get_module_definition("steward_ops"),
             access_catalog.get_module_definition("reports"),
             access_catalog.get_module_definition("billing"),
         ),

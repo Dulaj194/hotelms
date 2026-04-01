@@ -15,6 +15,7 @@ class TokenResponse(BaseModel):
 
 
 class UserFeatureFlagResponse(BaseModel):
+    steward: bool = False
     housekeeping: bool = False
     kds: bool = False
     reports: bool = False
@@ -26,6 +27,7 @@ class UserModuleAccessResponse(BaseModel):
     orders: bool = False
     qr: bool = False
     kds: bool = False
+    steward_ops: bool = False
     reports: bool = False
     billing: bool = False
     housekeeping: bool = False
@@ -45,6 +47,7 @@ class UserMeResponse(BaseModel):
     package_code: str | None = None
     subscription_status: str | None = None
     privileges: list[str] = Field(default_factory=list)
+    super_admin_scopes: list[str] = Field(default_factory=list)
     feature_flags: UserFeatureFlagResponse = Field(default_factory=UserFeatureFlagResponse)
     module_access: UserModuleAccessResponse = Field(default_factory=UserModuleAccessResponse)
 

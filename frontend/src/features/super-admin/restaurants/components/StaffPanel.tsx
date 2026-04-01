@@ -1,4 +1,4 @@
-import type { StaffDetailResponse } from "@/types/user";
+import type { StaffDetailResponse, UserRole } from "@/types/user";
 import { ROLE_LABELS } from "@/types/user";
 
 import { FormField } from "@/features/super-admin/restaurants/components/FormField";
@@ -12,6 +12,7 @@ type StaffPanelProps = {
   addUserForm: AddHotelUserFormState;
   addingUser: boolean;
   addUserMsg: InlineMessage;
+  availableRoles: UserRole[];
   deletingUserId: number | null;
   togglingUserId: number | null;
   onToggleAddUser: () => void;
@@ -28,6 +29,7 @@ export function StaffPanel({
   addUserForm,
   addingUser,
   addUserMsg,
+  availableRoles,
   deletingUserId,
   togglingUserId,
   onToggleAddUser,
@@ -84,14 +86,18 @@ export function StaffPanel({
                 onFormChange({ ...addUserForm, role: event.target.value as AddHotelUserFormState["role"] })
               }
             >
-              <option value="admin">Admin</option>
-              <option value="owner">Owner</option>
-              <option value="steward">Steward</option>
-              <option value="housekeeper">Housekeeper</option>
-              <option value="cashier">Cashier</option>
-              <option value="accountant">Accountant</option>
+              {availableRoles.map((role) => (
+                <option key={role} value={role}>
+                  {ROLE_LABELS[role]}
+                </option>
+              ))}
             </select>
           </div>
+          {availableRoles.length < 6 && (
+            <p className="text-xs text-gray-500">
+              Feature-disabled hotel workflows are hidden from the staff-role picker.
+            </p>
+          )}
           <button
             type="submit"
             disabled={

@@ -2,21 +2,42 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
+import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
 import { clearAuth, getUser } from "@/lib/auth";
 import {
   clearInAppNavigationHistory,
 } from "@/lib/navigationHistory";
 
 const SUPER_ADMIN_NAV = [
-  { path: "/super-admin", label: "Overview" },
-  { path: "/super-admin/notifications", label: "Notifications" },
-  { path: "/super-admin/registrations", label: "Registrations" },
-  { path: "/super-admin/restaurants", label: "Hotels" },
-  { path: "/super-admin/packages", label: "Packages" },
-  { path: "/super-admin/settings-requests", label: "Settings Requests" },
-  { path: "/super-admin/promo-codes", label: "Promo Codes" },
-  { path: "/super-admin/platform-users", label: "Platform Users" },
-  { path: "/super-admin/audit-logs", label: "Audit Logs" },
+  { path: "/super-admin", label: "Overview", scopes: null },
+  {
+    path: "/super-admin/notifications",
+    label: "Notifications",
+    scopes: ["ops_viewer", "security_admin"],
+  },
+  {
+    path: "/super-admin/registrations",
+    label: "Registrations",
+    scopes: ["tenant_admin"],
+  },
+  {
+    path: "/super-admin/restaurants",
+    label: "Hotels",
+    scopes: ["tenant_admin", "billing_admin", "security_admin"],
+  },
+  { path: "/super-admin/packages", label: "Packages", scopes: ["billing_admin"] },
+  {
+    path: "/super-admin/settings-requests",
+    label: "Settings Requests",
+    scopes: ["tenant_admin"],
+  },
+  { path: "/super-admin/promo-codes", label: "Promo Codes", scopes: ["billing_admin"] },
+  {
+    path: "/super-admin/platform-users",
+    label: "Platform Users",
+    scopes: ["security_admin"],
+  },
+  { path: "/super-admin/audit-logs", label: "Audit Logs", scopes: ["ops_viewer", "security_admin"] },
 ];
 
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.superAdmin";
@@ -29,6 +50,9 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const user = getUser();
+  const visibleNavItems = SUPER_ADMIN_NAV.filter((item) =>
+    item.scopes ? hasAnyPlatformScope(user?.super_admin_scopes, item.scopes) : true,
+  );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const sidebarNavRef = useRef<HTMLElement | null>(null);
 
@@ -138,7 +162,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
           onScroll={handleSidebarScroll}
           className="scrollbar-hide flex-1 overflow-y-auto space-y-0.5 px-2 py-4"
         >
-          {SUPER_ADMIN_NAV.map((item) => {
+          {visibleNavItems.map((item) => {
             const active = isNavItemActive(item.path);
             return (
               <Link

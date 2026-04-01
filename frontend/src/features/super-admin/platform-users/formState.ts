@@ -1,3 +1,8 @@
+import {
+  DEFAULT_PLATFORM_SCOPES,
+  normalizePlatformScopes,
+  type PlatformScopeValue,
+} from "@/features/platform-access/catalog";
 import type {
   PlatformUserCreateRequest,
   PlatformUserDetailResponse,
@@ -13,6 +18,7 @@ export type PlatformUserFormState = {
   password: string;
   is_active: boolean;
   must_change_password: boolean;
+  super_admin_scopes: PlatformScopeValue[];
 };
 
 export const EMPTY_PLATFORM_USER_FORM: PlatformUserFormState = {
@@ -23,6 +29,7 @@ export const EMPTY_PLATFORM_USER_FORM: PlatformUserFormState = {
   password: "",
   is_active: true,
   must_change_password: true,
+  super_admin_scopes: [...DEFAULT_PLATFORM_SCOPES],
 };
 
 export function buildPlatformUserCreatePayload(
@@ -36,6 +43,7 @@ export function buildPlatformUserCreatePayload(
     password: form.password,
     is_active: form.is_active,
     must_change_password: form.must_change_password,
+    super_admin_scopes: normalizePlatformScopes(form.super_admin_scopes),
   };
 }
 
@@ -49,6 +57,7 @@ export function buildPlatformUserUpdatePayload(
     phone: form.phone.trim() || null,
     is_active: form.is_active,
     must_change_password: form.must_change_password,
+    super_admin_scopes: normalizePlatformScopes(form.super_admin_scopes),
   };
   if (form.password.trim()) {
     payload.password = form.password;
@@ -67,5 +76,6 @@ export function mapPlatformUserToFormState(
     password: "",
     is_active: user.is_active,
     must_change_password: user.must_change_password,
+    super_admin_scopes: normalizePlatformScopes(user.super_admin_scopes),
   };
 }

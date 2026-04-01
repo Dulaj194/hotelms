@@ -14,6 +14,11 @@ export type ModuleCatalogItem = {
 
 export const FEATURE_FLAG_CATALOG: FeatureFlagCatalogItem[] = [
   {
+    key: "steward",
+    label: "Steward",
+    description: "Allow steward-facing order handoff and ready-to-serve workflows.",
+  },
+  {
     key: "housekeeping",
     label: "Housekeeping",
     description: "Allow housekeeping task boards and room-service request workflows.",
@@ -56,6 +61,11 @@ export const MODULE_ACCESS_CATALOG: Record<keyof ModuleAccessSnapshot, ModuleCat
     label: "KDS",
     description: "Kitchen display and steward order-processing boards.",
   },
+  steward_ops: {
+    key: "steward_ops",
+    label: "Steward Workflow",
+    description: "Steward-facing order handoff, readiness, and serving workflows.",
+  },
   reports: {
     key: "reports",
     label: "Reports",
@@ -80,6 +90,7 @@ export const MODULE_ACCESS_CATALOG: Record<keyof ModuleAccessSnapshot, ModuleCat
 
 export function createEmptyFeatureFlags(): FeatureFlagSnapshot {
   return {
+    steward: false,
     housekeeping: false,
     kds: false,
     reports: false,
@@ -93,6 +104,7 @@ export function createEmptyModuleAccess(): ModuleAccessSnapshot {
     orders: false,
     qr: false,
     kds: false,
+    steward_ops: false,
     reports: false,
     billing: false,
     housekeeping: false,

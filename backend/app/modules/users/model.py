@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import enum
+import json
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -45,6 +46,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    platform_scopes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     # MULTI-TENANT: restaurant_id links this user to a tenant restaurant.
     # super_admin may have restaurant_id = None (platform-level account).
     # All other roles should always have a restaurant_id set.
@@ -75,3 +77,19 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    @property
+    def super_admin_scopes(self) -> list[str]:
+        from app.modules.platform_access import catalog as platform_access_catalog
+
+        if self.role != UserRole.super_admin:
+            return []
+        return platform_access_catalog.parse_platform_scopes_json(self.platform_scopes_json)
+
+    def set_super_admin_scopes(self, scopes: list[str] | None) -> None:
+        from app.modules.platform_access import catalog as platform_access_catalog
+
+        if self.role != UserRole.super_admin:
+            self.platform_scopes_json = json.dumps([])
+            return
+        self.platform_scopes_json = platform_access_catalog.serialize_platform_scopes(scopes)

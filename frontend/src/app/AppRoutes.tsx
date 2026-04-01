@@ -62,7 +62,7 @@ function RootRedirect() {
   if (user?.must_change_password) {
     return <Navigate to="/first-time-password" replace />;
   }
-  const redirectPath = getRoleRedirect(user?.role ?? "");
+  const redirectPath = getRoleRedirect(user?.role ?? "", user?.super_admin_scopes);
   return <Navigate to={redirectPath || "/dashboard"} replace />;
 }
 
@@ -163,7 +163,7 @@ function AppRoutes() {
           path="/admin/steward"
           element={
             <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
-              <PrivilegeRoute requiredModuleKey="kds">
+              <PrivilegeRoute requiredModuleKey="steward_ops">
                 <Steward />
               </PrivilegeRoute>
             </ProtectedRoute>
@@ -360,7 +360,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/notifications"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["ops_viewer", "security_admin"]}
+            >
               <SuperAdminNotifications />
             </ProtectedRoute>
           }
@@ -368,7 +371,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/registrations"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["tenant_admin"]}
+            >
               <SuperAdminPendingRegistrations />
             </ProtectedRoute>
           }
@@ -376,7 +382,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/registrations/history"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["tenant_admin"]}
+            >
               <SuperAdminRegistrationHistory />
             </ProtectedRoute>
           }
@@ -384,7 +393,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/restaurants"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["tenant_admin", "billing_admin", "security_admin"]}
+            >
               <SuperAdminRestaurants />
             </ProtectedRoute>
           }
@@ -392,7 +404,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/packages"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["billing_admin"]}
+            >
               <SuperAdminPackages />
             </ProtectedRoute>
           }
@@ -400,7 +415,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/settings-requests"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["tenant_admin"]}
+            >
               <SuperAdminSettingsRequests />
             </ProtectedRoute>
           }
@@ -408,7 +426,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/settings-requests/history"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["tenant_admin"]}
+            >
               <SuperAdminSettingsRequestHistory />
             </ProtectedRoute>
           }
@@ -416,7 +437,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/promo-codes"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["billing_admin"]}
+            >
               <SuperAdminPromoCodes />
             </ProtectedRoute>
           }
@@ -424,7 +448,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/platform-users"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["security_admin"]}
+            >
               <SuperAdminPlatformUsers />
             </ProtectedRoute>
           }
@@ -432,7 +459,10 @@ function AppRoutes() {
         <Route
           path="/super-admin/audit-logs"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["ops_viewer", "security_admin"]}
+            >
               <SuperAdminAuditLogs />
             </ProtectedRoute>
           }

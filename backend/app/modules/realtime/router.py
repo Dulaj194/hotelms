@@ -35,6 +35,8 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import decode_token
 from app.db.session import SessionLocal
+from app.modules.access import catalog as access_catalog
+from app.modules.platform_access import catalog as platform_access_catalog
 from app.modules.realtime.repository import get_order_channel, get_super_admin_channel
 from app.modules.users.repository import get_by_id_global
 
@@ -101,7 +103,27 @@ def _user_can_access_super_admin_stream(user: object) -> bool:
         return False
     if role not in _SUPER_ADMIN_ROLES:
         return False
+    if not platform_access_catalog.user_has_any_platform_scope(
+        user,
+        ("ops_viewer", "security_admin"),
+    ):
+        return False
 
+    return True
+
+
+def _restaurant_allows_kitchen_stream(db: Session, restaurant_id: int, role: str) -> bool:
+    from app.modules.restaurants.model import Restaurant
+
+    restaurant = db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+    if restaurant is None:
+        return False
+
+    feature_flags = access_catalog.build_feature_flag_snapshot(restaurant)
+    if not feature_flags.get("kds", True):
+        return False
+    if role == "steward" and not feature_flags.get("steward", True):
+        return False
     return True
 
 
@@ -137,6 +159,9 @@ def _validate_ws_token(token: str, restaurant_id: int, db: Session) -> dict | No
 
     role = user.role.value if hasattr(user.role, "value") else str(user.role)
     if not _user_can_access_kitchen_stream(user, restaurant_id):
+        return None
+
+    if not _restaurant_allows_kitchen_stream(db, restaurant_id, role):
         return None
 
     # Defense in depth: reject stale tokens if role/tenant claim mismatches DB.
@@ -202,7 +227,13 @@ def _is_ws_user_access_valid(user_id: int, restaurant_id: int) -> bool:
     db = SessionLocal()
     try:
         user = get_by_id_global(db, user_id)
-        return _user_can_access_kitchen_stream(user, restaurant_id)
+        if user is None:
+            return False
+        role_obj = getattr(user, "role", None)
+        role = role_obj.value if hasattr(role_obj, "value") else str(role_obj)
+        if not _user_can_access_kitchen_stream(user, restaurant_id):
+            return False
+        return _restaurant_allows_kitchen_stream(db, restaurant_id, role)
     except Exception:
         # Fail closed on DB failures.
         return False

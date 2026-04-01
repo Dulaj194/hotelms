@@ -1134,6 +1134,7 @@ function toNullableNumber(value: string): number | null {
 
 function restaurantFeatureFlagDefaults() {
   return {
+    steward: false,
     housekeeping: false,
     kds: false,
     reports: false,

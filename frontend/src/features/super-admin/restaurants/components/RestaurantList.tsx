@@ -12,6 +12,7 @@ type RestaurantListProps = {
   list: RestaurantMeResponse[];
   selectedId: number | null;
   deletingId: number | null;
+  canManageTenants: boolean;
   subscriptionStatusByHotel: Record<number, string>;
   onView: (restaurantId: number) => void;
   onEdit: (restaurantId: number) => void;
@@ -24,6 +25,7 @@ export function RestaurantList({
   list,
   selectedId,
   deletingId,
+  canManageTenants,
   subscriptionStatusByHotel,
   onView,
   onEdit,
@@ -76,21 +78,25 @@ export function RestaurantList({
               >
                 View
               </button>
-              <button
-                type="button"
-                onClick={() => onEdit(restaurant.id)}
-                className="w-full rounded border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 sm:w-auto"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => onDelete(restaurant.id, restaurant.name)}
-                disabled={deletingId === restaurant.id}
-                className="w-full rounded border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:w-auto"
-              >
-                {deletingId === restaurant.id ? "Deleting..." : "Delete"}
-              </button>
+              {canManageTenants && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onEdit(restaurant.id)}
+                    className="w-full rounded border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 sm:w-auto"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(restaurant.id, restaurant.name)}
+                    disabled={deletingId === restaurant.id}
+                    className="w-full rounded border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:w-auto"
+                  >
+                    {deletingId === restaurant.id ? "Deleting..." : "Delete"}
+                  </button>
+                </>
+              )}
             </div>
           </article>
         ))}
@@ -144,21 +150,25 @@ export function RestaurantList({
                     >
                       View
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onEdit(restaurant.id)}
-                      className="rounded border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(restaurant.id, restaurant.name)}
-                      disabled={deletingId === restaurant.id}
-                      className="rounded border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      {deletingId === restaurant.id ? "Deleting..." : "Delete"}
-                    </button>
+                    {canManageTenants && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onEdit(restaurant.id)}
+                          className="rounded border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(restaurant.id, restaurant.name)}
+                          disabled={deletingId === restaurant.id}
+                          className="rounded border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        >
+                          {deletingId === restaurant.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

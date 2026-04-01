@@ -68,6 +68,7 @@ def get_current_user(
         )
 
     if user.restaurant_id is not None:
+        from app.modules.auth.service import _assert_role_feature_access
         from app.modules.restaurants.model import RegistrationStatus, Restaurant
 
         restaurant = db.query(Restaurant).filter(Restaurant.id == user.restaurant_id).first()
@@ -99,6 +100,7 @@ def get_current_user(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Your restaurant account is inactive.",
                 )
+            _assert_role_feature_access(user, restaurant)
 
     if user.must_change_password:
         allowed_paths = {
@@ -234,6 +236,34 @@ def require_privilege(privilege_code: str):
 
         subscription_service.assert_privilege(db, restaurant_id, privilege_code)
         return True
+
+    return _check
+
+
+def require_platform_scopes(*scopes: str):
+    """Dependency factory that enforces super-admin scope-based access."""
+
+    normalized_scopes = tuple(dict.fromkeys(scope.strip().lower() for scope in scopes if scope))
+
+    def _check(current_user=Depends(get_current_user)):
+        from app.modules.platform_access import catalog as platform_access_catalog
+        from app.modules.users.model import UserRole
+
+        if current_user.role != UserRole.super_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action.",
+            )
+
+        if not platform_access_catalog.user_has_any_platform_scope(
+            current_user,
+            normalized_scopes,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your platform account does not have the required permission scope.",
+            )
+        return current_user
 
     return _check
 

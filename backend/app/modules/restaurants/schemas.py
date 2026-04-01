@@ -8,6 +8,7 @@ WebhookHealthStatusValue = Literal["not_configured", "healthy", "degraded", "dis
 
 
 class RestaurantFeatureFlagsResponse(BaseModel):
+    steward: bool
     housekeeping: bool
     kds: bool
     reports: bool
@@ -16,6 +17,7 @@ class RestaurantFeatureFlagsResponse(BaseModel):
 
 
 class RestaurantFeatureFlagsUpdateRequest(BaseModel):
+    steward: bool | None = None
     housekeeping: bool | None = None
     kds: bool | None = None
     reports: bool | None = None

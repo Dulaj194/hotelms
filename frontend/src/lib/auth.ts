@@ -1,3 +1,8 @@
+import {
+  getDefaultSuperAdminPath,
+  hasAnyPlatformScope,
+  normalizePlatformScopes,
+} from "@/features/platform-access/catalog";
 import type { FeatureFlagSnapshot, ModuleAccessSnapshot } from "@/types/access";
 
 /**
@@ -45,6 +50,7 @@ export interface StoredUser {
   package_code?: string | null;
   subscription_status?: string | null;
   privileges?: string[];
+  super_admin_scopes?: string[];
   feature_flags?: FeatureFlagSnapshot;
   module_access?: ModuleAccessSnapshot;
 }
@@ -86,12 +92,15 @@ export function getUser(): StoredUser | null {
 }
 
 export function setUser(user: StoredUser): void {
+  const normalizedSuperAdminScopes = normalizePlatformScopes(user.super_admin_scopes);
   localStorage.setItem(
     USER_KEY,
     JSON.stringify({
       ...user,
       privileges: user.privileges ?? [],
+      super_admin_scopes: normalizedSuperAdminScopes,
       feature_flags: user.feature_flags ?? {
+        steward: false,
         housekeeping: false,
         kds: false,
         reports: false,
@@ -102,6 +111,7 @@ export function setUser(user: StoredUser): void {
         orders: false,
         qr: false,
         kds: false,
+        steward_ops: false,
         reports: false,
         billing: false,
         housekeeping: false,
@@ -124,10 +134,20 @@ export function isAuthenticated(): boolean {
   return getAccessToken() !== null;
 }
 
-export function getRoleRedirect(role: string): string {
+export function hasSuperAdminScope(
+  requiredScopes: string[],
+  scopes: string[] | null | undefined,
+): boolean {
+  return hasAnyPlatformScope(scopes, requiredScopes);
+}
+
+export function getRoleRedirect(
+  role: string,
+  superAdminScopes?: string[] | null,
+): string {
   switch (normalizeRole(role)) {
     case "super_admin":
-      return "/super-admin";
+      return getDefaultSuperAdminPath(superAdminScopes);
     case "owner":
     case "admin":
       return "/dashboard";

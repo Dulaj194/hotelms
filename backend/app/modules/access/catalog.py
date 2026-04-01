@@ -43,6 +43,13 @@ _MODULE_DEFINITIONS = {
         package_privileges=("QR_MENU",),
         feature_flags=("KDS",),
     ),
+    "steward_ops": AccessModuleDefinition(
+        key="steward_ops",
+        label="Steward Workflow",
+        description="Steward-facing order handoff, readiness, and serving workflows.",
+        package_privileges=("QR_MENU",),
+        feature_flags=("KDS", "STEWARD"),
+    ),
     "reports": AccessModuleDefinition(
         key="reports",
         label="Reports",
@@ -74,6 +81,14 @@ _MODULE_DEFINITIONS = {
 }
 
 _FEATURE_FLAG_DEFINITIONS = {
+    "steward": RestaurantFeatureFlagDefinition(
+        code="STEWARD",
+        key="steward",
+        label="Steward",
+        description="Allow steward-specific order handoff and serving workflows.",
+        column_name="enable_steward",
+        modules=("steward_ops",),
+    ),
     "housekeeping": RestaurantFeatureFlagDefinition(
         code="HOUSEKEEPING",
         key="housekeeping",

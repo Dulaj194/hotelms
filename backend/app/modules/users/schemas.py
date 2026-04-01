@@ -48,6 +48,7 @@ _STAFF_ROLES = {
 }
 
 AssignedArea = Literal["kitchen", "housekeeping", "steward", "cashier", "accounting"]
+PlatformScopeValue = Literal["ops_viewer", "tenant_admin", "billing_admin", "security_admin"]
 
 
 class StaffCreateRequest(BaseModel):
@@ -133,6 +134,7 @@ class PlatformUserCreateRequest(BaseModel):
     password: str = Field(..., min_length=8)
     is_active: bool = True
     must_change_password: bool = False
+    super_admin_scopes: list[PlatformScopeValue] = Field(default_factory=list)
 
 
 class PlatformUserUpdateRequest(BaseModel):
@@ -143,6 +145,7 @@ class PlatformUserUpdateRequest(BaseModel):
     password: str | None = Field(None, min_length=8)
     is_active: bool | None = None
     must_change_password: bool | None = None
+    super_admin_scopes: list[PlatformScopeValue] | None = None
 
 
 class PlatformUserListItemResponse(BaseModel):
@@ -154,6 +157,7 @@ class PlatformUserListItemResponse(BaseModel):
     role: str
     is_active: bool
     must_change_password: bool
+    super_admin_scopes: list[str] = Field(default_factory=list)
     last_login_at: datetime | None
     created_at: datetime
     updated_at: datetime

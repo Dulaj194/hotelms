@@ -13,6 +13,7 @@ type SubscriptionPanelProps = {
   accessSummary: SubscriptionAccessSummaryResponse | null;
   historyItems: SubscriptionChangeHistoryItemResponse[];
   packages: PackageDetailResponse[];
+  canManageBilling: boolean;
   subLoading: boolean;
   editingSub: boolean;
   savingSub: boolean;
@@ -28,6 +29,7 @@ export function SubscriptionPanel({
   accessSummary,
   historyItems,
   packages,
+  canManageBilling,
   subLoading,
   editingSub,
   savingSub,
@@ -55,6 +57,7 @@ export function SubscriptionPanel({
   const draftModules = buildEnabledModules(draftPackage?.privileges ?? []);
   const featureFlags = accessSummary?.feature_flags ?? [];
   const moduleAccess = accessSummary?.module_access ?? activeModules;
+  const isEditing = editingSub && canManageBilling;
 
   function formatHistoryAction(item: SubscriptionChangeHistoryItemResponse): string {
     switch (item.action) {
@@ -77,7 +80,7 @@ export function SubscriptionPanel({
         <h2 className="font-medium text-sm text-gray-500 uppercase tracking-wide">
           Package Access
         </h2>
-        {!editingSub && selectedSub && (
+        {!isEditing && selectedSub && canManageBilling && (
           <button
             type="button"
             onClick={() => onEditToggle(true)}
@@ -94,11 +97,18 @@ export function SubscriptionPanel({
         </p>
       )}
 
+      {!canManageBilling && selectedSub && (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          Read-only view. Billing Admin scope is required to change package assignments or
+          subscription status.
+        </div>
+      )}
+
       {subLoading ? (
         <p className="text-sm text-gray-400">Loading subscription...</p>
       ) : !selectedSub ? (
         <p className="text-sm text-gray-400">No subscription found for this hotel.</p>
-      ) : editingSub ? (
+      ) : isEditing ? (
         <div className="space-y-3">
           <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">

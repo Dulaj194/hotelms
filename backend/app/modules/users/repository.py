@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
+from app.modules.platform_access import catalog as platform_access_catalog
 from app.modules.users.model import User, UserRole
 from app.modules.users.schemas import StaffCreateRequest, StaffUpdateRequest, UserCreate
 
@@ -110,6 +111,7 @@ def create_platform_user(
     password: str,
     is_active: bool,
     must_change_password: bool,
+    super_admin_scopes: list[str] | None,
 ) -> User:
     user = User(
         full_name=full_name,
@@ -122,6 +124,7 @@ def create_platform_user(
         is_active=is_active,
         must_change_password=must_change_password,
     )
+    user.set_super_admin_scopes(super_admin_scopes)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -198,6 +201,13 @@ def update_platform_user(
     if "password" in update_data:
         update_data["password_hash"] = hash_password(update_data.pop("password"))
 
+    if "super_admin_scopes" in update_data:
+        user.set_super_admin_scopes(
+            platform_access_catalog.normalize_platform_scopes(
+                update_data.pop("super_admin_scopes")
+            )
+        )
+
     for field, value in update_data.items():
         setattr(user, field, value)
 
@@ -260,6 +270,24 @@ def count_active_platform_users(db: Session) -> int:
             User.is_active.is_(True),
         )
         .count()
+    )
+
+
+def count_active_platform_users_with_scope(db: Session, scope: str) -> int:
+    normalized_scope = scope.strip().lower()
+    users = (
+        db.query(User)
+        .filter(
+            User.role == UserRole.super_admin,
+            User.restaurant_id.is_(None),
+            User.is_active.is_(True),
+        )
+        .all()
+    )
+    return sum(
+        1
+        for user in users
+        if normalized_scope in platform_access_catalog.get_user_platform_scopes(user)
     )
 
 

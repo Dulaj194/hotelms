@@ -3,6 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import ActionDialog from "@/components/shared/ActionDialog";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import {
+  PLATFORM_SCOPE_CATALOG,
+  type PlatformScopeValue,
+} from "@/features/platform-access/catalog";
+import {
   buildPlatformUserCreatePayload,
   buildPlatformUserUpdatePayload,
   EMPTY_PLATFORM_USER_FORM,
@@ -263,6 +267,7 @@ export default function PlatformUsersPage() {
                       <th className="px-3 py-3">Username</th>
                       <th className="px-3 py-3">Phone</th>
                       <th className="px-3 py-3">Status</th>
+                      <th className="px-3 py-3">Scopes</th>
                       <th className="px-3 py-3">Password Policy</th>
                       <th className="px-3 py-3">Last Login</th>
                       <th className="px-3 py-3 text-right">Actions</th>
@@ -287,6 +292,21 @@ export default function PlatformUsersPage() {
                           >
                             {user.is_active ? "Active" : "Inactive"}
                           </span>
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap gap-1.5">
+                            {user.super_admin_scopes.map((scope) => {
+                              const definition = PLATFORM_SCOPE_CATALOG.find((item) => item.key === scope);
+                              return (
+                                <span
+                                  key={scope}
+                                  className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600"
+                                >
+                                  {definition?.label ?? scope}
+                                </span>
+                              );
+                            })}
+                          </div>
                         </td>
                         <td className="px-3 py-3 text-slate-600">
                           {user.must_change_password ? "Reset required" : "Stable"}
@@ -474,6 +494,43 @@ function PlatformUserFormFields({
         />
         Force password change on next login
       </label>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 md:col-span-2">
+        <p className="text-sm font-medium text-slate-700">Permission Scopes</p>
+        <p className="mt-1 text-xs text-slate-500">
+          Assign only the platform areas this super admin should control.
+        </p>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          {PLATFORM_SCOPE_CATALOG.map((scope) => {
+            const checked = form.super_admin_scopes.includes(scope.key);
+            return (
+              <label
+                key={scope.key}
+                className="rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700"
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={(event) => {
+                      const nextScopes = event.target.checked
+                        ? [...form.super_admin_scopes, scope.key]
+                        : form.super_admin_scopes.filter((value) => value !== scope.key);
+                      onChange({
+                        ...form,
+                        super_admin_scopes: Array.from(new Set(nextScopes)) as PlatformScopeValue[],
+                      });
+                    }}
+                  />
+                  <div>
+                    <p className="font-semibold text-slate-900">{scope.label}</p>
+                    <p className="mt-1 text-xs text-slate-500">{scope.description}</p>
+                  </div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

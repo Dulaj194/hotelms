@@ -134,7 +134,7 @@ export default function Login() {
         navigate("/first-time-password", { replace: true });
         return;
       }
-      navigate(getRoleRedirect(me.role), { replace: true });
+      navigate(getRoleRedirect(me.role, me.super_admin_scopes), { replace: true });
     } catch (err) {
       setError(getLoginErrorMessage(err, flowConfig.invalidCredentialsMessage));
     } finally {
