@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_platform_scopes
@@ -23,6 +25,10 @@ def list_audit_logs(
     event_type: str | None = Query(default=None),
     restaurant_id: int | None = Query(default=None, ge=1),
     search: str | None = Query(default=None, min_length=1, max_length=200),
+    actor_search: str | None = Query(default=None, min_length=1, max_length=200),
+    severity: str | None = Query(default=None, pattern="^(info|success|warning|danger)$"),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
     _current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
     db: Session = Depends(get_db),
 ) -> AuditLogListResponse:
@@ -33,6 +39,41 @@ def list_audit_logs(
         event_type=event_type,
         restaurant_id=restaurant_id,
         search=search,
+        actor_search=actor_search,
+        severity=severity,
+        created_from=created_from,
+        created_to=created_to,
+    )
+
+
+@router.get("/export")
+def export_audit_logs(
+    event_type: str | None = Query(default=None),
+    restaurant_id: int | None = Query(default=None, ge=1),
+    search: str | None = Query(default=None, min_length=1, max_length=200),
+    actor_search: str | None = Query(default=None, min_length=1, max_length=200),
+    severity: str | None = Query(default=None, pattern="^(info|success|warning|danger)$"),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
+    _current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
+    db: Session = Depends(get_db),
+) -> Response:
+    csv_content = service.export_audit_logs_csv(
+        db,
+        event_type=event_type,
+        restaurant_id=restaurant_id,
+        search=search,
+        actor_search=actor_search,
+        severity=severity,
+        created_from=created_from,
+        created_to=created_to,
+    )
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="audit-logs-export.csv"',
+        },
     )
 
 

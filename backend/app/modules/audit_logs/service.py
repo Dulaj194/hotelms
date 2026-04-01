@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import csv
 import json
+from io import StringIO
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_
+from sqlalchemy import false, or_
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.logging import get_logger
@@ -38,6 +40,13 @@ def _normalize_datetime(value: datetime | None) -> datetime | None:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def _normalize_filter_datetime(value: datetime | None) -> datetime | None:
+    normalized = _normalize_datetime(value)
+    if normalized is None:
+        return None
+    return normalized.replace(tzinfo=None)
 
 
 def _parse_metadata(metadata_json: str | None) -> dict[str, Any]:
@@ -385,7 +394,13 @@ def list_audit_logs(
     event_type: str | None = None,
     restaurant_id: int | None = None,
     search: str | None = None,
+    actor_search: str | None = None,
+    severity: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
 ) -> AuditLogListResponse:
+    from app.modules.users.model import User
+
     query = db.query(AuditLog)
 
     if event_type:
@@ -411,13 +426,42 @@ def list_audit_logs(
             )
         )
 
-    total = query.count()
-    items = (
-        query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    if actor_search:
+        actor_pattern = f"%{actor_search.strip()}%"
+        actor_ids = [
+            user_id
+            for (user_id,) in db.query(User.id)
+            .filter(
+                or_(
+                    User.full_name.ilike(actor_pattern),
+                    User.email.ilike(actor_pattern),
+                )
+            )
+            .all()
+        ]
+        query = query.filter(AuditLog.user_id.in_(actor_ids) if actor_ids else false())
+
+    normalized_created_from = _normalize_filter_datetime(created_from)
+    if normalized_created_from is not None:
+        query = query.filter(AuditLog.created_at >= normalized_created_from)
+
+    normalized_created_to = _normalize_filter_datetime(created_to)
+    if normalized_created_to is not None:
+        query = query.filter(AuditLog.created_at <= normalized_created_to)
+
+    ordered_items = query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).all()
+
+    if severity:
+        normalized_severity = severity.strip().lower()
+        ordered_items = [
+            log
+            for log in ordered_items
+            if catalog.get_event_severity(log.event_type, _parse_metadata(log.metadata_json))
+            == normalized_severity
+        ]
+
+    total = len(ordered_items)
+    items = ordered_items[offset: offset + limit]
     user_map, restaurant_map = _load_context_maps(db, items)
 
     return AuditLogListResponse(
@@ -431,6 +475,76 @@ def list_audit_logs(
         ],
         total=total,
     )
+
+
+def export_audit_logs_csv(
+    db: Session,
+    *,
+    event_type: str | None = None,
+    restaurant_id: int | None = None,
+    search: str | None = None,
+    actor_search: str | None = None,
+    severity: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+) -> str:
+    response = list_audit_logs(
+        db,
+        limit=5000,
+        offset=0,
+        event_type=event_type,
+        restaurant_id=restaurant_id,
+        search=search,
+        actor_search=actor_search,
+        severity=severity,
+        created_from=created_from,
+        created_to=created_to,
+    )
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "id",
+            "created_at",
+            "event_type",
+            "category",
+            "severity",
+            "title",
+            "message",
+            "restaurant_id",
+            "restaurant_name",
+            "actor_user_id",
+            "actor_name",
+            "actor_email",
+            "ip_address",
+            "user_agent",
+            "metadata_json",
+        ]
+    )
+
+    for item in response.items:
+        writer.writerow(
+            [
+                item.id,
+                item.created_at.isoformat(),
+                item.event_type,
+                item.category,
+                item.severity,
+                item.title,
+                item.message,
+                item.restaurant.restaurant_id,
+                item.restaurant.name,
+                item.actor.user_id,
+                item.actor.full_name,
+                item.actor.email,
+                item.ip_address,
+                item.user_agent,
+                json.dumps(item.metadata, ensure_ascii=True, sort_keys=True),
+            ]
+        )
+
+    return buffer.getvalue()
 
 
 def list_super_admin_notifications(

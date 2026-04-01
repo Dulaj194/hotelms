@@ -99,6 +99,8 @@ def _map_super_admin_event_name(event_type: str) -> str:
         return "user:updated"
     if event_type.startswith("restaurant_api_key_") or event_type.startswith("restaurant_webhook_"):
         return "integration:updated"
+    if event_type.startswith("stripe_webhook_"):
+        return "billing:alert"
     if event_type == "login_failed":
         return "security:alert"
     return "super-admin:notification"

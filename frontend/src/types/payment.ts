@@ -55,3 +55,51 @@ export interface BillingTransactionListResponse {
   items: BillingTransactionResponse[];
   total: number;
 }
+
+export interface PlatformRevenueByTenantResponse {
+  restaurant_id: number;
+  restaurant_name: string;
+  revenue_today: number;
+  paid_bill_count: number;
+}
+
+export interface PlatformOverduePaymentResponse {
+  bill_id: number;
+  restaurant_id: number;
+  restaurant_name: string;
+  table_number: string;
+  amount: number;
+  created_at: string;
+}
+
+export interface PlatformExpiringSubscriptionResponse {
+  restaurant_id: number;
+  restaurant_name: string;
+  package_name: string | null;
+  package_code: string | null;
+  status: string;
+  is_trial: boolean;
+  expires_at: string;
+  days_remaining: number;
+}
+
+export interface PlatformFailedWebhookResponse {
+  audit_log_id: number;
+  restaurant_id: number | null;
+  restaurant_name: string | null;
+  stripe_event_type: string | null;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface PlatformCommercialOverviewResponse {
+  overdue_payment_count: number;
+  failed_stripe_webhook_count: number;
+  active_trial_count: number;
+  expiring_subscription_count: number;
+  today_revenue_total: number;
+  revenue_by_tenant: PlatformRevenueByTenantResponse[];
+  overdue_payments: PlatformOverduePaymentResponse[];
+  failed_stripe_webhooks: PlatformFailedWebhookResponse[];
+  expiring_subscriptions: PlatformExpiringSubscriptionResponse[];
+}

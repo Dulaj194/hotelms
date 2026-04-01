@@ -66,3 +66,51 @@ class BillingTransactionListResponse(BaseModel):
 
 class WebhookAckResponse(BaseModel):
     received: bool = True
+
+
+class PlatformRevenueByTenantResponse(BaseModel):
+    restaurant_id: int
+    restaurant_name: str
+    revenue_today: float
+    paid_bill_count: int
+
+
+class PlatformOverduePaymentResponse(BaseModel):
+    bill_id: int
+    restaurant_id: int
+    restaurant_name: str
+    table_number: str
+    amount: float
+    created_at: datetime
+
+
+class PlatformExpiringSubscriptionResponse(BaseModel):
+    restaurant_id: int
+    restaurant_name: str
+    package_name: str | None
+    package_code: str | None
+    status: str
+    is_trial: bool
+    expires_at: datetime
+    days_remaining: int
+
+
+class PlatformFailedWebhookResponse(BaseModel):
+    audit_log_id: int
+    restaurant_id: int | None
+    restaurant_name: str | None
+    stripe_event_type: str | None
+    reason: str | None
+    created_at: datetime
+
+
+class PlatformCommercialOverviewResponse(BaseModel):
+    overdue_payment_count: int
+    failed_stripe_webhook_count: int
+    active_trial_count: int
+    expiring_subscription_count: int
+    today_revenue_total: float
+    revenue_by_tenant: list[PlatformRevenueByTenantResponse]
+    overdue_payments: list[PlatformOverduePaymentResponse]
+    failed_stripe_webhooks: list[PlatformFailedWebhookResponse]
+    expiring_subscriptions: list[PlatformExpiringSubscriptionResponse]

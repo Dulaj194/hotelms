@@ -2,13 +2,19 @@
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_restaurant_id, get_db, require_roles
+from app.core.dependencies import (
+	get_current_restaurant_id,
+	get_db,
+	require_platform_scopes,
+	require_roles,
+)
 from app.modules.payments import service
 from app.modules.payments.schemas import (
 	BillingTransactionListResponse,
 	BillingTransactionResponse,
 	CheckoutSessionRequest,
 	CheckoutSessionResponse,
+	PlatformCommercialOverviewResponse,
 	WebhookAckResponse,
 )
 
@@ -67,3 +73,11 @@ def get_billing_transaction_detail(
 		restaurant_id=restaurant_id,
 		transaction_id=transaction_id,
 	)
+
+
+@router.get("/admin/oversight", response_model=PlatformCommercialOverviewResponse)
+def get_platform_commercial_overview(
+	db: Session = Depends(get_db),
+	_=Depends(require_platform_scopes("ops_viewer", "billing_admin")),
+) -> PlatformCommercialOverviewResponse:
+	return service.get_platform_commercial_overview(db)

@@ -124,6 +124,11 @@ _EVENT_DEFINITIONS: dict[str, dict[str, str]] = {
         "severity": "info",
         "title": "Webhook health checked",
     },
+    "stripe_webhook_failed": {
+        "category": "billing",
+        "severity": "danger",
+        "title": "Stripe webhook failed",
+    },
     "login_failed": {
         "category": "security",
         "severity": "danger",
@@ -233,6 +238,10 @@ def build_event_message(
     if event_type == "restaurant_webhook_health_checked":
         webhook_status = metadata.get("webhook_status") or "unknown"
         return f"{hotel_label} webhook health check finished with status: {webhook_status}."
+    if event_type == "stripe_webhook_failed":
+        reason = metadata.get("reason") or "unknown_error"
+        event_name = metadata.get("stripe_event_type") or "unknown_event"
+        return f"Stripe webhook processing failed for {event_name} ({reason})."
     if event_type == "login_failed":
         reason = metadata.get("reason")
         if reason:
