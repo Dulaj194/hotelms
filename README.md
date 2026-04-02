@@ -42,3 +42,49 @@ hotelms/
 1. Configure env files from the provided `.env.example` files.
 2. Start the active HotelMS stack with `docker compose up --build` from repo root.
 3. Frontend runs on `http://localhost:5173`, backend on `http://localhost:8000`.
+
+## Backend Tests
+
+Backend tests use Python `unittest` as the default runner.
+
+1. Create and activate the backend virtual environment.
+2. Install backend dependencies:
+   `backend/venv/Scripts/python.exe -m pip install -r backend/requirements.txt`
+3. Run all backend tests from the `backend` folder:
+   `venv/Scripts/python.exe -m unittest discover tests`
+4. Run one test file:
+   `venv/Scripts/python.exe -m unittest tests.test_realtime_ws_auth`
+
+## Backend Quality Checks
+
+For code quality, formatting, type checking, and security scanning, install development dependencies:
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+```
+
+Then run individual checks:
+
+```bash
+# Code formatting (check only)
+black --check app/ tests/
+
+# Auto-fix formatting
+black app/ tests/
+
+# Linting (with auto-fixes)
+ruff check app/ tests/ --fix
+
+# Type checking
+mypy app/
+
+# Security scanning
+bandit -r app/ -ll
+
+# All tests with coverage
+pytest tests/ --cov=app --cov-report=term-level=2
+```
+
+**CI Integration:**  
+All quality checks run automatically on pull requests and pushes to `main` or `dev1` branches. Check [.github/workflows/backend-quality.yml](.github/workflows/backend-quality.yml) for the full pipeline.

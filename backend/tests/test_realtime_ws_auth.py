@@ -17,6 +17,25 @@ from app.modules.realtime.router import (
 )
 
 
+class _FakeQuery:
+    def __init__(self, restaurant: object | None) -> None:
+        self._restaurant = restaurant
+
+    def filter(self, *_args, **_kwargs) -> "_FakeQuery":
+        return self
+
+    def first(self) -> object | None:
+        return self._restaurant
+
+
+class _FakeDb:
+    def __init__(self, restaurant: object | None) -> None:
+        self._restaurant = restaurant
+
+    def query(self, *_args, **_kwargs) -> _FakeQuery:
+        return _FakeQuery(self._restaurant)
+
+
 class RealtimeWebSocketAuthTests(unittest.TestCase):
     def _build_user(
         self,
@@ -35,6 +54,9 @@ class RealtimeWebSocketAuthTests(unittest.TestCase):
             must_change_password=must_change_password,
         )
 
+    def _build_db_with_restaurant(self) -> _FakeDb:
+        return _FakeDb(SimpleNamespace(enable_kds=True, enable_steward=True))
+
     def test_accepts_active_restaurant_user_with_valid_access_token(self) -> None:
         payload = {
             "type": "access",
@@ -48,7 +70,11 @@ class RealtimeWebSocketAuthTests(unittest.TestCase):
             patch("app.modules.realtime.router.decode_token", return_value=payload),
             patch("app.modules.realtime.router.get_by_id_global", return_value=user),
         ):
-            result = _validate_ws_token("token", restaurant_id=5, db=SimpleNamespace())
+            result = _validate_ws_token(
+                "token",
+                restaurant_id=5,
+                db=self._build_db_with_restaurant(),
+            )
 
         self.assertEqual(result, {"user_id": 10, "role": "steward"})
 
@@ -60,7 +86,11 @@ class RealtimeWebSocketAuthTests(unittest.TestCase):
             patch("app.modules.realtime.router.decode_token", return_value=payload),
             patch("app.modules.realtime.router.get_by_id_global", return_value=user),
         ):
-            result = _validate_ws_token("token", restaurant_id=5, db=SimpleNamespace())
+            result = _validate_ws_token(
+                "token",
+                restaurant_id=5,
+                db=self._build_db_with_restaurant(),
+            )
 
         self.assertIsNone(result)
 
@@ -72,7 +102,11 @@ class RealtimeWebSocketAuthTests(unittest.TestCase):
             patch("app.modules.realtime.router.decode_token", return_value=payload),
             patch("app.modules.realtime.router.get_by_id_global", return_value=user),
         ):
-            result = _validate_ws_token("token", restaurant_id=5, db=SimpleNamespace())
+            result = _validate_ws_token(
+                "token",
+                restaurant_id=5,
+                db=self._build_db_with_restaurant(),
+            )
 
         self.assertIsNone(result)
 
@@ -84,7 +118,11 @@ class RealtimeWebSocketAuthTests(unittest.TestCase):
             patch("app.modules.realtime.router.decode_token", return_value=payload),
             patch("app.modules.realtime.router.get_by_id_global", return_value=user),
         ):
-            result = _validate_ws_token("token", restaurant_id=5, db=SimpleNamespace())
+            result = _validate_ws_token(
+                "token",
+                restaurant_id=5,
+                db=self._build_db_with_restaurant(),
+            )
 
         self.assertIsNone(result)
 
@@ -96,13 +134,21 @@ class RealtimeWebSocketAuthTests(unittest.TestCase):
             patch("app.modules.realtime.router.decode_token", return_value=payload),
             patch("app.modules.realtime.router.get_by_id_global", return_value=user),
         ):
-            result = _validate_ws_token("token", restaurant_id=5, db=SimpleNamespace())
+            result = _validate_ws_token(
+                "token",
+                restaurant_id=5,
+                db=self._build_db_with_restaurant(),
+            )
 
         self.assertIsNone(result)
 
     def test_rejects_when_decode_fails(self) -> None:
         with patch("app.modules.realtime.router.decode_token", side_effect=JWTError("bad token")):
-            result = _validate_ws_token("token", restaurant_id=5, db=SimpleNamespace())
+            result = _validate_ws_token(
+                "token",
+                restaurant_id=5,
+                db=self._build_db_with_restaurant(),
+            )
 
         self.assertIsNone(result)
 
