@@ -72,7 +72,7 @@ def list_platform_users(
     return query.order_by(User.created_at.desc(), User.id.desc()).all()
 
 
-def get_platform_user_by_id(db: Session, user_id: int) -> User | None:
+def get_platform_user_for_super_admin(db: Session, user_id: int) -> User | None:
     return (
         db.query(User)
         .filter(

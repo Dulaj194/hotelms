@@ -38,6 +38,91 @@ from app.modules.subscriptions.schemas import (
 )
 
 
+# ============================================================================
+# SUBSCRIPTION STATE TRANSITION HELPER
+# ============================================================================
+# Encapsulates the common pattern: clone state → modify → record change
+class SubscriptionTransition:
+    """Helper class for managing subscription state transitions.
+
+    Consolidates the pattern used across activate, cancel, expire, and update
+    functions to avoid duplication and ensure consistent audit logging.
+
+    Usage:
+        transition = SubscriptionTransition(db, restaurant_id)
+        previous = transition.get_previous_state()
+        next_sub = transition.perform_update(
+            handler=lambda: repository.create_subscription(...),
+            action=SubscriptionChangeAction.activated,
+            audit_event_type="subscription_activated",
+        )
+    """
+
+    def __init__(
+        self,
+        db: Session,
+        restaurant_id: int,
+        actor_user_id: int | None = None,
+        source: str = "system",
+    ):
+        self.db = db
+        self.restaurant_id = restaurant_id
+        self.actor_user_id = actor_user_id
+        self.source = source
+        self._previous_state: RestaurantSubscription | None = None
+
+    def get_previous_state(self) -> RestaurantSubscription | None:
+        """Get and cache the previous subscription state."""
+        if self._previous_state is None:
+            latest = repository.get_latest_subscription_by_restaurant(
+                self.db, self.restaurant_id
+            )
+            self._previous_state = _clone_subscription_state(latest)
+        return self._previous_state
+
+    def perform_update(
+        self,
+        *,
+        handler: callable,  # Callable that performs the modification and returns new subscription
+        action: SubscriptionChangeAction,
+        audit_event_type: str,
+        change_reason: str | None = None,
+        emit_live_notification: bool = True,
+        extra_metadata: dict | None = None,
+    ) -> RestaurantSubscription:
+        """Execute transition: call handler, then record the change.
+
+        Args:
+            handler: Function that performs the database modification
+                     and returns the updated subscription
+            action: The type of change action
+            audit_event_type: The audit log event type
+            change_reason: Optional description of why the change occurred
+            emit_live_notification: Whether to publish realtime notification
+            extra_metadata: Additional metadata to include in audit log
+
+        Returns:
+            The updated subscription object
+        """
+        previous = self.get_previous_state()
+        next_subscription = handler()
+
+        _record_subscription_change(
+            self.db,
+            action=action,
+            restaurant_id=self.restaurant_id,
+            previous_subscription=previous,
+            next_subscription=next_subscription,
+            actor_user_id=self.actor_user_id,
+            source=self.source,
+            change_reason=change_reason,
+            audit_event_type=audit_event_type,
+            emit_live_notification=emit_live_notification,
+            extra_metadata=extra_metadata,
+        )
+        return next_subscription
+
+
 def _utcnow_naive() -> datetime:
     return datetime.utcnow()
 

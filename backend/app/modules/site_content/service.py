@@ -400,7 +400,7 @@ def _get_valid_lead_assignee(db: Session, user_id: int | None) -> User | None:
     if user_id is None:
         return None
 
-    user = users_repository.get_platform_user_by_id(db, user_id)
+    user = users_repository.get_platform_user_for_super_admin(db, user_id)
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

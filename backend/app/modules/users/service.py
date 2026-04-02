@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.modules.access import role_hierarchy
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.housekeeping.model import HousekeepingRequest
 from app.modules.platform_access import catalog as platform_access_catalog
@@ -26,7 +27,7 @@ from app.modules.users.repository import (
     get_user_by_email,
     get_user_by_phone,
     get_user_by_username,
-    get_platform_user_by_id,
+    get_platform_user_for_super_admin,
     list_by_restaurant,
     list_platform_users as repo_list_platform_users,
     update_platform_user as repo_update_platform_user,
@@ -48,62 +49,10 @@ from app.modules.users.schemas import (
     UserResponse,
 )
 
-# ─── Role hierarchy ───────────────────────────────────────────────────────────
-#
-# Defines which roles a given manager role is allowed to create / modify.
-# owner  → can manage admin, steward, housekeeper
-# admin  → can manage steward, housekeeper
-# steward / housekeeper → no management rights (enforced at router level too)
-
-_MANAGEABLE_ROLES: dict[str, set[UserRole]] = {
-    "super_admin": {
-        UserRole.owner,
-        UserRole.admin,
-        UserRole.steward,
-        UserRole.housekeeper,
-        UserRole.cashier,
-        UserRole.accountant,
-    },
-    "owner": {
-        UserRole.admin,
-        UserRole.steward,
-        UserRole.housekeeper,
-        UserRole.cashier,
-        UserRole.accountant,
-    },
-    "admin": {
-        UserRole.steward,
-        UserRole.housekeeper,
-        UserRole.cashier,
-        UserRole.accountant,
-    },
-}
-
-_DEFAULT_ASSIGNED_AREAS: dict[UserRole, str | None] = {
-    UserRole.owner: None,
-    UserRole.admin: None,
-    UserRole.steward: "steward",
-    UserRole.housekeeper: "housekeeping",
-    UserRole.cashier: "cashier",
-    UserRole.accountant: "accounting",
-    UserRole.super_admin: None,
-}
-
-_ALLOWED_ASSIGNED_AREAS: dict[UserRole, set[str | None]] = {
-    UserRole.owner: {None},
-    UserRole.admin: {None},
-    UserRole.steward: {None, "steward", "kitchen"},
-    UserRole.housekeeper: {None, "housekeeping"},
-    UserRole.cashier: {None, "cashier"},
-    UserRole.accountant: {None, "accounting"},
-    UserRole.super_admin: {None},
-}
-
 
 def _assert_can_manage_role(manager: User, target_role: UserRole) -> None:
     """Raise 403 if the manager's role cannot manage the target role."""
-    allowed = _MANAGEABLE_ROLES.get(manager.role.value, set())
-    if target_role not in allowed:
+    if not role_hierarchy.can_manage_role(manager.role, target_role):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Your role '{manager.role.value}' cannot manage '{target_role.value}' users.",
@@ -115,8 +64,8 @@ def _normalize_assigned_area(
     role: UserRole,
     assigned_area: str | None,
 ) -> str | None:
-    allowed_areas = _ALLOWED_ASSIGNED_AREAS.get(role, {None})
-    if assigned_area not in allowed_areas:
+    if not role_hierarchy.is_allowed_assigned_area(role, assigned_area):
+        allowed_areas = role_hierarchy.get_allowed_assigned_areas(role)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
@@ -124,7 +73,7 @@ def _normalize_assigned_area(
                 f"'{role.value}' role."
             ),
         )
-    return assigned_area if assigned_area is not None else _DEFAULT_ASSIGNED_AREAS.get(role)
+    return assigned_area if assigned_area is not None else role_hierarchy.get_default_assigned_area(role)
 
 
 def _normalize_super_admin_scopes(scopes: list[str] | None) -> list[str]:
@@ -585,7 +534,7 @@ def get_platform_user(
     db: Session,
     user_id: int,
 ) -> PlatformUserDetailResponse:
-    user = get_platform_user_by_id(db, user_id)
+    user = get_platform_user_for_super_admin(db, user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -649,7 +598,7 @@ def update_platform_user(
     data: PlatformUserUpdateRequest,
     current_user: User,
 ) -> PlatformUserDetailResponse:
-    user = get_platform_user_by_id(db, user_id)
+    user = get_platform_user_for_super_admin(db, user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -722,7 +671,7 @@ def disable_platform_user(
             detail="You cannot disable your own platform account.",
         )
 
-    user = get_platform_user_by_id(db, user_id)
+    user = get_platform_user_for_super_admin(db, user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -759,7 +708,7 @@ def enable_platform_user(
     user_id: int,
     current_user: User,
 ) -> StaffStatusResponse:
-    user = get_platform_user_by_id(db, user_id)
+    user = get_platform_user_for_super_admin(db, user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -791,7 +740,7 @@ def delete_platform_user(
             detail="You cannot delete your own platform account.",
         )
 
-    user = get_platform_user_by_id(db, user_id)
+    user = get_platform_user_for_super_admin(db, user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

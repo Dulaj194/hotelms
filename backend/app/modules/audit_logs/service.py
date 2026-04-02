@@ -137,14 +137,31 @@ def _serialize_audit_entry(
     log: AuditLog,
     user_map: dict[int, object],
     restaurant_map: dict[int, object],
-) -> AuditLogEntryResponse:
+    notification_state: SuperAdminNotificationState | None = None,
+) -> AuditLogEntryResponse | SuperAdminNotificationResponse:
+    """Serialize an audit log entry with optional notification fields.
+
+    Args:
+        log: The audit log entry
+        user_map: Map of user_id → user object for fast lookup
+        restaurant_map: Map of restaurant_id → restaurant object for fast lookup
+        notification_state: Optional notification state. If provided, returns
+                           SuperAdminNotificationResponse with notification fields.
+                           Otherwise returns AuditLogEntryResponse.
+
+    Returns:
+        AuditLogEntryResponse if notification_state is None
+        SuperAdminNotificationResponse if notification_state is provided
+    """
     metadata = _parse_metadata(log.metadata_json)
     restaurant_id = _effective_restaurant_id(log, metadata)
     actor_obj = user_map.get(log.user_id) if log.user_id is not None else None
     restaurant_obj = restaurant_map.get(restaurant_id) if restaurant_id is not None else None
 
     restaurant_name = getattr(restaurant_obj, "name", None)
-    entry = AuditLogEntryResponse(
+    
+    # Base audit entry fields
+    base_fields = dict(
         id=log.id,
         event_type=log.event_type,
         category=catalog.get_event_category(log.event_type),
@@ -170,52 +187,42 @@ def _serialize_audit_entry(
         metadata=metadata,
         created_at=log.created_at,
     )
-    return entry
 
+    # Return base response if no notification state
+    if notification_state is None:
+        return AuditLogEntryResponse(**base_fields)
 
-def _serialize_notification_entry(
-    *,
-    log: AuditLog,
-    notification_state: SuperAdminNotificationState | None,
-    user_map: dict[int, object],
-    restaurant_map: dict[int, object],
-) -> SuperAdminNotificationResponse:
-    entry = _serialize_audit_entry(
-        log=log,
-        user_map=user_map,
-        restaurant_map=restaurant_map,
-    )
-
+    # Build notification-specific fields
     read_by = (
         user_map.get(notification_state.read_by_user_id)
-        if notification_state is not None and notification_state.read_by_user_id is not None
+        if notification_state.read_by_user_id is not None
         else None
     )
     assigned_to = (
         user_map.get(notification_state.assigned_user_id)
-        if notification_state is not None and notification_state.assigned_user_id is not None
+        if notification_state.assigned_user_id is not None
         else None
     )
     acknowledged_by = (
         user_map.get(notification_state.acknowledged_by_user_id)
-        if notification_state is not None and notification_state.acknowledged_by_user_id is not None
+        if notification_state.acknowledged_by_user_id is not None
         else None
     )
 
     return SuperAdminNotificationResponse(
-        id=f"audit:{entry.id}",
-        audit_log_id=entry.id,
-        event_type=entry.event_type,
-        category=entry.category,
-        severity=entry.severity,
-        title=entry.title,
-        message=entry.message,
-        actor=entry.actor,
-        restaurant=entry.restaurant,
-        metadata=entry.metadata,
+        id=f"audit:{log.id}",
+        audit_log_id=log.id,
+        event_type=base_fields["event_type"],
+        category=base_fields["category"],
+        severity=base_fields["severity"],
+        title=base_fields["title"],
+        message=base_fields["message"],
+        actor=base_fields["actor"],
+        restaurant=base_fields["restaurant"],
+        metadata=base_fields["metadata"],
         queue_status=_build_notification_queue_status(notification_state),
-        is_read=bool(notification_state.is_read) if notification_state is not None else False,
-        read_at=notification_state.read_at if notification_state is not None else None,
+        is_read=bool(notification_state.is_read),
+        read_at=notification_state.read_at,
         read_by=AuditLogActorResponse(
             user_id=getattr(read_by, "id", None),
             full_name=getattr(read_by, "full_name", None),
@@ -226,17 +233,37 @@ def _serialize_notification_entry(
             full_name=getattr(assigned_to, "full_name", None),
             email=getattr(assigned_to, "email", None),
         ),
-        assigned_at=notification_state.assigned_at if notification_state is not None else None,
-        is_acknowledged=bool(notification_state and notification_state.acknowledged_at),
-        acknowledged_at=notification_state.acknowledged_at if notification_state is not None else None,
+        assigned_at=notification_state.assigned_at,
+        is_acknowledged=bool(notification_state.acknowledged_at),
+        acknowledged_at=notification_state.acknowledged_at,
         acknowledged_by=AuditLogActorResponse(
             user_id=getattr(acknowledged_by, "id", None),
             full_name=getattr(acknowledged_by, "full_name", None),
             email=getattr(acknowledged_by, "email", None),
         ),
         is_snoozed=_is_notification_snoozed(notification_state),
-        snoozed_until=notification_state.snoozed_until if notification_state is not None else None,
-        created_at=entry.created_at,
+        snoozed_until=notification_state.snoozed_until,
+        created_at=log.created_at,
+    )
+
+
+def _serialize_notification_entry(
+    *,
+    log: AuditLog,
+    notification_state: SuperAdminNotificationState | None,
+    user_map: dict[int, object],
+    restaurant_map: dict[int, object],
+) -> SuperAdminNotificationResponse:
+    """DEPRECATED: Use _serialize_audit_entry with notification_state parameter.
+
+    This function is kept for backward compatibility.
+    Calls _serialize_audit_entry with notification_state parameter.
+    """
+    return _serialize_audit_entry(
+        log=log,
+        user_map=user_map,
+        restaurant_map=restaurant_map,
+        notification_state=notification_state,
     )
 
 
@@ -305,7 +332,7 @@ def _get_notification_target(
 
 
 def _get_valid_notification_assignee(db: Session, user_id: int):
-    user = users_repository.get_platform_user_by_id(db, user_id)
+    user = users_repository.get_platform_user_for_super_admin(db, user_id)
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
