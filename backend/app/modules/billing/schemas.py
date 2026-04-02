@@ -1,12 +1,17 @@
 """Pydantic schemas for the billing module."""
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Literal
+from datetime import date, datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from app.modules.billing.model import BillContextType, BillHandoffStatus, BillStatus
+from app.modules.billing.model import (
+    BillContextType,
+    BillHandoffStatus,
+    BillReviewStatus,
+    BillStatus,
+)
 from app.modules.payments.schemas import PaymentResponse
 
 
@@ -49,6 +54,11 @@ class BillRecordResponse(BaseModel):
     handoff_completed_at: datetime | None
     settled_at: datetime | None
     created_at: datetime
+    cashier_status: BillReviewStatus | None = None
+    accountant_status: BillReviewStatus | None = None
+    printed_count: int = 0
+    last_printed_at: datetime | None = None
+    reopened_count: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -120,3 +130,72 @@ class SessionPaymentHistoryResponse(BaseModel):
 class BillListResponse(BaseModel):
     items: list[BillRecordResponse]
     total: int
+
+
+class BillingActorResponse(BaseModel):
+    user_id: int | None = None
+    full_name: str | None = None
+    role: str | None = None
+
+
+class BillWorkflowEventResponse(BaseModel):
+    id: int
+    bill_id: int
+    bill_number: str
+    context_type: BillContextType
+    session_id: str
+    table_number: str | None
+    room_number: str | None
+    action_type: str
+    note: str | None = None
+    metadata: dict[str, Any] | None = None
+    created_at: datetime
+    actor: BillingActorResponse = Field(default_factory=BillingActorResponse)
+
+
+class BillWorkflowEventListResponse(BaseModel):
+    items: list[BillWorkflowEventResponse]
+    total: int
+
+
+class BillDetailResponse(BillSummaryResponse):
+    payments: list[PaymentResponse]
+    payment_count: int
+    events: list[BillWorkflowEventResponse]
+
+
+class BillWorkflowActionRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class BillingQueueSummaryResponse(BaseModel):
+    fresh_count: int
+    cashier_pending_count: int
+    cashier_accepted_count: int
+    accountant_pending_count: int
+    completed_count: int
+    printed_today_count: int
+    rejected_today_count: int
+    reopened_today_count: int
+    room_folio_total: int
+
+
+class BillingReconciliationPaymentMethodResponse(BaseModel):
+    payment_method: str
+    folio_count: int
+    total_amount: float
+
+
+class BillingReconciliationResponse(BaseModel):
+    business_date: date
+    total_paid_bills: int
+    total_paid_amount: float
+    room_paid_amount: float
+    table_paid_amount: float
+    completed_room_folios: int
+    outstanding_cashier_folios: int
+    outstanding_accountant_folios: int
+    printed_today_count: int
+    reopened_today_count: int
+    payment_methods: list[BillingReconciliationPaymentMethodResponse]
+    recent_completed: list[BillRecordResponse]

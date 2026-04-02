@@ -1,7 +1,9 @@
 import { Search } from "lucide-react";
 import { useDeferredValue, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
+import SeoHead from "@/components/public/SeoHead";
+import { buildTrackedPath } from "@/features/public/attribution";
 import { publicGet } from "@/lib/publicApi";
 import type { BlogListResponse } from "@/types/siteContent";
 
@@ -9,11 +11,30 @@ import { landingFallbackContent } from "./landing/content";
 import { BlogCard, CTASection, Navbar, PageHero, PublicFooter } from "./landing/components";
 
 export default function Blog() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [content, setContent] = useState<BlogListResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
+  const [search, setSearch] = useState(searchParams.get("search") ?? "");
+  const [category, setCategory] = useState(searchParams.get("category") ?? "All");
   const deferredSearch = useDeferredValue(search);
+  const currentSearchParams = searchParams.toString();
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (deferredSearch.trim()) {
+      nextParams.set("search", deferredSearch.trim());
+    } else {
+      nextParams.delete("search");
+    }
+    if (category !== "All") {
+      nextParams.set("category", category);
+    } else {
+      nextParams.delete("category");
+    }
+    if (nextParams.toString() !== currentSearchParams) {
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [category, currentSearchParams, deferredSearch, searchParams, setSearchParams]);
 
   useEffect(() => {
     let active = true;
@@ -23,7 +44,7 @@ export default function Blog() {
         const params = new URLSearchParams();
         if (deferredSearch.trim()) params.set("search", deferredSearch.trim());
         if (category !== "All") params.set("category", category);
-        const path = params.size > 0 ? `/public/site/blogs?${params.toString()}` : "/public/site/blogs";
+        const path = params.toString() ? `/public/site/blogs?${params.toString()}` : "/public/site/blogs";
         const response = await publicGet<BlogListResponse>(path);
         if (!active) return;
         setContent(response);
@@ -59,6 +80,28 @@ export default function Blog() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
+      <SeoHead
+        title={
+          category !== "All" ? `${category} Hospitality Guides` : "Hospitality Insights and Blog"
+        }
+        description={content.page_description}
+        path={
+          currentSearchParams ? `/blog?${currentSearchParams}` : "/blog"
+        }
+        keywords={[
+          "hotel operations blog",
+          "restaurant billing articles",
+          "room service workflow guides",
+          category !== "All" ? `${category.toLowerCase()} guides` : "hospitality insights",
+        ]}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Blog",
+          name: content.page_title,
+          description: content.page_description,
+        }}
+        trackAs="blog"
+      />
       <Navbar />
 
       <PageHero
@@ -78,7 +121,10 @@ export default function Blog() {
             />
           </label>
           <Link
-            to="/contact"
+            to={buildTrackedPath("/contact", {
+              source_page: "blog",
+              entry_point: "blog_hero_demo",
+            })}
             className="inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800"
           >
             Request a Demo
@@ -138,7 +184,7 @@ export default function Blog() {
               </div>
               <div className="mt-8">
                 <Link
-                  to={`/blog/${content.featured_post.slug}`}
+                  to={buildTrackedPath(`/blog/${content.featured_post.slug}`)}
                   className="inline-flex items-center rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500"
                 >
                   Read Featured Article
@@ -171,6 +217,7 @@ export default function Blog() {
         message="Talk with us about how your property can apply QR ordering, room service, and folio improvements."
         action_label="Contact Our Team"
         action_to="/contact"
+        trackingEntryPoint="blog_bottom_cta"
       />
       <PublicFooter footer={landingFallbackContent.footer} />
     </main>

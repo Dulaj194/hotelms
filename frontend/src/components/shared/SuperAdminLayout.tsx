@@ -31,6 +31,11 @@ const SUPER_ADMIN_NAV = [
     label: "Settings Requests",
     scopes: ["tenant_admin"],
   },
+  {
+    path: "/super-admin/site-content",
+    label: "Site Content",
+    scopes: ["tenant_admin"],
+  },
   { path: "/super-admin/promo-codes", label: "Promo Codes", scopes: ["billing_admin"] },
   {
     path: "/super-admin/platform-users",

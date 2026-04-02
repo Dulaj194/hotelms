@@ -1,15 +1,19 @@
-"""Repository layer for bills / folios."""
+"""Repository layer for bills, folio workflow state, and audit events."""
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.modules.billing.model import (
     Bill,
     BillContextType,
     BillHandoffStatus,
+    BillReviewStatus,
     BillStatus,
+    BillWorkflowEvent,
 )
 
 
@@ -75,6 +79,8 @@ def create_bill(
         payment_status=BillStatus.pending,
         transaction_reference=transaction_reference,
         notes=notes,
+        cashier_status=BillReviewStatus.not_sent,
+        accountant_status=BillReviewStatus.not_sent,
     )
     db.add(bill)
     db.flush()
@@ -98,18 +104,60 @@ def list_bills(
     restaurant_id: int,
     context_type: BillContextType | None = None,
     handoff_status: BillHandoffStatus | None = None,
+    cashier_status: BillReviewStatus | None = None,
+    accountant_status: BillReviewStatus | None = None,
+    search: str | None = None,
+    settled_from: datetime | None = None,
+    settled_to: datetime | None = None,
     limit: int = 100,
-) -> list[Bill]:
+    offset: int = 0,
+) -> tuple[list[Bill], int]:
     query = db.query(Bill).filter(Bill.restaurant_id == restaurant_id)
     if context_type is not None:
         query = query.filter(Bill.context_type == context_type)
     if handoff_status is not None:
         query = query.filter(Bill.handoff_status == handoff_status)
-    return (
+    if cashier_status is not None:
+        query = query.filter(Bill.cashier_status == cashier_status)
+    if accountant_status is not None:
+        query = query.filter(Bill.accountant_status == accountant_status)
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                Bill.bill_number.ilike(pattern),
+                Bill.session_id.ilike(pattern),
+                Bill.table_number.ilike(pattern),
+                Bill.room_number.ilike(pattern),
+                Bill.transaction_reference.ilike(pattern),
+                Bill.notes.ilike(pattern),
+            )
+        )
+    if settled_from is not None:
+        query = query.filter(Bill.settled_at >= settled_from)
+    if settled_to is not None:
+        query = query.filter(Bill.settled_at <= settled_to)
+
+    total = query.count()
+    items = (
         query.order_by(Bill.settled_at.desc().nullslast(), Bill.created_at.desc(), Bill.id.desc())
+        .offset(offset)
         .limit(limit)
         .all()
     )
+    return items, total
+
+
+def update_bill_fields(
+    db: Session,
+    *,
+    bill: Bill,
+    **fields,
+) -> Bill:
+    for field_name, value in fields.items():
+        setattr(bill, field_name, value)
+    db.flush()
+    return bill
 
 
 def update_handoff_status(
@@ -131,3 +179,62 @@ def update_handoff_status(
 
     db.flush()
     return bill
+
+
+def create_workflow_event(
+    db: Session,
+    *,
+    bill_id: int,
+    restaurant_id: int,
+    user_id: int | None,
+    actor_role: str | None,
+    action_type: str,
+    note: str | None = None,
+    metadata: dict | None = None,
+) -> BillWorkflowEvent:
+    event = BillWorkflowEvent(
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        user_id=user_id,
+        actor_role=actor_role,
+        action_type=action_type,
+        note=note,
+        metadata_json=json.dumps(metadata) if metadata else None,
+    )
+    db.add(event)
+    db.flush()
+    return event
+
+
+def list_workflow_events(
+    db: Session,
+    *,
+    restaurant_id: int,
+    bill_id: int | None = None,
+    action_type: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[list[BillWorkflowEvent], int]:
+    query = db.query(BillWorkflowEvent).filter(BillWorkflowEvent.restaurant_id == restaurant_id)
+    if bill_id is not None:
+        query = query.filter(BillWorkflowEvent.bill_id == bill_id)
+    if action_type:
+        query = query.filter(BillWorkflowEvent.action_type == action_type)
+    if created_from is not None:
+        query = query.filter(BillWorkflowEvent.created_at >= created_from)
+    if created_to is not None:
+        query = query.filter(BillWorkflowEvent.created_at <= created_to)
+
+    total = query.count()
+    items = (
+        query.order_by(
+            BillWorkflowEvent.created_at.desc(),
+            BillWorkflowEvent.id.desc(),
+        )
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return items, total

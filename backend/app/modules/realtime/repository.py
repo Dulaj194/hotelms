@@ -22,6 +22,11 @@ def get_super_admin_channel() -> str:
     return "platform:super_admin"
 
 
+def get_billing_channel(restaurant_id: int) -> str:
+    """Return the Redis pub/sub channel for a restaurant's billing workflow."""
+    return f"billing:{restaurant_id}"
+
+
 def _json_default(obj: object) -> str:
     if isinstance(obj, datetime):
         return obj.isoformat()

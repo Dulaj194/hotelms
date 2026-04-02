@@ -27,7 +27,7 @@ let refreshPromise: Promise<string | null> | null = null;
 
 function redirectToLoginIfNeeded(): void {
   if (typeof window === "undefined") return;
-  if (window.location.pathname === "/login") return;
+  if (window.location.pathname.startsWith("/login")) return;
   window.location.replace("/login");
 }
 

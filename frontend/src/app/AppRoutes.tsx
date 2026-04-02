@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import PrivilegeRoute from "@/components/shared/PrivilegeRoute";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
-import { getRoleRedirect, getUser, isAuthenticated } from "@/lib/auth";
+import { getRoleRedirect, getUser, isAuthenticated, normalizeRole } from "@/lib/auth";
 import {
   BILLING_STAFF_ROLES,
   HOUSEKEEPING_TASK_ROLES,
@@ -14,6 +14,8 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const AllTableQRCodes = lazy(() => import("@/pages/admin/AllTableQRCodes"));
 const AllRoomQRCodes = lazy(() => import("@/pages/admin/AllRoomQRCodes"));
 const Billing = lazy(() => import("@/pages/admin/Billing"));
+const CashierBillingDashboard = lazy(() => import("@/pages/admin/CashierBillingDashboard"));
+const AccountantBillingDashboard = lazy(() => import("@/pages/admin/AccountantBillingDashboard"));
 const GenerateTableQRCodes = lazy(() => import("@/pages/admin/GenerateTableQRCodes"));
 const GenerateRoomQRCodes = lazy(() => import("@/pages/admin/GenerateRoomQRCodes"));
 const Kitchen = lazy(() => import("@/pages/admin/Kitchen"));
@@ -60,6 +62,7 @@ const SuperAdminSettingsRequestHistory = lazy(() => import("@/pages/super-admin/
 const SuperAdminPromoCodes = lazy(() => import("@/pages/super-admin/PromoCodes"));
 const SuperAdminPlatformUsers = lazy(() => import("@/pages/super-admin/PlatformUsers"));
 const SuperAdminAuditLogs = lazy(() => import("@/pages/super-admin/AuditLogs"));
+const SuperAdminSiteContent = lazy(() => import("@/pages/super-admin/SiteContent"));
 
 function RootRedirect() {
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
@@ -69,6 +72,17 @@ function RootRedirect() {
   }
   const redirectPath = getRoleRedirect(user?.role ?? "", user?.super_admin_scopes);
   return <Navigate to={redirectPath || "/dashboard"} replace />;
+}
+
+function BillingRouteEntry() {
+  const role = normalizeRole(getUser()?.role);
+  if (role === "cashier") {
+    return <Navigate to="/admin/billing/cashier" replace />;
+  }
+  if (role === "accountant") {
+    return <Navigate to="/admin/billing/accountant" replace />;
+  }
+  return <Billing />;
 }
 
 const routeFallback = (
@@ -81,6 +95,7 @@ function AppRoutes() {
   return (
     <Suspense fallback={routeFallback}>
       <Routes>
+        <Route path="/login/:portal" element={<Login />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
@@ -218,7 +233,27 @@ function AppRoutes() {
           element={
             <ProtectedRoute allowedRoles={[...BILLING_STAFF_ROLES]}>
               <PrivilegeRoute requiredModuleKey="billing">
-                <Billing />
+                <BillingRouteEntry />
+              </PrivilegeRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/billing/cashier"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin", "cashier"]}>
+              <PrivilegeRoute requiredModuleKey="billing">
+                <CashierBillingDashboard />
+              </PrivilegeRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/billing/accountant"
+          element={
+            <ProtectedRoute allowedRoles={["owner", "admin", "accountant"]}>
+              <PrivilegeRoute requiredModuleKey="billing">
+                <AccountantBillingDashboard />
               </PrivilegeRoute>
             </ProtectedRoute>
           }
@@ -433,6 +468,17 @@ function AppRoutes() {
               requiredSuperAdminScopes={["tenant_admin"]}
             >
               <SuperAdminSettingsRequests />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/super-admin/site-content"
+          element={
+            <ProtectedRoute
+              allowedRoles={["super_admin"]}
+              requiredSuperAdminScopes={["tenant_admin"]}
+            >
+              <SuperAdminSiteContent />
             </ProtectedRoute>
           }
         />

@@ -152,8 +152,9 @@ export function getRoleRedirect(
     case "admin":
       return "/dashboard";
     case "cashier":
+      return "/admin/billing/cashier";
     case "accountant":
-      return "/admin/billing";
+      return "/admin/billing/accountant";
     case "steward":
       return "/admin/kitchen";
     case "housekeeper":

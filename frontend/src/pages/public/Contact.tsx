@@ -1,6 +1,10 @@
 import { Send } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { useLocation } from "react-router-dom";
 
+import SeoHead from "@/components/public/SeoHead";
+import { trackAnalyticsEvent } from "@/features/public/analytics";
+import { getLeadAttribution } from "@/features/public/attribution";
 import { publicGet, publicPost } from "@/lib/publicApi";
 import type {
   ContactLeadCreateRequest,
@@ -19,10 +23,10 @@ const INITIAL_FORM: ContactLeadCreateRequest = {
   property_type: "",
   subject: "",
   message: "",
-  source_page: "contact",
 };
 
 export default function Contact() {
+  const location = useLocation();
   const [content, setContent] = useState<ContactPageContent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<ContactLeadCreateRequest>(INITIAL_FORM);
@@ -55,8 +59,19 @@ export default function Contact() {
     setSubmitting(true);
     setError(null);
     setSuccess(null);
+    const attribution = getLeadAttribution(location.pathname, location.search);
     try {
-      const response = await publicPost<ContactLeadCreateResponse>("/public/site/contact", form);
+      const payload: ContactLeadCreateRequest = {
+        ...form,
+        ...attribution,
+      };
+      const response = await publicPost<ContactLeadCreateResponse>("/public/site/contact", payload);
+      trackAnalyticsEvent("lead_submit", {
+        source_page: payload.source_page,
+        entry_point: payload.entry_point,
+        utm_source: payload.utm_source,
+        login_intent: payload.login_intent,
+      });
       setSuccess(response.message);
       setForm(INITIAL_FORM);
     } catch {
@@ -84,6 +99,23 @@ export default function Contact() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
+      <SeoHead
+        title="Talk With Our Team"
+        description={content.hero_description}
+        path={location.search ? `/contact${location.search}` : "/contact"}
+        keywords={[
+          "hotel software demo",
+          "restaurant management contact",
+          "hospitality rollout consultation",
+        ]}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "ContactPage",
+          name: content.hero_title,
+          description: content.hero_description,
+        }}
+        trackAs="contact"
+      />
       <Navbar />
 
       <PageHero

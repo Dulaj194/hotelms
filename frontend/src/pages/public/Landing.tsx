@@ -1,6 +1,7 @@
 import { CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import SeoHead from "@/components/public/SeoHead";
 import { publicGet } from "@/lib/publicApi";
 import type { BlogPostSummary, LandingPageContent } from "@/types/siteContent";
 
@@ -52,6 +53,29 @@ export default function Landing() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900">
+      <SeoHead
+        title="Hospitality Operations Platform"
+        description="Unify QR ordering, room service, billing handoff, and staff workflows in one hospitality platform."
+        path="/"
+        keywords={[
+          "hotel restaurant management software",
+          "room service software",
+          "folio billing workflow",
+          "restaurant qr ordering",
+        ]}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          name: content.product_name,
+          applicationCategory: "BusinessApplication",
+          description: content.hero_description,
+          offers: {
+            "@type": "Offer",
+            description: "Hospitality platform demo and onboarding consultation",
+          },
+        }}
+        trackAs="landing"
+      />
       <Navbar />
 
       <HeroBlock {...content} />
@@ -148,7 +172,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <CTASection {...content.cta} />
+      <CTASection {...content.cta} trackingEntryPoint="landing_bottom_cta" />
 
       <section className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">

@@ -1,6 +1,7 @@
 import { CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import SeoHead from "@/components/public/SeoHead";
 import { publicGet } from "@/lib/publicApi";
 import type { AboutPageContent } from "@/types/siteContent";
 
@@ -50,6 +51,23 @@ export default function About() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
+      <SeoHead
+        title="About R.LUMINUOUS"
+        description={content.hero_description}
+        path="/about"
+        keywords={[
+          "hotel software company",
+          "restaurant operations platform",
+          "hospitality technology partner",
+        ]}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "AboutPage",
+          name: content.hero_title,
+          description: content.hero_description,
+        }}
+        trackAs="about"
+      />
       <Navbar />
 
       <PageHero
@@ -121,7 +139,7 @@ export default function About() {
         </div>
       </section>
 
-      <CTASection {...content.cta} />
+      <CTASection {...content.cta} trackingEntryPoint="about_bottom_cta" />
       <PublicFooter footer={landingFallbackContent.footer} />
     </main>
   );

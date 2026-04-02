@@ -25,6 +25,7 @@ import {
 import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
+import { getBillingHomePath } from "@/features/billing/helpers";
 import {
   BILLING_STAFF_ROLES,
   canAccessModuleItem,
@@ -374,6 +375,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         item.moduleKey,
       )
   );
+  const billingNavPath = getBillingHomePath(role);
   const toggleGroup = (group: keyof SidebarGroupState) => {
     setGroupState((prev) => ({ ...prev, [group]: !prev[group] }));
   };
@@ -760,14 +762,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
 
           {navItems.map((item) => {
+            const resolvedPath = item.path === "/admin/billing" ? billingNavPath : item.path;
             const active =
-              location.pathname === item.path ||
-              location.pathname.startsWith(`${item.path}/`);
+              item.path === "/admin/billing"
+                ? location.pathname === "/admin/billing" ||
+                  location.pathname.startsWith("/admin/billing/")
+                : location.pathname === resolvedPath ||
+                  location.pathname.startsWith(`${resolvedPath}/`);
             const Icon = item.icon;
             return (
               <Link
                 key={item.path}
-                to={item.path}
+                to={resolvedPath}
                 onClick={handleSidebarNavigate}
                 className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                   active

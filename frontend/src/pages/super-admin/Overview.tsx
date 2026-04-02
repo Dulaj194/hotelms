@@ -171,6 +171,7 @@ export default function SuperAdminOverview() {
         canViewHotels && ["/super-admin/restaurants", "Manage Hotels", "Open hotel profiles, packages, staff, and integrations."],
         canViewTenantQueue && ["/super-admin/registrations", "Review Registrations", "Approve or reject hotel sign-ups waiting for review."],
         canViewSettings && ["/super-admin/settings-requests", "Review Settings Requests", "Approve or reject tenant profile and feature requests."],
+        canViewSettings && ["/super-admin/site-content", "Manage Site Content", "Edit public pages, publish blogs, and work the lead inbox."],
         canViewPromos && ["/super-admin/promo-codes", "Manage Promo Codes", "Control active campaigns and platform discounts."],
         canViewPackages && ["/super-admin/packages", "Manage Packages", "Maintain package tiers and access bundles."],
         canViewAudit && ["/super-admin/audit-logs", "Review Audit Logs", "Search platform approvals, billing alerts, and security events."],

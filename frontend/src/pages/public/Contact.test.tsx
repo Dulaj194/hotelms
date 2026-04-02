@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import Contact from "@/pages/public/Contact";
@@ -17,6 +17,11 @@ vi.mock("@/lib/publicApi", () => ({
 describe("Contact page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
+    Object.defineProperty(document, "referrer", {
+      configurable: true,
+      value: "https://google.com/search?q=hotel+software",
+    });
     publicGet.mockResolvedValue({
       hero_eyebrow: "Talk With Our Team",
       hero_title: "Plan your rollout with a hospitality-focused demo",
@@ -47,12 +52,21 @@ describe("Contact page", () => {
 
   it("submits a contact lead and shows the success state", async () => {
     render(
-      <MemoryRouter>
-        <Contact />
+      <MemoryRouter
+        initialEntries={[
+          "/contact?utm_source=google&utm_campaign=spring-demo&entry_point=blog_bottom_cta&intent=cashier",
+        ]}
+      >
+        <Routes>
+          <Route path="/contact" element={<Contact />} />
+        </Routes>
       </MemoryRouter>,
     );
 
     expect(await screen.findByText("Plan your rollout with a hospitality-focused demo")).toBeTruthy();
+    await waitFor(() => {
+      expect(document.title).toContain("Talk With Our Team");
+    });
 
     fireEvent.change(screen.getByLabelText("Full name"), { target: { value: "Nadeesha Perera" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "nadeesha@example.com" } });
@@ -69,6 +83,14 @@ describe("Contact page", () => {
       expect.objectContaining({
         full_name: "Nadeesha Perera",
         email: "nadeesha@example.com",
+        source_page: "contact",
+        source_path:
+          "/contact?utm_source=google&utm_campaign=spring-demo&entry_point=blog_bottom_cta&intent=cashier",
+        entry_point: "blog_bottom_cta",
+        login_intent: "cashier",
+        utm_source: "google",
+        utm_campaign: "spring-demo",
+        referrer_url: "https://google.com/search?q=hotel+software",
       }),
     );
   });

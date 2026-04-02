@@ -5,7 +5,7 @@
 
 from app.modules.audit_logs.model import AuditLog, SuperAdminNotificationState  # noqa: F401
 from app.modules.auth.model import PasswordResetToken  # noqa: F401
-from app.modules.billing.model import Bill  # noqa: F401
+from app.modules.billing.model import Bill, BillWorkflowEvent  # noqa: F401
 from app.modules.categories.model import Category  # noqa: F401
 from app.modules.dashboard.model import DashboardAlertImpression, DashboardSetupProgress  # noqa: F401
 from app.modules.items.model import Item  # noqa: F401

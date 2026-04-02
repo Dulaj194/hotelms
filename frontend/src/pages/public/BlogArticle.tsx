@@ -2,6 +2,8 @@ import { Clock3 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import SeoHead from "@/components/public/SeoHead";
+import { buildTrackedPath } from "@/features/public/attribution";
 import { publicGet } from "@/lib/publicApi";
 import type { BlogPostDetail } from "@/types/siteContent";
 
@@ -61,18 +63,39 @@ export default function BlogArticle() {
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
+      <SeoHead
+        title={article.title}
+        description={article.excerpt}
+        path={`/blog/${article.slug}`}
+        type="article"
+        image={article.cover_image_url}
+        keywords={[article.category, ...article.tags]}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: article.title,
+          description: article.excerpt,
+          datePublished: article.published_at,
+          articleSection: article.category,
+          keywords: article.tags.join(", "),
+        }}
+        trackAs="blog_article"
+      />
       <Navbar />
 
       <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50">
         <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-          <Link to="/blog" className="text-sm font-semibold text-emerald-700 hover:underline">
+          <Link
+            to={buildTrackedPath("/blog")}
+            className="text-sm font-semibold text-emerald-700 hover:underline"
+          >
             Back to blog
           </Link>
           <div className="mt-6 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
             <span>{article.category}</span>
-            <span className="text-slate-300">•</span>
+            <span className="text-slate-300">|</span>
             <span>{fmt(article.published_at)}</span>
-            <span className="text-slate-300">•</span>
+            <span className="text-slate-300">|</span>
             <span className="inline-flex items-center gap-1">
               <Clock3 className="h-3.5 w-3.5" />
               {article.reading_minutes} min read
@@ -129,7 +152,10 @@ export default function BlogArticle() {
                   Share your hotel or restaurant setup and we can walk through the right rollout plan.
                 </p>
                 <Link
-                  to="/contact"
+                  to={buildTrackedPath("/contact", {
+                    source_page: "blog_article",
+                    entry_point: "blog_article_sidebar_cta",
+                  })}
                   className="mt-5 inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                 >
                   Contact our team
@@ -148,7 +174,7 @@ export default function BlogArticle() {
               {article.related_posts.map((item) => (
                 <Link
                   key={item.slug}
-                  to={`/blog/${item.slug}`}
+                  to={buildTrackedPath(`/blog/${item.slug}`)}
                   className="rounded-3xl border border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-300 hover:bg-emerald-50"
                 >
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">

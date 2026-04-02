@@ -8,6 +8,7 @@ export type BillHandoffStatus =
   | "sent_to_cashier"
   | "sent_to_accountant"
   | "completed";
+export type BillReviewStatus = "not_sent" | "pending" | "accepted" | "rejected";
 
 export interface BillOrderItem {
   id: number;
@@ -44,6 +45,11 @@ export interface BillRecord {
   handoff_completed_at: string | null;
   settled_at: string | null;
   created_at: string;
+  cashier_status: BillReviewStatus | null;
+  accountant_status: BillReviewStatus | null;
+  printed_count: number;
+  last_printed_at: string | null;
+  reopened_count: number;
 }
 
 export interface BillSummaryResponse {
@@ -113,4 +119,82 @@ export interface SessionPaymentHistoryResponse {
 export interface BillListResponse {
   items: BillRecord[];
   total: number;
+}
+
+export interface BillingActor {
+  user_id: number | null;
+  full_name: string | null;
+  role: string | null;
+}
+
+export interface BillWorkflowEvent {
+  id: number;
+  bill_id: number;
+  bill_number: string;
+  context_type: BillContextType;
+  session_id: string;
+  table_number: string | null;
+  room_number: string | null;
+  action_type: string;
+  note: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  actor: BillingActor;
+}
+
+export interface BillWorkflowEventListResponse {
+  items: BillWorkflowEvent[];
+  total: number;
+}
+
+export interface BillDetailResponse extends BillSummaryResponse {
+  payments: PaymentResponse[];
+  payment_count: number;
+  events: BillWorkflowEvent[];
+}
+
+export interface BillWorkflowActionRequest {
+  note?: string;
+}
+
+export interface BillingQueueSummaryResponse {
+  fresh_count: number;
+  cashier_pending_count: number;
+  cashier_accepted_count: number;
+  accountant_pending_count: number;
+  completed_count: number;
+  printed_today_count: number;
+  rejected_today_count: number;
+  reopened_today_count: number;
+  room_folio_total: number;
+}
+
+export interface BillingReconciliationPaymentMethod {
+  payment_method: string;
+  folio_count: number;
+  total_amount: number;
+}
+
+export interface BillingReconciliationResponse {
+  business_date: string;
+  total_paid_bills: number;
+  total_paid_amount: number;
+  room_paid_amount: number;
+  table_paid_amount: number;
+  completed_room_folios: number;
+  outstanding_cashier_folios: number;
+  outstanding_accountant_folios: number;
+  printed_today_count: number;
+  reopened_today_count: number;
+  payment_methods: BillingReconciliationPaymentMethod[];
+  recent_completed: BillRecord[];
+}
+
+export interface BillingRealtimeEnvelope {
+  event: "billing_folio_updated";
+  restaurant_id: number;
+  action: string;
+  occurred_at: string;
+  bill?: BillRecord;
+  summary: BillingQueueSummaryResponse;
 }

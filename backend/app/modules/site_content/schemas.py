@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
+
+from app.modules.site_content.model import ContactLeadStatus
 
 
 class SiteStatResponse(BaseModel):
@@ -158,8 +161,148 @@ class ContactLeadCreateRequest(BaseModel):
     subject: str | None = Field(None, max_length=150)
     message: str = Field(..., min_length=20, max_length=5000)
     source_page: str = Field(default="contact", max_length=50)
+    source_path: str | None = Field(default=None, max_length=255)
+    entry_point: str | None = Field(default=None, max_length=120)
+    login_intent: str | None = Field(default=None, max_length=80)
+    referrer_url: str | None = Field(default=None, max_length=500)
+    utm_source: str | None = Field(default=None, max_length=120)
+    utm_medium: str | None = Field(default=None, max_length=120)
+    utm_campaign: str | None = Field(default=None, max_length=150)
+    utm_term: str | None = Field(default=None, max_length=150)
+    utm_content: str | None = Field(default=None, max_length=150)
 
 
 class ContactLeadCreateResponse(BaseModel):
     id: int
     message: str
+
+
+class SiteContentAdminUserResponse(BaseModel):
+    user_id: int
+    full_name: str
+    email: str
+    scopes: list[str] = Field(default_factory=list)
+
+
+class SiteContentAdminUserListResponse(BaseModel):
+    items: list[SiteContentAdminUserResponse]
+    total: int
+
+
+class AdminSitePageSummaryResponse(BaseModel):
+    slug: str
+    title: str
+    summary: str | None
+    is_published: bool
+    last_published_at: datetime | None
+    updated_at: datetime
+    updated_by: SiteContentAdminUserResponse | None = None
+    published_by: SiteContentAdminUserResponse | None = None
+
+
+class AdminSitePageDetailResponse(AdminSitePageSummaryResponse):
+    payload: dict[str, Any]
+    published_payload: dict[str, Any] | None = None
+
+
+class AdminSitePageListResponse(BaseModel):
+    items: list[AdminSitePageSummaryResponse]
+    total: int
+
+
+class AdminSitePageUpdateRequest(BaseModel):
+    title: str = Field(..., min_length=2, max_length=255)
+    summary: str | None = Field(default=None, max_length=500)
+    payload: dict[str, Any]
+
+
+class AdminBlogPostSummaryResponse(BaseModel):
+    slug: str
+    title: str
+    excerpt: str
+    category: str
+    cover_image_url: str | None
+    tags: list[str]
+    reading_minutes: int
+    is_featured: bool
+    is_published: bool
+    scheduled_publish_at: datetime
+    live_published_at: datetime | None
+    last_published_at: datetime | None
+    updated_at: datetime
+    updated_by: SiteContentAdminUserResponse | None = None
+    published_by: SiteContentAdminUserResponse | None = None
+
+
+class AdminBlogPostDetailResponse(AdminBlogPostSummaryResponse):
+    body: list[str]
+    key_takeaways: list[str]
+
+
+class AdminBlogPostListResponse(BaseModel):
+    items: list[AdminBlogPostSummaryResponse]
+    total: int
+
+
+class AdminBlogPostUpsertRequest(BaseModel):
+    slug: str = Field(..., min_length=3, max_length=120)
+    title: str = Field(..., min_length=3, max_length=255)
+    excerpt: str = Field(..., min_length=20, max_length=5000)
+    category: str = Field(..., min_length=2, max_length=80)
+    cover_image_url: str | None = Field(default=None, max_length=500)
+    tags: list[str] = Field(default_factory=list)
+    body: list[str] = Field(..., min_length=1)
+    key_takeaways: list[str] = Field(default_factory=list)
+    reading_minutes: int = Field(default=4, ge=1, le=60)
+    is_featured: bool = False
+    scheduled_publish_at: datetime | None = None
+
+
+class SiteContentActionResponse(BaseModel):
+    message: str
+
+
+class AdminContactLeadSummaryResponse(BaseModel):
+    new_count: int
+    reviewed_count: int
+    qualified_count: int
+    closed_count: int
+    unassigned_count: int
+
+
+class AdminContactLeadResponse(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    phone: str | None
+    company_name: str | None
+    property_type: str | None
+    subject: str | None
+    message: str
+    source_page: str | None
+    source_path: str | None
+    entry_point: str | None
+    login_intent: str | None
+    referrer_url: str | None
+    utm_source: str | None
+    utm_medium: str | None
+    utm_campaign: str | None
+    utm_term: str | None
+    utm_content: str | None
+    status: ContactLeadStatus
+    internal_notes: str | None
+    assigned_to: SiteContentAdminUserResponse | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminContactLeadListResponse(BaseModel):
+    items: list[AdminContactLeadResponse]
+    total: int
+    summary: AdminContactLeadSummaryResponse
+
+
+class AdminContactLeadUpdateRequest(BaseModel):
+    status: ContactLeadStatus | None = None
+    assigned_to_user_id: int | None = None
+    internal_notes: str | None = Field(default=None, max_length=5000)

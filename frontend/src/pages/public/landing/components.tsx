@@ -13,6 +13,9 @@ import {
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { trackAnalyticsEvent } from "@/features/public/analytics";
+import { buildPortalLoginPath, NAVBAR_LOGIN_PORTALS } from "@/features/public/authEntry";
+import { buildTrackedPath } from "@/features/public/attribution";
 import type {
   BlogPostSummary,
   LandingPageContent,
@@ -31,6 +34,7 @@ type NavLinkItem = {
   label: string;
   href?: string;
   to?: string;
+  trackingEntryPoint?: string;
 };
 
 const navLinks: NavLinkItem[] = [
@@ -51,16 +55,23 @@ const featureIcons: Record<SiteFeatureIconKey, typeof QrCode> = {
 
 export function NavLink({ item, onClick }: { item: NavLinkItem; onClick?: () => void }) {
   if (item.to) {
+    const target = buildTrackedPath(item.to, {
+      entry_point: item.trackingEntryPoint,
+    });
     return (
-      <Link to={item.to} onClick={onClick} className="rounded-lg px-3 py-2 hover:bg-slate-100">
+      <Link to={target} onClick={onClick} className="rounded-lg px-3 py-2 hover:bg-slate-100">
         {item.label}
       </Link>
     );
   }
 
+  const target = item.href
+    ? buildTrackedPath(item.href, { entry_point: item.trackingEntryPoint })
+    : undefined;
+
   return (
     <a
-      href={item.href}
+      href={target}
       onClick={onClick}
       className="rounded-lg px-3 py-2 hover:bg-slate-100"
     >
@@ -74,11 +85,13 @@ export function CTAButton({
   to,
   href,
   variant = "primary",
+  trackingEntryPoint,
 }: {
   label: string;
   to?: string;
   href?: string;
   variant?: "primary" | "secondary" | "dark";
+  trackingEntryPoint?: string;
 }) {
   const base =
     "inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition";
@@ -91,16 +104,38 @@ export function CTAButton({
         : "border border-emerald-600 bg-white text-emerald-700 hover:bg-emerald-50";
 
   if (to) {
+    const target = buildTrackedPath(to, { entry_point: trackingEntryPoint });
     return (
-      <Link to={to} className={`${base} ${style}`}>
+      <Link
+        to={target}
+        onClick={() =>
+          trackAnalyticsEvent("cta_click", {
+            label,
+            destination: to,
+            entry_point: trackingEntryPoint,
+          })
+        }
+        className={`${base} ${style}`}
+      >
         {label}
         {variant === "primary" && <ArrowRight className="h-4 w-4" />}
       </Link>
     );
   }
 
+  const target = href ? buildTrackedPath(href, { entry_point: trackingEntryPoint }) : undefined;
   return (
-    <a href={href} className={`${base} ${style}`}>
+    <a
+      href={target}
+      onClick={() =>
+        trackAnalyticsEvent("cta_click", {
+          label,
+          destination: href,
+          entry_point: trackingEntryPoint,
+        })
+      }
+      className={`${base} ${style}`}
+    >
       {label}
       {variant === "primary" && <ArrowRight className="h-4 w-4" />}
     </a>
@@ -120,10 +155,17 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
+  function handlePortalClick(label: string, entryPoint: string) {
+    trackAnalyticsEvent("login_portal_click", {
+      label,
+      entry_point: entryPoint,
+    });
+  }
+
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-3">
+        <Link to={buildTrackedPath("/")} className="flex items-center gap-3">
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-600 text-sm font-bold text-white">
             R
           </div>
@@ -139,33 +181,32 @@ export function Navbar() {
               More
               <ChevronDown className="h-4 w-4" />
             </button>
-            <div className="invisible absolute right-0 top-9 w-48 rounded-xl border border-slate-200 bg-white p-2 opacity-0 shadow-md transition group-hover:visible group-hover:opacity-100">
-              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
-                Restaurant Admin
-              </Link>
-              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
-                Super Admin
-              </Link>
-              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
-                Steward Login
-              </Link>
-              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
-                HouseKeeper Login
-              </Link>
+            <div className="invisible absolute right-0 top-9 w-56 rounded-xl border border-slate-200 bg-white p-2 opacity-0 shadow-md transition group-hover:visible group-hover:opacity-100">
+              {NAVBAR_LOGIN_PORTALS.map((portal) => (
+                <Link
+                  key={portal.key}
+                  to={buildPortalLoginPath(portal.key, "navbar_more")}
+                  onClick={() => handlePortalClick(portal.label, "navbar_more")}
+                  className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                >
+                  {portal.label}
+                </Link>
+              ))}
             </div>
           </div>
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
           <Link
-            to="/register"
+            to={buildTrackedPath("/register", { entry_point: "navbar_register" })}
             className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-base font-semibold text-slate-700 hover:bg-slate-100"
           >
             Register Restaurant
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
-            to="/login"
+            to={buildPortalLoginPath("restaurant-admin", "navbar_primary_login")}
+            onClick={() => handlePortalClick("Restaurant Admin", "navbar_primary_login")}
             className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-5 py-3 text-base font-bold text-teal-700 hover:bg-slate-200"
           >
             Restaurant Login
@@ -203,39 +244,24 @@ export function Navbar() {
 
             {mobileMoreOpen && (
               <div className="ml-3 flex flex-col gap-1 border-l border-slate-200 pl-3">
-                <Link
-                  to="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  Restaurant Admin
-                </Link>
-                <Link
-                  to="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  Super Admin
-                </Link>
-                <Link
-                  to="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  Steward Login
-                </Link>
-                <Link
-                  to="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  HouseKeeper Login
-                </Link>
+                {NAVBAR_LOGIN_PORTALS.map((portal) => (
+                  <Link
+                    key={portal.key}
+                    to={buildPortalLoginPath(portal.key, "navbar_more_mobile")}
+                    onClick={() => {
+                      handlePortalClick(portal.label, "navbar_more_mobile");
+                      setMobileOpen(false);
+                    }}
+                    className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                  >
+                    {portal.label}
+                  </Link>
+                ))}
               </div>
             )}
 
             <Link
-              to="/register"
+              to={buildTrackedPath("/register", { entry_point: "navbar_register_mobile" })}
               onClick={() => setMobileOpen(false)}
               className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
             >
@@ -244,8 +270,11 @@ export function Navbar() {
             </Link>
 
             <Link
-              to="/login"
-              onClick={() => setMobileOpen(false)}
+              to={buildPortalLoginPath("restaurant-admin", "navbar_primary_login_mobile")}
+              onClick={() => {
+                handlePortalClick("Restaurant Admin", "navbar_primary_login_mobile");
+                setMobileOpen(false);
+              }}
               className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
             >
               Restaurant Login
@@ -292,8 +321,18 @@ export function HeroBlock({
           <p className="mt-5 max-w-xl text-lg text-slate-600">{hero_description}</p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <CTAButton label={primary_cta_label} to={primary_cta_to} variant="primary" />
-            <CTAButton label={secondary_cta_label} to={secondary_cta_to} variant="secondary" />
+            <CTAButton
+              label={primary_cta_label}
+              to={primary_cta_to}
+              variant="primary"
+              trackingEntryPoint="landing_hero_primary"
+            />
+            <CTAButton
+              label={secondary_cta_label}
+              to={secondary_cta_to}
+              variant="secondary"
+              trackingEntryPoint="landing_hero_secondary"
+            />
           </div>
         </div>
 
@@ -437,13 +476,13 @@ export function BlogCard({ item }: { item: BlogPostSummary }) {
     <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
         <span>{item.category}</span>
-        <span className="text-slate-300">•</span>
+        <span className="text-slate-300">|</span>
         <span>{item.reading_minutes} min read</span>
       </div>
       <h3 className="mt-3 text-lg font-bold text-slate-900">{item.title}</h3>
       <p className="mt-3 text-sm leading-6 text-slate-600">{item.excerpt}</p>
       <Link
-        to={`/blog/${item.slug}`}
+        to={buildTrackedPath(`/blog/${item.slug}`)}
         className="mt-4 inline-flex text-sm font-semibold text-emerald-700"
       >
         Read more
@@ -478,7 +517,13 @@ export function TestimonialBlock({ item }: { item: SiteTestimonial }) {
   );
 }
 
-export function CTASection({ title, message, action_label, action_to }: SiteCta) {
+export function CTASection({
+  title,
+  message,
+  action_label,
+  action_to,
+  trackingEntryPoint = "cta_section",
+}: SiteCta & { trackingEntryPoint?: string }) {
   return (
     <section id="contact" className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <div className="rounded-3xl bg-slate-900 p-8 text-white sm:p-10">
@@ -486,7 +531,14 @@ export function CTASection({ title, message, action_label, action_to }: SiteCta)
         <p className="mt-3 max-w-2xl text-slate-300">{message}</p>
         <div className="mt-7">
           <Link
-            to={action_to}
+            to={buildTrackedPath(action_to, { entry_point: trackingEntryPoint })}
+            onClick={() =>
+              trackAnalyticsEvent("cta_click", {
+                label: action_label,
+                destination: action_to,
+                entry_point: trackingEntryPoint,
+              })
+            }
             className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-bold text-white hover:bg-emerald-400"
           >
             {action_label}
@@ -523,15 +575,15 @@ export function PublicFooter({ footer }: { footer: SiteFooter }) {
         </div>
 
         <FooterColumn title="Product">
-          <a href="/#features" className="block">Features</a>
-          <a href="/#how-it-works" className="block">How it works</a>
-          <Link to="/pricing" className="block">Pricing</Link>
+          <a href={buildTrackedPath("/#features")} className="block">Features</a>
+          <a href={buildTrackedPath("/#how-it-works")} className="block">How it works</a>
+          <Link to={buildTrackedPath("/pricing")} className="block">Pricing</Link>
         </FooterColumn>
 
         <FooterColumn title="Company">
-          <Link to="/about" className="block">About</Link>
-          <Link to="/blog" className="block">Blog</Link>
-          <Link to="/contact" className="block">Contact</Link>
+          <Link to={buildTrackedPath("/about")} className="block">About</Link>
+          <Link to={buildTrackedPath("/blog")} className="block">Blog</Link>
+          <Link to={buildTrackedPath("/contact", { entry_point: "footer_contact" })} className="block">Contact</Link>
         </FooterColumn>
 
         <FooterColumn title="Contact">

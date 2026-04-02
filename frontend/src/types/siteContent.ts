@@ -153,9 +153,152 @@ export interface ContactLeadCreateRequest {
   subject?: string;
   message: string;
   source_page?: string;
+  source_path?: string;
+  entry_point?: string;
+  login_intent?: string;
+  referrer_url?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
 }
 
 export interface ContactLeadCreateResponse {
   id: number;
+  message: string;
+}
+
+export type SitePageSlug = "landing" | "about" | "contact";
+export type ContactLeadStatus = "new" | "reviewed" | "qualified" | "closed";
+
+export interface SiteContentAdminUser {
+  user_id: number;
+  full_name: string;
+  email: string;
+  scopes: string[];
+}
+
+export interface SiteContentAdminUserListResponse {
+  items: SiteContentAdminUser[];
+  total: number;
+}
+
+export interface AdminSitePageSummary {
+  slug: SitePageSlug;
+  title: string;
+  summary: string | null;
+  is_published: boolean;
+  last_published_at: string | null;
+  updated_at: string;
+  updated_by: SiteContentAdminUser | null;
+  published_by: SiteContentAdminUser | null;
+}
+
+export interface AdminSitePageDetail extends AdminSitePageSummary {
+  payload: Record<string, unknown>;
+  published_payload: Record<string, unknown> | null;
+}
+
+export interface AdminSitePageListResponse {
+  items: AdminSitePageSummary[];
+  total: number;
+}
+
+export interface AdminSitePageUpdateRequest {
+  title: string;
+  summary?: string | null;
+  payload: Record<string, unknown>;
+}
+
+export interface AdminBlogPostSummary {
+  slug: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  cover_image_url: string | null;
+  tags: string[];
+  reading_minutes: number;
+  is_featured: boolean;
+  is_published: boolean;
+  scheduled_publish_at: string;
+  live_published_at: string | null;
+  last_published_at: string | null;
+  updated_at: string;
+  updated_by: SiteContentAdminUser | null;
+  published_by: SiteContentAdminUser | null;
+}
+
+export interface AdminBlogPostDetail extends AdminBlogPostSummary {
+  body: string[];
+  key_takeaways: string[];
+}
+
+export interface AdminBlogPostListResponse {
+  items: AdminBlogPostSummary[];
+  total: number;
+}
+
+export interface AdminBlogPostUpsertRequest {
+  slug: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  cover_image_url?: string | null;
+  tags: string[];
+  body: string[];
+  key_takeaways: string[];
+  reading_minutes: number;
+  is_featured: boolean;
+  scheduled_publish_at?: string | null;
+}
+
+export interface AdminContactLeadSummary {
+  new_count: number;
+  reviewed_count: number;
+  qualified_count: number;
+  closed_count: number;
+  unassigned_count: number;
+}
+
+export interface AdminContactLead {
+  id: number;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  company_name: string | null;
+  property_type: string | null;
+  subject: string | null;
+  message: string;
+  source_page: string | null;
+  source_path: string | null;
+  entry_point: string | null;
+  login_intent: string | null;
+  referrer_url: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_term: string | null;
+  utm_content: string | null;
+  status: ContactLeadStatus;
+  internal_notes: string | null;
+  assigned_to: SiteContentAdminUser | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminContactLeadListResponse {
+  items: AdminContactLead[];
+  total: number;
+  summary: AdminContactLeadSummary;
+}
+
+export interface AdminContactLeadUpdateRequest {
+  status?: ContactLeadStatus;
+  assigned_to_user_id?: number | null;
+  internal_notes?: string | null;
+}
+
+export interface SiteContentActionResponse {
   message: string;
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { getUser, normalizeRole } from "@/lib/auth";
@@ -348,6 +349,24 @@ export default function Billing() {
               <p className="app-body-text text-slate-300">
                 Handle table settlements, room charge posting, invoice printing, and cashier to accountant handoff in one responsive view.
               </p>
+              <div className="flex flex-wrap gap-2 pt-2">
+                {["owner", "admin", "cashier"].includes(role) && (
+                  <Link
+                    to="/admin/billing/cashier"
+                    className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+                  >
+                    Cashier Dashboard
+                  </Link>
+                )}
+                {["owner", "admin", "accountant"].includes(role) && (
+                  <Link
+                    to="/admin/billing/accountant"
+                    className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+                  >
+                    Accountant Dashboard
+                  </Link>
+                )}
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               {TABS.map((item) => (
@@ -406,7 +425,18 @@ export default function Billing() {
                   <p><span className="text-emerald-800">Total:</span> {cur(receipt.receipt.total_amount)}</p>
                 </div>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                  <button type="button" onClick={() => printInvoice(receipt.summary, receipt.receipt)} className="app-btn-base rounded-2xl bg-slate-900 text-white hover:bg-slate-800">Print Invoice</button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void api
+                        .post(`/billing/folios/${receipt.receipt.bill_id}/print`, {})
+                        .catch(() => null)
+                        .then(() => printInvoice(receipt.summary, receipt.receipt))
+                    }
+                    className="app-btn-base rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
+                  >
+                    Print Invoice
+                  </button>
                   {receipt.receipt.context_type === "room" && <button type="button" onClick={() => setTab("folios")} className="app-btn-base rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Open Folio Queue</button>}
                   <button type="button" onClick={resetState} className="app-btn-base rounded-2xl border border-emerald-300 bg-transparent text-emerald-900 hover:bg-emerald-100">Start Another Lookup</button>
                 </div>
@@ -484,7 +514,20 @@ export default function Billing() {
                   ) : (
                     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                       <div className="flex flex-col gap-3">
-                        {summary.is_settled && <button type="button" onClick={() => printInvoice(summary)} className="app-btn-base rounded-2xl bg-slate-900 text-white hover:bg-slate-800">Print Invoice</button>}
+                        {summary.is_settled && summary.bill && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void api
+                                .post(`/billing/folios/${summary.bill!.id}/print`, {})
+                                .catch(() => null)
+                                .then(() => printInvoice(summary))
+                            }
+                            className="app-btn-base rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
+                          >
+                            Print Invoice
+                          </button>
+                        )}
                         {summary.is_settled && summary.context_type === "room" && <button type="button" onClick={() => setTab("folios")} className="app-btn-base rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Open Folio Queue</button>}
                         <button type="button" onClick={resetState} className="app-btn-base rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Start Another Lookup</button>
                       </div>
@@ -534,7 +577,16 @@ export default function Billing() {
                     role={role}
                     busy={folioActionId === bill.id}
                     onOpen={() => void (setTab("room"), setRoomLookup(bill.session_id), loadSummary("room", bill.session_id))}
-                    onPrint={() => void api.get<BillSummaryResponse>(summaryPath("room", bill.session_id)).then((data) => printInvoice(data)).catch((error) => setFolioActionError(errorText(error, "Failed to load folio for printing.")))}
+                    onPrint={() =>
+                      void api
+                        .post(`/billing/folios/${bill.id}/print`, {})
+                        .catch(() => null)
+                        .then(() => api.get<BillSummaryResponse>(summaryPath("room", bill.session_id)))
+                        .then((data) => printInvoice(data))
+                        .catch((error) =>
+                          setFolioActionError(errorText(error, "Failed to load folio for printing."))
+                        )
+                    }
                     onAction={(action) => void onFolioAction(bill.id, action)}
                   />
                 ))}
