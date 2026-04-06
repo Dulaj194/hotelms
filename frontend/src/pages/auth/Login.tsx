@@ -1,15 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
 
 import SeoHead from "@/components/public/SeoHead";
 import { trackAnalyticsEvent } from "@/features/public/analytics";
-import {
-  buildPortalLoginPath,
-  getDefaultPortalPathForFlow,
-  LOGIN_PORTALS,
-  resolveLoginPortal,
-  type LoginFlow,
-} from "@/features/public/authEntry";
 import { buildTrackedPath } from "@/features/public/attribution";
 import { ApiError, api } from "@/lib/api";
 import { getRoleRedirect, setAccessToken, setUser } from "@/lib/auth";
@@ -26,36 +20,32 @@ type LoginFlowConfig = {
   submitLabel: string;
 };
 
-const DEFAULT_LOGIN_FLOW: LoginFlow = "restaurant_admin";
-
-const LOGIN_FLOW_CONFIGS: Record<LoginFlow, LoginFlowConfig> = {
-  restaurant_admin: {
-    title: "Restaurant/Admin Sign In",
-    subtitle: "Use this portal if you are an owner or admin.",
-    endpoint: "/auth/login/restaurant-admin",
-    invalidCredentialsMessage: "Invalid restaurant/admin email or password.",
-    submitLabel: "Sign in as Restaurant/Admin",
-  },
-  staff: {
-    title: "Staff Sign In",
-    subtitle: "Use this portal if you are a steward, housekeeper, cashier, or accountant.",
-    endpoint: "/auth/login/staff",
-    invalidCredentialsMessage: "Invalid staff email or password.",
-    submitLabel: "Sign in as Staff",
-  },
-  super_admin: {
-    title: "Super Admin Sign In",
-    subtitle: "Platform-level access only.",
-    endpoint: "/auth/login/super-admin",
-    invalidCredentialsMessage: "Invalid super admin email or password.",
-    submitLabel: "Sign in as Super Admin",
-  },
+const LOGIN_CONFIG: LoginFlowConfig = {
+  title: "HotelMS Sign In",
+  subtitle: "Use your email address and password. Your role is detected automatically after sign in.",
+  endpoint: "/auth/login",
+  invalidCredentialsMessage: "Invalid email or password.",
+  submitLabel: "Sign in",
 };
 
-function parseLoginFlow(value: string | null): LoginFlow {
-  if (value === "staff") return "staff";
-  if (value === "super_admin") return "super_admin";
-  return DEFAULT_LOGIN_FLOW;
+type AccessTokenClaims = {
+  sub?: string | number;
+  role?: string;
+  restaurant_id?: number | null;
+  must_change_password?: boolean;
+};
+
+function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const payload = atob(padded);
+    return JSON.parse(payload) as AccessTokenClaims;
+  } catch {
+    return null;
+  }
 }
 
 function getLoginErrorMessage(err: unknown, invalidCredentialsMessage: string): string {
@@ -84,26 +74,10 @@ export default function Login() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const portalConfig = useMemo(() => resolveLoginPortal(portal), [portal]);
-  const loginFlow = portalConfig?.flow ?? parseLoginFlow(searchParams.get("flow"));
-  const flowConfig = useMemo(() => LOGIN_FLOW_CONFIGS[loginFlow], [loginFlow]);
-  const portalSubmitLabel =
-    portalConfig && portalConfig.flow === "staff"
-      ? `Continue to ${portalConfig.label}`
-      : flowConfig.submitLabel;
-  const publicPortals = useMemo(
-    () =>
-      LOGIN_PORTALS.filter((item) =>
-        ["restaurant-admin", "cashier", "accountant", "steward", "housekeeper", "super-admin"].includes(
-          item.key,
-        ),
-      ),
-    [],
-  );
 
   useEffect(() => {
     const noticeKey = searchParams.get("notice");
@@ -123,31 +97,18 @@ export default function Login() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    if (portal && !portalConfig) {
-      navigate("/login", { replace: true });
-    }
-  }, [navigate, portal, portalConfig]);
+    if (!portal) return;
+
+    const query = searchParams.toString();
+    navigate(query ? `/login?${query}` : "/login", { replace: true });
+  }, [navigate, portal, searchParams]);
 
   useEffect(() => {
-    trackAnalyticsEvent("login_portal_view", {
-      portal: portalConfig?.key ?? loginFlow,
-      flow: loginFlow,
+    trackAnalyticsEvent("login_view", {
       entry_point: searchParams.get("entry_point") ?? undefined,
-      intent: searchParams.get("intent") ?? portalConfig?.key,
+      intent: searchParams.get("intent") ?? portal ?? undefined,
     });
-  }, [loginFlow, portalConfig, searchParams]);
-
-  function switchFlow(nextFlow: LoginFlow) {
-    if (nextFlow === loginFlow) return;
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete("flow");
-    const targetPath = getDefaultPortalPathForFlow(nextFlow);
-    const nextQuery = nextParams.toString();
-    navigate(`${targetPath}${nextQuery ? `?${nextQuery}` : ""}`, {
-      replace: true,
-    });
-    setError(null);
-  }
+  }, [portal, searchParams]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -155,211 +116,181 @@ export default function Login() {
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
-      setError(flowConfig.invalidCredentialsMessage);
+      setError(LOGIN_CONFIG.invalidCredentialsMessage);
       return;
     }
 
     setLoading(true);
     try {
-      const data = await api.post<TokenResponse>(flowConfig.endpoint, {
+      const data = await api.post<TokenResponse>(LOGIN_CONFIG.endpoint, {
         email: normalizedEmail,
         password,
       });
       trackAnalyticsEvent("login_submit_success", {
-        portal: portalConfig?.key ?? loginFlow,
-        flow: loginFlow,
+        entry_point: searchParams.get("entry_point") ?? undefined,
+        intent: searchParams.get("intent") ?? portal ?? undefined,
       });
       setAccessToken(data.access_token);
-      const me = await api.get<UserMeResponse>("/auth/me");
-      setUser(me);
-      if (me.must_change_password) {
+
+      const claims = decodeAccessTokenClaims(data.access_token);
+      const provisionalRole = claims?.role ?? "";
+      const provisionalRestaurantId =
+        typeof claims?.restaurant_id === "number" ? claims.restaurant_id : null;
+      const provisionalMustChangePassword =
+        typeof claims?.must_change_password === "boolean" ? claims.must_change_password : false;
+      const provisionalId = Number(claims?.sub);
+
+      setUser({
+        id: Number.isFinite(provisionalId) ? provisionalId : 0,
+        full_name: "",
+        email: normalizedEmail,
+        role: provisionalRole,
+        restaurant_id: provisionalRestaurantId,
+        must_change_password: provisionalMustChangePassword,
+        super_admin_scopes: [],
+      });
+
+      if (provisionalMustChangePassword) {
         navigate("/first-time-password", { replace: true });
         return;
       }
-      navigate(getRoleRedirect(me.role, me.super_admin_scopes), { replace: true });
+
+      navigate(getRoleRedirect(provisionalRole, []), { replace: true });
+
+      void api
+        .get<UserMeResponse>("/auth/me")
+        .then((me) => {
+          setUser(me);
+        })
+        .catch(() => {
+          // Keep provisional user snapshot if enrichment call fails.
+        });
     } catch (err) {
       trackAnalyticsEvent("login_submit_failure", {
-        portal: portalConfig?.key ?? loginFlow,
-        flow: loginFlow,
+        entry_point: searchParams.get("entry_point") ?? undefined,
+        intent: searchParams.get("intent") ?? portal ?? undefined,
       });
-      setError(getLoginErrorMessage(err, flowConfig.invalidCredentialsMessage));
+      setError(getLoginErrorMessage(err, LOGIN_CONFIG.invalidCredentialsMessage));
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-10 flex items-center justify-center">
       <SeoHead
-        title={portalConfig?.title ?? flowConfig.title}
-        description={
-          portalConfig?.subtitle ??
-          "Sign in to HotelMS and continue with your hospitality operations workspace."
-        }
-        path={
-          typeof window !== "undefined"
-            ? `${window.location.pathname}${window.location.search}`
-            : portalConfig?.path ?? "/login"
-        }
+        title={LOGIN_CONFIG.title}
+        description={LOGIN_CONFIG.subtitle}
+        path={typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "/login"}
         robots="noindex, nofollow"
         trackAs="login"
       />
-      <div className="w-full max-w-5xl rounded-[28px] border border-border bg-card shadow-sm">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.75fr)]">
-          <section className="border-b border-border bg-slate-900 px-6 py-8 text-white lg:border-b-0 lg:border-r lg:px-8">
-            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-100">
-              {portalConfig?.badge ?? "Secure Access"}
-            </span>
-            <h1 className="mt-4 text-3xl font-semibold tracking-tight">
-              {portalConfig?.title ?? flowConfig.title}
-            </h1>
-            <p className="mt-3 text-sm leading-7 text-slate-200">
-              {portalConfig?.subtitle ?? flowConfig.subtitle}
-            </p>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300">
-              {portalConfig?.description ??
-                "Choose the portal that fits your role and continue with the right workspace faster."}
-            </p>
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              {publicPortals.map((item) => (
-                <Link
-                  key={item.key}
-                  to={buildPortalLoginPath(item.key, "login_portal_picker")}
-                  className={`rounded-2xl border px-4 py-3 text-left transition ${
-                    portalConfig?.key === item.key ||
-                    (!portalConfig && item.flow === loginFlow && item.key === "restaurant-admin")
-                      ? "border-white/40 bg-white/10"
-                      : "border-white/15 bg-white/5 hover:bg-white/10"
-                  }`}
-                >
-                  <span className="block text-sm font-semibold">{item.label}</span>
-                  <span className="mt-1 block text-xs text-slate-300">{item.badge}</span>
-                </Link>
-              ))}
+      <section className="w-full max-w-lg rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-8 lg:p-10">
+        <div className="mx-auto flex w-full max-w-sm flex-col items-center text-center">
+          <div className="mb-4 inline-flex items-center gap-3 rounded-full border border-border bg-muted/60 px-3 py-2">
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-900 text-sm font-bold text-white">
+              H
             </div>
-          </section>
-
-          <section className="space-y-6 p-6 sm:p-8">
-            <div className="space-y-1 text-center">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">HotelMS</h1>
-              <p className="text-sm text-muted-foreground">
-                {portalConfig?.title ?? flowConfig.title}
+            <div className="text-left">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                HotelMS
               </p>
-              <p className="text-xs text-muted-foreground">
-                {portalConfig?.description ?? flowConfig.subtitle}
-              </p>
+              <p className="text-xs text-muted-foreground">Secure hospitality access</p>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => switchFlow("restaurant_admin")}
-                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    loginFlow === "restaurant_admin"
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-input bg-background text-foreground hover:bg-muted"
-                  }`}
-                >
-                  Restaurant/Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchFlow("staff")}
-                  className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    loginFlow === "staff"
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-input bg-background text-foreground hover:bg-muted"
-                  }`}
-                >
-                  Staff
-                </button>
-              </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            {LOGIN_CONFIG.title}
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
+            {LOGIN_CONFIG.subtitle}
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
+          <div className="space-y-1.5">
+            <label htmlFor="email" className="text-sm font-medium text-foreground">
+              Email address
+            </label>
+            <input
+              id="email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full rounded-lg border border-input bg-background px-3 py-3 text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+            />
+            <p className="text-xs leading-5 text-muted-foreground">
+              Use the email address registered to your HotelMS account.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
+                Password
+              </label>
               <button
                 type="button"
-                onClick={() => switchFlow("super_admin")}
-                className={`w-full rounded-md px-3 py-2 text-xs font-medium transition-colors ${
-                  loginFlow === "super_admin"
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-input bg-background text-muted-foreground hover:bg-muted"
-                }`}
+                onClick={() => setShowPassword((current) => !current)}
+                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                Super Admin Portal
+                {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                {showPassword ? "Hide" : "Show"}
               </button>
             </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label htmlFor="email" className="text-sm font-medium text-foreground">
-                  Email address
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="password" className="text-sm font-medium text-foreground">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="********"
-                  className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-                />
-              </div>
-
-              {notice && loginFlow === "restaurant_admin" && (
-                <p className="text-sm text-primary font-medium">{notice}</p>
-              )}
-
-              {error && <p className="text-sm text-destructive font-medium">{error}</p>}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2 px-4 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-              >
-                {loading ? "Signing in..." : portalSubmitLabel}
-              </button>
-            </form>
-
-            <p className="text-center text-sm text-muted-foreground">
-              <Link
-                to="/forgot-password"
-                className="underline underline-offset-4 hover:text-foreground transition-colors"
-              >
-                Forgot your password?
-              </Link>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full rounded-lg border border-input bg-background px-3 py-3 pr-24 text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+              />
+            </div>
+            <p className="text-xs leading-5 text-muted-foreground">
+              Use your current HotelMS password. If it is your first login, you may be asked to change it.
             </p>
+          </div>
 
-            {loginFlow === "restaurant_admin" && (
-              <p className="text-center text-xs text-muted-foreground">
-                New restaurant owner?{" "}
-                <Link
-                  to={buildTrackedPath("/register", { entry_point: "login_register_link" })}
-                  className="underline underline-offset-4 hover:text-foreground transition-colors"
-                >
-                  Register here
-                </Link>
-              </p>
-            )}
-          </section>
-        </div>
-      </div>
+          {notice && <p className="text-sm font-medium text-primary">{notice}</p>}
+          {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Signing in..." : LOGIN_CONFIG.submitLabel}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          <Link
+            to="/forgot-password"
+            className="underline underline-offset-4 transition-colors hover:text-foreground"
+          >
+            Forgot your password?
+          </Link>
+        </p>
+
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          New restaurant owner?{" "}
+          <Link
+            to={buildTrackedPath("/register", { entry_point: "login_register_link" })}
+            className="underline underline-offset-4 transition-colors hover:text-foreground"
+          >
+            Register here
+          </Link>
+        </p>
+      </section>
     </div>
   );
 }

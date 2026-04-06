@@ -62,7 +62,6 @@ export default function MenuItems() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [restaurantCurrency, setRestaurantCurrency] = useState("LKR");
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -226,12 +225,14 @@ export default function MenuItems() {
     setEditingItem(null);
     setFormData({
       ...EMPTY_FORM,
-      category_id: filterCategoryId === "all" ? "" : filterCategoryId,
+      category_id:
+        filterCategoryId !== "all"
+          ? filterCategoryId
+          : categories[0]?.id ?? "",
     });
     resetMediaState();
     setFormError(null);
     setModalOpen(true);
-    void reloadCategoriesForForm();
   }
 
   function openEdit(item: Item) {
@@ -248,19 +249,6 @@ export default function MenuItems() {
     resetMediaState();
     setFormError(null);
     setModalOpen(true);
-    void reloadCategoriesForForm();
-  }
-
-  async function reloadCategoriesForForm() {
-    setCategoriesLoading(true);
-    try {
-      const latestCategories = await api.get<Category[]>("/categories");
-      setCategories(latestCategories);
-    } catch {
-      // Keep previously loaded categories as fallback.
-    } finally {
-      setCategoriesLoading(false);
-    }
   }
 
   async function handleSave() {
@@ -270,7 +258,7 @@ export default function MenuItems() {
     }
 
     if (formData.category_id === "") {
-      setFormError("Select a category.");
+      setFormError("Select a category before saving.");
       return;
     }
 
@@ -318,25 +306,39 @@ export default function MenuItems() {
       } else {
         const created = await api.post<Item>("/items", payload);
         savedItemId = created.id;
+        setEditingItem(created);
+        setItems((current) => upsertItem(current, created));
       }
 
       const slotsToUpload = Object.keys(selectedMediaFiles) as MediaSlot[];
-      for (const slot of slotsToUpload) {
-        const mediaFile = selectedMediaFiles[slot];
-        if (!mediaFile) continue;
+      const uploadResults = await Promise.allSettled(
+        slotsToUpload.map(async (slot) => {
+          const mediaFile = selectedMediaFiles[slot];
+          if (!mediaFile) return null;
 
-        const fd = new FormData();
-        fd.append("file", mediaFile);
-        await api.post(`/items/${savedItemId}/media/${SLOT_TO_API_SEGMENT[slot]}`, fd);
+          const fd = new FormData();
+          fd.append("file", mediaFile);
+          const response = await api.post<{ path: string }>(
+            `/items/${savedItemId}/media/${SLOT_TO_API_SEGMENT[slot]}`,
+            fd,
+          );
+          setItems((current) => applyItemMediaUpdate(current, savedItemId, slot, response.path));
+          return response.path;
+        }),
+      );
+
+      const failedUploads = uploadResults.filter((result) => result.status === "rejected");
+      if (failedUploads.length > 0) {
+        throw new Error("Item saved, but one or more media uploads failed. Please try again.");
       }
 
       resetMediaState();
       setModalOpen(false);
-      await loadData();
+      setEditingItem(null);
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-        "Failed to save item.";
+        (err instanceof Error ? err.message : "Failed to save item.");
       setFormError(msg);
     } finally {
       setSaving(false);
@@ -345,10 +347,10 @@ export default function MenuItems() {
 
   async function handleToggleAvailable(item: Item) {
     try {
-      await api.patch(`/items/${item.id}`, {
+      const updated = await api.patch<Item>(`/items/${item.id}`, {
         is_available: !item.is_available,
       });
-      await loadData();
+      setItems((current) => upsertItem(current, updated));
     } catch {
       // ignore
     }
@@ -360,7 +362,7 @@ export default function MenuItems() {
     try {
       await api.delete(`/items/${deleteTarget.id}`);
       setDeleteTarget(null);
-      await loadData();
+      setItems((current) => current.filter((item) => item.id !== deleteTarget.id));
     } catch {
       setDeleteTarget(null);
     } finally {
@@ -380,10 +382,14 @@ export default function MenuItems() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      await api.post(`/items/${uploadTarget.id}/image`, fd);
-      await loadData();
+      const response = await api.post<{ image_path: string }>(`/items/${uploadTarget.id}/image`, fd);
+      setItems((current) =>
+        current.map((item) =>
+          item.id === uploadTarget.id ? { ...item, image_path: response.image_path } : item,
+        ),
+      );
     } catch {
-      await loadData();
+      // Keep current list state on upload failure.
     } finally {
       setUploading(false);
       setUploadTarget(null);
@@ -591,12 +597,13 @@ export default function MenuItems() {
                       </option>
                     ))}
                   </select>
-                  {categoriesLoading && (
-                    <p className="mt-1 text-[11px] text-gray-400">Loading categories...</p>
-                  )}
-                  {!categoriesLoading && categories.length === 0 && (
+                  {categories.length === 0 ? (
                     <p className="mt-1 text-[11px] text-red-500">
                       No categories found from API. Please create a category first.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      Category is required. The current restaurant categories are loaded here.
                     </p>
                   )}
                 </div>
@@ -785,7 +792,7 @@ export default function MenuItems() {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saving || categories.length === 0}
+                disabled={saving || categories.length === 0 || formData.category_id === ""}
                 className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
               >
                 {saving ? "Saving..." : editingItem ? "Update Item" : "Add Item"}
@@ -821,5 +828,28 @@ export default function MenuItems() {
         </div>
       )}
     </DashboardLayout>
+  );
+}
+
+function upsertItem(items: Item[], nextItem: Item): Item[] {
+  const index = items.findIndex((item) => item.id === nextItem.id);
+  if (index === -1) {
+    return [...items, nextItem].sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  const nextItems = [...items];
+  nextItems[index] = nextItem;
+  return nextItems;
+}
+
+function applyItemMediaUpdate(
+  items: Item[],
+  itemId: number,
+  slot: MediaSlot,
+  path: string,
+): Item[] {
+  const fieldName = SLOT_TO_ITEM_FIELD[slot];
+  return items.map((item) =>
+    item.id === itemId ? { ...item, [fieldName]: path } : item,
   );
 }

@@ -6,7 +6,7 @@ import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Star } from "lucide-rea
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { getFeatureFlagEntries } from "@/features/access/catalog";
 import { ApiError, api } from "@/lib/api";
-import type { SettingsRequestResponse } from "@/types/settings";
+import type { SettingsRequestListResponse, SettingsRequestResponse } from "@/types/settings";
 import type {
   AdminDashboardOverviewResponse,
   DashboardSetupRequirement,
@@ -95,6 +95,7 @@ export default function RestaurantProfile() {
   const [accessRequestReason, setAccessRequestReason] = useState("");
   const [submittingAccessRequest, setSubmittingAccessRequest] = useState(false);
   const [accessRequestNotice, setAccessRequestNotice] = useState<NoticeMessage | null>(null);
+  const [pendingAccessRequest, setPendingAccessRequest] = useState<SettingsRequestResponse | null>(null);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -123,7 +124,7 @@ export default function RestaurantProfile() {
       resetBusinessForm(profileData);
       resetScheduleForm(profileData);
       setAccessRequestFlags(profileData.feature_flags);
-      await loadReferenceLookups();
+      await Promise.all([loadReferenceLookups(), loadPendingAccessRequest()]);
     } catch (err) {
       if (!aliveRef.current) {
         return;
@@ -169,6 +170,23 @@ export default function RestaurantProfile() {
       setSubscriptionSummary(null);
       setSetupRequirements([]);
       setSetupProgress(null);
+    }
+  }
+
+  async function loadPendingAccessRequest() {
+    try {
+      const response = await api.get<SettingsRequestListResponse>("/settings/requests?limit=50");
+      if (!aliveRef.current) {
+        return;
+      }
+
+      const pending = response.items.find((item) => item.status === "PENDING") ?? null;
+      setPendingAccessRequest(pending);
+    } catch {
+      if (!aliveRef.current) {
+        return;
+      }
+      setPendingAccessRequest(null);
     }
   }
 
@@ -218,21 +236,23 @@ export default function RestaurantProfile() {
       return;
     }
 
-    const requestedChanges = Object.entries(accessRequestFlags).reduce<Record<string, boolean>>(
-      (accumulator, [key, value]) => {
-        const typedKey = key as keyof typeof accessRequestFlags;
-        if (restaurant.feature_flags[typedKey] !== value) {
-          accumulator[key] = value;
-        }
-        return accumulator;
-      },
-      {},
+    if (pendingAccessRequest) {
+      setAccessRequestNotice({
+        tone: "error",
+        text: `Pending request #${pendingAccessRequest.request_id} is already awaiting super admin review.`,
+      });
+      return;
+    }
+
+    const requestedChanges = getRequestedFeatureFlagChanges(
+      restaurant.feature_flags,
+      accessRequestFlags,
     );
 
     if (Object.keys(requestedChanges).length === 0) {
       setAccessRequestNotice({
         tone: "error",
-        text: "Adjust at least one feature toggle before submitting a request.",
+        text: "Change at least one module toggle before submitting. Request reason alone is not enough.",
       });
       return;
     }
@@ -253,11 +273,17 @@ export default function RestaurantProfile() {
         tone: "success",
         text: `Access request #${response.request_id} submitted for super admin review.`,
       });
+      setPendingAccessRequest(response);
       setAccessRequestReason("");
     } catch (error) {
       if (!aliveRef.current) {
         return;
       }
+
+      if (error instanceof ApiError && error.status === 409) {
+        await loadPendingAccessRequest();
+      }
+
       setAccessRequestNotice({
         tone: "error",
         text: getErrorMessage(error, "Failed to submit the access request."),
@@ -515,6 +541,15 @@ export default function RestaurantProfile() {
   const billingEmailValue = toNullable(businessForm.billing_email);
   const billingEmailMatchesPrimary = emailsEqual(billingEmailSuggestion, billingEmailValue);
   const featureFlagEntries = getFeatureFlagEntries(accessRequestFlags);
+  const requestedAccessChanges = getRequestedFeatureFlagChanges(
+    restaurant.feature_flags,
+    accessRequestFlags,
+  );
+  const changedFeatureEntries = featureFlagEntries.filter(
+    (flag) => requestedAccessChanges[flag.key] !== undefined,
+  );
+  const canSubmitAccessRequest =
+    !submittingAccessRequest && !pendingAccessRequest && changedFeatureEntries.length > 0;
 
   return (
     <DashboardLayout>
@@ -910,6 +945,12 @@ export default function RestaurantProfile() {
             </div>
           )}
 
+          {pendingAccessRequest && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Request #{pendingAccessRequest.request_id} is pending review. You can submit new changes after it is approved or rejected.
+            </div>
+          )}
+
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             {featureFlagEntries.map((flag) => (
               <label
@@ -921,6 +962,7 @@ export default function RestaurantProfile() {
                     type="checkbox"
                     className="mt-1"
                     checked={flag.enabled}
+                    disabled={Boolean(pendingAccessRequest)}
                     onChange={(event) =>
                       setAccessRequestFlags((prev) => ({
                         ...prev,
@@ -951,13 +993,24 @@ export default function RestaurantProfile() {
               placeholder="Explain why this access change is needed..."
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
+            <p className="mt-1 text-xs text-slate-500">
+              Tip: You must change at least one module toggle. Reason only cannot be submitted.
+            </p>
+          </div>
+
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            {changedFeatureEntries.length > 0
+              ? `Ready to request ${changedFeatureEntries.length} module change(s): ${changedFeatureEntries
+                  .map((flag) => flag.label)
+                  .join(", ")}.`
+              : "No module changes selected yet."}
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => void handleAccessRequestSubmit()}
-              disabled={submittingAccessRequest}
+              disabled={!canSubmitAccessRequest}
               className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submittingAccessRequest ? "Submitting..." : "Submit Access Request"}
@@ -969,6 +1022,7 @@ export default function RestaurantProfile() {
                 setAccessRequestReason("");
                 setAccessRequestNotice(null);
               }}
+              disabled={submittingAccessRequest}
               className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Reset
@@ -1141,6 +1195,19 @@ function restaurantFeatureFlagDefaults() {
     accountant: false,
     cashier: false,
   };
+}
+
+function getRequestedFeatureFlagChanges(
+  currentFlags: ReturnType<typeof restaurantFeatureFlagDefaults>,
+  nextFlags: ReturnType<typeof restaurantFeatureFlagDefaults>,
+): Record<string, boolean> {
+  return Object.entries(nextFlags).reduce<Record<string, boolean>>((accumulator, [key, value]) => {
+    const typedKey = key as keyof ReturnType<typeof restaurantFeatureFlagDefaults>;
+    if (currentFlags[typedKey] !== value) {
+      accumulator[key] = value;
+    }
+    return accumulator;
+  }, {});
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {

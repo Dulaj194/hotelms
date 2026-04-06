@@ -62,19 +62,19 @@ describe("Login role entry points", () => {
     cleanup();
   });
 
-  it("renders a cashier portal login and signs in through the staff endpoint", async () => {
+  it("renders the standard login form and signs in through the shared endpoint", async () => {
     render(
       <MemoryRouter initialEntries={["/login/cashier?entry_point=navbar_more&utm_source=google"]}>
         <Routes>
           <Route path="/login/:portal" element={<Login />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/admin/billing/cashier" element={<div>Cashier Dashboard</div>} />
         </Routes>
       </MemoryRouter>,
     );
 
-    expect(screen.getAllByText("Cashier Sign In").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Continue to Cashier Portal" })).toBeTruthy();
-    expect(document.title).toContain("Cashier Sign In");
+    expect(await screen.findByRole("button", { name: "Sign in" })).toBeTruthy();
+    expect(document.title).toContain("HotelMS Sign In");
 
     fireEvent.change(screen.getByLabelText("Email address"), {
       target: { value: "cashier@example.com" },
@@ -82,10 +82,10 @@ describe("Login role entry points", () => {
     fireEvent.change(screen.getByLabelText("Password"), {
       target: { value: "Password1" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continue to Cashier Portal" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
     expect(await screen.findByText("Cashier Dashboard")).toBeTruthy();
-    expect(apiPost).toHaveBeenCalledWith("/auth/login/staff", {
+    expect(apiPost).toHaveBeenCalledWith("/auth/login", {
       email: "cashier@example.com",
       password: "Password1",
     });

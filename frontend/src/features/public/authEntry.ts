@@ -117,9 +117,7 @@ export function buildPortalLoginPath(
   portalKey: LoginPortalKey,
   entryPoint?: string,
 ): string {
-  const portal = LOGIN_PORTAL_MAP.get(portalKey);
-  const target = portal?.path ?? "/login";
-  return buildTrackedPath(target, {
+  return buildTrackedPath("/login", {
     entry_point: entryPoint,
     intent: portalKey,
   });
