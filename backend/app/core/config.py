@@ -1,6 +1,7 @@
+import re
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -86,6 +87,32 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
 
+    @field_validator("sms_provider", mode="before")
+    @classmethod
+    def normalize_sms_provider(cls, value: object) -> str:
+        if value is None:
+            return "twilio"
+        return str(value).strip().lower()
+
+    @field_validator("sms_default_country_code", mode="before")
+    @classmethod
+    def normalize_sms_default_country_code(cls, value: object) -> str:
+        if value is None:
+            return ""
+        normalized = str(value).strip()
+        if not normalized:
+            return ""
+        if normalized.startswith("+"):
+            return normalized
+        return f"+{normalized}"
+
+    @field_validator("twilio_from_number", mode="before")
+    @classmethod
+    def normalize_twilio_from_number(cls, value: object) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
     @model_validator(mode="after")
     def validate_production_guardrails(self) -> "Settings":
         if self.app_env.lower() != "production":
@@ -104,6 +131,42 @@ class Settings(BaseSettings):
             raise ValueError(
                 "In production, DB_AUTO_SCHEMA_SYNC must be false. Apply Alembic migrations instead."
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_sms_configuration(self) -> "Settings":
+        if not self.sms_enabled:
+            return self
+
+        if self.sms_provider != "twilio":
+            raise ValueError(
+                "When SMS_ENABLED=true, SMS_PROVIDER must be 'twilio'."
+            )
+
+        missing_fields: list[str] = []
+        if not self.twilio_account_sid:
+            missing_fields.append("TWILIO_ACCOUNT_SID")
+        if not self.twilio_auth_token:
+            missing_fields.append("TWILIO_AUTH_TOKEN")
+        if not self.twilio_from_number:
+            missing_fields.append("TWILIO_FROM_NUMBER")
+
+        if missing_fields:
+            raise ValueError(
+                "When SMS_ENABLED=true, these fields are required: "
+                + ", ".join(missing_fields)
+            )
+
+        if not self.twilio_account_sid.startswith("AC"):
+            raise ValueError(
+                "TWILIO_ACCOUNT_SID must start with 'AC'."
+            )
+
+        if not re.fullmatch(r"\+\d{8,15}", self.twilio_from_number):
+            raise ValueError(
+                "TWILIO_FROM_NUMBER must be in E.164 format (e.g., +14155552671)."
+            )
+
         return self
 
 

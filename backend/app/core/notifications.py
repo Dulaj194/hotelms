@@ -239,6 +239,14 @@ def send_registration_approved_sms(
         )
         return False
 
+    from_number = settings.twilio_from_number.strip()
+    if to_number == from_number:
+        logger.warning(
+            "Registration approval SMS not sent: recipient and sender numbers cannot be identical (%s).",
+            to_number,
+        )
+        return False
+
     sms_body = (
         f"HotelMS: '{restaurant_name}' registration approved. "
         f"Login: {settings.frontend_login_url}"
@@ -249,7 +257,7 @@ def send_registration_approved_sms(
             f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json",
             data={
                 "To": to_number,
-                "From": settings.twilio_from_number,
+                "From": from_number,
                 "Body": sms_body,
             },
             auth=(settings.twilio_account_sid, settings.twilio_auth_token),
