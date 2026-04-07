@@ -40,7 +40,7 @@ jobs:
         run: mypy app/ || true
 
       - name: Security scanning (bandit)
-        run: bandit -r app/ -ll --exit-code 0
+        run: bandit -r app/ -ll --exit-zero
 
       - name: Run unittest suite with coverage
         run: python -m pytest tests/ --cov=app --cov-report=term-level=2 --tb=short || python -m unittest discover tests
