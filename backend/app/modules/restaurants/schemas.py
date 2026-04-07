@@ -225,6 +225,27 @@ class RestaurantLogoUploadResponse(BaseModel):
     message: str = "Logo uploaded successfully."
 
 
+class RestaurantStaffPasswordResetRequest(BaseModel):
+    temporary_password: str | None = Field(
+        default=None,
+        min_length=8,
+        max_length=128,
+        description=(
+            "Optional temporary password for the target account. "
+            "If omitted, a secure temporary password is generated."
+        ),
+    )
+
+
+class RestaurantStaffPasswordResetResponse(BaseModel):
+    message: str
+    user_id: int
+    role: str
+    must_change_password: bool
+    email_sent: bool
+    temporary_password: str
+
+
 class RestaurantRegistrationSummaryResponse(BaseModel):
     restaurant_id: int
     name: str

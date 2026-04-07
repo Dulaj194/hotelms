@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
-from app.core.security import hash_token
-from app.core.notifications import send_onboarding_email
+from app.core.notifications import send_onboarding_email, send_temporary_password_reset_email
+from app.core.security import hash_password, hash_token
 from app.modules.access import catalog as access_catalog
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.restaurants.integration_service import DEFAULT_WEBHOOK_SECRET_HEADER_NAME
@@ -22,7 +22,7 @@ from app.modules.restaurants import repository
 from app.modules.subscriptions import service as subscription_service
 from app.modules.restaurants.model import RegistrationStatus, WebhookHealthStatus
 from app.modules.users.model import UserRole
-from app.modules.users.repository import create_staff, get_user_by_email, list_by_restaurant
+from app.modules.users.repository import create_staff, get_by_id, get_user_by_email, list_by_restaurant
 from app.modules.users.schemas import StaffCreateRequest
 from app.modules.restaurants.schemas import (
     PendingRestaurantRegistrationListResponse,
@@ -40,6 +40,8 @@ from app.modules.restaurants.schemas import (
     RestaurantRegistrationReviewRequest,
     RestaurantRegistrationReviewResponse,
     RestaurantRegistrationSummaryResponse,
+    RestaurantStaffPasswordResetRequest,
+    RestaurantStaffPasswordResetResponse,
     RestaurantUpdateRequest,
     RestaurantWebhookSecretSummaryResponse,
     RestaurantWebhookHealthRefreshResponse,
@@ -47,6 +49,7 @@ from app.modules.restaurants.schemas import (
 
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+_RESETTABLE_HOTEL_STAFF_ROLES = {UserRole.owner, UserRole.admin}
 
 
 def _effective_billing_email(
@@ -438,6 +441,83 @@ def create_restaurant(
     return _serialize_restaurant(restaurant)
 
 
+def reset_restaurant_staff_password(
+    db: Session,
+    *,
+    restaurant_id: int,
+    user_id: int,
+    payload: RestaurantStaffPasswordResetRequest,
+    current_user_id: int,
+) -> RestaurantStaffPasswordResetResponse:
+    restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    user = get_by_id(db, user_id, restaurant_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Staff member not found.",
+        )
+
+    if user.role not in _RESETTABLE_HOTEL_STAFF_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Temporary password reset is allowed only for owner/admin accounts.",
+        )
+
+    temporary_password = (
+        payload.temporary_password.strip()
+        if payload.temporary_password and payload.temporary_password.strip()
+        else _generate_temporary_password()
+    )
+    _assert_temporary_password_policy(temporary_password)
+
+    user.password_hash = hash_password(temporary_password)
+    user.must_change_password = True
+    user.password_changed_at = None
+    db.commit()
+    db.refresh(user)
+
+    email_sent = send_temporary_password_reset_email(
+        recipient_email=user.email,
+        recipient_name=user.full_name,
+        restaurant_name=restaurant.name,
+        temporary_password=temporary_password,
+    )
+
+    write_audit_log(
+        db,
+        event_type="restaurant_staff_password_reset_by_super_admin",
+        user_id=current_user_id,
+        restaurant_id=restaurant_id,
+        metadata={
+            "restaurant_id": restaurant_id,
+            "target_user_id": user.id,
+            "target_role": user.role.value,
+            "email_sent": email_sent,
+        },
+    )
+
+    message = (
+        "Temporary password issued and sent to the user's email."
+        if email_sent
+        else "Temporary password issued. Email could not be sent; share it securely with the user."
+    )
+
+    return RestaurantStaffPasswordResetResponse(
+        message=message,
+        user_id=user.id,
+        role=user.role.value,
+        must_change_password=user.must_change_password,
+        email_sent=email_sent,
+        temporary_password=temporary_password,
+    )
+
+
 def update_restaurant_for_super_admin(
     db: Session,
     restaurant_id: int,
@@ -764,9 +844,47 @@ def review_restaurant_registration(
     )
 
 
+def _assert_temporary_password_policy(password: str) -> None:
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Temporary password must be at least 8 characters.",
+        )
+    if not any(char.isupper() for char in password):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Temporary password must contain at least one uppercase letter.",
+        )
+    if not any(char.islower() for char in password):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Temporary password must contain at least one lowercase letter.",
+        )
+    if not any(char.isdigit() for char in password):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Temporary password must contain at least one number.",
+        )
+
+
 def _generate_temporary_password(length: int = 12) -> str:
+    if length < 8:
+        length = 8
+
+    required_chars = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+        secrets.choice("@#$%!"),
+    ]
     alphabet = string.ascii_letters + string.digits + "@#$%!"
-    return "".join(secrets.choice(alphabet) for _ in range(length))
+    remaining_chars = [
+        secrets.choice(alphabet)
+        for _ in range(length - len(required_chars))
+    ]
+    password_chars = required_chars + remaining_chars
+    secrets.SystemRandom().shuffle(password_chars)
+    return "".join(password_chars)
 
 
 def _serialize_registration_summary_with_db(

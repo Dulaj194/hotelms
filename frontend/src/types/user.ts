@@ -80,6 +80,15 @@ export interface GenericMessageResponse {
   message: string;
 }
 
+export interface RestaurantStaffPasswordResetResponse {
+  message: string;
+  user_id: number;
+  role: UserRole;
+  must_change_password: boolean;
+   email_sent: boolean;
+  temporary_password: string;
+}
+
 
 export interface PlatformUserListItemResponse {
   id: number;

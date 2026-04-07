@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from fastapi import Response
+from fastapi import HTTPException, Response
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -16,7 +16,7 @@ import app.db.init_models  # noqa: F401
 from app.modules.auth import service as auth_service  # noqa: E402
 from app.modules.audit_logs import service as audit_logs_service  # noqa: E402
 from app.modules.audit_logs.schemas import SuperAdminNotificationUpdateRequest  # noqa: E402
-from app.core.security import hash_password  # noqa: E402
+from app.core.security import hash_password, verify_password  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.modules.packages import service as packages_service  # noqa: E402
 from app.modules.packages import repository as packages_repository  # noqa: E402
@@ -27,6 +27,7 @@ from app.modules.restaurants.model import RegistrationStatus, Restaurant  # noqa
 from app.modules.restaurants.schemas import (
     RestaurantIntegrationUpdateRequest,
     RestaurantRegistrationReviewRequest,
+    RestaurantStaffPasswordResetRequest,
 )  # noqa: E402
 from app.modules.settings import service as settings_service  # noqa: E402
 from app.modules.settings.schemas import SettingsRequestCreateRequest, SettingsRequestReviewRequest  # noqa: E402
@@ -243,6 +244,112 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.assertEqual(cashier.assigned_area, "cashier")
         self.assertEqual(accountant.role, "accountant")
         self.assertEqual(accountant.assigned_area, "accounting")
+
+    def test_super_admin_can_reset_owner_password_with_generated_temporary_password(self) -> None:
+        restaurant = self._create_active_restaurant()
+        owner = self._create_owner_for_restaurant(restaurant)
+
+        response = restaurants_service.reset_restaurant_staff_password(
+            self.db,
+            restaurant_id=restaurant.id,
+            user_id=owner.id,
+            payload=RestaurantStaffPasswordResetRequest(),
+            current_user_id=self.current_super_admin.id,
+        )
+
+        self.db.refresh(owner)
+        self.assertEqual(response.user_id, owner.id)
+        self.assertEqual(response.role, "owner")
+        self.assertTrue(response.must_change_password)
+        self.assertIsInstance(response.email_sent, bool)
+        self.assertTrue(owner.must_change_password)
+        self.assertTrue(verify_password(response.temporary_password, owner.password_hash))
+
+    def test_super_admin_can_reset_admin_password_with_custom_temporary_password(self) -> None:
+        restaurant = self._create_active_restaurant()
+        admin = users_service.add_staff(
+            self.db,
+            None,
+            StaffCreateRequest(
+                full_name="Resettable Admin",
+                email="resettable.admin@example.com",
+                password="Password1",
+                role=UserRole.admin,
+                restaurant_id=restaurant.id,
+            ),
+            self.current_super_admin,
+        )
+
+        response = restaurants_service.reset_restaurant_staff_password(
+            self.db,
+            restaurant_id=restaurant.id,
+            user_id=admin.id,
+            payload=RestaurantStaffPasswordResetRequest(temporary_password="TempAdmin123"),
+            current_user_id=self.current_super_admin.id,
+        )
+
+        updated_admin = self.db.query(User).filter(User.id == admin.id).first()
+        self.assertIsNotNone(updated_admin)
+        assert updated_admin is not None
+        self.assertEqual(response.temporary_password, "TempAdmin123")
+        self.assertIsInstance(response.email_sent, bool)
+        self.assertTrue(updated_admin.must_change_password)
+        self.assertTrue(verify_password("TempAdmin123", updated_admin.password_hash))
+
+    def test_super_admin_reset_password_marks_email_sent_when_notification_succeeds(self) -> None:
+        restaurant = self._create_active_restaurant()
+        owner = self._create_owner_for_restaurant(restaurant)
+
+        with patch(
+            "app.modules.restaurants.service.send_temporary_password_reset_email",
+            return_value=True,
+        ) as mocked_sender:
+            response = restaurants_service.reset_restaurant_staff_password(
+                self.db,
+                restaurant_id=restaurant.id,
+                user_id=owner.id,
+                payload=RestaurantStaffPasswordResetRequest(),
+                current_user_id=self.current_super_admin.id,
+            )
+
+        self.assertTrue(response.email_sent)
+        self.assertIn("sent to the user's email", response.message)
+        mocked_sender.assert_called_once_with(
+            recipient_email=owner.email,
+            recipient_name=owner.full_name,
+            restaurant_name=restaurant.name,
+            temporary_password=response.temporary_password,
+        )
+
+    def test_super_admin_reset_password_rejects_non_owner_admin_roles(self) -> None:
+        restaurant = self._create_active_restaurant()
+        steward = users_service.add_staff(
+            self.db,
+            None,
+            StaffCreateRequest(
+                full_name="Steward User",
+                email="steward.reset.blocked@example.com",
+                password="Password1",
+                role=UserRole.steward,
+                restaurant_id=restaurant.id,
+            ),
+            self.current_super_admin,
+        )
+
+        with self.assertRaises(HTTPException) as ctx:
+            restaurants_service.reset_restaurant_staff_password(
+                self.db,
+                restaurant_id=restaurant.id,
+                user_id=steward.id,
+                payload=RestaurantStaffPasswordResetRequest(),
+                current_user_id=self.current_super_admin.id,
+            )
+
+        self.assertEqual(ctx.exception.status_code, 422)
+        self.assertEqual(
+            ctx.exception.detail,
+            "Temporary password reset is allowed only for owner/admin accounts.",
+        )
 
     def test_staff_login_supports_cashier_and_accountant_roles(self) -> None:
         restaurant = self._create_active_restaurant()

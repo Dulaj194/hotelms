@@ -22,7 +22,12 @@ import type {
   SubscriptionResponse,
   SuperAdminSubscriptionUpdateRequest,
 } from "@/types/subscription";
-import type { GenericMessageResponse, StaffDetailResponse, UserRole } from "@/types/user";
+import type {
+  GenericMessageResponse,
+  RestaurantStaffPasswordResetResponse,
+  StaffDetailResponse,
+  UserRole,
+} from "@/types/user";
 
 export async function listRestaurants(): Promise<RestaurantMeResponse[]> {
   return api.get<RestaurantMeResponse[]>("/restaurants");
@@ -218,6 +223,17 @@ export async function createRestaurantUser(
   },
 ): Promise<StaffDetailResponse> {
   return api.post<StaffDetailResponse>(`/restaurants/${restaurantId}/users`, payload);
+}
+
+export async function resetRestaurantUserPassword(
+  restaurantId: number,
+  userId: number,
+  payload: { temporary_password?: string | null } = {},
+): Promise<RestaurantStaffPasswordResetResponse> {
+  return api.post<RestaurantStaffPasswordResetResponse>(
+    `/restaurants/${restaurantId}/users/${userId}/reset-password`,
+    payload,
+  );
 }
 
 export async function toggleRestaurantUser(

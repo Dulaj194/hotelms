@@ -21,6 +21,7 @@ import {
   listRestaurants,
   listRestaurantUsers,
   refreshRestaurantWebhookHealth,
+  resetRestaurantUserPassword,
   revokeRestaurantApiKey,
   revokeRestaurantWebhookSecret,
   retryRestaurantWebhookDelivery,
@@ -189,6 +190,7 @@ export default function SuperAdminRestaurants() {
   const [addUserMsg, setAddUserMsg] = useState<InlineMessage>(null);
   const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
+  const [resettingUserId, setResettingUserId] = useState<number | null>(null);
 
   const [confirmAction, setConfirmAction] = useState<ConfirmActionState>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -282,6 +284,7 @@ export default function SuperAdminRestaurants() {
     setSelectedIntegrationOps(null);
     setSubMsg(null);
     setAddUserMsg(null);
+    setResettingUserId(null);
     setIntegrationMsg(null);
     setRevealedApiKey(null);
     setRevealedWebhookSecret(null);
@@ -683,6 +686,55 @@ export default function SuperAdminRestaurants() {
     });
   }
 
+  async function resetHotelUserPassword(userId: number, userName: string) {
+    if (!selected) return;
+    if (!canManageTenants) {
+      setAddUserMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to manage hotel staff.",
+      });
+      return;
+    }
+
+    setResettingUserId(userId);
+    setAddUserMsg(null);
+    try {
+      const result = await resetRestaurantUserPassword(selected.id, userId);
+      const deliveryNote = result.email_sent
+        ? "Temporary password was sent to the user's email."
+        : `Email delivery failed for "${userName}". Share this temporary password securely: ${result.temporary_password}`;
+      setAddUserMsg({
+        type: "ok",
+        text: `${result.message} ${deliveryNote}`,
+      });
+    } catch (error) {
+      setAddUserMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to reset user password.",
+      });
+    } finally {
+      setResettingUserId(null);
+    }
+  }
+
+  function handleResetUserPassword(userId: number, userName: string, role: UserRole) {
+    if (!selected) return;
+    const roleLabel = role === "owner" ? "Owner" : "Admin";
+
+    setConfirmError(null);
+    setConfirmAction({
+      title: "Reset Staff Password",
+      description:
+        `Generate a temporary password for "${userName}" (${roleLabel})? ` +
+        "Share it securely. The user must change it on next login.",
+      confirmLabel: "Generate Temporary Password",
+      confirmTone: "warning",
+      onConfirm: async () => {
+        await resetHotelUserPassword(userId, userName);
+      },
+    });
+  }
+
   async function handleToggleUser(userId: number, isActive: boolean) {
     if (!selected) return;
     if (!canManageTenants) {
@@ -1044,6 +1096,7 @@ export default function SuperAdminRestaurants() {
     setAddUserMsg(null);
     setShowAddUser(false);
     setAddUserForm(EMPTY_USER_FORM);
+    setResettingUserId(null);
     setWebhookSecretAction(null);
     setSendingTestDelivery(false);
     setRetryingDeliveryId(null);
@@ -1217,6 +1270,7 @@ export default function SuperAdminRestaurants() {
                 availableRoles={availableStaffRoles}
                 deletingUserId={deletingUserId}
                 togglingUserId={togglingUserId}
+                resettingUserId={resettingUserId}
                 onToggleAddUser={() => {
                   setShowAddUser((current) => !current);
                   setAddUserMsg(null);
@@ -1225,6 +1279,7 @@ export default function SuperAdminRestaurants() {
                 onSubmit={(event) => void handleAddUser(event)}
                 onToggleUser={(userId, isActive) => void handleToggleUser(userId, isActive)}
                 onDeleteUser={handleDeleteUser}
+                onResetUserPassword={handleResetUserPassword}
               />
             )}
           </div>

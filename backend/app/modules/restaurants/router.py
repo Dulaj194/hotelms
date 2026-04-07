@@ -25,6 +25,8 @@ from app.modules.restaurants.schemas import (
     RestaurantRegistrationHistoryListResponse,
     RestaurantRegistrationReviewRequest,
     RestaurantRegistrationReviewResponse,
+    RestaurantStaffPasswordResetRequest,
+    RestaurantStaffPasswordResetResponse,
     RestaurantUpdateRequest,
     RestaurantWebhookDeliveryActionResponse,
     RestaurantWebhookSecretProvisionResponse,
@@ -446,6 +448,27 @@ def add_restaurant_staff(
     """
     payload_for_hotel = payload.model_copy(update={"restaurant_id": restaurant_id})
     return users_service.add_staff(db, None, payload_for_hotel, current_user)
+
+
+@router.post(
+    "/{restaurant_id}/users/{user_id}/reset-password",
+    response_model=RestaurantStaffPasswordResetResponse,
+)
+def reset_restaurant_staff_password(
+    restaurant_id: int,
+    user_id: int,
+    payload: RestaurantStaffPasswordResetRequest,
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantStaffPasswordResetResponse:
+    """Reset owner/admin password and enforce password change on next login."""
+    return service.reset_restaurant_staff_password(
+        db,
+        restaurant_id=restaurant_id,
+        user_id=user_id,
+        payload=payload,
+        current_user_id=current_user.id,
+    )
 
 
 @router.delete(
