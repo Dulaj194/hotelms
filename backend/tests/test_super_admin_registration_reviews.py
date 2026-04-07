@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi import HTTPException, Response
 from sqlalchemy import create_engine
@@ -134,15 +135,22 @@ class SuperAdminRegistrationReviewTests(unittest.TestCase):
     def test_approve_registration_activates_owner_and_trial(self) -> None:
         db, restaurant, owner, reviewer = self._create_pending_registration()
 
-        response = restaurants_service.review_restaurant_registration(
-            db,
-            restaurant_id=restaurant.id,
-            reviewer_user_id=reviewer.id,
-            payload=RestaurantRegistrationReviewRequest(
-                status="APPROVED",
-                review_notes="Verified and approved.",
-            ),
-        )
+        with patch(
+            "app.modules.restaurants.service.send_registration_approved_email",
+            return_value=False,
+        ) as mocked_email, patch(
+            "app.modules.restaurants.service.send_registration_approved_sms",
+            return_value=False,
+        ) as mocked_sms:
+            response = restaurants_service.review_restaurant_registration(
+                db,
+                restaurant_id=restaurant.id,
+                reviewer_user_id=reviewer.id,
+                payload=RestaurantRegistrationReviewRequest(
+                    status="APPROVED",
+                    review_notes="Verified and approved.",
+                ),
+            )
 
         db.refresh(restaurant)
         db.refresh(owner)
@@ -158,20 +166,37 @@ class SuperAdminRegistrationReviewTests(unittest.TestCase):
         self.assertIsNotNone(subscription)
         assert subscription is not None
         self.assertTrue(subscription.is_trial)
+        mocked_email.assert_called_once_with(
+            recipient_email=owner.email,
+            recipient_name=owner.full_name,
+            restaurant_name=restaurant.name,
+            review_notes="Verified and approved.",
+        )
+        mocked_sms.assert_called_once_with(
+            recipient_phone=restaurant.phone,
+            restaurant_name=restaurant.name,
+        )
         db.close()
 
     def test_reject_registration_keeps_owner_inactive_and_skips_trial(self) -> None:
         db, restaurant, owner, reviewer = self._create_pending_registration()
 
-        response = restaurants_service.review_restaurant_registration(
-            db,
-            restaurant_id=restaurant.id,
-            reviewer_user_id=reviewer.id,
-            payload=RestaurantRegistrationReviewRequest(
-                status="REJECTED",
-                review_notes="Incomplete onboarding information.",
-            ),
-        )
+        with patch(
+            "app.modules.restaurants.service.send_registration_approved_email",
+            return_value=False,
+        ) as mocked_email, patch(
+            "app.modules.restaurants.service.send_registration_approved_sms",
+            return_value=False,
+        ) as mocked_sms:
+            response = restaurants_service.review_restaurant_registration(
+                db,
+                restaurant_id=restaurant.id,
+                reviewer_user_id=reviewer.id,
+                payload=RestaurantRegistrationReviewRequest(
+                    status="REJECTED",
+                    review_notes="Incomplete onboarding information.",
+                ),
+            )
 
         db.refresh(restaurant)
         db.refresh(owner)
@@ -185,6 +210,8 @@ class SuperAdminRegistrationReviewTests(unittest.TestCase):
         self.assertFalse(restaurant.is_active)
         self.assertFalse(owner.is_active)
         self.assertIsNone(subscription)
+        mocked_email.assert_not_called()
+        mocked_sms.assert_not_called()
         db.close()
 
 

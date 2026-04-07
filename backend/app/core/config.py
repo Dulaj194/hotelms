@@ -78,6 +78,14 @@ class Settings(BaseSettings):
     smtp_from_name: str = "HotelMS"
     frontend_login_url: str = "http://localhost:5173/login"
 
+    # SMS notifications (Twilio)
+    sms_enabled: bool = False
+    sms_provider: str = "twilio"
+    sms_default_country_code: str = ""
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from_number: str = ""
+
     @model_validator(mode="after")
     def validate_production_guardrails(self) -> "Settings":
         if self.app_env.lower() != "production":

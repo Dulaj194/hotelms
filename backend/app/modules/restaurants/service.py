@@ -11,7 +11,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
-from app.core.notifications import send_onboarding_email, send_temporary_password_reset_email
+from app.core.notifications import (
+    send_onboarding_email,
+    send_registration_approved_email,
+    send_registration_approved_sms,
+    send_temporary_password_reset_email,
+)
 from app.core.security import hash_password, hash_token
 from app.modules.access import catalog as access_catalog
 from app.modules.audit_logs.service import write_audit_log
@@ -50,6 +55,46 @@ from app.modules.restaurants.schemas import (
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 _RESETTABLE_HOTEL_STAFF_ROLES = {UserRole.owner, UserRole.admin}
+
+
+def _send_registration_approval_notifications(
+    db: Session,
+    *,
+    restaurant,
+    review_notes: str | None,
+) -> dict[str, object]:
+    owner = repository.get_owner_user(db, restaurant.id)
+    recipient_email = (owner.email if owner else restaurant.email) or ""
+    recipient_name = (owner.full_name if owner else restaurant.name) or restaurant.name
+    recipient_phone = (
+        owner.phone
+        if owner and owner.phone
+        else (restaurant.phone or "")
+    )
+
+    email_sent = False
+    sms_sent = False
+
+    if recipient_email:
+        email_sent = send_registration_approved_email(
+            recipient_email=recipient_email,
+            recipient_name=recipient_name,
+            restaurant_name=restaurant.name,
+            review_notes=review_notes,
+        )
+
+    if recipient_phone:
+        sms_sent = send_registration_approved_sms(
+            recipient_phone=recipient_phone,
+            restaurant_name=restaurant.name,
+        )
+
+    return {
+        "notification_email": recipient_email or None,
+        "notification_phone": recipient_phone or None,
+        "notification_email_sent": email_sent,
+        "notification_sms_sent": sms_sent,
+    }
 
 
 def _effective_billing_email(
@@ -796,7 +841,8 @@ def review_restaurant_registration(
 
     users = list_by_restaurant(db, restaurant.id)
 
-    if payload.status == RegistrationStatus.APPROVED.value:
+    approved = payload.status == RegistrationStatus.APPROVED.value
+    if approved:
         restaurant.registration_status = RegistrationStatus.APPROVED
         restaurant.is_active = True
         for user in users:
@@ -822,6 +868,14 @@ def review_restaurant_registration(
     db.commit()
     db.refresh(restaurant)
 
+    notification_metadata: dict[str, object] = {}
+    if approved:
+        notification_metadata = _send_registration_approval_notifications(
+            db,
+            restaurant=restaurant,
+            review_notes=payload.review_notes,
+        )
+
     audit_log = write_audit_log(
         db,
         event_type=audit_event,
@@ -830,6 +884,7 @@ def review_restaurant_registration(
         metadata={
             "restaurant_id": restaurant.id,
             "review_notes": payload.review_notes,
+            **notification_metadata,
         },
     )
     if audit_log is not None:

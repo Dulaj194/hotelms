@@ -856,15 +856,22 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
     def test_review_history_lists_reviewed_records(self) -> None:
         restaurant, owner = self._create_pending_restaurant()
 
-        restaurants_service.review_restaurant_registration(
-            self.db,
-            restaurant_id=restaurant.id,
-            reviewer_user_id=self.current_super_admin.id,
-            payload=RestaurantRegistrationReviewRequest(
-                status="APPROVED",
-                review_notes="Verified registration details.",
-            ),
-        )
+        with patch(
+            "app.modules.restaurants.service.send_registration_approved_email",
+            return_value=False,
+        ), patch(
+            "app.modules.restaurants.service.send_registration_approved_sms",
+            return_value=False,
+        ):
+            restaurants_service.review_restaurant_registration(
+                self.db,
+                restaurant_id=restaurant.id,
+                reviewer_user_id=self.current_super_admin.id,
+                payload=RestaurantRegistrationReviewRequest(
+                    status="APPROVED",
+                    review_notes="Verified registration details.",
+                ),
+            )
 
         registration_history = restaurants_service.list_restaurant_registration_history(
             self.db,
