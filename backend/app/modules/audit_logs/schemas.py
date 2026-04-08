@@ -38,6 +38,28 @@ class AuditLogListResponse(BaseModel):
     total: int
 
 
+class AuditLogExportRequest(BaseModel):
+    event_type: str | None = None
+    restaurant_id: int | None = Field(default=None, ge=1)
+    search: str | None = None
+    actor_search: str | None = None
+    severity: str | None = None
+    category: str | None = None
+    created_from: datetime | None = None
+    created_to: datetime | None = None
+
+
+class AuditLogExportJobResponse(BaseModel):
+    id: str
+    status: str
+    row_count: int | None = None
+    error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
 class SuperAdminNotificationResponse(BaseModel):
     id: str
     audit_log_id: int

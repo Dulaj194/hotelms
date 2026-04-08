@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_platform_action
 from app.modules.audit_logs import service
 from app.modules.audit_logs.schemas import (
     AuditLogListResponse,
+    AuditLogExportJobResponse,
+    AuditLogExportRequest,
     SuperAdminNotificationAssigneeListResponse,
     SuperAdminNotificationListResponse,
     SuperAdminNotificationResponse,
@@ -27,6 +30,7 @@ def list_audit_logs(
     search: str | None = Query(default=None, min_length=1, max_length=200),
     actor_search: str | None = Query(default=None, min_length=1, max_length=200),
     severity: str | None = Query(default=None, pattern="^(info|success|warning|danger)$"),
+    category: str | None = Query(default=None, min_length=1, max_length=80),
     created_from: datetime | None = Query(default=None),
     created_to: datetime | None = Query(default=None),
     _current_user=Depends(require_platform_action("audit_logs", "view")),
@@ -41,6 +45,7 @@ def list_audit_logs(
         search=search,
         actor_search=actor_search,
         severity=severity,
+        category=category,
         created_from=created_from,
         created_to=created_to,
     )
@@ -53,6 +58,7 @@ def export_audit_logs(
     search: str | None = Query(default=None, min_length=1, max_length=200),
     actor_search: str | None = Query(default=None, min_length=1, max_length=200),
     severity: str | None = Query(default=None, pattern="^(info|success|warning|danger)$"),
+    category: str | None = Query(default=None, min_length=1, max_length=80),
     created_from: datetime | None = Query(default=None),
     created_to: datetime | None = Query(default=None),
     _current_user=Depends(require_platform_action("audit_logs", "view")),
@@ -65,6 +71,7 @@ def export_audit_logs(
         search=search,
         actor_search=actor_search,
         severity=severity,
+        category=category,
         created_from=created_from,
         created_to=created_to,
     )
@@ -74,6 +81,52 @@ def export_audit_logs(
         headers={
             "Content-Disposition": 'attachment; filename="audit-logs-export.csv"',
         },
+    )
+
+
+@router.post(
+    "/export-jobs",
+    response_model=AuditLogExportJobResponse,
+    status_code=202,
+)
+def create_audit_log_export_job(
+    payload: AuditLogExportRequest,
+    background_tasks: BackgroundTasks,
+    current_user=Depends(require_platform_action("audit_logs", "view")),
+    db: Session = Depends(get_db),
+) -> AuditLogExportJobResponse:
+    job = service.create_audit_log_export_job(
+        db,
+        requested_by_user_id=getattr(current_user, "id", None),
+        filters=payload,
+    )
+    background_tasks.add_task(service.process_audit_log_export_job, job.id)
+    return job
+
+
+@router.get(
+    "/export-jobs/{job_id}",
+    response_model=AuditLogExportJobResponse,
+)
+def get_audit_log_export_job(
+    job_id: str,
+    _current_user=Depends(require_platform_action("audit_logs", "view")),
+    db: Session = Depends(get_db),
+) -> AuditLogExportJobResponse:
+    return service.get_audit_log_export_job(db, job_id=job_id)
+
+
+@router.get("/export-jobs/{job_id}/download")
+def download_audit_log_export_job(
+    job_id: str,
+    _current_user=Depends(require_platform_action("audit_logs", "view")),
+    db: Session = Depends(get_db),
+) -> FileResponse:
+    file_path = service.get_audit_log_export_download_path(db, job_id=job_id)
+    return FileResponse(
+        path=str(file_path),
+        media_type="text/csv",
+        filename=f"audit-logs-export-{job_id}.csv",
     )
 
 

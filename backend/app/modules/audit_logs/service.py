@@ -3,9 +3,11 @@ from __future__ import annotations
 import base64
 import csv
 import json
+import uuid
 import binascii
 from io import StringIO
-from datetime import UTC, datetime
+from pathlib import Path
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -13,11 +15,14 @@ from sqlalchemy import and_, case, false, or_
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.logging import get_logger
+from app.db.session import SessionLocal
 from app.modules.audit_logs import catalog
-from app.modules.audit_logs.model import AuditLog, SuperAdminNotificationState
+from app.modules.audit_logs.model import AuditLog, AuditLogExportJob, SuperAdminNotificationState
 from app.modules.audit_logs.schemas import (
     AuditLogActorResponse,
     AuditLogEntryResponse,
+    AuditLogExportJobResponse,
+    AuditLogExportRequest,
     AuditLogListResponse,
     AuditLogRestaurantResponse,
     SuperAdminNotificationAssigneeListResponse,
@@ -30,6 +35,308 @@ from app.modules.platform_access import catalog as platform_access_catalog
 from app.modules.users import repository as users_repository
 
 logger = get_logger(__name__)
+
+_EXPORT_JOB_STATUS_PENDING = "pending"
+_EXPORT_JOB_STATUS_PROCESSING = "processing"
+_EXPORT_JOB_STATUS_COMPLETED = "completed"
+_EXPORT_JOB_STATUS_FAILED = "failed"
+_AUDIT_EXPORT_TTL_HOURS = 24
+_AUDIT_EXPORT_BATCH_SIZE = 500
+_BACKEND_ROOT = Path(__file__).resolve().parents[3]
+_AUDIT_EXPORT_DIR = _BACKEND_ROOT / "data" / "exports" / "audit-logs"
+_AUDIT_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _prepare_export_filters(filters: AuditLogExportRequest | dict[str, Any] | None) -> dict[str, Any]:
+    if filters is None:
+        return {}
+
+    if isinstance(filters, AuditLogExportRequest):
+        payload = filters.model_dump(exclude_none=True)
+    else:
+        payload = {k: v for k, v in dict(filters).items() if v is not None}
+
+    normalized: dict[str, Any] = {}
+    for key, value in payload.items():
+        if isinstance(value, datetime):
+            normalized[key] = value.isoformat()
+        else:
+            normalized[key] = value
+    return normalized
+
+
+def _parse_export_filter_datetimes(filters: dict[str, Any]) -> dict[str, Any]:
+    parsed = dict(filters)
+    for field_name in ("created_from", "created_to"):
+        value = parsed.get(field_name)
+        if isinstance(value, str):
+            try:
+                parsed[field_name] = datetime.fromisoformat(value)
+            except ValueError:
+                parsed[field_name] = None
+    return parsed
+
+
+def _build_export_file_path(job_id: str) -> Path:
+    return _AUDIT_EXPORT_DIR / f"audit-logs-{job_id}.csv"
+
+
+def _iter_audit_logs_for_export(
+    base_query,
+    *,
+    batch_size: int = _AUDIT_EXPORT_BATCH_SIZE,
+):
+    cursor_created_at: datetime | None = None
+    cursor_id: int | None = None
+
+    while True:
+        query = base_query
+        if cursor_created_at is not None and cursor_id is not None:
+            query = query.filter(
+                or_(
+                    AuditLog.created_at < cursor_created_at,
+                    and_(AuditLog.created_at == cursor_created_at, AuditLog.id < cursor_id),
+                )
+            )
+
+        rows = (
+            query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .limit(batch_size)
+            .all()
+        )
+        if not rows:
+            break
+
+        yield rows
+        last = rows[-1]
+        cursor_created_at = last.created_at
+        cursor_id = last.id
+
+
+def _write_audit_export_csv_file(
+    db: Session,
+    *,
+    destination_path: Path,
+    filters: dict[str, Any],
+) -> int:
+    export_filters = _parse_export_filter_datetimes(filters)
+    base_query = _build_audit_logs_query(
+        db,
+        event_type=export_filters.get("event_type"),
+        restaurant_id=export_filters.get("restaurant_id"),
+        search=export_filters.get("search"),
+        actor_search=export_filters.get("actor_search"),
+        severity=export_filters.get("severity"),
+        category=export_filters.get("category"),
+        created_from=export_filters.get("created_from"),
+        created_to=export_filters.get("created_to"),
+    )
+
+    row_count = 0
+    with destination_path.open("w", encoding="utf-8", newline="") as export_file:
+        writer = csv.writer(export_file)
+        writer.writerow(
+            [
+                "id",
+                "created_at",
+                "event_type",
+                "category",
+                "severity",
+                "title",
+                "message",
+                "restaurant_id",
+                "restaurant_name",
+                "actor_user_id",
+                "actor_name",
+                "actor_email",
+                "ip_address",
+                "user_agent",
+                "metadata_json",
+            ]
+        )
+
+        for batch in _iter_audit_logs_for_export(base_query):
+            user_map, restaurant_map = _load_context_maps(db, batch)
+            for log in batch:
+                item = _serialize_audit_entry(
+                    log=log,
+                    user_map=user_map,
+                    restaurant_map=restaurant_map,
+                )
+                writer.writerow(
+                    [
+                        item.id,
+                        item.created_at.isoformat(),
+                        item.event_type,
+                        item.category,
+                        item.severity,
+                        item.title,
+                        item.message,
+                        item.restaurant.restaurant_id,
+                        item.restaurant.name,
+                        item.actor.user_id,
+                        item.actor.full_name,
+                        item.actor.email,
+                        item.ip_address,
+                        item.user_agent,
+                        json.dumps(item.metadata, ensure_ascii=True, sort_keys=True),
+                    ]
+                )
+                row_count += 1
+
+    return row_count
+
+
+def create_audit_log_export_job(
+    db: Session,
+    *,
+    requested_by_user_id: int | None,
+    filters: AuditLogExportRequest,
+) -> AuditLogExportJobResponse:
+    job_id = uuid.uuid4().hex
+    now = _utcnow()
+    job = AuditLogExportJob(
+        id=job_id,
+        requested_by_user_id=requested_by_user_id,
+        status=_EXPORT_JOB_STATUS_PENDING,
+        filters_json=json.dumps(_prepare_export_filters(filters), ensure_ascii=True),
+        expires_at=now + timedelta(hours=_AUDIT_EXPORT_TTL_HOURS),
+    )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    return _serialize_export_job(job)
+
+
+def process_audit_log_export_job(job_id: str) -> None:
+    db = SessionLocal()
+    try:
+        job = (
+            db.query(AuditLogExportJob)
+            .filter(AuditLogExportJob.id == job_id)
+            .first()
+        )
+        if job is None:
+            return
+
+        job.status = _EXPORT_JOB_STATUS_PROCESSING
+        job.error_message = None
+        db.add(job)
+        db.commit()
+
+        filters = _parse_metadata(job.filters_json)
+        file_path = _build_export_file_path(job.id)
+        row_count = _write_audit_export_csv_file(
+            db,
+            destination_path=file_path,
+            filters=filters,
+        )
+
+        job.status = _EXPORT_JOB_STATUS_COMPLETED
+        job.file_path = str(file_path)
+        job.row_count = row_count
+        job.completed_at = _utcnow()
+        job.expires_at = _utcnow() + timedelta(hours=_AUDIT_EXPORT_TTL_HOURS)
+        db.add(job)
+        db.commit()
+    except Exception as exc:  # pragma: no cover - background task failures are environment-specific
+        logger.exception("Audit log export job failed: %s", job_id)
+        failed_job = (
+            db.query(AuditLogExportJob)
+            .filter(AuditLogExportJob.id == job_id)
+            .first()
+        )
+        if failed_job is not None:
+            failed_job.status = _EXPORT_JOB_STATUS_FAILED
+            failed_job.error_message = str(exc)[:2000]
+            failed_job.completed_at = _utcnow()
+            db.add(failed_job)
+            db.commit()
+    finally:
+        db.close()
+
+
+def get_audit_log_export_job(
+    db: Session,
+    *,
+    job_id: str,
+) -> AuditLogExportJobResponse:
+    job = (
+        db.query(AuditLogExportJob)
+        .filter(AuditLogExportJob.id == job_id)
+        .first()
+    )
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Export job not found.",
+        )
+    return _serialize_export_job(job)
+
+
+def get_audit_log_export_download_path(
+    db: Session,
+    *,
+    job_id: str,
+) -> Path:
+    job = (
+        db.query(AuditLogExportJob)
+        .filter(AuditLogExportJob.id == job_id)
+        .first()
+    )
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Export job not found.",
+        )
+    if job.status != _EXPORT_JOB_STATUS_COMPLETED or not job.file_path:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Export job is not ready for download.",
+        )
+
+    file_path = Path(job.file_path)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Export file no longer exists.",
+        )
+    return file_path
+
+
+def export_audit_logs_csv(
+    db: Session,
+    *,
+    event_type: str | None = None,
+    restaurant_id: int | None = None,
+    search: str | None = None,
+    actor_search: str | None = None,
+    severity: str | None = None,
+    category: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+) -> str:
+    filters = _prepare_export_filters(
+        {
+            "event_type": event_type,
+            "restaurant_id": restaurant_id,
+            "search": search,
+            "actor_search": actor_search,
+            "severity": severity,
+            "category": category,
+            "created_from": created_from,
+            "created_to": created_to,
+        }
+    )
+    buffer = StringIO()
+    temp_path = _AUDIT_EXPORT_DIR / f"sync-export-{uuid.uuid4().hex}.csv"
+    try:
+        _write_audit_export_csv_file(db, destination_path=temp_path, filters=filters)
+        buffer.write(temp_path.read_text(encoding="utf-8"))
+        return buffer.getvalue()
+    finally:
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
 
 
 def _utcnow() -> datetime:
@@ -91,6 +398,89 @@ def _parse_metadata(metadata_json: str | None) -> dict[str, Any]:
     except Exception:
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def _serialize_export_job(job: AuditLogExportJob) -> AuditLogExportJobResponse:
+    return AuditLogExportJobResponse(
+        id=job.id,
+        status=job.status,
+        row_count=job.row_count,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        completed_at=job.completed_at,
+        expires_at=job.expires_at,
+    )
+
+
+def _build_audit_logs_query(
+    db: Session,
+    *,
+    event_type: str | None = None,
+    restaurant_id: int | None = None,
+    search: str | None = None,
+    actor_search: str | None = None,
+    severity: str | None = None,
+    category: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+):
+    from app.modules.users.model import User
+
+    query = db.query(AuditLog)
+
+    if event_type:
+        query = query.filter(AuditLog.event_type == event_type)
+
+    if category:
+        query = query.filter(AuditLog.category == category.strip().lower())
+
+    if severity:
+        query = query.filter(AuditLog.severity == severity.strip().lower())
+
+    if restaurant_id is not None:
+        query = query.filter(
+            or_(
+                AuditLog.restaurant_id == restaurant_id,
+                AuditLog.metadata_restaurant_id == restaurant_id,
+            )
+        )
+
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                AuditLog.event_type.ilike(pattern),
+                AuditLog.metadata_json.ilike(pattern),
+                AuditLog.ip_address.ilike(pattern),
+                AuditLog.user_agent.ilike(pattern),
+            )
+        )
+
+    if actor_search:
+        actor_pattern = f"%{actor_search.strip()}%"
+        actor_ids = [
+            user_id
+            for (user_id,) in db.query(User.id)
+            .filter(
+                or_(
+                    User.full_name.ilike(actor_pattern),
+                    User.email.ilike(actor_pattern),
+                )
+            )
+            .all()
+        ]
+        query = query.filter(AuditLog.user_id.in_(actor_ids) if actor_ids else false())
+
+    normalized_created_from = _normalize_filter_datetime(created_from)
+    if normalized_created_from is not None:
+        query = query.filter(AuditLog.created_at >= normalized_created_from)
+
+    normalized_created_to = _normalize_filter_datetime(created_to)
+    if normalized_created_to is not None:
+        query = query.filter(AuditLog.created_at <= normalized_created_to)
+
+    return query
 
 
 def _safe_int(value: object) -> int | None:
@@ -201,8 +591,8 @@ def _serialize_audit_entry(
     base_fields = dict(
         id=log.id,
         event_type=log.event_type,
-        category=catalog.get_event_category(log.event_type),
-        severity=catalog.get_event_severity(log.event_type, metadata),
+        category=log.category or catalog.get_event_category(log.event_type),
+        severity=log.severity or catalog.get_event_severity(log.event_type, metadata),
         title=catalog.get_event_title(log.event_type),
         message=catalog.build_event_message(
             event_type=log.event_type,
@@ -433,16 +823,20 @@ def write_audit_log(
     """
     try:
         metadata_payload = dict(metadata or {})
-        effective_restaurant_id = restaurant_id or _safe_int(
-            metadata_payload.get("restaurant_id")
-        )
+        metadata_restaurant_id = _safe_int(metadata_payload.get("restaurant_id"))
+        effective_restaurant_id = restaurant_id or metadata_restaurant_id
+        category = catalog.get_event_category(event_type)
+        severity = catalog.get_event_severity(event_type, metadata_payload)
         bind = db.get_bind()
         audit_session_factory = sessionmaker(bind=bind, autocommit=False, autoflush=False)
         with audit_session_factory() as audit_db:
             log = AuditLog(
                 event_type=event_type,
+                category=category,
+                severity=severity,
                 user_id=user_id,
                 restaurant_id=effective_restaurant_id,
+                metadata_restaurant_id=metadata_restaurant_id,
                 ip_address=ip_address,
                 user_agent=user_agent,
                 metadata_json=json.dumps(metadata_payload) if metadata_payload else None,
@@ -472,72 +866,29 @@ def list_audit_logs(
     search: str | None = None,
     actor_search: str | None = None,
     severity: str | None = None,
+    category: str | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
 ) -> AuditLogListResponse:
-    from app.modules.users.model import User
+    query = _build_audit_logs_query(
+        db,
+        event_type=event_type,
+        restaurant_id=restaurant_id,
+        search=search,
+        actor_search=actor_search,
+        severity=severity,
+        category=category,
+        created_from=created_from,
+        created_to=created_to,
+    )
 
-    query = db.query(AuditLog)
-
-    if event_type:
-        query = query.filter(AuditLog.event_type == event_type)
-
-    if restaurant_id is not None:
-        query = query.filter(
-            or_(
-                AuditLog.restaurant_id == restaurant_id,
-                AuditLog.metadata_json.like(f'%\"restaurant_id\": {restaurant_id}%'),
-                AuditLog.metadata_json.like(f'%\"restaurant_id\":{restaurant_id}%'),
-            )
-        )
-
-    if search:
-        pattern = f"%{search.strip()}%"
-        query = query.filter(
-            or_(
-                AuditLog.event_type.ilike(pattern),
-                AuditLog.metadata_json.ilike(pattern),
-                AuditLog.ip_address.ilike(pattern),
-                AuditLog.user_agent.ilike(pattern),
-            )
-        )
-
-    if actor_search:
-        actor_pattern = f"%{actor_search.strip()}%"
-        actor_ids = [
-            user_id
-            for (user_id,) in db.query(User.id)
-            .filter(
-                or_(
-                    User.full_name.ilike(actor_pattern),
-                    User.email.ilike(actor_pattern),
-                )
-            )
-            .all()
-        ]
-        query = query.filter(AuditLog.user_id.in_(actor_ids) if actor_ids else false())
-
-    normalized_created_from = _normalize_filter_datetime(created_from)
-    if normalized_created_from is not None:
-        query = query.filter(AuditLog.created_at >= normalized_created_from)
-
-    normalized_created_to = _normalize_filter_datetime(created_to)
-    if normalized_created_to is not None:
-        query = query.filter(AuditLog.created_at <= normalized_created_to)
-
-    ordered_items = query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).all()
-
-    if severity:
-        normalized_severity = severity.strip().lower()
-        ordered_items = [
-            log
-            for log in ordered_items
-            if catalog.get_event_severity(log.event_type, _parse_metadata(log.metadata_json))
-            == normalized_severity
-        ]
-
-    total = len(ordered_items)
-    items = ordered_items[offset: offset + limit]
+    total = query.count()
+    items = (
+        query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     user_map, restaurant_map = _load_context_maps(db, items)
 
     return AuditLogListResponse(
@@ -551,77 +902,6 @@ def list_audit_logs(
         ],
         total=total,
     )
-
-
-def export_audit_logs_csv(
-    db: Session,
-    *,
-    event_type: str | None = None,
-    restaurant_id: int | None = None,
-    search: str | None = None,
-    actor_search: str | None = None,
-    severity: str | None = None,
-    created_from: datetime | None = None,
-    created_to: datetime | None = None,
-) -> str:
-    response = list_audit_logs(
-        db,
-        limit=5000,
-        offset=0,
-        event_type=event_type,
-        restaurant_id=restaurant_id,
-        search=search,
-        actor_search=actor_search,
-        severity=severity,
-        created_from=created_from,
-        created_to=created_to,
-    )
-
-    buffer = StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(
-        [
-            "id",
-            "created_at",
-            "event_type",
-            "category",
-            "severity",
-            "title",
-            "message",
-            "restaurant_id",
-            "restaurant_name",
-            "actor_user_id",
-            "actor_name",
-            "actor_email",
-            "ip_address",
-            "user_agent",
-            "metadata_json",
-        ]
-    )
-
-    for item in response.items:
-        writer.writerow(
-            [
-                item.id,
-                item.created_at.isoformat(),
-                item.event_type,
-                item.category,
-                item.severity,
-                item.title,
-                item.message,
-                item.restaurant.restaurant_id,
-                item.restaurant.name,
-                item.actor.user_id,
-                item.actor.full_name,
-                item.actor.email,
-                item.ip_address,
-                item.user_agent,
-                json.dumps(item.metadata, ensure_ascii=True, sort_keys=True),
-            ]
-        )
-
-    return buffer.getvalue()
-
 
 def list_super_admin_notifications(
     db: Session,

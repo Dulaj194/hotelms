@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.modules.packages.model import PackagePrivilege
 from app.modules.subscriptions.model import (
@@ -23,6 +23,42 @@ def get_latest_subscription_by_restaurant(
         .filter(RestaurantSubscription.restaurant_id == restaurant_id)
         .order_by(RestaurantSubscription.started_at.desc(), RestaurantSubscription.id.desc())
         .first()
+    )
+
+
+def list_latest_subscriptions_by_restaurant_ids(
+    db: Session,
+    restaurant_ids: list[int],
+) -> list[RestaurantSubscription]:
+    if not restaurant_ids:
+        return []
+
+    ranked_subscriptions = (
+        db.query(
+            RestaurantSubscription.id.label("subscription_id"),
+            func.row_number()
+            .over(
+                partition_by=RestaurantSubscription.restaurant_id,
+                order_by=(
+                    RestaurantSubscription.started_at.desc(),
+                    RestaurantSubscription.id.desc(),
+                ),
+            )
+            .label("row_number"),
+        )
+        .filter(RestaurantSubscription.restaurant_id.in_(restaurant_ids))
+        .subquery()
+    )
+
+    return (
+        db.query(RestaurantSubscription)
+        .options(joinedload(RestaurantSubscription.package))
+        .join(
+            ranked_subscriptions,
+            ranked_subscriptions.c.subscription_id == RestaurantSubscription.id,
+        )
+        .filter(ranked_subscriptions.c.row_number == 1)
+        .all()
     )
 
 

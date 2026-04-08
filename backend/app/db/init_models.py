@@ -3,7 +3,11 @@
 #   - Base.metadata.create_all()  (development table creation)
 #   - Alembic autogenerate        (migration generation)
 
-from app.modules.audit_logs.model import AuditLog, SuperAdminNotificationState  # noqa: F401
+from app.modules.audit_logs.model import (  # noqa: F401
+    AuditLog,
+    AuditLogExportJob,
+    SuperAdminNotificationState,
+)
 from app.modules.auth.model import PasswordResetToken  # noqa: F401
 from app.modules.billing.model import Bill, BillWorkflowEvent  # noqa: F401
 from app.modules.categories.model import Category  # noqa: F401

@@ -143,6 +143,24 @@ class RestaurantResponse(BaseModel):
 RestaurantMeResponse = RestaurantResponse
 
 
+class RestaurantSubscriptionSnapshotResponse(BaseModel):
+    restaurant_id: int
+    status: str
+    is_trial: bool
+    is_active: bool
+    is_expired: bool
+    package_id: int | None
+    package_name: str | None
+    package_code: str | None
+    started_at: datetime | None
+    expires_at: datetime | None
+
+
+class RestaurantOverviewListResponse(BaseModel):
+    items: list[RestaurantResponse]
+    subscriptions: list[RestaurantSubscriptionSnapshotResponse]
+
+
 class RestaurantUpdateRequest(BaseModel):
     """Allowed fields for the tenant to update on their own restaurant profile.
 
