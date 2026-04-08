@@ -178,6 +178,7 @@ class RestaurantCreateRequest(BaseModel):
     billing_email: EmailStr | None = None
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
+    change_reason: str | None = Field(default=None, min_length=3, max_length=500)
 
 
 class RestaurantAdminUpdateRequest(BaseModel):
@@ -196,6 +197,7 @@ class RestaurantAdminUpdateRequest(BaseModel):
     closing_time: str | None = Field(None, max_length=8)
     feature_flags: RestaurantFeatureFlagsUpdateRequest | None = None
     is_active: bool | None = None
+    change_reason: str | None = Field(default=None, min_length=3, max_length=500)
 
 
 class RestaurantIntegrationUpdateRequest(BaseModel):
@@ -286,11 +288,15 @@ class RestaurantRegistrationSummaryResponse(BaseModel):
 class PendingRestaurantRegistrationListResponse(BaseModel):
     items: list[RestaurantRegistrationSummaryResponse]
     total: int
+    next_cursor: str | None = None
+    has_more: bool = False
 
 
 class RestaurantRegistrationHistoryListResponse(BaseModel):
     items: list[RestaurantRegistrationSummaryResponse]
     total: int
+    next_cursor: str | None = None
+    has_more: bool = False
 
 
 class RestaurantRegistrationReviewRequest(BaseModel):

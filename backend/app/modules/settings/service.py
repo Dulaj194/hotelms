@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 from datetime import UTC, datetime
 from typing import Any
 
@@ -36,6 +38,26 @@ _FEATURE_FLAG_KEYS = {
     definition.key for definition in access_catalog.list_feature_flag_definitions()
 }
 _ALLOWED_SETTING_KEYS = _PROFILE_SETTING_KEYS | _FEATURE_FLAG_KEYS
+
+
+def _encode_pagination_cursor(timestamp: datetime, request_id: int) -> str:
+    payload = f"{timestamp.isoformat()}|{request_id}"
+    return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii")
+
+
+def _decode_pagination_cursor(cursor: str) -> tuple[datetime, int]:
+    try:
+        decoded = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+        raw_timestamp, raw_request_id = decoded.split("|", 1)
+        timestamp = datetime.fromisoformat(raw_timestamp)
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=UTC)
+        return timestamp, int(raw_request_id)
+    except (ValueError, TypeError, binascii.Error):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid pagination cursor.",
+        )
 
 
 def _snapshot_current_settings(restaurant) -> dict[str, Any]:
@@ -143,6 +165,8 @@ def list_my_settings_requests(
     return SettingsRequestListResponse(
         items=[SettingsRequestResponse.model_validate(item) for item in items],
         total=len(items),
+        next_cursor=None,
+        has_more=False,
     )
 
 
@@ -151,15 +175,39 @@ def list_pending_settings_requests(
     *,
     restaurant_id: int | None,
     limit: int = 100,
+    cursor: str | None = None,
+    sort_order: str = "oldest",
 ) -> SettingsRequestListResponse:
+    cursor_created_at: datetime | None = None
+    cursor_request_id: int | None = None
+    if cursor:
+        cursor_created_at, cursor_request_id = _decode_pagination_cursor(cursor)
+
     items = repository.list_pending_requests(
         db,
         restaurant_id=restaurant_id,
-        limit=limit,
+        limit=limit + 1,
+        cursor_created_at=cursor_created_at,
+        cursor_request_id=cursor_request_id,
+        sort_order=sort_order,
     )
+    has_more = len(items) > limit
+    current_page = items[:limit]
+    total = repository.count_pending_requests(
+        db,
+        restaurant_id=restaurant_id,
+    )
+
+    next_cursor: str | None = None
+    if has_more and current_page:
+        last = current_page[-1]
+        next_cursor = _encode_pagination_cursor(last.created_at, last.request_id)
+
     return SettingsRequestListResponse(
-        items=[SettingsRequestResponse.model_validate(item) for item in items],
-        total=len(items),
+        items=[SettingsRequestResponse.model_validate(item) for item in current_page],
+        total=total,
+        next_cursor=next_cursor,
+        has_more=has_more,
     )
 
 
@@ -169,21 +217,42 @@ def list_reviewed_settings_requests(
     restaurant_id: int | None,
     status: SettingsRequestStatus | None,
     limit: int = 100,
+    cursor: str | None = None,
+    sort_order: str = "newest",
 ) -> SettingsRequestListResponse:
+    cursor_reviewed_at: datetime | None = None
+    cursor_request_id: int | None = None
+    if cursor:
+        cursor_reviewed_at, cursor_request_id = _decode_pagination_cursor(cursor)
+
     items = repository.list_reviewed_requests(
         db,
         restaurant_id=restaurant_id,
         status=status,
-        limit=limit,
+        limit=limit + 1,
+        cursor_reviewed_at=cursor_reviewed_at,
+        cursor_request_id=cursor_request_id,
+        sort_order=sort_order,
     )
+    has_more = len(items) > limit
+    current_page = items[:limit]
+
+    next_cursor: str | None = None
+    if has_more and current_page:
+        last = current_page[-1]
+        review_marker = last.reviewed_at or last.updated_at
+        next_cursor = _encode_pagination_cursor(review_marker, last.request_id)
+
     total = repository.count_reviewed_requests(
         db,
         restaurant_id=restaurant_id,
         status=status,
     )
     return SettingsRequestListResponse(
-        items=[SettingsRequestResponse.model_validate(item) for item in items],
+        items=[SettingsRequestResponse.model_validate(item) for item in current_page],
         total=total,
+        next_cursor=next_cursor,
+        has_more=has_more,
     )
 
 

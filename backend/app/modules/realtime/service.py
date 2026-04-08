@@ -103,6 +103,12 @@ def _map_super_admin_event_name(event_type: str) -> str:
         return "billing:alert"
     if event_type == "login_failed":
         return "security:alert"
+    if event_type.startswith("site_page_") or event_type.startswith("site_blog_"):
+        return "site-content:updated"
+    if event_type == "site_contact_lead_updated":
+        return "site-content:leads"
+    if event_type.startswith("restaurant_") and event_type.endswith("_by_super_admin"):
+        return "tenant:lifecycle"
     return "super-admin:notification"
 
 

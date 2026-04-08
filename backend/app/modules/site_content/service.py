@@ -8,7 +8,9 @@ from io import StringIO
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.modules.audit_logs.service import write_audit_log
 from app.modules.platform_access import catalog as platform_access_catalog
+from app.modules.realtime import service as realtime_service
 from app.modules.site_content import repository
 from app.modules.site_content.defaults import DEFAULT_BLOG_POSTS, DEFAULT_SITE_PAGES
 from app.modules.site_content.model import ContactLead, SiteBlogPost, SitePage
@@ -50,6 +52,105 @@ _PAGE_SCHEMA_MAP = {
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _normalize_reason(reason: str | None, *, default_reason: str) -> str:
+    normalized = _normalize_optional_text(reason)
+    return normalized if normalized else default_reason
+
+
+def _to_json_safe_dict(value: dict[str, object]) -> dict[str, object]:
+    return json.loads(json.dumps(value, ensure_ascii=True, default=str))
+
+
+def _build_change_delta(
+    before_state: dict[str, object],
+    after_state: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    delta: dict[str, dict[str, object]] = {}
+    for key in sorted(set(before_state.keys()) | set(after_state.keys())):
+        before_value = before_state.get(key)
+        after_value = after_state.get(key)
+        if before_value != after_value:
+            delta[key] = {
+                "before": before_value,
+                "after": after_value,
+            }
+    return delta
+
+
+def _write_site_content_mutation_audit(
+    db: Session,
+    *,
+    event_type: str,
+    current_user_id: int,
+    reason: str | None,
+    default_reason: str,
+    before_state: dict[str, object],
+    after_state: dict[str, object],
+    extra_metadata: dict[str, object] | None = None,
+) -> None:
+    normalized_before = _to_json_safe_dict(before_state)
+    normalized_after = _to_json_safe_dict(after_state)
+    delta = _build_change_delta(normalized_before, normalized_after)
+
+    metadata = {
+        "reason": _normalize_reason(reason, default_reason=default_reason),
+        "before": normalized_before,
+        "after": normalized_after,
+        "delta": delta,
+        "delta_field_count": len(delta),
+    }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+
+    audit_log = write_audit_log(
+        db,
+        event_type=event_type,
+        user_id=current_user_id,
+        metadata=metadata,
+    )
+    if audit_log is not None:
+        realtime_service.publish_super_admin_audit_notification(audit_log=audit_log)
+
+
+def _snapshot_site_page(page: SitePage) -> dict[str, object]:
+    return {
+        "slug": page.slug,
+        "title": page.title,
+        "summary": page.summary,
+        "is_published": page.is_published,
+        "payload": _parse_json_document(page.payload_json, {}),
+        "published_payload": _parse_json_document(page.published_payload_json, None),
+        "last_published_at": page.last_published_at.isoformat() if page.last_published_at else None,
+    }
+
+
+def _snapshot_blog_post(post: SiteBlogPost) -> dict[str, object]:
+    return {
+        "slug": post.slug,
+        "title": post.title,
+        "excerpt": post.excerpt,
+        "category": post.category,
+        "cover_image_url": post.cover_image_url,
+        "tags": _parse_json_document(post.tags_json, []),
+        "body": _parse_json_document(post.body_json, {}).get("body", []),
+        "key_takeaways": _parse_json_document(post.body_json, {}).get("key_takeaways", []),
+        "reading_minutes": post.reading_minutes,
+        "is_featured": post.is_featured,
+        "is_published": post.is_published,
+        "scheduled_publish_at": post.published_at.isoformat() if post.published_at else None,
+        "published_content_at": post.published_content_at.isoformat() if post.published_content_at else None,
+    }
+
+
+def _snapshot_contact_lead(lead: ContactLead) -> dict[str, object]:
+    return {
+        "lead_id": lead.id,
+        "status": lead.status.value,
+        "assigned_to_user_id": lead.assigned_to_user_id,
+        "internal_notes": lead.internal_notes,
+    }
 
 
 def ensure_seeded(db: Session) -> None:
@@ -551,6 +652,7 @@ def update_site_page_admin(
     current_user: User,
 ) -> AdminSitePageDetailResponse:
     page = _require_admin_page(db, slug)
+    before_state = _snapshot_site_page(page)
     validated_payload = _validate_page_payload(slug, payload.payload)
     repository.update_page(
         db,
@@ -565,6 +667,19 @@ def update_site_page_admin(
     db.commit()
     refreshed = repository.get_page_by_slug_admin(db, slug)
     assert refreshed is not None
+    after_state = _snapshot_site_page(refreshed)
+    _write_site_content_mutation_audit(
+        db,
+        event_type="site_page_updated",
+        current_user_id=current_user.id,
+        reason=payload.reason,
+        default_reason=f"Updated {slug} page draft.",
+        before_state=before_state,
+        after_state=after_state,
+        extra_metadata={
+            "page_slug": slug,
+        },
+    )
     user_map = _load_user_map(db, {refreshed.updated_by_user_id, refreshed.published_by_user_id})
     return _serialize_page_detail(refreshed, user_map)
 
@@ -574,8 +689,10 @@ def publish_site_page_admin(
     *,
     slug: str,
     current_user: User,
+    reason: str | None = None,
 ) -> AdminSitePageDetailResponse:
     page = _require_admin_page(db, slug)
+    before_state = _snapshot_site_page(page)
     validated_payload = _validate_page_payload(slug, _parse_json_document(page.payload_json, {}))
     repository.update_page(
         db,
@@ -590,6 +707,19 @@ def publish_site_page_admin(
     db.commit()
     refreshed = repository.get_page_by_slug_admin(db, slug)
     assert refreshed is not None
+    after_state = _snapshot_site_page(refreshed)
+    _write_site_content_mutation_audit(
+        db,
+        event_type="site_page_published",
+        current_user_id=current_user.id,
+        reason=reason,
+        default_reason=f"Published {slug} page.",
+        before_state=before_state,
+        after_state=after_state,
+        extra_metadata={
+            "page_slug": slug,
+        },
+    )
     user_map = _load_user_map(db, {refreshed.updated_by_user_id, refreshed.published_by_user_id})
     return _serialize_page_detail(refreshed, user_map)
 
@@ -599,8 +729,10 @@ def unpublish_site_page_admin(
     *,
     slug: str,
     current_user: User,
+    reason: str | None = None,
 ) -> AdminSitePageDetailResponse:
     page = _require_admin_page(db, slug)
+    before_state = _snapshot_site_page(page)
     repository.update_page(
         db,
         page,
@@ -612,6 +744,19 @@ def unpublish_site_page_admin(
     db.commit()
     refreshed = repository.get_page_by_slug_admin(db, slug)
     assert refreshed is not None
+    after_state = _snapshot_site_page(refreshed)
+    _write_site_content_mutation_audit(
+        db,
+        event_type="site_page_unpublished",
+        current_user_id=current_user.id,
+        reason=reason,
+        default_reason=f"Unpublished {slug} page.",
+        before_state=before_state,
+        after_state=after_state,
+        extra_metadata={
+            "page_slug": slug,
+        },
+    )
     user_map = _load_user_map(db, {refreshed.updated_by_user_id, refreshed.published_by_user_id})
     return _serialize_page_detail(refreshed, user_map)
 
@@ -676,6 +821,18 @@ def create_blog_post_admin(
         },
     )
     db.commit()
+    _write_site_content_mutation_audit(
+        db,
+        event_type="site_blog_created",
+        current_user_id=current_user.id,
+        reason=payload.reason,
+        default_reason="Created blog draft.",
+        before_state={},
+        after_state=_snapshot_blog_post(post),
+        extra_metadata={
+            "blog_slug": post.slug,
+        },
+    )
     user_map = _load_user_map(db, {post.updated_by_user_id, post.published_by_user_id})
     return _serialize_blog_detail(post, user_map)
 
@@ -688,6 +845,7 @@ def update_blog_post_admin(
     current_user: User,
 ) -> AdminBlogPostDetailResponse:
     post = _require_blog_post_admin(db, slug)
+    before_state = _snapshot_blog_post(post)
     upsert_payload = _prepare_blog_upsert_payload(payload, updated_by_user_id=current_user.id)
     if post.is_published and upsert_payload["slug"] != post.slug:
         raise HTTPException(
@@ -699,6 +857,18 @@ def update_blog_post_admin(
     db.commit()
     refreshed = repository.get_blog_post_by_slug_admin(db, upsert_payload["slug"])
     assert refreshed is not None
+    _write_site_content_mutation_audit(
+        db,
+        event_type="site_blog_updated",
+        current_user_id=current_user.id,
+        reason=payload.reason,
+        default_reason=f"Updated blog draft '{slug}'.",
+        before_state=before_state,
+        after_state=_snapshot_blog_post(refreshed),
+        extra_metadata={
+            "blog_slug": refreshed.slug,
+        },
+    )
     user_map = _load_user_map(db, {refreshed.updated_by_user_id, refreshed.published_by_user_id})
     return _serialize_blog_detail(refreshed, user_map)
 
@@ -708,8 +878,10 @@ def publish_blog_post_admin(
     *,
     slug: str,
     current_user: User,
+    reason: str | None = None,
 ) -> AdminBlogPostDetailResponse:
     post = _require_blog_post_admin(db, slug)
+    before_state = _snapshot_blog_post(post)
     body_payload = _parse_json_document(post.body_json, {})
     publish_time = post.published_at or _utcnow()
     _set_published_featured_state(db, post.id, post.is_featured)
@@ -740,6 +912,18 @@ def publish_blog_post_admin(
     db.commit()
     refreshed = repository.get_blog_post_by_slug_admin(db, slug)
     assert refreshed is not None
+    _write_site_content_mutation_audit(
+        db,
+        event_type="site_blog_published",
+        current_user_id=current_user.id,
+        reason=reason,
+        default_reason=f"Published blog post '{slug}'.",
+        before_state=before_state,
+        after_state=_snapshot_blog_post(refreshed),
+        extra_metadata={
+            "blog_slug": refreshed.slug,
+        },
+    )
     user_map = _load_user_map(db, {refreshed.updated_by_user_id, refreshed.published_by_user_id})
     return _serialize_blog_detail(refreshed, user_map)
 
@@ -749,8 +933,10 @@ def unpublish_blog_post_admin(
     *,
     slug: str,
     current_user: User,
+    reason: str | None = None,
 ) -> AdminBlogPostDetailResponse:
     post = _require_blog_post_admin(db, slug)
+    before_state = _snapshot_blog_post(post)
     repository.update_blog_post(
         db,
         post,
@@ -763,6 +949,18 @@ def unpublish_blog_post_admin(
     db.commit()
     refreshed = repository.get_blog_post_by_slug_admin(db, slug)
     assert refreshed is not None
+    _write_site_content_mutation_audit(
+        db,
+        event_type="site_blog_unpublished",
+        current_user_id=current_user.id,
+        reason=reason,
+        default_reason=f"Unpublished blog post '{slug}'.",
+        before_state=before_state,
+        after_state=_snapshot_blog_post(refreshed),
+        extra_metadata={
+            "blog_slug": refreshed.slug,
+        },
+    )
     user_map = _load_user_map(db, {refreshed.updated_by_user_id, refreshed.published_by_user_id})
     return _serialize_blog_detail(refreshed, user_map)
 
@@ -771,8 +969,11 @@ def delete_blog_post_admin(
     db: Session,
     *,
     slug: str,
+    current_user: User,
+    reason: str | None = None,
 ) -> SiteContentActionResponse:
     post = _require_blog_post_admin(db, slug)
+    before_state = _snapshot_blog_post(post)
     if post.is_published:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -780,6 +981,23 @@ def delete_blog_post_admin(
         )
     repository.delete_blog_post(db, post)
     db.commit()
+
+    _write_site_content_mutation_audit(
+        db,
+        event_type="site_blog_deleted",
+        current_user_id=current_user.id,
+        reason=reason,
+        default_reason=f"Deleted blog draft '{slug}'.",
+        before_state=before_state,
+        after_state={
+            "slug": slug,
+            "is_deleted": True,
+        },
+        extra_metadata={
+            "blog_slug": slug,
+        },
+    )
+
     return SiteContentActionResponse(message="Blog draft deleted successfully.")
 
 
@@ -839,6 +1057,7 @@ def update_contact_lead_admin(
     *,
     lead_id: int,
     payload: AdminContactLeadUpdateRequest,
+    current_user: User,
 ) -> AdminContactLeadResponse:
     lead = repository.get_contact_lead_by_id(db, lead_id)
     if lead is None:
@@ -847,6 +1066,7 @@ def update_contact_lead_admin(
             detail="Contact lead not found.",
         )
 
+    before_state = _snapshot_contact_lead(lead)
     provided_fields = payload.model_fields_set
     update_payload: dict[str, object] = {}
 
@@ -866,6 +1086,20 @@ def update_contact_lead_admin(
         db.add(lead)
         db.commit()
         db.refresh(lead)
+
+        _write_site_content_mutation_audit(
+            db,
+            event_type="site_contact_lead_updated",
+            current_user_id=current_user.id,
+            reason=payload.reason,
+            default_reason=f"Updated contact lead #{lead_id}.",
+            before_state=before_state,
+            after_state=_snapshot_contact_lead(lead),
+            extra_metadata={
+                "lead_id": lead.id,
+                "lead_status": lead.status.value,
+            },
+        )
 
     user_map = _load_user_map(db, {lead.assigned_to_user_id})
     return _serialize_contact_lead(lead, user_map)

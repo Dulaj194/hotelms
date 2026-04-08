@@ -38,6 +38,8 @@ class SettingsRequestResponse(BaseModel):
 class SettingsRequestListResponse(BaseModel):
     items: list[SettingsRequestResponse]
     total: int
+    next_cursor: str | None = None
+    has_more: bool = False
 
 
 class SettingsRequestReviewResponse(BaseModel):

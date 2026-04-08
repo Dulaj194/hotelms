@@ -38,6 +38,10 @@ export default function PendingRegistrations() {
 
   const [items, setItems] = useState<RestaurantRegistrationSummaryResponse[]>([]);
   const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [sortOrder, setSortOrder] = useState<"oldest" | "newest">("oldest");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pageMessage, setPageMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -49,8 +53,8 @@ export default function PendingRegistrations() {
   const [reviewError, setReviewError] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadRegistrations();
-  }, []);
+    void loadRegistrations(true);
+  }, [sortOrder]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -63,20 +67,53 @@ export default function PendingRegistrations() {
     }
   }, [items, selectedId]);
 
-  async function loadRegistrations() {
-    setLoading(true);
+  async function loadRegistrations(reset: boolean) {
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     try {
+      const params = new URLSearchParams();
+      params.set("limit", "50");
+      params.set("sort", sortOrder);
+      if (!reset && nextCursor) {
+        params.set("cursor", nextCursor);
+      }
+
       const response = await api.get<PendingRestaurantRegistrationListResponse>(
-        "/restaurants/registrations/pending?limit=200",
+        `/restaurants/registrations/pending?${params.toString()}`,
       );
-      setItems(response.items);
+
+      setItems((current) => {
+        if (reset) {
+          return response.items;
+        }
+        const merged = [...current];
+        for (const item of response.items) {
+          if (!merged.some((existing) => existing.restaurant_id === item.restaurant_id)) {
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
       setTotal(response.total);
+      setNextCursor(response.next_cursor);
+      setHasMore(response.has_more);
     } catch (loadError) {
       setError(getApiErrorMessage(loadError, "Failed to load pending registrations."));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  }
+
+  async function loadMoreRegistrations() {
+    if (!hasMore || !nextCursor || loadingMore) {
+      return;
+    }
+    await loadRegistrations(false);
   }
 
   const selectedItem = useMemo(
@@ -137,7 +174,15 @@ export default function PendingRegistrations() {
               <Link to="/super-admin/registrations/history" className="app-btn-ghost">
                 Review History
               </Link>
-              <button type="button" onClick={() => void loadRegistrations()} className="app-btn-ghost">
+              <select
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value as "oldest" | "newest")}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                <option value="oldest">Oldest first</option>
+                <option value="newest">Newest first</option>
+              </select>
+              <button type="button" onClick={() => void loadRegistrations(true)} className="app-btn-ghost">
                 Refresh
               </button>
             </div>
@@ -250,6 +295,16 @@ export default function PendingRegistrations() {
                     </button>
                   );
                 })}
+              </div>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => void loadMoreRegistrations()}
+                  disabled={!hasMore || loadingMore}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loadingMore ? "Loading..." : hasMore ? "Load more" : "No more items"}
+                </button>
               </div>
             </aside>
 

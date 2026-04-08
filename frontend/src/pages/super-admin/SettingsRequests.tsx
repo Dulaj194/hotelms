@@ -60,12 +60,18 @@ export default function SuperAdminSettingsRequests() {
   );
 
   const [items, setItems] = useState<SettingsRequestResponse[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState<ActionMessage>(null);
 
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [restaurantFilter, setRestaurantFilter] = useState("");
+  const [appliedRestaurantId, setAppliedRestaurantId] = useState<number | null>(null);
+  const [sortOrder, setSortOrder] = useState<"oldest" | "newest">("oldest");
 
   const [reviewDialog, setReviewDialog] = useState<ReviewDialogState>(null);
   const [reviewNotes, setReviewNotes] = useState("");
@@ -77,26 +83,54 @@ export default function SuperAdminSettingsRequests() {
     [items, selectedRequestId],
   );
 
-  async function loadPendingRequests(filterRestaurantId?: number | null) {
-    setLoading(true);
+  async function loadPendingRequests(reset: boolean) {
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     setActionMsg(null);
     try {
-      const query = filterRestaurantId ? `&restaurant_id=${filterRestaurantId}` : "";
+      const params = new URLSearchParams();
+      params.set("limit", "50");
+      params.set("sort", sortOrder);
+      if (appliedRestaurantId) {
+        params.set("restaurant_id", String(appliedRestaurantId));
+      }
+      if (!reset && nextCursor) {
+        params.set("cursor", nextCursor);
+      }
+
       const data = await api.get<SettingsRequestListResponse>(
-        `/settings/requests/pending?limit=200${query}`,
+        `/settings/requests/pending?${params.toString()}`,
       );
-      setItems(data.items);
+      setItems((current) => {
+        if (reset) {
+          return data.items;
+        }
+        const merged = [...current];
+        for (const item of data.items) {
+          if (!merged.some((existing) => existing.request_id === item.request_id)) {
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
+      setTotal(data.total);
+      setNextCursor(data.next_cursor);
+      setHasMore(data.has_more);
     } catch (err) {
       setError(getErrorMessage(err, "Failed to load pending settings requests."));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }
 
   useEffect(() => {
-    void loadPendingRequests();
-  }, []);
+    void loadPendingRequests(true);
+  }, [appliedRestaurantId, sortOrder]);
 
   useEffect(() => {
     if (items.length === 0) {
@@ -109,9 +143,10 @@ export default function SuperAdminSettingsRequests() {
   }, [items, selectedRequestId]);
 
   async function applyRestaurantFilter() {
+    setError(null);
     const trimmed = restaurantFilter.trim();
     if (!trimmed) {
-      await loadPendingRequests(null);
+      setAppliedRestaurantId(null);
       return;
     }
     const restaurantId = Number(trimmed);
@@ -119,7 +154,14 @@ export default function SuperAdminSettingsRequests() {
       setError("Restaurant ID filter must be a positive integer.");
       return;
     }
-    await loadPendingRequests(restaurantId);
+    setAppliedRestaurantId(restaurantId);
+  }
+
+  async function loadMorePendingRequests() {
+    if (!hasMore || !nextCursor || loadingMore) {
+      return;
+    }
+    await loadPendingRequests(false);
   }
 
   function openReviewDialog(status: ReviewStatus) {
@@ -147,6 +189,7 @@ export default function SuperAdminSettingsRequests() {
       setItems((prev) =>
         prev.filter((item) => item.request_id !== reviewDialog.request.request_id),
       );
+      setTotal((prev) => Math.max(prev - 1, 0));
       setActionMsg({ type: "ok", text: response.message });
       setReviewDialog(null);
       setReviewNotes("");
@@ -186,7 +229,7 @@ export default function SuperAdminSettingsRequests() {
               </Link>
               <button
                 type="button"
-                onClick={() => void loadPendingRequests()}
+                onClick={() => void loadPendingRequests(true)}
                 className="rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Refresh
@@ -219,12 +262,25 @@ export default function SuperAdminSettingsRequests() {
               type="button"
               onClick={() => {
                 setRestaurantFilter("");
-                void loadPendingRequests(null);
+                setAppliedRestaurantId(null);
               }}
               className="rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Clear
             </button>
+            <label className="ml-2">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                Sort
+              </span>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as "oldest" | "newest")}
+                className="rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="oldest">Oldest first</option>
+                <option value="newest">Newest first</option>
+              </select>
+            </label>
           </div>
         </div>
 
@@ -268,7 +324,7 @@ export default function SuperAdminSettingsRequests() {
           <div className="grid gap-6 xl:grid-cols-[22rem_1fr]">
             <aside className="rounded-lg border bg-white p-4">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Pending Queue ({items.length})
+                Pending Queue ({total})
               </h2>
               <div className="mt-3 space-y-2">
                 {items.map((item) => {
@@ -302,6 +358,16 @@ export default function SuperAdminSettingsRequests() {
                     </button>
                   );
                 })}
+              </div>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => void loadMorePendingRequests()}
+                  disabled={!hasMore || loadingMore}
+                  className="w-full rounded-md border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loadingMore ? "Loading..." : hasMore ? "Load more" : "No more requests"}
+                </button>
               </div>
             </aside>
 

@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import base64
 import csv
 import json
+import binascii
 from io import StringIO
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import false, or_
+from sqlalchemy import and_, case, false, or_
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.logging import get_logger
@@ -32,6 +34,38 @@ logger = get_logger(__name__)
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _encode_notification_cursor(
+    created_at: datetime,
+    audit_log_id: int,
+    rank: int | None = None,
+) -> str:
+    if rank is None:
+        payload = f"{created_at.isoformat()}|{audit_log_id}"
+    else:
+        payload = f"{created_at.isoformat()}|{audit_log_id}|{rank}"
+    return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii")
+
+
+def _decode_notification_cursor(cursor: str) -> tuple[datetime, int, int | None]:
+    try:
+        decoded = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+        parts = decoded.split("|")
+        if len(parts) not in {2, 3}:
+            raise ValueError("Invalid cursor shape")
+
+        raw_created_at, raw_id = parts[0], parts[1]
+        created_at = datetime.fromisoformat(raw_created_at)
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=UTC)
+        rank = int(parts[2]) if len(parts) == 3 else None
+        return created_at, int(raw_id), rank
+    except (ValueError, TypeError, binascii.Error):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid pagination cursor.",
+        )
 
 
 def _normalize_datetime(value: datetime | None) -> datetime | None:
@@ -79,6 +113,8 @@ def _is_notification_snoozed(notification_state: SuperAdminNotificationState | N
 def _build_notification_queue_status(
     notification_state: SuperAdminNotificationState | None,
 ) -> str:
+    if notification_state is not None and notification_state.archived_at is not None:
+        return "archived"
     if notification_state is not None and notification_state.acknowledged_at is not None:
         return "acknowledged"
     if _is_notification_snoozed(notification_state):
@@ -111,6 +147,7 @@ def _load_context_maps(
             notification_state.read_by_user_id,
             notification_state.assigned_user_id,
             notification_state.acknowledged_by_user_id,
+            notification_state.archived_by_user_id,
         ):
             if user_id is not None:
                 user_ids.add(user_id)
@@ -208,6 +245,11 @@ def _serialize_audit_entry(
         if notification_state.acknowledged_by_user_id is not None
         else None
     )
+    archived_by = (
+        user_map.get(notification_state.archived_by_user_id)
+        if notification_state.archived_by_user_id is not None
+        else None
+    )
 
     return SuperAdminNotificationResponse(
         id=f"audit:{log.id}",
@@ -243,6 +285,13 @@ def _serialize_audit_entry(
         ),
         is_snoozed=_is_notification_snoozed(notification_state),
         snoozed_until=notification_state.snoozed_until,
+        is_archived=bool(notification_state.archived_at),
+        archived_at=notification_state.archived_at,
+        archived_by=AuditLogActorResponse(
+            user_id=getattr(archived_by, "id", None),
+            full_name=getattr(archived_by, "full_name", None),
+            email=getattr(archived_by, "email", None),
+        ),
         created_at=log.created_at,
     )
 
@@ -578,23 +627,184 @@ def list_super_admin_notifications(
     db: Session,
     *,
     limit: int = 50,
+    cursor: str | None = None,
+    queue_status: str | None = None,
+    category: str | None = None,
+    sort: str = "unresolved_first",
+    include_archived: bool = False,
 ) -> SuperAdminNotificationListResponse:
-    query = (
+    base_query = (
         db.query(AuditLog, SuperAdminNotificationState)
         .outerjoin(
             SuperAdminNotificationState,
             SuperAdminNotificationState.audit_log_id == AuditLog.id,
         )
         .filter(AuditLog.event_type.in_(sorted(catalog.HIGH_SIGNAL_EVENT_TYPES)))
-        .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
     )
-    rows = query.limit(limit).all()
-    logs = [log for log, _notification_state in rows]
+
+    if category:
+        event_types = catalog.get_event_types_by_category(category)
+        if not event_types:
+            return SuperAdminNotificationListResponse(
+                items=[],
+                total=0,
+                next_cursor=None,
+                has_more=False,
+            )
+        base_query = base_query.filter(AuditLog.event_type.in_(sorted(event_types)))
+
+    now = _utcnow()
+
+    if queue_status:
+        normalized_status = queue_status.strip().lower()
+        if normalized_status == "archived":
+            base_query = base_query.filter(SuperAdminNotificationState.archived_at.is_not(None))
+        elif normalized_status == "acknowledged":
+            base_query = base_query.filter(
+                SuperAdminNotificationState.archived_at.is_(None),
+                SuperAdminNotificationState.acknowledged_at.is_not(None),
+            )
+        elif normalized_status == "snoozed":
+            base_query = base_query.filter(
+                SuperAdminNotificationState.archived_at.is_(None),
+                SuperAdminNotificationState.acknowledged_at.is_(None),
+                SuperAdminNotificationState.snoozed_until.is_not(None),
+                SuperAdminNotificationState.snoozed_until > now,
+            )
+        elif normalized_status == "assigned":
+            base_query = base_query.filter(
+                SuperAdminNotificationState.archived_at.is_(None),
+                SuperAdminNotificationState.acknowledged_at.is_(None),
+                SuperAdminNotificationState.assigned_user_id.is_not(None),
+                or_(
+                    SuperAdminNotificationState.snoozed_until.is_(None),
+                    SuperAdminNotificationState.snoozed_until <= now,
+                ),
+            )
+        elif normalized_status == "read":
+            base_query = base_query.filter(
+                SuperAdminNotificationState.archived_at.is_(None),
+                SuperAdminNotificationState.acknowledged_at.is_(None),
+                SuperAdminNotificationState.is_read.is_(True),
+                SuperAdminNotificationState.assigned_user_id.is_(None),
+                or_(
+                    SuperAdminNotificationState.snoozed_until.is_(None),
+                    SuperAdminNotificationState.snoozed_until <= now,
+                ),
+            )
+        elif normalized_status == "unread":
+            base_query = base_query.filter(
+                SuperAdminNotificationState.archived_at.is_(None),
+                SuperAdminNotificationState.acknowledged_at.is_(None),
+                SuperAdminNotificationState.is_read.is_(False),
+                SuperAdminNotificationState.assigned_user_id.is_(None),
+                or_(
+                    SuperAdminNotificationState.snoozed_until.is_(None),
+                    SuperAdminNotificationState.snoozed_until <= now,
+                ),
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Invalid queue_status filter.",
+            )
+    elif not include_archived:
+        base_query = base_query.filter(SuperAdminNotificationState.archived_at.is_(None))
+
+    total = base_query.count()
+    query = base_query
+
+    cursor_created_at: datetime | None = None
+    cursor_id: int | None = None
+    cursor_rank: int | None = None
+    if cursor:
+        cursor_created_at, cursor_id, cursor_rank = _decode_notification_cursor(cursor)
+
+    unresolved_rank_expr = case(
+        (
+            and_(
+                SuperAdminNotificationState.archived_at.is_(None),
+                SuperAdminNotificationState.acknowledged_at.is_(None),
+            ),
+            0,
+        ),
+        else_=1,
+    )
+    unread_rank_expr = case(
+        (SuperAdminNotificationState.is_read.is_(False), 0),
+        else_=1,
+    )
+
+    sort_mode = sort.strip().lower()
+    if sort_mode not in {"newest_first", "oldest_first", "unread_first", "unresolved_first"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid sort option.",
+        )
+
+    if cursor_created_at is not None and cursor_id is not None:
+        if sort_mode == "newest_first":
+            query = query.filter(
+                or_(
+                    AuditLog.created_at < cursor_created_at,
+                    and_(AuditLog.created_at == cursor_created_at, AuditLog.id < cursor_id),
+                )
+            )
+        elif sort_mode == "oldest_first":
+            query = query.filter(
+                or_(
+                    AuditLog.created_at > cursor_created_at,
+                    and_(AuditLog.created_at == cursor_created_at, AuditLog.id > cursor_id),
+                )
+            )
+        elif sort_mode == "unread_first":
+            effective_rank = cursor_rank if cursor_rank is not None else 0
+            query = query.filter(
+                or_(
+                    unread_rank_expr > effective_rank,
+                    and_(
+                        unread_rank_expr == effective_rank,
+                        or_(
+                            AuditLog.created_at > cursor_created_at,
+                            and_(AuditLog.created_at == cursor_created_at, AuditLog.id > cursor_id),
+                        ),
+                    ),
+                )
+            )
+        else:
+            effective_rank = cursor_rank if cursor_rank is not None else 0
+            query = query.filter(
+                or_(
+                    unresolved_rank_expr > effective_rank,
+                    and_(
+                        unresolved_rank_expr == effective_rank,
+                        or_(
+                            AuditLog.created_at > cursor_created_at,
+                            and_(AuditLog.created_at == cursor_created_at, AuditLog.id > cursor_id),
+                        ),
+                    ),
+                )
+            )
+
+    if sort_mode == "newest_first":
+        query = query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+    elif sort_mode == "oldest_first":
+        query = query.order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+    elif sort_mode == "unread_first":
+        query = query.order_by(unread_rank_expr.asc(), AuditLog.created_at.asc(), AuditLog.id.asc())
+    else:
+        query = query.order_by(unresolved_rank_expr.asc(), AuditLog.created_at.asc(), AuditLog.id.asc())
+
+    rows = query.limit(limit + 1).all()
+    has_more = len(rows) > limit
+    page_rows = rows[:limit]
+
     notification_state_map = {
         log.id: notification_state
-        for log, notification_state in rows
+        for log, notification_state in page_rows
         if notification_state is not None
     }
+    logs = [log for log, _ in page_rows]
     user_map, restaurant_map = _load_context_maps(db, logs, notification_state_map)
 
     notifications = [
@@ -604,12 +814,32 @@ def list_super_admin_notifications(
             user_map=user_map,
             restaurant_map=restaurant_map,
         )
-        for log, notification_state in rows
+        for log, notification_state in page_rows
     ]
+
+    next_cursor: str | None = None
+    if has_more and page_rows:
+        last_log, last_state = page_rows[-1]
+        rank: int | None = None
+        if sort_mode == "unread_first":
+            rank = 0 if (last_state is not None and not last_state.is_read) else 1
+        elif sort_mode == "unresolved_first":
+            rank = (
+                0
+                if (
+                    last_state is not None
+                    and last_state.archived_at is None
+                    and last_state.acknowledged_at is None
+                )
+                else 1
+            )
+        next_cursor = _encode_notification_cursor(last_log.created_at, last_log.id, rank)
 
     return SuperAdminNotificationListResponse(
         items=notifications,
-        total=query.count(),
+        total=total,
+        next_cursor=next_cursor,
+        has_more=has_more,
     )
 
 
@@ -648,6 +878,19 @@ def update_super_admin_notification(
     now = _utcnow()
     current_user_id = _safe_int(getattr(current_user, "id", None))
     provided_fields = payload.model_fields_set
+
+    if (
+        notification_state.archived_at is not None
+        and "is_archived" not in provided_fields
+        and any(
+            field in provided_fields
+            for field in ("is_read", "assigned_user_id", "is_acknowledged", "snoozed_until")
+        )
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Unarchive this notification before updating queue state.",
+        )
 
     if (
         "is_read" in provided_fields
@@ -716,6 +959,21 @@ def update_super_admin_notification(
             notification_state.read_by_user_id = (
                 notification_state.read_by_user_id or current_user_id
             )
+
+    if "is_archived" in provided_fields:
+        if payload.is_archived:
+            notification_state.archived_at = notification_state.archived_at or now
+            notification_state.archived_by_user_id = (
+                notification_state.archived_by_user_id or current_user_id
+            )
+            notification_state.is_read = True
+            notification_state.read_at = notification_state.read_at or now
+            notification_state.read_by_user_id = (
+                notification_state.read_by_user_id or current_user_id
+            )
+        else:
+            notification_state.archived_at = None
+            notification_state.archived_by_user_id = None
 
     db.add(notification_state)
     db.commit()

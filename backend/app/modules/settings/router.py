@@ -54,7 +54,9 @@ def list_my_settings_requests(
 
 @router.get("/requests/pending", response_model=SettingsRequestListResponse)
 def list_pending_requests_for_super_admin(
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=50, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    sort: str = Query(default="oldest", pattern="^(oldest|newest)$"),
     restaurant_id: int | None = Query(default=None, ge=1),
     _current_user: User = Depends(require_platform_action("settings_requests", "view")),
     db: Session = Depends(get_db),
@@ -63,12 +65,16 @@ def list_pending_requests_for_super_admin(
         db,
         restaurant_id=restaurant_id,
         limit=limit,
+        cursor=cursor,
+        sort_order=sort,
     )
 
 
 @router.get("/requests/history", response_model=SettingsRequestListResponse)
 def list_reviewed_requests_for_super_admin(
-    limit: int = Query(default=100, ge=1, le=500),
+    limit: int = Query(default=50, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    sort: str = Query(default="newest", pattern="^(oldest|newest)$"),
     restaurant_id: int | None = Query(default=None, ge=1),
     status_filter: str | None = Query(default=None),
     _current_user: User = Depends(require_platform_action("settings_requests", "view")),
@@ -91,6 +97,8 @@ def list_reviewed_requests_for_super_admin(
         restaurant_id=restaurant_id,
         status=request_status,
         limit=limit,
+        cursor=cursor,
+        sort_order=sort,
     )
 
 

@@ -21,36 +21,76 @@ type HistoryFilter = "ALL" | "APPROVED" | "REJECTED";
 
 export default function RegistrationHistoryPage() {
   const [items, setItems] = useState<RestaurantRegistrationSummaryResponse[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>("ALL");
+  const [sortOrder, setSortOrder] = useState<"oldest" | "newest">("newest");
 
   useEffect(() => {
-    void loadHistory(filter);
-  }, [filter]);
+    void loadHistory(filter, true);
+  }, [filter, sortOrder]);
 
-  async function loadHistory(nextFilter: HistoryFilter) {
-    setLoading(true);
+  async function loadHistory(nextFilter: HistoryFilter, reset: boolean) {
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     try {
-      const query =
-        nextFilter === "ALL" ? "" : `?status_filter=${encodeURIComponent(nextFilter)}`;
+      const query = new URLSearchParams();
+      query.set("limit", "50");
+      query.set("sort", sortOrder);
+      if (nextFilter !== "ALL") {
+        query.set("status_filter", nextFilter);
+      }
+      if (!reset && nextCursor) {
+        query.set("cursor", nextCursor);
+      }
+
       const response = await api.get<RestaurantRegistrationHistoryListResponse>(
-        `/restaurants/registrations/history${query}`,
+        `/restaurants/registrations/history?${query.toString()}`,
       );
-      setItems(response.items);
+
+      setItems((current) => {
+        if (reset) {
+          return response.items;
+        }
+        const merged = [...current];
+        for (const item of response.items) {
+          if (!merged.some((existing) => existing.restaurant_id === item.restaurant_id)) {
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
+      setTotal(response.total);
+      setNextCursor(response.next_cursor);
+      setHasMore(response.has_more);
     } catch (loadError) {
       setError(getApiErrorMessage(loadError, "Failed to load registration history."));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  }
+
+  async function loadMoreHistory() {
+    if (!hasMore || !nextCursor || loadingMore) {
+      return;
+    }
+    await loadHistory(filter, false);
   }
 
   const metrics = useMemo(() => {
     const approved = items.filter((item) => item.registration_status === "APPROVED").length;
     const rejected = items.filter((item) => item.registration_status === "REJECTED").length;
-    return { total: items.length, approved, rejected };
-  }, [items]);
+    return { total, loaded: items.length, approved, rejected };
+  }, [items, total]);
 
   return (
     <SuperAdminLayout>
@@ -67,7 +107,15 @@ export default function RegistrationHistoryPage() {
               <Link to="/super-admin/registrations" className="app-btn-ghost">
                 Open Pending Queue
               </Link>
-              <button type="button" onClick={() => void loadHistory(filter)} className="app-btn-ghost">
+              <select
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value as "oldest" | "newest")}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+              <button type="button" onClick={() => void loadHistory(filter, true)} className="app-btn-ghost">
                 Refresh
               </button>
             </div>
@@ -75,9 +123,9 @@ export default function RegistrationHistoryPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <MetricCard label="Reviewed" value={metrics.total} hint="All completed decisions" />
-          <MetricCard label="Approved" value={metrics.approved} hint="Access granted" />
-          <MetricCard label="Rejected" value={metrics.rejected} hint="Tenant kept inactive" />
+          <MetricCard label="Reviewed" value={metrics.total} hint="All matching decisions" />
+          <MetricCard label="Loaded" value={metrics.loaded} hint="Loaded into this page" />
+          <MetricCard label="Approved" value={metrics.approved} hint="Approved in loaded records" />
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -116,10 +164,22 @@ export default function RegistrationHistoryPage() {
         )}
 
         {!loading && !error && items.length > 0 && (
-          <div className="grid gap-4 xl:grid-cols-2">
-            {items.map((item) => (
-              <RegistrationHistoryCard key={item.restaurant_id} item={item} />
-            ))}
+          <div className="space-y-4">
+            <div className="grid gap-4 xl:grid-cols-2">
+              {items.map((item) => (
+                <RegistrationHistoryCard key={item.restaurant_id} item={item} />
+              ))}
+            </div>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => void loadMoreHistory()}
+                disabled={!hasMore || loadingMore}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loadingMore ? "Loading..." : hasMore ? "Load more" : "No more records"}
+              </button>
+            </div>
           </div>
         )}
       </div>

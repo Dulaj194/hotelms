@@ -1,5 +1,6 @@
 import sys
 import unittest
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -15,6 +16,7 @@ sys.path.insert(0, str(BACKEND_ROOT))
 import app.db.init_models  # noqa: F401
 from app.modules.auth import service as auth_service  # noqa: E402
 from app.modules.audit_logs import service as audit_logs_service  # noqa: E402
+from app.modules.audit_logs.model import AuditLog, SuperAdminNotificationState  # noqa: E402
 from app.modules.audit_logs.schemas import SuperAdminNotificationUpdateRequest  # noqa: E402
 from app.core.security import hash_password, verify_password  # noqa: E402
 from app.db.base import Base  # noqa: E402
@@ -25,6 +27,8 @@ from app.modules.restaurants import integration_service  # noqa: E402
 from app.modules.restaurants import service as restaurants_service  # noqa: E402
 from app.modules.restaurants.model import RegistrationStatus, Restaurant  # noqa: E402
 from app.modules.restaurants.schemas import (
+    RestaurantAdminUpdateRequest,
+    RestaurantCreateRequest,
     RestaurantIntegrationUpdateRequest,
     RestaurantRegistrationReviewRequest,
     RestaurantStaffPasswordResetRequest,
@@ -244,6 +248,67 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.assertEqual(cashier.assigned_area, "cashier")
         self.assertEqual(accountant.role, "accountant")
         self.assertEqual(accountant.assigned_area, "accounting")
+
+    def test_restaurant_lifecycle_mutations_emit_forensic_audit_events(self) -> None:
+        created = restaurants_service.create_restaurant(
+            self.db,
+            RestaurantCreateRequest(
+                name="Lifecycle Audit Hotel",
+                email="lifecycle.audit@example.com",
+                phone="0771231231",
+                address="No 7, Governance Street",
+                change_reason="Initial tenant provisioning for compliance tests.",
+            ),
+            current_user_id=self.current_super_admin.id,
+        )
+
+        updated = restaurants_service.update_restaurant_for_super_admin(
+            self.db,
+            created.id,
+            RestaurantAdminUpdateRequest(
+                phone="0770000000",
+                is_active=True,
+                change_reason="Corrected contact channel after verification.",
+            ),
+            current_user_id=self.current_super_admin.id,
+        )
+        self.assertEqual(updated.phone, "0770000000")
+
+        deleted = restaurants_service.delete_restaurant_for_super_admin(
+            self.db,
+            created.id,
+            current_user_id=self.current_super_admin.id,
+            reason="Tenant record cleanup after audit scenario.",
+        )
+        self.assertEqual(deleted.restaurant_id, created.id)
+
+        for event_type in (
+            "restaurant_created_by_super_admin",
+            "restaurant_profile_updated_by_super_admin",
+            "restaurant_deleted_by_super_admin",
+        ):
+            log = (
+                self.db.query(AuditLog)
+                .filter(AuditLog.event_type == event_type)
+                .order_by(AuditLog.id.desc())
+                .first()
+            )
+            self.assertIsNotNone(log)
+            assert log is not None
+
+            metadata = json.loads(log.metadata_json or "{}")
+            self.assertIn("reason", metadata)
+            self.assertIn("before", metadata)
+            self.assertIn("after", metadata)
+            self.assertIn("delta", metadata)
+            self.assertIn("delta_field_count", metadata)
+
+            notification_state = (
+                self.db.query(SuperAdminNotificationState)
+                .filter(SuperAdminNotificationState.audit_log_id == log.id)
+                .first()
+            )
+            self.assertIsNotNone(notification_state)
 
     def test_super_admin_can_reset_owner_password_with_generated_temporary_password(self) -> None:
         restaurant = self._create_active_restaurant()

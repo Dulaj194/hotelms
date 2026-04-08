@@ -7,7 +7,26 @@ export function mergeNotification(
   next: SuperAdminNotificationResponse,
 ): SuperAdminNotificationResponse[] {
   const existing = current.filter((item) => item.id !== next.id);
-  return [next, ...existing].slice(0, 100);
+  return [next, ...existing];
+}
+
+export function sortNotificationsWithUnresolvedPinning(
+  items: SuperAdminNotificationResponse[],
+): SuperAdminNotificationResponse[] {
+  return [...items].sort((a, b) => {
+    const aPinned = !a.is_archived && !a.is_acknowledged ? 0 : 1;
+    const bPinned = !b.is_archived && !b.is_acknowledged ? 0 : 1;
+    if (aPinned !== bPinned) {
+      return aPinned - bPinned;
+    }
+
+    const aTs = new Date(a.created_at).getTime();
+    const bTs = new Date(b.created_at).getTime();
+    if (aPinned === 0) {
+      return aTs - bTs;
+    }
+    return bTs - aTs;
+  });
 }
 
 export function countNotificationsByStatus(items: SuperAdminNotificationResponse[]) {

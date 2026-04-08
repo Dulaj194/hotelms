@@ -21,7 +21,19 @@ type PageMessage =
     }
   | null;
 
-type QueueStatusFilter = "all" | "unread" | "read" | "assigned" | "snoozed" | "acknowledged";
+type QueueStatusFilter = "all" | "unread" | "read" | "assigned" | "snoozed" | "acknowledged" | "archived";
+type QueueSortFilter = "newest_first" | "oldest_first" | "unread_first" | "unresolved_first";
+
+const DEFAULT_CATEGORIES = [
+  "onboarding",
+  "governance",
+  "subscriptions",
+  "users",
+  "integrations",
+  "billing",
+  "security",
+  "site_content",
+];
 
 function badgeClass(value: string): string {
   switch (value) {
@@ -54,14 +66,39 @@ function formatQueueStatusLabel(status: QueueStatusFilter | SuperAdminNotificati
       return "Snoozed";
     case "acknowledged":
       return "Acknowledged";
+    case "archived":
+      return "Archived";
     default:
       return "All statuses";
+  }
+}
+
+function formatSortLabel(sort: QueueSortFilter): string {
+  switch (sort) {
+    case "newest_first":
+      return "Newest first";
+    case "oldest_first":
+      return "Oldest first";
+    case "unread_first":
+      return "Unread first";
+    case "unresolved_first":
+      return "Unresolved first";
+    default:
+      return "Newest first";
   }
 }
 
 export default function SuperAdminNotificationsPage() {
   const currentUser = getUser();
   const currentUserId = currentUser?.id ?? null;
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<QueueStatusFilter>("all");
+  const [ownershipFilter, setOwnershipFilter] = useState<NotificationOwnershipFilter>("all");
+  const [sortFilter, setSortFilter] = useState<QueueSortFilter>("unresolved_first");
+  const [includeArchived, setIncludeArchived] = useState(false);
+
+  const effectiveIncludeArchived = includeArchived || statusFilter === "archived";
+
   const canMutateQueue = canPerformPlatformAction(
     currentUser?.super_admin_scopes,
     "notifications_queue",
@@ -71,21 +108,26 @@ export default function SuperAdminNotificationsPage() {
     items,
     assignees,
     loading,
+    loadingMore,
+    hasMore,
     assigneesLoading,
     error,
     connected,
     refresh,
+    loadMore,
     applyNotificationUpdate,
-  } = useSuperAdminOpsFeed();
+  } = useSuperAdminOpsFeed({
+    category: categoryFilter === "all" ? undefined : categoryFilter,
+    queueStatus: statusFilter === "all" ? undefined : statusFilter,
+    sort: sortFilter,
+    includeArchived: effectiveIncludeArchived,
+  });
 
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState<QueueStatusFilter>("all");
-  const [ownershipFilter, setOwnershipFilter] = useState<NotificationOwnershipFilter>("all");
   const [busyById, setBusyById] = useState<Record<string, boolean>>({});
   const [pageMessage, setPageMessage] = useState<PageMessage>(null);
 
   const categories = useMemo(
-    () => ["all", ...Array.from(new Set(items.map((item) => item.category))).sort()],
+    () => ["all", ...Array.from(new Set([...DEFAULT_CATEGORIES, ...items.map((item) => item.category)])).sort()],
     [items],
   );
 
@@ -93,15 +135,9 @@ export default function SuperAdminNotificationsPage() {
 
   const visibleItems = useMemo(() => {
     return items.filter((item) => {
-      if (categoryFilter !== "all" && item.category !== categoryFilter) {
-        return false;
-      }
-      if (statusFilter !== "all" && item.queue_status !== statusFilter) {
-        return false;
-      }
       return matchesOwnershipFilter(item, ownershipFilter, currentUserId);
     });
-  }, [categoryFilter, currentUserId, items, ownershipFilter, statusFilter]);
+  }, [currentUserId, items, ownershipFilter]);
 
   async function runQueueAction(
     notificationId: string,
@@ -197,9 +233,25 @@ export default function SuperAdminNotificationsPage() {
                 onChange={(event) => setStatusFilter(event.target.value as QueueStatusFilter)}
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
               >
-                {(["all", "unread", "assigned", "snoozed", "acknowledged", "read"] as QueueStatusFilter[]).map((status) => (
+                {(["all", "unread", "assigned", "snoozed", "acknowledged", "read", "archived"] as QueueStatusFilter[]).map((status) => (
                   <option key={status} value={status}>
                     {formatQueueStatusLabel(status)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Sort
+              </span>
+              <select
+                value={sortFilter}
+                onChange={(event) => setSortFilter(event.target.value as QueueSortFilter)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                {(["unresolved_first", "unread_first", "newest_first", "oldest_first"] as QueueSortFilter[]).map((sort) => (
+                  <option key={sort} value={sort}>
+                    {formatSortLabel(sort)}
                   </option>
                 ))}
               </select>
@@ -218,8 +270,17 @@ export default function SuperAdminNotificationsPage() {
                 <option value="unassigned">Unassigned only</option>
               </select>
             </label>
+            <label className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={includeArchived}
+                onChange={(event) => setIncludeArchived(event.target.checked)}
+              />
+              Include archived
+            </label>
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-              Showing {visibleItems.length} of {metrics.total} queue item{metrics.total === 1 ? "" : "s"}
+              Loaded {visibleItems.length} item{visibleItems.length === 1 ? "" : "s"}
+              {hasMore ? " (more available)" : ""}
             </div>
           </div>
         </div>
@@ -321,6 +382,10 @@ export default function SuperAdminNotificationsPage() {
                     <InfoCard
                       label="Snoozed Until"
                       value={item.is_snoozed ? formatDateTime(item.snoozed_until) : "Active now"}
+                    />
+                    <InfoCard
+                      label="Archive State"
+                      value={item.is_archived ? `Archived • ${formatDateTime(item.archived_at)}` : "In active queue"}
                     />
                   </div>
 
@@ -450,6 +515,22 @@ export default function SuperAdminNotificationsPage() {
                             >
                               Clear Snooze
                             </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void runQueueAction(
+                                  item.id,
+                                  { is_archived: !item.is_archived },
+                                  item.is_archived
+                                    ? "Notification restored to active queue."
+                                    : "Notification archived.",
+                                )
+                              }
+                              disabled={isBusy}
+                              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-50"
+                            >
+                              {item.is_archived ? "Unarchive" : "Archive"}
+                            </button>
                           </div>
                         </>
                       ) : (
@@ -462,6 +543,17 @@ export default function SuperAdminNotificationsPage() {
                 </article>
               );
             })}
+
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={!hasMore || loadingMore}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loadingMore ? "Loading..." : hasMore ? "Load more" : "No more items"}
+              </button>
+            </div>
           </div>
         )}
       </div>

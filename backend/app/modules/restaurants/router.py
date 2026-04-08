@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import (
@@ -115,11 +115,18 @@ def list_restaurants(
     response_model=PendingRestaurantRegistrationListResponse,
 )
 def list_pending_registrations(
-    limit: int = 100,
+    limit: int = Query(default=50, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    sort: str = Query(default="oldest", pattern="^(oldest|newest)$"),
     _current_user: User = Depends(require_platform_action("registrations", "view")),
     db: Session = Depends(get_db),
 ) -> PendingRestaurantRegistrationListResponse:
-    return service.list_pending_restaurant_registrations(db, limit=limit)
+    return service.list_pending_restaurant_registrations(
+        db,
+        limit=limit,
+        cursor=cursor,
+        sort_order=sort,
+    )
 
 
 @router.get(
@@ -127,7 +134,9 @@ def list_pending_registrations(
     response_model=RestaurantRegistrationHistoryListResponse,
 )
 def list_registration_history(
-    limit: int = 100,
+    limit: int = Query(default=50, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    sort: str = Query(default="newest", pattern="^(oldest|newest)$"),
     status_filter: str | None = None,
     _current_user: User = Depends(require_platform_action("registrations", "view")),
     db: Session = Depends(get_db),
@@ -150,6 +159,8 @@ def list_registration_history(
         db,
         registration_status=registration_status,
         limit=limit,
+        cursor=cursor,
+        sort_order=sort,
     )
 
 
@@ -184,11 +195,16 @@ def get_restaurant_by_id(
 def update_restaurant_by_id(
     restaurant_id: int,
     payload: RestaurantAdminUpdateRequest,
-    _current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Update any restaurant by ID. Super-admin only."""
-    return service.update_restaurant_for_super_admin(db, restaurant_id, payload)
+    return service.update_restaurant_for_super_admin(
+        db,
+        restaurant_id,
+        payload,
+        current_user_id=current_user.id,
+    )
 
 
 @router.patch("/{restaurant_id}/integration", response_model=RestaurantIntegrationResponse)
@@ -374,11 +390,17 @@ def retry_restaurant_webhook_delivery(
 @router.delete("/{restaurant_id}", response_model=RestaurantDeleteResponse)
 def delete_restaurant_by_id(
     restaurant_id: int,
-    _current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    reason: str | None = Query(default=None, min_length=3, max_length=500),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantDeleteResponse:
     """Delete any restaurant by ID. Super-admin only."""
-    return service.delete_restaurant_for_super_admin(db, restaurant_id)
+    return service.delete_restaurant_for_super_admin(
+        db,
+        restaurant_id,
+        current_user_id=current_user.id,
+        reason=reason,
+    )
 
 
 @router.patch(

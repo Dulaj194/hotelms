@@ -45,8 +45,8 @@ const EMPTY_COMMERCIAL: PlatformCommercialOverviewResponse = {
 
 const EMPTY_DATA: OverviewData = {
   restaurants: [],
-  registrations: { items: [], total: 0 },
-  settings: { items: [], total: 0 },
+  registrations: { items: [], total: 0, next_cursor: null, has_more: false },
+  settings: { items: [], total: 0, next_cursor: null, has_more: false },
   promos: { items: [], total: 0 },
   packages: { items: [] },
   commercial: EMPTY_COMMERCIAL,
@@ -148,10 +148,10 @@ export default function SuperAdminOverview() {
         canViewHotels ? api.get<RestaurantMeResponse[]>("/restaurants") : Promise.resolve([]),
         canViewTenantQueue
           ? api.get<PendingRestaurantRegistrationListResponse>("/restaurants/registrations/pending?limit=200")
-          : Promise.resolve({ items: [], total: 0 }),
+          : Promise.resolve({ items: [], total: 0, next_cursor: null, has_more: false }),
         canViewSettings
           ? api.get<SettingsRequestListResponse>("/settings/requests/pending?limit=200")
-          : Promise.resolve({ items: [], total: 0 }),
+          : Promise.resolve({ items: [], total: 0, next_cursor: null, has_more: false }),
         canViewPromos ? api.get<PromoCodeListResponse>("/promo-codes") : Promise.resolve({ items: [], total: 0 }),
         canViewPackages ? api.get<PackageListResponse>("/packages") : Promise.resolve({ items: [] }),
         canViewCommercial ? api.get<PlatformCommercialOverviewResponse>("/payments/admin/oversight") : Promise.resolve(EMPTY_COMMERCIAL),

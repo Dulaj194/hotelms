@@ -1,3 +1,6 @@
+from datetime import datetime
+
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from app.modules.restaurants.model import RegistrationStatus, Restaurant
@@ -74,14 +77,34 @@ def list_by_registration_status(
     registration_status: RegistrationStatus,
     *,
     limit: int = 100,
+    cursor_created_at: datetime | None = None,
+    cursor_id: int | None = None,
+    sort_order: str = "newest",
 ) -> list[Restaurant]:
-    return (
-        db.query(Restaurant)
-        .filter(Restaurant.registration_status == registration_status)
-        .order_by(Restaurant.created_at.desc(), Restaurant.id.desc())
-        .limit(limit)
-        .all()
-    )
+    query = db.query(Restaurant).filter(Restaurant.registration_status == registration_status)
+
+    if cursor_created_at is not None and cursor_id is not None:
+        if sort_order == "oldest":
+            query = query.filter(
+                or_(
+                    Restaurant.created_at > cursor_created_at,
+                    and_(Restaurant.created_at == cursor_created_at, Restaurant.id > cursor_id),
+                )
+            )
+        else:
+            query = query.filter(
+                or_(
+                    Restaurant.created_at < cursor_created_at,
+                    and_(Restaurant.created_at == cursor_created_at, Restaurant.id < cursor_id),
+                )
+            )
+
+    if sort_order == "oldest":
+        query = query.order_by(Restaurant.created_at.asc(), Restaurant.id.asc())
+    else:
+        query = query.order_by(Restaurant.created_at.desc(), Restaurant.id.desc())
+
+    return query.limit(limit).all()
 
 
 def count_by_registration_status(
@@ -100,6 +123,9 @@ def list_reviewed_registrations(
     *,
     registration_status: RegistrationStatus | None = None,
     limit: int = 100,
+    cursor_reviewed_at: datetime | None = None,
+    cursor_id: int | None = None,
+    sort_order: str = "newest",
 ) -> list[Restaurant]:
     query = db.query(Restaurant).filter(
         Restaurant.registration_status.in_(
@@ -108,15 +134,41 @@ def list_reviewed_registrations(
     )
     if registration_status is not None:
         query = query.filter(Restaurant.registration_status == registration_status)
-    return (
-        query.order_by(
-            Restaurant.registration_reviewed_at.desc().nullslast(),
-            Restaurant.updated_at.desc(),
+
+    if cursor_reviewed_at is not None and cursor_id is not None:
+        if sort_order == "oldest":
+            query = query.filter(
+                or_(
+                    Restaurant.registration_reviewed_at > cursor_reviewed_at,
+                    and_(
+                        Restaurant.registration_reviewed_at == cursor_reviewed_at,
+                        Restaurant.id > cursor_id,
+                    ),
+                )
+            )
+        else:
+            query = query.filter(
+                or_(
+                    Restaurant.registration_reviewed_at < cursor_reviewed_at,
+                    and_(
+                        Restaurant.registration_reviewed_at == cursor_reviewed_at,
+                        Restaurant.id < cursor_id,
+                    ),
+                )
+            )
+
+    if sort_order == "oldest":
+        query = query.order_by(
+            Restaurant.registration_reviewed_at.asc(),
+            Restaurant.id.asc(),
+        )
+    else:
+        query = query.order_by(
+            Restaurant.registration_reviewed_at.desc(),
             Restaurant.id.desc(),
         )
-        .limit(limit)
-        .all()
-    )
+
+    return query.limit(limit).all()
 
 
 def count_reviewed_registrations(

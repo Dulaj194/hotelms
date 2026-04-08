@@ -122,19 +122,31 @@ def update_site_page_admin(
 @admin_router.post("/pages/{slug}/publish", response_model=AdminSitePageDetailResponse)
 def publish_site_page_admin(
     slug: str,
+    reason: str | None = Query(default=None, min_length=3, max_length=500),
     current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> AdminSitePageDetailResponse:
-    return service.publish_site_page_admin(db, slug=slug, current_user=current_user)
+    return service.publish_site_page_admin(
+        db,
+        slug=slug,
+        current_user=current_user,
+        reason=reason,
+    )
 
 
 @admin_router.post("/pages/{slug}/unpublish", response_model=AdminSitePageDetailResponse)
 def unpublish_site_page_admin(
     slug: str,
+    reason: str | None = Query(default=None, min_length=3, max_length=500),
     current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> AdminSitePageDetailResponse:
-    return service.unpublish_site_page_admin(db, slug=slug, current_user=current_user)
+    return service.unpublish_site_page_admin(
+        db,
+        slug=slug,
+        current_user=current_user,
+        reason=reason,
+    )
 
 
 @admin_router.get("/blogs", response_model=AdminBlogPostListResponse)
@@ -197,28 +209,46 @@ def update_blog_post_admin(
 @admin_router.post("/blogs/{slug}/publish", response_model=AdminBlogPostDetailResponse)
 def publish_blog_post_admin(
     slug: str,
+    reason: str | None = Query(default=None, min_length=3, max_length=500),
     current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> AdminBlogPostDetailResponse:
-    return service.publish_blog_post_admin(db, slug=slug, current_user=current_user)
+    return service.publish_blog_post_admin(
+        db,
+        slug=slug,
+        current_user=current_user,
+        reason=reason,
+    )
 
 
 @admin_router.post("/blogs/{slug}/unpublish", response_model=AdminBlogPostDetailResponse)
 def unpublish_blog_post_admin(
     slug: str,
+    reason: str | None = Query(default=None, min_length=3, max_length=500),
     current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> AdminBlogPostDetailResponse:
-    return service.unpublish_blog_post_admin(db, slug=slug, current_user=current_user)
+    return service.unpublish_blog_post_admin(
+        db,
+        slug=slug,
+        current_user=current_user,
+        reason=reason,
+    )
 
 
 @admin_router.delete("/blogs/{slug}", response_model=SiteContentActionResponse)
 def delete_blog_post_admin(
     slug: str,
-    _current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    reason: str | None = Query(default=None, min_length=3, max_length=500),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> SiteContentActionResponse:
-    return service.delete_blog_post_admin(db, slug=slug)
+    return service.delete_blog_post_admin(
+        db,
+        slug=slug,
+        current_user=current_user,
+        reason=reason,
+    )
 
 
 @admin_router.get("/leads/assignees", response_model=SiteContentAdminUserListResponse)
@@ -253,10 +283,15 @@ def list_contact_leads_admin(
 def update_contact_lead_admin(
     lead_id: int,
     payload: AdminContactLeadUpdateRequest,
-    _current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> AdminContactLeadResponse:
-    return service.update_contact_lead_admin(db, lead_id=lead_id, payload=payload)
+    return service.update_contact_lead_admin(
+        db,
+        lead_id=lead_id,
+        payload=payload,
+        current_user=current_user,
+    )
 
 
 @admin_router.get("/leads/export")

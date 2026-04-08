@@ -23,6 +23,8 @@ export interface SettingsRequestResponse {
 export interface SettingsRequestListResponse {
   items: SettingsRequestResponse[];
   total: number;
+  next_cursor: string | null;
+  has_more: boolean;
 }
 
 export interface SettingsRequestReviewRequest {

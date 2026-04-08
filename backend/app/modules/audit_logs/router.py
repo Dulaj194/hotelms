@@ -80,10 +80,29 @@ def export_audit_logs(
 @router.get("/notifications", response_model=SuperAdminNotificationListResponse)
 def list_super_admin_notifications(
     limit: int = Query(default=50, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    queue_status: str | None = Query(
+        default=None,
+        pattern="^(unread|read|assigned|snoozed|acknowledged|archived)$",
+    ),
+    category: str | None = Query(default=None),
+    sort: str = Query(
+        default="unresolved_first",
+        pattern="^(newest_first|oldest_first|unread_first|unresolved_first)$",
+    ),
+    include_archived: bool = Query(default=False),
     _current_user=Depends(require_platform_action("notifications_queue", "view")),
     db: Session = Depends(get_db),
 ) -> SuperAdminNotificationListResponse:
-    return service.list_super_admin_notifications(db, limit=limit)
+    return service.list_super_admin_notifications(
+        db,
+        limit=limit,
+        cursor=cursor,
+        queue_status=queue_status,
+        category=category,
+        sort=sort,
+        include_archived=include_archived,
+    )
 
 
 @router.get(

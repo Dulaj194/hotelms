@@ -1,5 +1,7 @@
 import uuid
+import base64
 from datetime import UTC, datetime, timedelta
+import binascii
 from pathlib import Path
 import secrets
 import string
@@ -68,6 +70,115 @@ _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 _RESETTABLE_HOTEL_STAFF_ROLES = {UserRole.owner, UserRole.admin}
 _STAFF_PASSWORD_REVEAL_TTL_MINUTES = 15
 _STAFF_PASSWORD_REVEAL_INVALID_DETAIL = "Temporary password reveal token is invalid or expired."
+
+
+def _normalize_reason(reason: str | None, *, default_reason: str) -> str:
+    if reason is None:
+        return default_reason
+    trimmed = reason.strip()
+    return trimmed if trimmed else default_reason
+
+
+def _encode_pagination_cursor(timestamp: datetime, entity_id: int) -> str:
+    payload = f"{timestamp.isoformat()}|{entity_id}"
+    return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii")
+
+
+def _decode_pagination_cursor(cursor: str) -> tuple[datetime, int]:
+    try:
+        decoded = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("utf-8")
+        raw_timestamp, raw_id = decoded.split("|", 1)
+        timestamp = datetime.fromisoformat(raw_timestamp)
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=UTC)
+        return timestamp, int(raw_id)
+    except (ValueError, TypeError, binascii.Error):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid pagination cursor.",
+        )
+
+
+def _build_change_delta(
+    before_state: dict[str, object],
+    after_state: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    delta: dict[str, dict[str, object]] = {}
+    for key in sorted(set(before_state.keys()) | set(after_state.keys())):
+        before_value = before_state.get(key)
+        after_value = after_state.get(key)
+        if before_value != after_value:
+            delta[key] = {
+                "before": before_value,
+                "after": after_value,
+            }
+    return delta
+
+
+def _restaurant_lifecycle_snapshot(restaurant) -> dict[str, object]:
+    return {
+        "restaurant_id": restaurant.id,
+        "name": restaurant.name,
+        "email": restaurant.email,
+        "phone": restaurant.phone,
+        "address": restaurant.address,
+        "country": restaurant.country,
+        "country_id": restaurant.country_id,
+        "currency": restaurant.currency,
+        "currency_id": restaurant.currency_id,
+        "billing_email": restaurant.billing_email,
+        "opening_time": restaurant.opening_time,
+        "closing_time": restaurant.closing_time,
+        "is_active": restaurant.is_active,
+        "registration_status": restaurant.registration_status.value,
+        "registration_review_notes": restaurant.registration_review_notes,
+        "feature_flags": {
+            "steward": bool(restaurant.enable_steward),
+            "housekeeping": bool(restaurant.enable_housekeeping),
+            "kds": bool(restaurant.enable_kds),
+            "reports": bool(restaurant.enable_reports),
+            "accountant": bool(restaurant.enable_accountant),
+            "cashier": bool(restaurant.enable_cashier),
+        },
+    }
+
+
+def _write_restaurant_mutation_audit(
+    db: Session,
+    *,
+    event_type: str,
+    current_user_id: int,
+    restaurant_id: int,
+    reason: str | None,
+    default_reason: str,
+    before_state: dict[str, object],
+    after_state: dict[str, object],
+    extra_metadata: dict[str, object] | None = None,
+) -> None:
+    delta = _build_change_delta(before_state, after_state)
+    metadata = {
+        "restaurant_id": restaurant_id,
+        "reason": _normalize_reason(reason, default_reason=default_reason),
+        "before": before_state,
+        "after": after_state,
+        "delta": delta,
+        "delta_field_count": len(delta),
+    }
+    if extra_metadata:
+        metadata.update(extra_metadata)
+
+    audit_log = write_audit_log(
+        db,
+        event_type=event_type,
+        user_id=current_user_id,
+        restaurant_id=restaurant_id,
+        metadata=metadata,
+    )
+    if audit_log is not None:
+        realtime_service.publish_super_admin_audit_notification(
+            audit_log=audit_log,
+            restaurant_id=restaurant_id,
+        )
 
 
 def _send_registration_approval_notifications(
@@ -389,18 +500,41 @@ def list_pending_restaurant_registrations(
     db: Session,
     *,
     limit: int = 100,
+    cursor: str | None = None,
+    sort_order: str = "oldest",
 ) -> PendingRestaurantRegistrationListResponse:
+    cursor_created_at: datetime | None = None
+    cursor_id: int | None = None
+    if cursor:
+        cursor_created_at, cursor_id = _decode_pagination_cursor(cursor)
+
     total = repository.count_by_registration_status(db, RegistrationStatus.PENDING)
     restaurants = repository.list_by_registration_status(
         db,
         RegistrationStatus.PENDING,
-        limit=limit,
+        limit=limit + 1,
+        cursor_created_at=cursor_created_at,
+        cursor_id=cursor_id,
+        sort_order=sort_order,
     )
+    has_more = len(restaurants) > limit
+    current_page = restaurants[:limit]
+
+    next_cursor: str | None = None
+    if has_more and current_page:
+        last = current_page[-1]
+        next_cursor = _encode_pagination_cursor(last.created_at, last.id)
+
     items = [
         _serialize_registration_summary_with_db(db, restaurant)
-        for restaurant in restaurants
+        for restaurant in current_page
     ]
-    return PendingRestaurantRegistrationListResponse(items=items, total=total)
+    return PendingRestaurantRegistrationListResponse(
+        items=items,
+        total=total,
+        next_cursor=next_cursor,
+        has_more=has_more,
+    )
 
 
 def list_restaurant_registration_history(
@@ -408,7 +542,14 @@ def list_restaurant_registration_history(
     *,
     registration_status: RegistrationStatus | None,
     limit: int = 100,
+    cursor: str | None = None,
+    sort_order: str = "newest",
 ) -> RestaurantRegistrationHistoryListResponse:
+    cursor_reviewed_at: datetime | None = None
+    cursor_id: int | None = None
+    if cursor:
+        cursor_reviewed_at, cursor_id = _decode_pagination_cursor(cursor)
+
     total = repository.count_reviewed_registrations(
         db,
         registration_status=registration_status,
@@ -416,13 +557,30 @@ def list_restaurant_registration_history(
     restaurants = repository.list_reviewed_registrations(
         db,
         registration_status=registration_status,
-        limit=limit,
+        limit=limit + 1,
+        cursor_reviewed_at=cursor_reviewed_at,
+        cursor_id=cursor_id,
+        sort_order=sort_order,
     )
+    has_more = len(restaurants) > limit
+    current_page = restaurants[:limit]
+
+    next_cursor: str | None = None
+    if has_more and current_page:
+        last = current_page[-1]
+        review_marker = last.registration_reviewed_at or last.updated_at
+        next_cursor = _encode_pagination_cursor(review_marker, last.id)
+
     items = [
         _serialize_registration_summary_with_db(db, restaurant)
-        for restaurant in restaurants
+        for restaurant in current_page
     ]
-    return RestaurantRegistrationHistoryListResponse(items=items, total=total)
+    return RestaurantRegistrationHistoryListResponse(
+        items=items,
+        total=total,
+        next_cursor=next_cursor,
+        has_more=has_more,
+    )
 
 
 def create_restaurant(
@@ -439,6 +597,11 @@ def create_restaurant(
         )
 
     create_data = _build_profile_update_data(db, payload)
+    change_reason = (
+        str(create_data.get("change_reason")).strip()
+        if create_data.get("change_reason")
+        else None
+    )
 
     restaurant = repository.create_restaurant(
         db,
@@ -493,6 +656,21 @@ def create_restaurant(
             metadata={
                 "restaurant_id": restaurant.id,
                 "email_sent": sent,
+            },
+        )
+
+    if current_user_id is not None:
+        _write_restaurant_mutation_audit(
+            db,
+            event_type="restaurant_created_by_super_admin",
+            current_user_id=current_user_id,
+            restaurant_id=restaurant.id,
+            reason=change_reason,
+            default_reason="Restaurant provisioned by super admin.",
+            before_state={},
+            after_state=_restaurant_lifecycle_snapshot(restaurant),
+            extra_metadata={
+                "email_present": bool(restaurant.email),
             },
         )
 
@@ -642,6 +820,8 @@ def update_restaurant_for_super_admin(
     db: Session,
     restaurant_id: int,
     payload: RestaurantAdminUpdateRequest,
+    *,
+    current_user_id: int,
 ) -> RestaurantMeResponse:
     """Update any restaurant by ID. Restricted to super_admin use only."""
     current_restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
@@ -650,11 +830,17 @@ def update_restaurant_for_super_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
+    before_state = _restaurant_lifecycle_snapshot(current_restaurant)
     update_data = _build_profile_update_data(
         db,
         payload,
         existing_primary_email=current_restaurant.email,
         existing_billing_email=current_restaurant.billing_email,
+    )
+    change_reason = (
+        str(update_data.pop("change_reason")).strip()
+        if update_data.get("change_reason")
+        else None
     )
     restaurant = repository.update_for_super_admin(db, restaurant_id, update_data)
     if not restaurant:
@@ -662,6 +848,18 @@ def update_restaurant_for_super_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
+
+    _write_restaurant_mutation_audit(
+        db,
+        event_type="restaurant_profile_updated_by_super_admin",
+        current_user_id=current_user_id,
+        restaurant_id=restaurant.id,
+        reason=change_reason,
+        default_reason="Restaurant profile updated by super admin.",
+        before_state=before_state,
+        after_state=_restaurant_lifecycle_snapshot(restaurant),
+    )
+
     return _serialize_restaurant(restaurant)
 
 
@@ -867,8 +1065,19 @@ def refresh_restaurant_webhook_health(
 def delete_restaurant_for_super_admin(
     db: Session,
     restaurant_id: int,
+    *,
+    current_user_id: int,
+    reason: str | None = None,
 ) -> RestaurantDeleteResponse:
     """Delete any restaurant by ID. Restricted to super_admin use only."""
+    current_restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if current_restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    before_state = _restaurant_lifecycle_snapshot(current_restaurant)
     try:
         deleted = repository.delete_for_super_admin(db, restaurant_id)
     except IntegrityError as exc:
@@ -883,6 +1092,20 @@ def delete_restaurant_for_super_admin(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
+
+    _write_restaurant_mutation_audit(
+        db,
+        event_type="restaurant_deleted_by_super_admin",
+        current_user_id=current_user_id,
+        restaurant_id=restaurant_id,
+        reason=reason,
+        default_reason="Restaurant tenant deleted by super admin.",
+        before_state=before_state,
+        after_state={
+            "restaurant_id": restaurant_id,
+            "is_deleted": True,
+        },
+    )
 
     return RestaurantDeleteResponse(
         message="Restaurant deleted successfully.",
@@ -909,6 +1132,8 @@ def review_restaurant_registration(
             status_code=status.HTTP_409_CONFLICT,
             detail="Only pending registrations can be reviewed.",
         )
+
+    before_state = _restaurant_lifecycle_snapshot(restaurant)
 
     restaurant.registration_reviewed_by_id = reviewer_user_id
     restaurant.registration_review_notes = payload.review_notes
@@ -951,22 +1176,24 @@ def review_restaurant_registration(
             review_notes=payload.review_notes,
         )
 
-    audit_log = write_audit_log(
+    _write_restaurant_mutation_audit(
         db,
         event_type=audit_event,
-        user_id=reviewer_user_id,
+        current_user_id=reviewer_user_id,
         restaurant_id=restaurant.id,
-        metadata={
-            "restaurant_id": restaurant.id,
+        reason=payload.review_notes,
+        default_reason=(
+            "Registration approved by super admin."
+            if approved
+            else "Registration rejected by super admin."
+        ),
+        before_state=before_state,
+        after_state=_restaurant_lifecycle_snapshot(restaurant),
+        extra_metadata={
             "review_notes": payload.review_notes,
             **notification_metadata,
         },
     )
-    if audit_log is not None:
-        realtime_service.publish_super_admin_audit_notification(
-            audit_log=audit_log,
-            restaurant_id=restaurant.id,
-        )
 
     return RestaurantRegistrationReviewResponse(
         message=message,

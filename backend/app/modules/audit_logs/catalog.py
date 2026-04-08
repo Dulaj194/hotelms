@@ -19,6 +19,21 @@ _EVENT_DEFINITIONS: dict[str, dict[str, str]] = {
         "severity": "danger",
         "title": "Registration rejected",
     },
+    "restaurant_created_by_super_admin": {
+        "category": "onboarding",
+        "severity": "success",
+        "title": "Restaurant created",
+    },
+    "restaurant_profile_updated_by_super_admin": {
+        "category": "onboarding",
+        "severity": "info",
+        "title": "Restaurant profile updated",
+    },
+    "restaurant_deleted_by_super_admin": {
+        "category": "onboarding",
+        "severity": "danger",
+        "title": "Restaurant deleted",
+    },
     "settings_request_submitted": {
         "category": "governance",
         "severity": "warning",
@@ -154,9 +169,63 @@ _EVENT_DEFINITIONS: dict[str, dict[str, str]] = {
         "severity": "danger",
         "title": "Failed login attempt",
     },
+    "site_page_updated": {
+        "category": "site_content",
+        "severity": "info",
+        "title": "Site page draft updated",
+    },
+    "site_page_published": {
+        "category": "site_content",
+        "severity": "success",
+        "title": "Site page published",
+    },
+    "site_page_unpublished": {
+        "category": "site_content",
+        "severity": "warning",
+        "title": "Site page unpublished",
+    },
+    "site_blog_created": {
+        "category": "site_content",
+        "severity": "info",
+        "title": "Blog draft created",
+    },
+    "site_blog_updated": {
+        "category": "site_content",
+        "severity": "info",
+        "title": "Blog draft updated",
+    },
+    "site_blog_published": {
+        "category": "site_content",
+        "severity": "success",
+        "title": "Blog post published",
+    },
+    "site_blog_unpublished": {
+        "category": "site_content",
+        "severity": "warning",
+        "title": "Blog post unpublished",
+    },
+    "site_blog_deleted": {
+        "category": "site_content",
+        "severity": "danger",
+        "title": "Blog draft deleted",
+    },
+    "site_contact_lead_updated": {
+        "category": "site_content",
+        "severity": "info",
+        "title": "Lead inbox item updated",
+    },
 }
 
 HIGH_SIGNAL_EVENT_TYPES = frozenset(_EVENT_DEFINITIONS.keys())
+
+
+def get_event_types_by_category(category: str) -> set[str]:
+    normalized = category.strip().lower()
+    return {
+        event_type
+        for event_type, definition in _EVENT_DEFINITIONS.items()
+        if str(definition.get("category") or "").lower() == normalized
+    }
 
 
 def get_event_category(event_type: str) -> str:
@@ -213,6 +282,12 @@ def build_event_message(
         return f"{hotel_label} was approved and trial access was activated."
     if event_type == "restaurant_registration_rejected":
         return f"{hotel_label} registration was rejected."
+    if event_type == "restaurant_created_by_super_admin":
+        return f"{hotel_label} tenant was provisioned by super admin."
+    if event_type == "restaurant_profile_updated_by_super_admin":
+        return f"{hotel_label} profile was updated by super admin."
+    if event_type == "restaurant_deleted_by_super_admin":
+        return f"{hotel_label} tenant was deleted by super admin."
     if event_type == "settings_request_submitted":
         count = int(metadata.get("requested_change_count") or 0)
         return f"{hotel_label} submitted {count or 'new'} setting change(s) for review."
@@ -280,5 +355,32 @@ def build_event_message(
         if reason:
             return f"Failed login attempt detected ({reason})."
         return "Failed login attempt detected."
+    if event_type == "site_page_updated":
+        page_slug = metadata.get("page_slug") or "unknown"
+        return f"Site page '{page_slug}' draft was updated."
+    if event_type == "site_page_published":
+        page_slug = metadata.get("page_slug") or "unknown"
+        return f"Site page '{page_slug}' was published."
+    if event_type == "site_page_unpublished":
+        page_slug = metadata.get("page_slug") or "unknown"
+        return f"Site page '{page_slug}' was unpublished."
+    if event_type == "site_blog_created":
+        blog_slug = metadata.get("blog_slug") or "unknown"
+        return f"Blog draft '{blog_slug}' was created."
+    if event_type == "site_blog_updated":
+        blog_slug = metadata.get("blog_slug") or "unknown"
+        return f"Blog draft '{blog_slug}' was updated."
+    if event_type == "site_blog_published":
+        blog_slug = metadata.get("blog_slug") or "unknown"
+        return f"Blog post '{blog_slug}' was published."
+    if event_type == "site_blog_unpublished":
+        blog_slug = metadata.get("blog_slug") or "unknown"
+        return f"Blog post '{blog_slug}' was unpublished."
+    if event_type == "site_blog_deleted":
+        blog_slug = metadata.get("blog_slug") or "unknown"
+        return f"Blog draft '{blog_slug}' was deleted."
+    if event_type == "site_contact_lead_updated":
+        lead_id = metadata.get("lead_id") or "unknown"
+        return f"Contact lead #{lead_id} was updated in the lead inbox."
 
     return f"{hotel_label}: {get_event_title(event_type)}."

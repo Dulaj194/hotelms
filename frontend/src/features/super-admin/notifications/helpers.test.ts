@@ -33,6 +33,9 @@ function buildNotification(
     acknowledged_by: { user_id: null, full_name: null, email: null },
     is_snoozed: false,
     snoozed_until: null,
+    is_archived: false,
+    archived_at: null,
+    archived_by: { user_id: null, full_name: null, email: null },
     created_at: "2026-04-01T10:00:00Z",
     ...overrides,
   };

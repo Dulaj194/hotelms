@@ -11,34 +11,95 @@ type HistoryFilter = "ALL" | "APPROVED" | "REJECTED";
 
 export default function SettingsRequestHistoryPage() {
   const [items, setItems] = useState<SettingsRequestResponse[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<HistoryFilter>("ALL");
+  const [sortOrder, setSortOrder] = useState<"oldest" | "newest">("newest");
+  const [restaurantFilter, setRestaurantFilter] = useState("");
+  const [appliedRestaurantId, setAppliedRestaurantId] = useState<number | null>(null);
 
   useEffect(() => {
-    void loadHistory(filter);
-  }, [filter]);
+    void loadHistory(filter, true);
+  }, [filter, sortOrder, appliedRestaurantId]);
 
-  async function loadHistory(nextFilter: HistoryFilter) {
-    setLoading(true);
+  async function loadHistory(nextFilter: HistoryFilter, reset: boolean) {
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     try {
-      const query =
-        nextFilter === "ALL" ? "" : `?status_filter=${encodeURIComponent(nextFilter)}`;
-      const response = await api.get<SettingsRequestListResponse>(`/settings/requests/history${query}`);
-      setItems(response.items);
+      const query = new URLSearchParams();
+      query.set("limit", "50");
+      query.set("sort", sortOrder);
+      if (nextFilter !== "ALL") {
+        query.set("status_filter", nextFilter);
+      }
+      if (appliedRestaurantId) {
+        query.set("restaurant_id", String(appliedRestaurantId));
+      }
+      if (!reset && nextCursor) {
+        query.set("cursor", nextCursor);
+      }
+
+      const response = await api.get<SettingsRequestListResponse>(
+        `/settings/requests/history?${query.toString()}`,
+      );
+      setItems((current) => {
+        if (reset) {
+          return response.items;
+        }
+        const merged = [...current];
+        for (const item of response.items) {
+          if (!merged.some((existing) => existing.request_id === item.request_id)) {
+            merged.push(item);
+          }
+        }
+        return merged;
+      });
+      setTotal(response.total);
+      setNextCursor(response.next_cursor);
+      setHasMore(response.has_more);
     } catch (loadError) {
       setError(getApiErrorMessage(loadError, "Failed to load settings review history."));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  }
+
+  async function loadMoreHistory() {
+    if (!hasMore || !nextCursor || loadingMore) {
+      return;
+    }
+    await loadHistory(filter, false);
+  }
+
+  function applyRestaurantFilter() {
+    setError(null);
+    const trimmed = restaurantFilter.trim();
+    if (!trimmed) {
+      setAppliedRestaurantId(null);
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      setError("Restaurant ID filter must be a positive integer.");
+      return;
+    }
+    setAppliedRestaurantId(parsed);
   }
 
   const metrics = useMemo(() => {
     const approved = items.filter((item) => item.status === "APPROVED").length;
     const rejected = items.filter((item) => item.status === "REJECTED").length;
-    return { total: items.length, approved, rejected };
-  }, [items]);
+    return { total, loaded: items.length, approved, rejected };
+  }, [items, total]);
 
   return (
     <SuperAdminLayout>
@@ -55,17 +116,58 @@ export default function SettingsRequestHistoryPage() {
               <Link to="/super-admin/settings-requests" className="app-btn-ghost">
                 Open Pending Queue
               </Link>
-              <button type="button" onClick={() => void loadHistory(filter)} className="app-btn-ghost">
+              <select
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value as "oldest" | "newest")}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+              <button type="button" onClick={() => void loadHistory(filter, true)} className="app-btn-ghost">
                 Refresh
               </button>
             </div>
           </div>
+
+          <div className="mt-4 flex flex-wrap items-end gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                Filter by Hotel ID
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={restaurantFilter}
+                onChange={(event) => setRestaurantFilter(event.target.value)}
+                placeholder="e.g. 12"
+                className="w-40 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={applyRestaurantFilter}
+              className="rounded-md border px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRestaurantFilter("");
+                setAppliedRestaurantId(null);
+              }}
+              className="rounded-md border px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Clear
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <MetricCard label="Reviewed" value={metrics.total} hint="All completed requests" />
-          <MetricCard label="Approved" value={metrics.approved} hint="Changes applied" />
-          <MetricCard label="Rejected" value={metrics.rejected} hint="Changes blocked" />
+          <MetricCard label="Reviewed" value={metrics.total} hint="All matching requests" />
+          <MetricCard label="Loaded" value={metrics.loaded} hint="Loaded into this page" />
+          <MetricCard label="Rejected" value={metrics.rejected} hint="Rejected in loaded records" />
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -104,10 +206,22 @@ export default function SettingsRequestHistoryPage() {
         )}
 
         {!loading && !error && items.length > 0 && (
-          <div className="grid gap-4 xl:grid-cols-2">
-            {items.map((item) => (
-              <SettingsHistoryCard key={item.request_id} item={item} />
-            ))}
+          <div className="space-y-4">
+            <div className="grid gap-4 xl:grid-cols-2">
+              {items.map((item) => (
+                <SettingsHistoryCard key={item.request_id} item={item} />
+              ))}
+            </div>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => void loadMoreHistory()}
+                disabled={!hasMore || loadingMore}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loadingMore ? "Loading..." : hasMore ? "Load more" : "No more records"}
+              </button>
+            </div>
           </div>
         )}
       </div>

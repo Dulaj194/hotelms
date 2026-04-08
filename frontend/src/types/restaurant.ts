@@ -150,11 +150,15 @@ export interface RestaurantRegistrationSummaryResponse {
 export interface PendingRestaurantRegistrationListResponse {
   items: RestaurantRegistrationSummaryResponse[];
   total: number;
+  next_cursor: string | null;
+  has_more: boolean;
 }
 
 export interface RestaurantRegistrationHistoryListResponse {
   items: RestaurantRegistrationSummaryResponse[];
   total: number;
+  next_cursor: string | null;
+  has_more: boolean;
 }
 
 export interface RestaurantRegistrationReviewRequest {

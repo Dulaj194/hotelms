@@ -60,12 +60,17 @@ class SuperAdminNotificationResponse(BaseModel):
     acknowledged_by: AuditLogActorResponse = Field(default_factory=AuditLogActorResponse)
     is_snoozed: bool = False
     snoozed_until: datetime | None = None
+    is_archived: bool = False
+    archived_at: datetime | None = None
+    archived_by: AuditLogActorResponse = Field(default_factory=AuditLogActorResponse)
     created_at: datetime
 
 
 class SuperAdminNotificationListResponse(BaseModel):
     items: list[SuperAdminNotificationResponse]
     total: int
+    next_cursor: str | None = None
+    has_more: bool = False
 
 
 class SuperAdminNotificationUpdateRequest(BaseModel):
@@ -73,6 +78,7 @@ class SuperAdminNotificationUpdateRequest(BaseModel):
     assigned_user_id: int | None = Field(default=None, ge=1)
     is_acknowledged: bool | None = None
     snoozed_until: datetime | None = None
+    is_archived: bool | None = None
 
     @model_validator(mode="after")
     def validate_has_action(self):

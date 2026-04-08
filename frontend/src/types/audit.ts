@@ -40,7 +40,7 @@ export interface SuperAdminNotificationResponse {
   actor: AuditLogActorResponse;
   restaurant: AuditLogRestaurantResponse;
   metadata: Record<string, unknown>;
-  queue_status: "unread" | "read" | "assigned" | "snoozed" | "acknowledged";
+  queue_status: "unread" | "read" | "assigned" | "snoozed" | "acknowledged" | "archived";
   is_read: boolean;
   read_at: string | null;
   read_by: AuditLogActorResponse;
@@ -51,12 +51,17 @@ export interface SuperAdminNotificationResponse {
   acknowledged_by: AuditLogActorResponse;
   is_snoozed: boolean;
   snoozed_until: string | null;
+  is_archived: boolean;
+  archived_at: string | null;
+  archived_by: AuditLogActorResponse;
   created_at: string;
 }
 
 export interface SuperAdminNotificationListResponse {
   items: SuperAdminNotificationResponse[];
   total: number;
+  next_cursor: string | null;
+  has_more: boolean;
 }
 
 export interface SuperAdminNotificationUpdateRequest {
@@ -64,6 +69,7 @@ export interface SuperAdminNotificationUpdateRequest {
   assigned_user_id?: number | null;
   is_acknowledged?: boolean;
   snoozed_until?: string | null;
+  is_archived?: boolean;
 }
 
 export interface SuperAdminNotificationAssigneeResponse {

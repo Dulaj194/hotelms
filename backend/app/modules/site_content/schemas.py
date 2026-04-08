@@ -214,6 +214,7 @@ class AdminSitePageUpdateRequest(BaseModel):
     title: str = Field(..., min_length=2, max_length=255)
     summary: str | None = Field(default=None, max_length=500)
     payload: dict[str, Any]
+    reason: str | None = Field(default=None, min_length=3, max_length=500)
 
 
 class AdminBlogPostSummaryResponse(BaseModel):
@@ -256,6 +257,7 @@ class AdminBlogPostUpsertRequest(BaseModel):
     reading_minutes: int = Field(default=4, ge=1, le=60)
     is_featured: bool = False
     scheduled_publish_at: datetime | None = None
+    reason: str | None = Field(default=None, min_length=3, max_length=500)
 
 
 class SiteContentActionResponse(BaseModel):
@@ -306,3 +308,4 @@ class AdminContactLeadUpdateRequest(BaseModel):
     status: ContactLeadStatus | None = None
     assigned_to_user_id: int | None = None
     internal_notes: str | None = Field(default=None, max_length=5000)
+    reason: str | None = Field(default=None, min_length=3, max_length=500)
