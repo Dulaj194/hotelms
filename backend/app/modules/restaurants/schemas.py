@@ -243,7 +243,23 @@ class RestaurantStaffPasswordResetResponse(BaseModel):
     role: str
     must_change_password: bool
     email_sent: bool
+    reveal_token: str | None = None
+    reveal_expires_at: datetime | None = None
+
+
+class RestaurantStaffPasswordRevealRequest(BaseModel):
+    reveal_token: str = Field(
+        min_length=32,
+        max_length=512,
+        description="One-time token issued when email delivery fails.",
+    )
+
+
+class RestaurantStaffPasswordRevealResponse(BaseModel):
+    message: str
+    user_id: int
     temporary_password: str
+    revealed_at: datetime
 
 
 class RestaurantRegistrationSummaryResponse(BaseModel):

@@ -24,6 +24,7 @@ import type {
 } from "@/types/subscription";
 import type {
   GenericMessageResponse,
+  RestaurantStaffPasswordRevealResponse,
   RestaurantStaffPasswordResetResponse,
   StaffDetailResponse,
   UserRole,
@@ -232,6 +233,17 @@ export async function resetRestaurantUserPassword(
 ): Promise<RestaurantStaffPasswordResetResponse> {
   return api.post<RestaurantStaffPasswordResetResponse>(
     `/restaurants/${restaurantId}/users/${userId}/reset-password`,
+    payload,
+  );
+}
+
+export async function revealRestaurantUserTemporaryPassword(
+  restaurantId: number,
+  userId: number,
+  payload: { reveal_token: string },
+): Promise<RestaurantStaffPasswordRevealResponse> {
+  return api.post<RestaurantStaffPasswordRevealResponse>(
+    `/restaurants/${restaurantId}/users/${userId}/reset-password/reveal`,
     payload,
   );
 }

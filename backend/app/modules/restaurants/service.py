@@ -1,5 +1,5 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import secrets
 import string
@@ -17,7 +17,13 @@ from app.core.notifications import (
     send_registration_approved_sms,
     send_temporary_password_reset_email,
 )
-from app.core.security import hash_password, hash_token
+from app.core.security import (
+    decrypt_secret_value,
+    encrypt_secret_value,
+    generate_secure_token,
+    hash_password,
+    hash_token,
+)
 from app.modules.access import catalog as access_catalog
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.restaurants.integration_service import DEFAULT_WEBHOOK_SECRET_HEADER_NAME
@@ -25,7 +31,11 @@ from app.modules.realtime import service as realtime_service
 from app.modules.reference_data import service as reference_data_service
 from app.modules.restaurants import repository
 from app.modules.subscriptions import service as subscription_service
-from app.modules.restaurants.model import RegistrationStatus, WebhookHealthStatus
+from app.modules.restaurants.model import (
+    RegistrationStatus,
+    RestaurantPasswordRevealToken,
+    WebhookHealthStatus,
+)
 from app.modules.users.model import UserRole
 from app.modules.users.repository import create_staff, get_by_id, get_user_by_email, list_by_restaurant
 from app.modules.users.schemas import StaffCreateRequest
@@ -45,6 +55,7 @@ from app.modules.restaurants.schemas import (
     RestaurantRegistrationReviewRequest,
     RestaurantRegistrationReviewResponse,
     RestaurantRegistrationSummaryResponse,
+    RestaurantStaffPasswordRevealResponse,
     RestaurantStaffPasswordResetRequest,
     RestaurantStaffPasswordResetResponse,
     RestaurantUpdateRequest,
@@ -55,6 +66,8 @@ from app.modules.restaurants.schemas import (
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 _RESETTABLE_HOTEL_STAFF_ROLES = {UserRole.owner, UserRole.admin}
+_STAFF_PASSWORD_REVEAL_TTL_MINUTES = 15
+_STAFF_PASSWORD_REVEAL_INVALID_DETAIL = "Temporary password reveal token is invalid or expired."
 
 
 def _send_registration_approval_notifications(
@@ -534,6 +547,22 @@ def reset_restaurant_staff_password(
         temporary_password=temporary_password,
     )
 
+    reveal_token: str | None = None
+    reveal_expires_at: datetime | None = None
+    if email_sent:
+        message = "Temporary password issued and sent to the user's email."
+    else:
+        reveal_token, reveal_expires_at = _issue_staff_password_reveal_token(
+            db,
+            restaurant_id=restaurant_id,
+            user_id=user.id,
+            current_user_id=current_user_id,
+            temporary_password=temporary_password,
+        )
+        message = (
+            "Temporary password issued. Email delivery failed; use the secure one-time reveal flow."
+        )
+
     write_audit_log(
         db,
         event_type="restaurant_staff_password_reset_by_super_admin",
@@ -544,13 +573,8 @@ def reset_restaurant_staff_password(
             "target_user_id": user.id,
             "target_role": user.role.value,
             "email_sent": email_sent,
+            "secure_reveal_issued": not email_sent,
         },
-    )
-
-    message = (
-        "Temporary password issued and sent to the user's email."
-        if email_sent
-        else "Temporary password issued. Email could not be sent; share it securely with the user."
     )
 
     return RestaurantStaffPasswordResetResponse(
@@ -559,7 +583,58 @@ def reset_restaurant_staff_password(
         role=user.role.value,
         must_change_password=user.must_change_password,
         email_sent=email_sent,
+        reveal_token=reveal_token,
+        reveal_expires_at=reveal_expires_at,
+    )
+
+
+def reveal_restaurant_staff_temporary_password(
+    db: Session,
+    *,
+    restaurant_id: int,
+    user_id: int,
+    reveal_token: str,
+    current_user_id: int,
+) -> RestaurantStaffPasswordRevealResponse:
+    restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    user = get_by_id(db, user_id, restaurant_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Staff member not found.",
+        )
+
+    temporary_password, revealed_at = _consume_staff_password_reveal_token(
+        db,
+        restaurant_id=restaurant_id,
+        user_id=user_id,
+        current_user_id=current_user_id,
+        reveal_token=reveal_token,
+    )
+
+    write_audit_log(
+        db,
+        event_type="restaurant_staff_password_reset_revealed_by_super_admin",
+        user_id=current_user_id,
+        restaurant_id=restaurant_id,
+        metadata={
+            "restaurant_id": restaurant_id,
+            "target_user_id": user.id,
+            "target_role": user.role.value,
+        },
+    )
+
+    return RestaurantStaffPasswordRevealResponse(
+        message="Temporary password revealed. This value cannot be viewed again.",
+        user_id=user.id,
         temporary_password=temporary_password,
+        revealed_at=revealed_at,
     )
 
 
@@ -940,6 +1015,80 @@ def _generate_temporary_password(length: int = 12) -> str:
     password_chars = required_chars + remaining_chars
     secrets.SystemRandom().shuffle(password_chars)
     return "".join(password_chars)
+
+
+def _issue_staff_password_reveal_token(
+    db: Session,
+    *,
+    restaurant_id: int,
+    user_id: int,
+    current_user_id: int,
+    temporary_password: str,
+) -> tuple[str, datetime]:
+    raw_token = generate_secure_token()
+    expires_at = datetime.now(UTC) + timedelta(minutes=_STAFF_PASSWORD_REVEAL_TTL_MINUTES)
+
+    record = RestaurantPasswordRevealToken(
+        restaurant_id=restaurant_id,
+        target_user_id=user_id,
+        created_by_user_id=current_user_id,
+        token_hash=hash_token(raw_token),
+        temporary_password_ciphertext=encrypt_secret_value(temporary_password),
+        expires_at=expires_at,
+    )
+    db.add(record)
+    db.commit()
+
+    return raw_token, expires_at
+
+
+def _consume_staff_password_reveal_token(
+    db: Session,
+    *,
+    restaurant_id: int,
+    user_id: int,
+    current_user_id: int,
+    reveal_token: str,
+) -> tuple[str, datetime]:
+    token_hash_value = hash_token(reveal_token)
+    record = (
+        db.query(RestaurantPasswordRevealToken)
+        .filter(
+            RestaurantPasswordRevealToken.restaurant_id == restaurant_id,
+            RestaurantPasswordRevealToken.target_user_id == user_id,
+            RestaurantPasswordRevealToken.created_by_user_id == current_user_id,
+            RestaurantPasswordRevealToken.token_hash == token_hash_value,
+        )
+        .first()
+    )
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_STAFF_PASSWORD_REVEAL_INVALID_DETAIL,
+        )
+
+    now = datetime.now(UTC)
+    expires_at = record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+
+    if record.used_at is not None or expires_at <= now:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=_STAFF_PASSWORD_REVEAL_INVALID_DETAIL,
+        )
+
+    temporary_password = decrypt_secret_value(record.temporary_password_ciphertext)
+    if not temporary_password:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to reveal temporary password.",
+        )
+
+    record.used_at = now
+    db.commit()
+
+    return temporary_password, now
 
 
 def _serialize_registration_summary_with_db(

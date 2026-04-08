@@ -48,10 +48,9 @@ def send_onboarding_email(
     """
     if not settings.smtp_host or not settings.smtp_from_email:
         logger.warning(
-            "Onboarding email not sent: SMTP not configured. recipient=%s restaurant=%s temp_password=%s",
+            "Onboarding email not sent: SMTP not configured. recipient=%s restaurant=%s",
             recipient_email,
             restaurant_name,
-            temporary_password,
         )
         return False
 
@@ -105,10 +104,9 @@ def send_temporary_password_reset_email(
     """
     if not settings.smtp_host or not settings.smtp_from_email:
         logger.warning(
-            "Password reset email not sent: SMTP not configured. recipient=%s restaurant=%s temp_password=%s",
+            "Password reset email not sent: SMTP not configured. recipient=%s restaurant=%s",
             recipient_email,
             restaurant_name,
-            temporary_password,
         )
         return False
 

@@ -268,6 +268,23 @@ def require_platform_scopes(*scopes: str):
     return _check
 
 
+def require_platform_action(resource: str, action: str):
+    """Dependency factory that enforces platform permission matrix actions."""
+
+    from app.modules.platform_access import matrix as platform_access_matrix
+
+    required_scopes = platform_access_matrix.get_required_scopes_for_action(
+        resource,
+        action,
+    )
+    if required_scopes is None:
+        raise ValueError(
+            f"Unknown platform permission mapping for resource='{resource}' action='{action}'."
+        )
+
+    return require_platform_scopes(*required_scopes)
+
+
 def require_module_access(module_key: str):
     """Dependency factory to enforce effective module access for tenant routes."""
 

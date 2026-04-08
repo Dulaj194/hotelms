@@ -53,7 +53,7 @@ def get_platform_scope_definition(value: str) -> PlatformScopeDefinition | None:
 
 def normalize_platform_scopes(values: Iterable[str] | None) -> list[str]:
     if values is None:
-        return list(DEFAULT_PLATFORM_SCOPES)
+        return []
 
     normalized: list[str] = []
     for value in values:
@@ -67,15 +67,15 @@ def normalize_platform_scopes(values: Iterable[str] | None) -> list[str]:
 
 def parse_platform_scopes_json(raw_value: str | None) -> list[str]:
     if not raw_value:
-        return list(DEFAULT_PLATFORM_SCOPES)
+        return []
 
     try:
         parsed = json.loads(raw_value)
     except Exception:
-        return list(DEFAULT_PLATFORM_SCOPES)
+        return []
 
     if not isinstance(parsed, list):
-        return list(DEFAULT_PLATFORM_SCOPES)
+        return []
 
     return normalize_platform_scopes([str(item) for item in parsed])
 

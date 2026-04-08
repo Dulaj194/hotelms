@@ -4,7 +4,9 @@ import { Link } from "react-router-dom";
 import ActionDialog from "@/components/shared/ActionDialog";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import { formatSettingFieldLabel, formatSettingFieldValue } from "@/features/access/catalog";
+import { canPerformPlatformAction } from "@/features/platform-access/permissions";
 import { ApiError, api } from "@/lib/api";
+import { getUser } from "@/lib/auth";
 import type {
   SettingsRequestListResponse,
   SettingsRequestResponse,
@@ -50,6 +52,13 @@ function getStatusBadgeClass(status: string): string {
 }
 
 export default function SuperAdminSettingsRequests() {
+  const currentUser = getUser();
+  const canApproveSettingsRequests = canPerformPlatformAction(
+    currentUser?.super_admin_scopes,
+    "settings_requests",
+    "approve",
+  );
+
   const [items, setItems] = useState<SettingsRequestResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +123,7 @@ export default function SuperAdminSettingsRequests() {
   }
 
   function openReviewDialog(status: ReviewStatus) {
+    if (!canApproveSettingsRequests) return;
     if (!selectedRequest) return;
     setReviewError(null);
     setReviewNotes("");
@@ -217,6 +227,12 @@ export default function SuperAdminSettingsRequests() {
             </button>
           </div>
         </div>
+
+        {!canApproveSettingsRequests && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            Read-only mode: You can inspect pending and reviewed settings requests, but only Tenant Admin scope can approve or reject changes.
+          </div>
+        )}
 
         {actionMsg && (
           <div
@@ -370,20 +386,28 @@ export default function SuperAdminSettingsRequests() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openReviewDialog("APPROVED")}
-                      className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                    >
-                      Approve and Apply
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openReviewDialog("REJECTED")}
-                      className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                    >
-                      Reject Request
-                    </button>
+                    {canApproveSettingsRequests ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openReviewDialog("APPROVED")}
+                          className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                        >
+                          Approve and Apply
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openReviewDialog("REJECTED")}
+                          className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                        >
+                          Reject Request
+                        </button>
+                      </>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                        Read-only access
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -392,7 +416,7 @@ export default function SuperAdminSettingsRequests() {
         )}
       </div>
 
-      {reviewDialog && (
+      {reviewDialog && canApproveSettingsRequests && (
         <ActionDialog
           title={reviewDialog.status === "APPROVED" ? "Approve Settings Request" : "Reject Settings Request"}
           description={

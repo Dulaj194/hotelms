@@ -21,6 +21,7 @@ import {
   listRestaurants,
   listRestaurantUsers,
   refreshRestaurantWebhookHealth,
+  revealRestaurantUserTemporaryPassword,
   resetRestaurantUserPassword,
   revokeRestaurantApiKey,
   revokeRestaurantWebhookSecret,
@@ -491,11 +492,12 @@ export default function SuperAdminRestaurants() {
 
   async function runConfirmedAction() {
     if (!confirmAction) return;
+    const pendingAction = confirmAction;
     setConfirmBusy(true);
     setConfirmError(null);
     try {
-      await confirmAction.onConfirm();
-      setConfirmAction(null);
+      await pendingAction.onConfirm();
+      setConfirmAction((current) => (current === pendingAction ? null : current));
     } catch (error) {
       setConfirmError(error instanceof Error ? error.message : "Action failed.");
     } finally {
@@ -699,13 +701,57 @@ export default function SuperAdminRestaurants() {
     setResettingUserId(userId);
     setAddUserMsg(null);
     try {
-      const result = await resetRestaurantUserPassword(selected.id, userId);
-      const deliveryNote = result.email_sent
-        ? "Temporary password was sent to the user's email."
-        : `Email delivery failed for "${userName}". Share this temporary password securely: ${result.temporary_password}`;
+      const restaurantId = selected.id;
+      const result = await resetRestaurantUserPassword(restaurantId, userId);
+
+      if (result.email_sent) {
+        setAddUserMsg({
+          type: "ok",
+          text: `${result.message} Temporary password was sent to the user's email.`,
+        });
+        return;
+      }
+
+      if (result.reveal_token) {
+        const revealToken = result.reveal_token;
+        const expiresAt = result.reveal_expires_at
+          ? new Date(result.reveal_expires_at).toLocaleString()
+          : null;
+        setAddUserMsg({
+          type: "ok",
+          text:
+            `${result.message} Email delivery failed for "${userName}". ` +
+            "Use one-time secure reveal to view the temporary password." +
+            (expiresAt ? ` Token expires at ${expiresAt}.` : ""),
+        });
+        setConfirmError(null);
+        setConfirmAction({
+          title: "Reveal Temporary Password",
+          description:
+            `Email delivery failed for "${userName}". Reveal the temporary password now? ` +
+            "This secret can be viewed only once and should be shared immediately.",
+          confirmLabel: "Reveal Once",
+          confirmTone: "warning",
+          onConfirm: async () => {
+            const reveal = await revealRestaurantUserTemporaryPassword(restaurantId, userId, {
+              reveal_token: revealToken,
+            });
+            setAddUserMsg({
+              type: "ok",
+              text:
+                `${reveal.message} Temporary password for "${userName}": ` +
+                `${reveal.temporary_password}. Share it securely now.`,
+            });
+          },
+        });
+        return;
+      }
+
       setAddUserMsg({
-        type: "ok",
-        text: `${result.message} ${deliveryNote}`,
+        type: "err",
+        text:
+          `${result.message} Email delivery failed and no secure reveal token was issued. ` +
+          "Retry reset and verify notification configuration.",
       });
     } catch (error) {
       setAddUserMsg({
@@ -726,7 +772,7 @@ export default function SuperAdminRestaurants() {
       title: "Reset Staff Password",
       description:
         `Generate a temporary password for "${userName}" (${roleLabel})? ` +
-        "Share it securely. The user must change it on next login.",
+        "The user must change it on next login. Delivery is email-first with secure reveal fallback.",
       confirmLabel: "Generate Temporary Password",
       confirmTone: "warning",
       onConfirm: async () => {

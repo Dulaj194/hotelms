@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
+import { canPerformPlatformAction } from "@/features/platform-access/permissions";
 import {
   buildSnoozeUntilISOString,
   countNotificationsByStatus,
@@ -61,6 +62,11 @@ function formatQueueStatusLabel(status: QueueStatusFilter | SuperAdminNotificati
 export default function SuperAdminNotificationsPage() {
   const currentUser = getUser();
   const currentUserId = currentUser?.id ?? null;
+  const canMutateQueue = canPerformPlatformAction(
+    currentUser?.super_admin_scopes,
+    "notifications_queue",
+    "mutate",
+  );
   const {
     items,
     assignees,
@@ -102,6 +108,14 @@ export default function SuperAdminNotificationsPage() {
     payload: Parameters<typeof applyNotificationUpdate>[1],
     successMessage: string,
   ) {
+    if (!canMutateQueue) {
+      setPageMessage({
+        type: "err",
+        text: "Read-only access: only Security Admin scope can update notification queue state.",
+      });
+      return;
+    }
+
     setBusyById((current) => ({ ...current, [notificationId]: true }));
     setPageMessage(null);
     try {
@@ -222,6 +236,12 @@ export default function SuperAdminNotificationsPage() {
           </div>
         )}
 
+        {!canMutateQueue && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+            Read-only mode: You can monitor queue activity, but queue assignment and status updates require Security Admin scope.
+          </div>
+        )}
+
         {loading && (
           <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
             Loading notification center...
@@ -312,123 +332,131 @@ export default function SuperAdminNotificationsPage() {
 
                   <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
                     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <label className="space-y-2">
-                          <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Assign Owner
-                          </span>
-                          <select
-                            value={item.assigned_to.user_id ?? ""}
-                            onChange={(event) =>
-                              void runQueueAction(
-                                item.id,
-                                {
-                                  assigned_user_id: event.target.value
-                                    ? Number(event.target.value)
-                                    : null,
-                                },
-                                "Queue owner updated.",
-                              )
-                            }
-                            disabled={isBusy || assigneesLoading}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
-                          >
-                            <option value="">Unassigned</option>
-                            {assignees.map((assignee) => (
-                              <option key={assignee.user_id} value={assignee.user_id}>
-                                {assignee.full_name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                      {canMutateQueue ? (
+                        <>
+                          <div className="grid gap-3 md:grid-cols-3">
+                            <label className="space-y-2">
+                              <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Assign Owner
+                              </span>
+                              <select
+                                value={item.assigned_to.user_id ?? ""}
+                                onChange={(event) =>
+                                  void runQueueAction(
+                                    item.id,
+                                    {
+                                      assigned_user_id: event.target.value
+                                        ? Number(event.target.value)
+                                        : null,
+                                    },
+                                    "Queue owner updated.",
+                                  )
+                                }
+                                disabled={isBusy || assigneesLoading}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
+                              >
+                                <option value="">Unassigned</option>
+                                {assignees.map((assignee) => (
+                                  <option key={assignee.user_id} value={assignee.user_id}>
+                                    {assignee.full_name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
 
-                        <div className="space-y-2">
-                          <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Read State
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void runQueueAction(
-                                item.id,
-                                { is_read: !item.is_read },
-                                item.is_read ? "Notification marked as unread." : "Notification marked as read.",
-                              )
-                            }
-                            disabled={isBusy}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-50"
-                          >
-                            {item.is_read ? "Mark Unread" : "Mark Read"}
-                          </button>
+                            <div className="space-y-2">
+                              <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Read State
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void runQueueAction(
+                                    item.id,
+                                    { is_read: !item.is_read },
+                                    item.is_read ? "Notification marked as unread." : "Notification marked as read.",
+                                  )
+                                }
+                                disabled={isBusy}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-50"
+                              >
+                                {item.is_read ? "Mark Unread" : "Mark Read"}
+                              </button>
+                            </div>
+
+                            <div className="space-y-2">
+                              <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Queue Outcome
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void runQueueAction(
+                                    item.id,
+                                    { is_acknowledged: !item.is_acknowledged },
+                                    item.is_acknowledged
+                                      ? "Acknowledgement removed."
+                                      : "Notification acknowledged.",
+                                  )
+                                }
+                                disabled={isBusy}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-50"
+                              >
+                                {item.is_acknowledged ? "Undo Acknowledge" : "Acknowledge"}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-end gap-2 lg:justify-end">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void runQueueAction(
+                                  item.id,
+                                  { snoozed_until: buildSnoozeUntilISOString(1) },
+                                  "Notification snoozed for 1 hour.",
+                                )
+                              }
+                              disabled={isBusy}
+                              className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                            >
+                              Snooze 1h
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void runQueueAction(
+                                  item.id,
+                                  { snoozed_until: buildSnoozeUntilISOString(4) },
+                                  "Notification snoozed for 4 hours.",
+                                )
+                              }
+                              disabled={isBusy}
+                              className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                            >
+                              Snooze 4h
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void runQueueAction(
+                                  item.id,
+                                  { snoozed_until: null },
+                                  "Notification snooze cleared.",
+                                )
+                              }
+                              disabled={isBusy || !item.is_snoozed}
+                              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-50"
+                            >
+                              Clear Snooze
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                          Queue state updates are disabled for your current scope. You can still monitor events in real-time.
                         </div>
-
-                        <div className="space-y-2">
-                          <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Queue Outcome
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void runQueueAction(
-                                item.id,
-                                { is_acknowledged: !item.is_acknowledged },
-                                item.is_acknowledged
-                                  ? "Acknowledgement removed."
-                                  : "Notification acknowledged.",
-                              )
-                            }
-                            disabled={isBusy}
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-50"
-                          >
-                            {item.is_acknowledged ? "Undo Acknowledge" : "Acknowledge"}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-end gap-2 lg:justify-end">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void runQueueAction(
-                              item.id,
-                              { snoozed_until: buildSnoozeUntilISOString(1) },
-                              "Notification snoozed for 1 hour.",
-                            )
-                          }
-                          disabled={isBusy}
-                          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
-                        >
-                          Snooze 1h
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void runQueueAction(
-                              item.id,
-                              { snoozed_until: buildSnoozeUntilISOString(4) },
-                              "Notification snoozed for 4 hours.",
-                            )
-                          }
-                          disabled={isBusy}
-                          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
-                        >
-                          Snooze 4h
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void runQueueAction(
-                              item.id,
-                              { snoozed_until: null },
-                              "Notification snooze cleared.",
-                            )
-                          }
-                          disabled={isBusy || !item.is_snoozed}
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-50"
-                        >
-                          Clear Snooze
-                        </button>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </article>

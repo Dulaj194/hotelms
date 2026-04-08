@@ -85,8 +85,16 @@ export interface RestaurantStaffPasswordResetResponse {
   user_id: number;
   role: UserRole;
   must_change_password: boolean;
-   email_sent: boolean;
+  email_sent: boolean;
+  reveal_token?: string | null;
+  reveal_expires_at?: string | null;
+}
+
+export interface RestaurantStaffPasswordRevealResponse {
+  message: string;
+  user_id: number;
   temporary_password: string;
+  revealed_at: string;
 }
 
 

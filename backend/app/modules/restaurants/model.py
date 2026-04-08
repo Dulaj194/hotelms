@@ -237,3 +237,54 @@ class RestaurantWebhookDelivery(Base):
         remote_side=[id],
         foreign_keys=[retried_from_delivery_id],
     )
+
+
+class RestaurantPasswordRevealToken(Base):
+    __tablename__ = "restaurant_password_reveal_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    target_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_by_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(
+        String(128),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+    temporary_password_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    restaurant: Mapped[Restaurant] = relationship(
+        "Restaurant",
+        foreign_keys=[restaurant_id],
+    )
+    target_user: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[target_user_id],
+    )
+    created_by: Mapped["User"] = relationship(
+        "User",
+        foreign_keys=[created_by_user_id],
+    )

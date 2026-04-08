@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Literal
 
 
 class HTTPMethod(str, Enum):
@@ -13,6 +12,24 @@ class HTTPMethod(str, Enum):
     POST = "POST"
     PATCH = "PATCH"
     DELETE = "DELETE"
+
+
+class PlatformPermissionAction(str, Enum):
+    """Permission actions used for policy-level access checks."""
+
+    VIEW = "view"
+    REVIEW = "review"
+    APPROVE = "approve"
+    MUTATE = "mutate"
+
+
+class PlatformPermissionResource(str, Enum):
+    """Resources that can be protected by platform permission actions."""
+
+    NOTIFICATIONS_QUEUE = "notifications_queue"
+    REGISTRATIONS = "registrations"
+    SETTINGS_REQUESTS = "settings_requests"
+    AUDIT_LOGS = "audit_logs"
 
 
 @dataclass(frozen=True)
@@ -25,6 +42,16 @@ class AccessRule:
     required_scopes: tuple[str, ...]
     description: str
     sensitive: bool = False
+
+
+@dataclass(frozen=True)
+class PlatformPermissionRule:
+    """Action-level permission mapping for frontend/backend policy alignment."""
+
+    resource: PlatformPermissionResource
+    action: PlatformPermissionAction
+    required_scopes: tuple[str, ...]
+    description: str
 
 
 # ============================================================================
@@ -66,7 +93,7 @@ ACCESS_CONTROL_RULES: tuple[AccessRule, ...] = (
         module="audit_logs",
         endpoint="PATCH /api/v1/audit-logs/notifications/{notification_id}",
         method=HTTPMethod.PATCH,
-        required_scopes=("ops_viewer", "security_admin"),
+        required_scopes=("security_admin",),
         description="Update notification state (read, assigned, acknowledged, snoozed)",
         sensitive=True,
     ),
@@ -234,7 +261,7 @@ ACCESS_CONTROL_RULES: tuple[AccessRule, ...] = (
     ),
     AccessRule(
         module="restaurants",
-        endpoint="GET /api/v1/restaurants/registrations/{restaurant_id}/history",
+        endpoint="GET /api/v1/restaurants/registrations/history",
         method=HTTPMethod.GET,
         required_scopes=("ops_viewer", "tenant_admin"),
         description="Get restaurant registration history",
@@ -243,7 +270,7 @@ ACCESS_CONTROL_RULES: tuple[AccessRule, ...] = (
         module="restaurants",
         endpoint="PATCH /api/v1/restaurants/registrations/{registration_id}/review",
         method=HTTPMethod.PATCH,
-        required_scopes=("ops_viewer", "tenant_admin"),
+        required_scopes=("tenant_admin",),
         description="Approve or reject registration",
         sensitive=True,
     ),
@@ -258,7 +285,7 @@ ACCESS_CONTROL_RULES: tuple[AccessRule, ...] = (
         module="restaurants",
         endpoint="PATCH /api/v1/restaurants/{restaurant_id}",
         method=HTTPMethod.PATCH,
-        required_scopes=("ops_viewer", "tenant_admin"),
+        required_scopes=("tenant_admin",),
         description="Update restaurant settings and profile",
         sensitive=True,
     ),
@@ -266,9 +293,67 @@ ACCESS_CONTROL_RULES: tuple[AccessRule, ...] = (
         module="restaurants",
         endpoint="DELETE /api/v1/restaurants/{restaurant_id}",
         method=HTTPMethod.DELETE,
-        required_scopes=("ops_viewer", "tenant_admin"),
+        required_scopes=("tenant_admin",),
         description="Delete restaurant and all associated data",
         sensitive=True,
+    ),
+)
+
+
+PLATFORM_PERMISSION_RULES: tuple[PlatformPermissionRule, ...] = (
+    PlatformPermissionRule(
+        resource=PlatformPermissionResource.NOTIFICATIONS_QUEUE,
+        action=PlatformPermissionAction.VIEW,
+        required_scopes=("ops_viewer", "security_admin"),
+        description="View notification queue items and queue metadata.",
+    ),
+    PlatformPermissionRule(
+        resource=PlatformPermissionResource.NOTIFICATIONS_QUEUE,
+        action=PlatformPermissionAction.MUTATE,
+        required_scopes=("security_admin",),
+        description="Assign, read/unread, acknowledge, and snooze notification queue items.",
+    ),
+    PlatformPermissionRule(
+        resource=PlatformPermissionResource.REGISTRATIONS,
+        action=PlatformPermissionAction.VIEW,
+        required_scopes=("ops_viewer", "tenant_admin"),
+        description="View registration queues and registration history.",
+    ),
+    PlatformPermissionRule(
+        resource=PlatformPermissionResource.REGISTRATIONS,
+        action=PlatformPermissionAction.REVIEW,
+        required_scopes=("tenant_admin",),
+        description="Review registration submissions for approval decisions.",
+    ),
+    PlatformPermissionRule(
+        resource=PlatformPermissionResource.REGISTRATIONS,
+        action=PlatformPermissionAction.APPROVE,
+        required_scopes=("tenant_admin",),
+        description="Approve or reject tenant registration submissions.",
+    ),
+    PlatformPermissionRule(
+        resource=PlatformPermissionResource.SETTINGS_REQUESTS,
+        action=PlatformPermissionAction.VIEW,
+        required_scopes=("ops_viewer", "tenant_admin"),
+        description="View pending and reviewed settings request queues.",
+    ),
+    PlatformPermissionRule(
+        resource=PlatformPermissionResource.SETTINGS_REQUESTS,
+        action=PlatformPermissionAction.REVIEW,
+        required_scopes=("tenant_admin",),
+        description="Review tenant settings requests before applying governance decisions.",
+    ),
+    PlatformPermissionRule(
+        resource=PlatformPermissionResource.SETTINGS_REQUESTS,
+        action=PlatformPermissionAction.APPROVE,
+        required_scopes=("tenant_admin",),
+        description="Approve or reject tenant settings requests.",
+    ),
+    PlatformPermissionRule(
+        resource=PlatformPermissionResource.AUDIT_LOGS,
+        action=PlatformPermissionAction.VIEW,
+        required_scopes=("ops_viewer", "security_admin"),
+        description="View platform audit logs and export audit evidence.",
     ),
 )
 
@@ -330,3 +415,27 @@ def get_endpoints_by_module(module: str) -> list[AccessRule]:
         List of access rules for this module
     """
     return [rule for rule in ACCESS_CONTROL_RULES if rule.module == module]
+
+
+def get_required_scopes_for_action(
+    resource: str | PlatformPermissionResource,
+    action: str | PlatformPermissionAction,
+) -> tuple[str, ...] | None:
+    """Get required scopes for a high-level action in a protected resource."""
+    if isinstance(resource, str):
+        try:
+            resource = PlatformPermissionResource(resource.strip().lower())
+        except ValueError:
+            return None
+
+    if isinstance(action, str):
+        try:
+            action = PlatformPermissionAction(action.strip().lower())
+        except ValueError:
+            return None
+
+    for rule in PLATFORM_PERMISSION_RULES:
+        if rule.resource == resource and rule.action == action:
+            return rule.required_scopes
+
+    return None

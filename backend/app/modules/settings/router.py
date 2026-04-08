@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import (
     get_current_restaurant_id,
     get_db,
-    require_platform_scopes,
+    require_platform_action,
     require_roles,
 )
 from app.modules.settings import service
@@ -56,7 +56,7 @@ def list_my_settings_requests(
 def list_pending_requests_for_super_admin(
     limit: int = Query(default=100, ge=1, le=500),
     restaurant_id: int | None = Query(default=None, ge=1),
-    _current_user: User = Depends(require_platform_scopes("ops_viewer", "tenant_admin")),
+    _current_user: User = Depends(require_platform_action("settings_requests", "view")),
     db: Session = Depends(get_db),
 ) -> SettingsRequestListResponse:
     return service.list_pending_settings_requests(
@@ -71,7 +71,7 @@ def list_reviewed_requests_for_super_admin(
     limit: int = Query(default=100, ge=1, le=500),
     restaurant_id: int | None = Query(default=None, ge=1),
     status_filter: str | None = Query(default=None),
-    _current_user: User = Depends(require_platform_scopes("ops_viewer", "tenant_admin")),
+    _current_user: User = Depends(require_platform_action("settings_requests", "view")),
     db: Session = Depends(get_db),
 ) -> SettingsRequestListResponse:
     try:
@@ -98,7 +98,7 @@ def list_reviewed_requests_for_super_admin(
 def review_settings_request(
     request_id: int,
     payload: SettingsRequestReviewRequest,
-    current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    current_user: User = Depends(require_platform_action("settings_requests", "approve")),
     db: Session = Depends(get_db),
 ) -> SettingsRequestReviewResponse:
     return service.review_settings_request(

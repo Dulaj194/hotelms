@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_platform_scopes
+from app.core.dependencies import get_db, require_platform_action
 from app.modules.audit_logs import service
 from app.modules.audit_logs.schemas import (
     AuditLogListResponse,
@@ -29,7 +29,7 @@ def list_audit_logs(
     severity: str | None = Query(default=None, pattern="^(info|success|warning|danger)$"),
     created_from: datetime | None = Query(default=None),
     created_to: datetime | None = Query(default=None),
-    _current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
+    _current_user=Depends(require_platform_action("audit_logs", "view")),
     db: Session = Depends(get_db),
 ) -> AuditLogListResponse:
     return service.list_audit_logs(
@@ -55,7 +55,7 @@ def export_audit_logs(
     severity: str | None = Query(default=None, pattern="^(info|success|warning|danger)$"),
     created_from: datetime | None = Query(default=None),
     created_to: datetime | None = Query(default=None),
-    _current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
+    _current_user=Depends(require_platform_action("audit_logs", "view")),
     db: Session = Depends(get_db),
 ) -> Response:
     csv_content = service.export_audit_logs_csv(
@@ -80,7 +80,7 @@ def export_audit_logs(
 @router.get("/notifications", response_model=SuperAdminNotificationListResponse)
 def list_super_admin_notifications(
     limit: int = Query(default=50, ge=1, le=200),
-    _current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
+    _current_user=Depends(require_platform_action("notifications_queue", "view")),
     db: Session = Depends(get_db),
 ) -> SuperAdminNotificationListResponse:
     return service.list_super_admin_notifications(db, limit=limit)
@@ -91,7 +91,7 @@ def list_super_admin_notifications(
     response_model=SuperAdminNotificationAssigneeListResponse,
 )
 def list_super_admin_notification_assignees(
-    _current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
+    _current_user=Depends(require_platform_action("notifications_queue", "view")),
     db: Session = Depends(get_db),
 ) -> SuperAdminNotificationAssigneeListResponse:
     return service.list_super_admin_notification_assignees(db)
@@ -104,7 +104,7 @@ def list_super_admin_notification_assignees(
 def update_super_admin_notification(
     notification_id: str,
     payload: SuperAdminNotificationUpdateRequest,
-    current_user=Depends(require_platform_scopes("ops_viewer", "security_admin")),
+    current_user=Depends(require_platform_action("notifications_queue", "mutate")),
     db: Session = Depends(get_db),
 ) -> SuperAdminNotificationResponse:
     return service.update_super_admin_notification(

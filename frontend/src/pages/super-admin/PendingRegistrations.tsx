@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 
 import ActionDialog from "@/components/shared/ActionDialog";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
+import { canPerformPlatformAction } from "@/features/platform-access/permissions";
+import { getUser } from "@/lib/auth";
 import { api } from "@/lib/api";
 import type {
   PendingRestaurantRegistrationListResponse,
@@ -27,6 +29,13 @@ type ReviewDialogState = {
 } | null;
 
 export default function PendingRegistrations() {
+  const currentUser = getUser();
+  const canApproveRegistrations = canPerformPlatformAction(
+    currentUser?.super_admin_scopes,
+    "registrations",
+    "approve",
+  );
+
   const [items, setItems] = useState<RestaurantRegistrationSummaryResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -76,6 +85,7 @@ export default function PendingRegistrations() {
   );
 
   function openReviewDialog(status: ReviewStatus) {
+    if (!canApproveRegistrations) return;
     if (!selectedItem) return;
     setReviewError(null);
     setReviewNotes("");
@@ -163,6 +173,12 @@ export default function PendingRegistrations() {
             </p>
           </div>
         </div>
+
+        {!canApproveRegistrations && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+            Read-only mode: You can view registration queues and history, but only Tenant Admin scope can approve or reject requests.
+          </div>
+        )}
 
         {pageMessage && (
           <div
@@ -259,20 +275,28 @@ export default function PendingRegistrations() {
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openReviewDialog("APPROVED")}
-                        className="app-btn-base bg-green-600 text-white hover:bg-green-700"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openReviewDialog("REJECTED")}
-                        className="app-btn-base bg-red-600 text-white hover:bg-red-700"
-                      >
-                        Reject
-                      </button>
+                      {canApproveRegistrations ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openReviewDialog("APPROVED")}
+                            className="app-btn-base bg-green-600 text-white hover:bg-green-700"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openReviewDialog("REJECTED")}
+                            className="app-btn-base bg-red-600 text-white hover:bg-red-700"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                          Read-only access
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -311,7 +335,7 @@ export default function PendingRegistrations() {
           </div>
         )}
 
-        {reviewDialog && (
+        {reviewDialog && canApproveRegistrations && (
           <ActionDialog
             title={
               reviewDialog.status === "APPROVED"

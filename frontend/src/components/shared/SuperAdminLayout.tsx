@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
+import { getRequiredScopesForPlatformAction } from "@/features/platform-access/permissions";
 import { clearAuth, getUser } from "@/lib/auth";
 import {
   clearInAppNavigationHistory,
@@ -13,12 +14,12 @@ const SUPER_ADMIN_NAV = [
   {
     path: "/super-admin/notifications",
     label: "Notifications",
-    scopes: ["ops_viewer", "security_admin"],
+    scopes: getRequiredScopesForPlatformAction("notifications_queue", "view"),
   },
   {
     path: "/super-admin/registrations",
     label: "Registrations",
-    scopes: ["tenant_admin"],
+    scopes: getRequiredScopesForPlatformAction("registrations", "view"),
   },
   {
     path: "/super-admin/restaurants",
@@ -29,7 +30,7 @@ const SUPER_ADMIN_NAV = [
   {
     path: "/super-admin/settings-requests",
     label: "Settings Requests",
-    scopes: ["tenant_admin"],
+    scopes: getRequiredScopesForPlatformAction("settings_requests", "view"),
   },
   {
     path: "/super-admin/site-content",
@@ -42,7 +43,11 @@ const SUPER_ADMIN_NAV = [
     label: "Platform Users",
     scopes: ["security_admin"],
   },
-  { path: "/super-admin/audit-logs", label: "Audit Logs", scopes: ["ops_viewer", "security_admin"] },
+  {
+    path: "/super-admin/audit-logs",
+    label: "Audit Logs",
+    scopes: getRequiredScopesForPlatformAction("audit_logs", "view"),
+  },
 ];
 
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.superAdmin";

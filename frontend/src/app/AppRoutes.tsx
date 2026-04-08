@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import PrivilegeRoute from "@/components/shared/PrivilegeRoute";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
+import { getRequiredScopesForPlatformAction } from "@/features/platform-access/permissions";
 import { getRoleRedirect, getUser, isAuthenticated, normalizeRole } from "@/lib/auth";
 import {
   BILLING_STAFF_ROLES,
@@ -410,7 +411,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={["super_admin"]}
-              requiredSuperAdminScopes={["ops_viewer", "security_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "notifications_queue",
+                "view",
+              )}
             >
               <SuperAdminNotifications />
             </ProtectedRoute>
@@ -421,7 +425,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={["super_admin"]}
-              requiredSuperAdminScopes={["tenant_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "registrations",
+                "view",
+              )}
             >
               <SuperAdminPendingRegistrations />
             </ProtectedRoute>
@@ -432,7 +439,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={["super_admin"]}
-              requiredSuperAdminScopes={["tenant_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "registrations",
+                "view",
+              )}
             >
               <SuperAdminRegistrationHistory />
             </ProtectedRoute>
@@ -465,7 +475,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={["super_admin"]}
-              requiredSuperAdminScopes={["tenant_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "settings_requests",
+                "view",
+              )}
             >
               <SuperAdminSettingsRequests />
             </ProtectedRoute>
@@ -487,7 +500,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={["super_admin"]}
-              requiredSuperAdminScopes={["tenant_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "settings_requests",
+                "view",
+              )}
             >
               <SuperAdminSettingsRequestHistory />
             </ProtectedRoute>
@@ -520,7 +536,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={["super_admin"]}
-              requiredSuperAdminScopes={["ops_viewer", "security_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "audit_logs",
+                "view",
+              )}
             >
               <SuperAdminAuditLogs />
             </ProtectedRoute>

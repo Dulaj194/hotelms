@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import (
     get_db,
+    require_platform_action,
     require_platform_scopes,
     require_restaurant_user,
     require_roles,
@@ -26,6 +27,8 @@ from app.modules.restaurants.schemas import (
     RestaurantRegistrationReviewRequest,
     RestaurantRegistrationReviewResponse,
     RestaurantStaffPasswordResetRequest,
+    RestaurantStaffPasswordRevealRequest,
+    RestaurantStaffPasswordRevealResponse,
     RestaurantStaffPasswordResetResponse,
     RestaurantUpdateRequest,
     RestaurantWebhookDeliveryActionResponse,
@@ -113,7 +116,7 @@ def list_restaurants(
 )
 def list_pending_registrations(
     limit: int = 100,
-    _current_user: User = Depends(require_platform_scopes("ops_viewer", "tenant_admin")),
+    _current_user: User = Depends(require_platform_action("registrations", "view")),
     db: Session = Depends(get_db),
 ) -> PendingRestaurantRegistrationListResponse:
     return service.list_pending_restaurant_registrations(db, limit=limit)
@@ -126,7 +129,7 @@ def list_pending_registrations(
 def list_registration_history(
     limit: int = 100,
     status_filter: str | None = None,
-    _current_user: User = Depends(require_platform_scopes("ops_viewer", "tenant_admin")),
+    _current_user: User = Depends(require_platform_action("registrations", "view")),
     db: Session = Depends(get_db),
 ) -> RestaurantRegistrationHistoryListResponse:
     try:
@@ -385,7 +388,7 @@ def delete_restaurant_by_id(
 def review_restaurant_registration(
     restaurant_id: int,
     payload: RestaurantRegistrationReviewRequest,
-    current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    current_user: User = Depends(require_platform_action("registrations", "approve")),
     db: Session = Depends(get_db),
 ) -> RestaurantRegistrationReviewResponse:
     return service.review_restaurant_registration(
@@ -467,6 +470,27 @@ def reset_restaurant_staff_password(
         restaurant_id=restaurant_id,
         user_id=user_id,
         payload=payload,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/users/{user_id}/reset-password/reveal",
+    response_model=RestaurantStaffPasswordRevealResponse,
+)
+def reveal_restaurant_staff_temporary_password(
+    restaurant_id: int,
+    user_id: int,
+    payload: RestaurantStaffPasswordRevealRequest,
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantStaffPasswordRevealResponse:
+    """Reveal reset password one time when email delivery fails."""
+    return service.reveal_restaurant_staff_temporary_password(
+        db,
+        restaurant_id=restaurant_id,
+        user_id=user_id,
+        reveal_token=payload.reveal_token,
         current_user_id=current_user.id,
     )
 

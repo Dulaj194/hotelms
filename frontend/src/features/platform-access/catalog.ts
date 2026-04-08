@@ -46,7 +46,7 @@ export function normalizePlatformScopes(
   values: string[] | null | undefined,
 ): PlatformScopeValue[] {
   if (!values) {
-    return [...DEFAULT_PLATFORM_SCOPES];
+    return [];
   }
 
   const normalized: PlatformScopeValue[] = [];

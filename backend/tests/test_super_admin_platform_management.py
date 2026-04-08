@@ -249,21 +249,29 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         restaurant = self._create_active_restaurant()
         owner = self._create_owner_for_restaurant(restaurant)
 
-        response = restaurants_service.reset_restaurant_staff_password(
-            self.db,
-            restaurant_id=restaurant.id,
-            user_id=owner.id,
-            payload=RestaurantStaffPasswordResetRequest(),
-            current_user_id=self.current_super_admin.id,
-        )
+        with patch(
+            "app.modules.restaurants.service.send_temporary_password_reset_email",
+            return_value=True,
+        ) as mocked_sender:
+            response = restaurants_service.reset_restaurant_staff_password(
+                self.db,
+                restaurant_id=restaurant.id,
+                user_id=owner.id,
+                payload=RestaurantStaffPasswordResetRequest(),
+                current_user_id=self.current_super_admin.id,
+            )
 
         self.db.refresh(owner)
         self.assertEqual(response.user_id, owner.id)
         self.assertEqual(response.role, "owner")
         self.assertTrue(response.must_change_password)
-        self.assertIsInstance(response.email_sent, bool)
+        self.assertTrue(response.email_sent)
+        self.assertIsNone(response.reveal_token)
+        self.assertIsNone(response.reveal_expires_at)
         self.assertTrue(owner.must_change_password)
-        self.assertTrue(verify_password(response.temporary_password, owner.password_hash))
+        generated_password = mocked_sender.call_args.kwargs["temporary_password"]
+        self.assertIn("sent to the user's email", response.message)
+        self.assertTrue(verify_password(generated_password, owner.password_hash))
 
     def test_super_admin_can_reset_admin_password_with_custom_temporary_password(self) -> None:
         restaurant = self._create_active_restaurant()
@@ -280,19 +288,24 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
             self.current_super_admin,
         )
 
-        response = restaurants_service.reset_restaurant_staff_password(
-            self.db,
-            restaurant_id=restaurant.id,
-            user_id=admin.id,
-            payload=RestaurantStaffPasswordResetRequest(temporary_password="TempAdmin123"),
-            current_user_id=self.current_super_admin.id,
-        )
+        with patch(
+            "app.modules.restaurants.service.send_temporary_password_reset_email",
+            return_value=True,
+        ) as mocked_sender:
+            response = restaurants_service.reset_restaurant_staff_password(
+                self.db,
+                restaurant_id=restaurant.id,
+                user_id=admin.id,
+                payload=RestaurantStaffPasswordResetRequest(temporary_password="TempAdmin123"),
+                current_user_id=self.current_super_admin.id,
+            )
 
         updated_admin = self.db.query(User).filter(User.id == admin.id).first()
         self.assertIsNotNone(updated_admin)
         assert updated_admin is not None
-        self.assertEqual(response.temporary_password, "TempAdmin123")
-        self.assertIsInstance(response.email_sent, bool)
+        self.assertTrue(response.email_sent)
+        self.assertIsNone(response.reveal_token)
+        self.assertEqual(mocked_sender.call_args.kwargs["temporary_password"], "TempAdmin123")
         self.assertTrue(updated_admin.must_change_password)
         self.assertTrue(verify_password("TempAdmin123", updated_admin.password_hash))
 
@@ -312,13 +325,65 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
                 current_user_id=self.current_super_admin.id,
             )
 
+        self.db.refresh(owner)
         self.assertTrue(response.email_sent)
         self.assertIn("sent to the user's email", response.message)
+        sent_password = mocked_sender.call_args.kwargs["temporary_password"]
         mocked_sender.assert_called_once_with(
             recipient_email=owner.email,
             recipient_name=owner.full_name,
             restaurant_name=restaurant.name,
-            temporary_password=response.temporary_password,
+            temporary_password=sent_password,
+        )
+        self.assertTrue(verify_password(sent_password, owner.password_hash))
+
+    def test_super_admin_reset_password_issues_secure_reveal_token_when_email_fails(self) -> None:
+        restaurant = self._create_active_restaurant()
+        owner = self._create_owner_for_restaurant(restaurant)
+
+        with patch(
+            "app.modules.restaurants.service.send_temporary_password_reset_email",
+            return_value=False,
+        ):
+            response = restaurants_service.reset_restaurant_staff_password(
+                self.db,
+                restaurant_id=restaurant.id,
+                user_id=owner.id,
+                payload=RestaurantStaffPasswordResetRequest(temporary_password="TempOwner123"),
+                current_user_id=self.current_super_admin.id,
+            )
+
+        self.db.refresh(owner)
+        self.assertFalse(response.email_sent)
+        self.assertIsNotNone(response.reveal_token)
+        self.assertIsNotNone(response.reveal_expires_at)
+        self.assertIn("secure one-time reveal flow", response.message)
+        self.assertTrue(verify_password("TempOwner123", owner.password_hash))
+
+        assert response.reveal_token is not None
+        reveal = restaurants_service.reveal_restaurant_staff_temporary_password(
+            self.db,
+            restaurant_id=restaurant.id,
+            user_id=owner.id,
+            reveal_token=response.reveal_token,
+            current_user_id=self.current_super_admin.id,
+        )
+        self.assertEqual(reveal.user_id, owner.id)
+        self.assertEqual(reveal.temporary_password, "TempOwner123")
+
+        with self.assertRaises(HTTPException) as ctx:
+            restaurants_service.reveal_restaurant_staff_temporary_password(
+                self.db,
+                restaurant_id=restaurant.id,
+                user_id=owner.id,
+                reveal_token=response.reveal_token,
+                current_user_id=self.current_super_admin.id,
+            )
+
+        self.assertEqual(ctx.exception.status_code, 404)
+        self.assertEqual(
+            ctx.exception.detail,
+            "Temporary password reveal token is invalid or expired.",
         )
 
     def test_super_admin_reset_password_rejects_non_owner_admin_roles(self) -> None:
