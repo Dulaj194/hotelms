@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import { canPerformPlatformAction } from "@/features/platform-access/permissions";
+import { bulkUpdateSuperAdminNotifications } from "@/features/super-admin/notifications/api";
 import {
   buildSnoozeUntilISOString,
   countNotificationsByStatus,
@@ -12,7 +13,10 @@ import {
 import { useSuperAdminOpsFeed } from "@/features/super-admin/notifications/useSuperAdminOpsFeed";
 import { getUser } from "@/lib/auth";
 import { formatDateTime, getApiErrorMessage } from "@/pages/super-admin/utils";
-import type { SuperAdminNotificationResponse } from "@/types/audit";
+import type {
+  SuperAdminNotificationBulkUpdateRequest,
+  SuperAdminNotificationResponse,
+} from "@/types/audit";
 
 type PageMessage =
   | {
@@ -34,6 +38,31 @@ const DEFAULT_CATEGORIES = [
   "security",
   "site_content",
 ];
+
+const REVIEW_REASON_TEMPLATE =
+  "Policy: <policy-check>; Evidence: <facts>; Decision: <approve/reject impact>.";
+const CRITICAL_REASON_MIN_LENGTH = 24;
+
+type QueueActionPayload = {
+  assigned_user_id?: number | null;
+  is_read?: boolean;
+  is_acknowledged?: boolean;
+  snoozed_until?: string | null;
+  is_archived?: boolean;
+  action_reason?: string | null;
+};
+
+type BulkQueueActionPayload = Omit<
+  SuperAdminNotificationBulkUpdateRequest,
+  "notification_ids" | "action_reason"
+>;
+
+function requiresActionReason(payload: {
+  is_acknowledged?: boolean | null;
+  is_archived?: boolean | null;
+}): boolean {
+  return payload.is_acknowledged === true || payload.is_archived === true || payload.is_archived === false;
+}
 
 function badgeClass(value: string): string {
   switch (value) {
@@ -125,6 +154,11 @@ export default function SuperAdminNotificationsPage() {
 
   const [busyById, setBusyById] = useState<Record<string, boolean>>({});
   const [pageMessage, setPageMessage] = useState<PageMessage>(null);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<string[]>([]);
+  const [bulkAssignedUserId, setBulkAssignedUserId] = useState<string>("");
+  const [bulkReason, setBulkReason] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [itemReasons, setItemReasons] = useState<Record<string, string>>({});
 
   const categories = useMemo(
     () => ["all", ...Array.from(new Set([...DEFAULT_CATEGORIES, ...items.map((item) => item.category)])).sort()],
@@ -139,9 +173,48 @@ export default function SuperAdminNotificationsPage() {
     });
   }, [currentUserId, items, ownershipFilter]);
 
+  const bulkSelectedSet = useMemo(() => new Set(bulkSelectedIds), [bulkSelectedIds]);
+
+  const allVisibleSelected =
+    visibleItems.length > 0 && visibleItems.every((item) => bulkSelectedSet.has(item.id));
+
+  useEffect(() => {
+    const visibleIdSet = new Set(visibleItems.map((item) => item.id));
+    setBulkSelectedIds((current) => current.filter((id) => visibleIdSet.has(id)));
+    setItemReasons((current) => {
+      const next: Record<string, string> = {};
+      for (const [id, reason] of Object.entries(current)) {
+        if (visibleIdSet.has(id)) {
+          next[id] = reason;
+        }
+      }
+      return next;
+    });
+  }, [visibleItems]);
+
+  function toggleBulkSelection(notificationId: string, checked: boolean) {
+    setBulkSelectedIds((current) => {
+      if (checked) {
+        return current.includes(notificationId) ? current : [...current, notificationId];
+      }
+      return current.filter((id) => id !== notificationId);
+    });
+  }
+
+  function toggleAllVisibleSelection(checked: boolean) {
+    const visibleIds = visibleItems.map((item) => item.id);
+    setBulkSelectedIds((current) => {
+      if (checked) {
+        return Array.from(new Set([...current, ...visibleIds]));
+      }
+      const visibleIdSet = new Set(visibleIds);
+      return current.filter((id) => !visibleIdSet.has(id));
+    });
+  }
+
   async function runQueueAction(
     notificationId: string,
-    payload: Parameters<typeof applyNotificationUpdate>[1],
+    payload: QueueActionPayload,
     successMessage: string,
   ) {
     if (!canMutateQueue) {
@@ -152,10 +225,26 @@ export default function SuperAdminNotificationsPage() {
       return;
     }
 
+    const needsReason = requiresActionReason(payload);
+    const actionReason = (itemReasons[notificationId] ?? "").trim();
+    if (needsReason && actionReason.length < CRITICAL_REASON_MIN_LENGTH) {
+      setPageMessage({
+        type: "err",
+        text:
+          `Critical queue actions require a reason with at least ${CRITICAL_REASON_MIN_LENGTH} characters. ` +
+          `Template: ${REVIEW_REASON_TEMPLATE}`,
+      });
+      return;
+    }
+
+    const requestPayload: QueueActionPayload = needsReason
+      ? { ...payload, action_reason: actionReason }
+      : payload;
+
     setBusyById((current) => ({ ...current, [notificationId]: true }));
     setPageMessage(null);
     try {
-      await applyNotificationUpdate(notificationId, payload);
+      await applyNotificationUpdate(notificationId, requestPayload);
       setPageMessage({ type: "ok", text: successMessage });
     } catch (actionError) {
       setPageMessage({
@@ -164,6 +253,68 @@ export default function SuperAdminNotificationsPage() {
       });
     } finally {
       setBusyById((current) => ({ ...current, [notificationId]: false }));
+    }
+  }
+
+  async function runBulkQueueAction(payload: BulkQueueActionPayload, successMessage: string) {
+    if (!canMutateQueue) {
+      setPageMessage({
+        type: "err",
+        text: "Read-only access: only Security Admin scope can run bulk queue operations.",
+      });
+      return;
+    }
+    if (bulkSelectedIds.length === 0) {
+      setPageMessage({ type: "err", text: "Select at least one queue item for bulk action." });
+      return;
+    }
+
+    const needsReason = requiresActionReason(payload);
+    const actionReason = bulkReason.trim();
+    if (needsReason && actionReason.length < CRITICAL_REASON_MIN_LENGTH) {
+      setPageMessage({
+        type: "err",
+        text:
+          `Critical bulk actions require a reason with at least ${CRITICAL_REASON_MIN_LENGTH} characters. ` +
+          `Template: ${REVIEW_REASON_TEMPLATE}`,
+      });
+      return;
+    }
+
+    setBulkBusy(true);
+    setPageMessage(null);
+    try {
+      const response = await bulkUpdateSuperAdminNotifications({
+        notification_ids: bulkSelectedIds,
+        ...payload,
+        action_reason: needsReason ? actionReason : undefined,
+      });
+
+      if (response.succeeded > 0) {
+        await refresh();
+      }
+
+      const failedIds = new Set(
+        response.results
+          .filter((result) => result.status === "error")
+          .map((result) => result.notification_id),
+      );
+      setBulkSelectedIds((current) => current.filter((id) => failedIds.has(id)));
+
+      setPageMessage({
+        type: response.failed > 0 ? "err" : "ok",
+        text:
+          response.failed > 0
+            ? `Bulk action partially completed (${response.succeeded} succeeded, ${response.failed} failed).`
+            : `${successMessage} (${response.succeeded} item${response.succeeded === 1 ? "" : "s"}).`,
+      });
+    } catch (actionError) {
+      setPageMessage({
+        type: "err",
+        text: getApiErrorMessage(actionError, "Failed to run bulk queue action."),
+      });
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -303,6 +454,137 @@ export default function SuperAdminNotificationsPage() {
           </div>
         )}
 
+        {canMutateQueue && visibleItems.length > 0 && (
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={(event) => toggleAllVisibleSelection(event.target.checked)}
+                  disabled={bulkBusy}
+                />
+                Select all visible ({visibleItems.length})
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  Selected: {bulkSelectedIds.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBulkSelectedIds([])}
+                  disabled={bulkBusy || bulkSelectedIds.length === 0}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-2 lg:col-span-2">
+                <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Bulk Assign Owner
+                </span>
+                <div className="flex gap-2">
+                  <select
+                    value={bulkAssignedUserId}
+                    onChange={(event) => setBulkAssignedUserId(event.target.value)}
+                    disabled={bulkBusy || assigneesLoading}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:opacity-50"
+                  >
+                    <option value="">Select owner</option>
+                    {assignees.map((assignee) => (
+                      <option key={assignee.user_id} value={assignee.user_id}>
+                        {assignee.full_name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void runBulkQueueAction(
+                        { assigned_user_id: Number(bulkAssignedUserId) },
+                        "Bulk queue owner update completed",
+                      )
+                    }
+                    disabled={bulkBusy || bulkSelectedIds.length === 0 || !bulkAssignedUserId}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Assign
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void runBulkQueueAction({ is_read: true }, "Bulk mark-read completed")}
+                disabled={bulkBusy || bulkSelectedIds.length === 0}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Mark Read
+              </button>
+              <button
+                type="button"
+                onClick={() => void runBulkQueueAction({ is_read: false }, "Bulk mark-unread completed")}
+                disabled={bulkBusy || bulkSelectedIds.length === 0}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Mark Unread
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void runBulkQueueAction(
+                    { is_acknowledged: true },
+                    "Bulk acknowledge completed",
+                  )
+                }
+                disabled={bulkBusy || bulkSelectedIds.length === 0}
+                className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-100 disabled:opacity-50"
+              >
+                Acknowledge
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void runBulkQueueAction({ is_archived: true }, "Bulk archive completed")
+                }
+                disabled={bulkBusy || bulkSelectedIds.length === 0}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Archive
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  void runBulkQueueAction({ is_archived: false }, "Bulk unarchive completed")
+                }
+                disabled={bulkBusy || bulkSelectedIds.length === 0}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Unarchive
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Critical Bulk Action Reason Template
+              </label>
+              <textarea
+                value={bulkReason}
+                onChange={(event) => setBulkReason(event.target.value)}
+                placeholder={REVIEW_REASON_TEMPLATE}
+                rows={3}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+              />
+              <p className="text-xs text-slate-500">
+                Required for bulk acknowledge/archive/unarchive. Minimum {CRITICAL_REASON_MIN_LENGTH} characters.
+              </p>
+            </div>
+          </div>
+        )}
+
         {loading && (
           <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
             Loading notification center...
@@ -333,6 +615,17 @@ export default function SuperAdminNotificationsPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
+                        {canMutateQueue ? (
+                          <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={bulkSelectedSet.has(item.id)}
+                              onChange={(event) => toggleBulkSelection(item.id, event.target.checked)}
+                              disabled={bulkBusy}
+                            />
+                            Select
+                          </label>
+                        ) : null}
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(item.severity)}`}>
                           {item.severity}
                         </span>
@@ -400,6 +693,27 @@ export default function SuperAdminNotificationsPage() {
                       {canMutateQueue ? (
                         <>
                           <div className="grid gap-3 md:grid-cols-3">
+                            <label className="space-y-2 md:col-span-3">
+                              <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Critical Action Reason
+                              </span>
+                              <textarea
+                                value={itemReasons[item.id] ?? ""}
+                                onChange={(event) =>
+                                  setItemReasons((current) => ({
+                                    ...current,
+                                    [item.id]: event.target.value,
+                                  }))
+                                }
+                                placeholder={REVIEW_REASON_TEMPLATE}
+                                rows={2}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                              />
+                              <p className="text-xs text-slate-500">
+                                Required for acknowledge/archive/unarchive actions. Minimum {CRITICAL_REASON_MIN_LENGTH} characters.
+                              </p>
+                            </label>
+
                             <label className="space-y-2">
                               <span className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                                 Assign Owner

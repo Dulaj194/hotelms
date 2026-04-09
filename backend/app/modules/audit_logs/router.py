@@ -13,6 +13,8 @@ from app.modules.audit_logs.schemas import (
     AuditLogExportJobResponse,
     AuditLogExportRequest,
     SuperAdminNotificationAssigneeListResponse,
+    SuperAdminNotificationBulkUpdateRequest,
+    SuperAdminNotificationBulkUpdateResponse,
     SuperAdminNotificationListResponse,
     SuperAdminNotificationResponse,
     SuperAdminNotificationUpdateRequest,
@@ -184,4 +186,20 @@ def update_super_admin_notification(
         notification_id,
         payload,
         current_user,
+    )
+
+
+@router.post(
+    "/notifications/bulk-update",
+    response_model=SuperAdminNotificationBulkUpdateResponse,
+)
+def bulk_update_super_admin_notifications(
+    payload: SuperAdminNotificationBulkUpdateRequest,
+    current_user=Depends(require_platform_action("notifications_queue", "mutate")),
+    db: Session = Depends(get_db),
+) -> SuperAdminNotificationBulkUpdateResponse:
+    return service.bulk_update_super_admin_notifications(
+        db,
+        payload=payload,
+        current_user=current_user,
     )

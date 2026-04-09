@@ -1,6 +1,8 @@
 import { api } from "@/lib/api";
 import type {
   SuperAdminNotificationAssigneeListResponse,
+  SuperAdminNotificationBulkUpdateRequest,
+  SuperAdminNotificationBulkUpdateResponse,
   SuperAdminNotificationListResponse,
   SuperAdminNotificationResponse,
   SuperAdminNotificationUpdateRequest,
@@ -39,6 +41,15 @@ export async function updateSuperAdminNotification(
 ): Promise<SuperAdminNotificationResponse> {
   return api.patch<SuperAdminNotificationResponse>(
     `/audit-logs/notifications/${encodeURIComponent(notificationId)}`,
+    payload,
+  );
+}
+
+export async function bulkUpdateSuperAdminNotifications(
+  payload: SuperAdminNotificationBulkUpdateRequest,
+): Promise<SuperAdminNotificationBulkUpdateResponse> {
+  return api.post<SuperAdminNotificationBulkUpdateResponse>(
+    "/audit-logs/notifications/bulk-update",
     payload,
   );
 }

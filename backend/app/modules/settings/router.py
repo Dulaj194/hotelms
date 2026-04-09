@@ -12,8 +12,11 @@ from app.core.dependencies import (
 from app.modules.settings import service
 from app.modules.settings.model import SettingsRequestStatus
 from app.modules.settings.schemas import (
+    SettingsRequestBulkReviewRequest,
+    SettingsRequestBulkReviewResponse,
     SettingsRequestCreateRequest,
     SettingsRequestListResponse,
+    SettingsRequestPendingCountResponse,
     SettingsRequestResponse,
     SettingsRequestReviewRequest,
     SettingsRequestReviewResponse,
@@ -70,6 +73,20 @@ def list_pending_requests_for_super_admin(
     )
 
 
+@router.get("/requests/pending/count", response_model=SettingsRequestPendingCountResponse)
+def get_pending_settings_request_count(
+    restaurant_id: int | None = Query(default=None, ge=1),
+    _current_user: User = Depends(require_platform_action("settings_requests", "view")),
+    db: Session = Depends(get_db),
+) -> SettingsRequestPendingCountResponse:
+    return SettingsRequestPendingCountResponse(
+        pending_count=service.get_pending_settings_requests_count(
+            db,
+            restaurant_id=restaurant_id,
+        )
+    )
+
+
 @router.get("/requests/history", response_model=SettingsRequestListResponse)
 def list_reviewed_requests_for_super_admin(
     limit: int = Query(default=50, ge=1, le=200),
@@ -112,6 +129,22 @@ def review_settings_request(
     return service.review_settings_request(
         db,
         request_id=request_id,
+        reviewer_user_id=current_user.id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/requests/bulk-review",
+    response_model=SettingsRequestBulkReviewResponse,
+)
+def bulk_review_settings_requests(
+    payload: SettingsRequestBulkReviewRequest,
+    current_user: User = Depends(require_platform_action("settings_requests", "approve")),
+    db: Session = Depends(get_db),
+) -> SettingsRequestBulkReviewResponse:
+    return service.bulk_review_settings_requests(
+        db,
         reviewer_user_id=current_user.id,
         payload=payload,
     )

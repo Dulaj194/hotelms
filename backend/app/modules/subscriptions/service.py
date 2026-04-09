@@ -124,7 +124,7 @@ class SubscriptionTransition:
 
 
 def _utcnow_naive() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _normalize_datetime(value: datetime | None) -> datetime | None:

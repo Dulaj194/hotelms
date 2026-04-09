@@ -102,6 +102,24 @@ export interface RestaurantResponse {
 
 export type RestaurantMeResponse = RestaurantResponse;
 
+export interface RestaurantSubscriptionSnapshotResponse {
+  restaurant_id: number;
+  status: string;
+  is_trial: boolean;
+  is_active: boolean;
+  is_expired: boolean;
+  package_id: number | null;
+  package_name: string | null;
+  package_code: string | null;
+  started_at: string | null;
+  expires_at: string | null;
+}
+
+export interface RestaurantOverviewListResponse {
+  items: RestaurantMeResponse[];
+  subscriptions: RestaurantSubscriptionSnapshotResponse[];
+}
+
 /**
  * SECURITY: restaurant_id is intentionally absent from this type.
  * The backend derives the current restaurant from the authenticated token.
@@ -164,6 +182,25 @@ export interface RestaurantRegistrationHistoryListResponse {
 export interface RestaurantRegistrationReviewRequest {
   status: Extract<RestaurantRegistrationStatus, "APPROVED" | "REJECTED">;
   review_notes?: string | null;
+}
+
+export interface RestaurantRegistrationBulkReviewRequest {
+  restaurant_ids: number[];
+  status: Extract<RestaurantRegistrationStatus, "APPROVED" | "REJECTED">;
+  review_notes?: string | null;
+}
+
+export interface RestaurantRegistrationBulkReviewResultItem {
+  restaurant_id: number;
+  status: "ok" | "error";
+  message: string;
+}
+
+export interface RestaurantRegistrationBulkReviewResponse {
+  total_requested: number;
+  succeeded: number;
+  failed: number;
+  results: RestaurantRegistrationBulkReviewResultItem[];
 }
 
 export interface RestaurantRegistrationReviewResponse {

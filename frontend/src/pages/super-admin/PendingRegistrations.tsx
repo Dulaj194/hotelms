@@ -7,6 +7,7 @@ import { canPerformPlatformAction } from "@/features/platform-access/permissions
 import { getUser } from "@/lib/auth";
 import { api } from "@/lib/api";
 import type {
+  RestaurantRegistrationBulkReviewResponse,
   PendingRestaurantRegistrationListResponse,
   RestaurantRegistrationReviewResponse,
   RestaurantRegistrationSummaryResponse,
@@ -27,6 +28,9 @@ type ReviewDialogState = {
   item: RestaurantRegistrationSummaryResponse;
   status: ReviewStatus;
 } | null;
+
+const REVIEW_REASON_TEMPLATE =
+  "Policy: <policy-check>; Evidence: <facts>; Decision: <approve/reject impact>.";
 
 export default function PendingRegistrations() {
   const currentUser = getUser();
@@ -51,6 +55,9 @@ export default function PendingRegistrations() {
   const [reviewNotes, setReviewNotes] = useState("");
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState<number[]>([]);
+  const [bulkReason, setBulkReason] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
     void loadRegistrations(true);
@@ -65,6 +72,10 @@ export default function PendingRegistrations() {
     if (!items.some((item) => item.restaurant_id === selectedId)) {
       setSelectedId(items[0].restaurant_id);
     }
+
+    setBulkSelectedIds((current) =>
+      current.filter((id) => items.some((item) => item.restaurant_id === id)),
+    );
   }, [items, selectedId]);
 
   async function loadRegistrations(reset: boolean) {
@@ -156,6 +167,65 @@ export default function PendingRegistrations() {
     }
   }
 
+  function toggleBulkSelection(restaurantId: number, checked: boolean) {
+    setBulkSelectedIds((current) => {
+      if (checked) {
+        return current.includes(restaurantId) ? current : [...current, restaurantId];
+      }
+      return current.filter((id) => id !== restaurantId);
+    });
+  }
+
+  async function runBulkReview(status: ReviewStatus) {
+    if (!canApproveRegistrations) {
+      setPageMessage({
+        type: "err",
+        text: "Read-only access: only Tenant Admin scope can bulk review registrations.",
+      });
+      return;
+    }
+    if (bulkSelectedIds.length === 0) {
+      setPageMessage({ type: "err", text: "Select at least one registration for bulk review." });
+      return;
+    }
+
+    setBulkBusy(true);
+    setPageMessage(null);
+    try {
+      const response = await api.post<RestaurantRegistrationBulkReviewResponse>(
+        "/restaurants/registrations/bulk-review",
+        {
+          restaurant_ids: bulkSelectedIds,
+          status,
+          review_notes: bulkReason.trim() || null,
+        },
+      );
+
+      const succeededIds = response.results
+        .filter((item) => item.status === "ok")
+        .map((item) => item.restaurant_id);
+      if (succeededIds.length > 0) {
+        setItems((current) => current.filter((item) => !succeededIds.includes(item.restaurant_id)));
+        setTotal((current) => Math.max(current - succeededIds.length, 0));
+      }
+      setBulkSelectedIds((current) => current.filter((id) => !succeededIds.includes(id)));
+      setPageMessage({
+        type: response.failed > 0 ? "err" : "ok",
+        text:
+          response.failed > 0
+            ? `Bulk review partially completed (${response.succeeded} succeeded, ${response.failed} failed).`
+            : `Bulk ${status === "APPROVED" ? "approval" : "rejection"} completed for ${response.succeeded} registration(s).`,
+      });
+    } catch (bulkError) {
+      setPageMessage({
+        type: "err",
+        text: getApiErrorMessage(bulkError, "Failed to run bulk registration review."),
+      });
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const submittedAtHint = selectedItem ? formatDateTime(selectedItem.created_at) : "-";
   const logoUrl = buildAssetUrl(selectedItem?.logo_url);
 
@@ -219,6 +289,38 @@ export default function PendingRegistrations() {
           </div>
         </div>
 
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bulk Review</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Reason template: {REVIEW_REASON_TEMPLATE}
+          </p>
+          <textarea
+            value={bulkReason}
+            onChange={(event) => setBulkReason(event.target.value)}
+            rows={3}
+            placeholder={REVIEW_REASON_TEMPLATE}
+            className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void runBulkReview("APPROVED")}
+              disabled={bulkBusy || bulkSelectedIds.length === 0}
+              className="app-btn-base bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+            >
+              {bulkBusy ? "Processing..." : `Bulk Approve (${bulkSelectedIds.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={() => void runBulkReview("REJECTED")}
+              disabled={bulkBusy || bulkSelectedIds.length === 0}
+              className="app-btn-base bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {bulkBusy ? "Processing..." : `Bulk Reject (${bulkSelectedIds.length})`}
+            </button>
+          </div>
+        </div>
+
         {!canApproveRegistrations && (
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
             Read-only mode: You can view registration queues and history, but only Tenant Admin scope can approve or reject requests.
@@ -275,6 +377,17 @@ export default function PendingRegistrations() {
                           : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                       }`}
                     >
+                      <label className="mb-2 inline-flex items-center gap-2 text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={bulkSelectedIds.includes(item.restaurant_id)}
+                          onChange={(event) =>
+                            toggleBulkSelection(item.restaurant_id, event.target.checked)
+                          }
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                        Select for bulk review
+                      </label>
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{item.name}</p>

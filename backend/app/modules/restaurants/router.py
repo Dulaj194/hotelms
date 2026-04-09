@@ -12,6 +12,7 @@ from app.modules.restaurants import integration_service
 from app.modules.restaurants import service
 from app.modules.restaurants.model import RegistrationStatus
 from app.modules.restaurants.schemas import (
+    PendingRestaurantRegistrationCountResponse,
     PendingRestaurantRegistrationListResponse,
     RestaurantApiKeyProvisionResponse,
     RestaurantApiKeySummaryResponse,
@@ -23,7 +24,10 @@ from app.modules.restaurants.schemas import (
     RestaurantIntegrationUpdateRequest,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
+    RestaurantOverviewListResponse,
     RestaurantRegistrationHistoryListResponse,
+    RestaurantRegistrationBulkReviewRequest,
+    RestaurantRegistrationBulkReviewResponse,
     RestaurantRegistrationReviewRequest,
     RestaurantRegistrationReviewResponse,
     RestaurantStaffPasswordResetRequest,
@@ -110,6 +114,22 @@ def list_restaurants(
     return service.list_all_restaurants(db)
 
 
+@router.get("/overview", response_model=RestaurantOverviewListResponse)
+def list_restaurants_overview(
+    _current_user: User = Depends(
+        require_platform_scopes(
+            "ops_viewer",
+            "tenant_admin",
+            "billing_admin",
+            "security_admin",
+        )
+    ),
+    db: Session = Depends(get_db),
+) -> RestaurantOverviewListResponse:
+    """List restaurants and latest subscription snapshots in one call."""
+    return service.list_restaurants_overview(db)
+
+
 @router.get(
     "/registrations/pending",
     response_model=PendingRestaurantRegistrationListResponse,
@@ -126,6 +146,19 @@ def list_pending_registrations(
         limit=limit,
         cursor=cursor,
         sort_order=sort,
+    )
+
+
+@router.get(
+    "/registrations/pending/count",
+    response_model=PendingRestaurantRegistrationCountResponse,
+)
+def get_pending_registration_count(
+    _current_user: User = Depends(require_platform_action("registrations", "view")),
+    db: Session = Depends(get_db),
+) -> PendingRestaurantRegistrationCountResponse:
+    return PendingRestaurantRegistrationCountResponse(
+        pending_count=service.get_pending_restaurant_registrations_count(db),
     )
 
 
@@ -416,6 +449,22 @@ def review_restaurant_registration(
     return service.review_restaurant_registration(
         db,
         restaurant_id=restaurant_id,
+        reviewer_user_id=current_user.id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/registrations/bulk-review",
+    response_model=RestaurantRegistrationBulkReviewResponse,
+)
+def bulk_review_restaurant_registrations(
+    payload: RestaurantRegistrationBulkReviewRequest,
+    current_user: User = Depends(require_platform_action("registrations", "approve")),
+    db: Session = Depends(get_db),
+) -> RestaurantRegistrationBulkReviewResponse:
+    return service.bulk_review_restaurant_registrations(
+        db,
         reviewer_user_id=current_user.id,
         payload=payload,
     )

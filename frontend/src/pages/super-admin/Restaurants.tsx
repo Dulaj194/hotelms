@@ -4,7 +4,6 @@ import ActionDialog from "@/components/shared/ActionDialog";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
 import {
-  buildSubscriptionStatusMap,
   createRestaurant,
   createRestaurantUser,
   deleteRestaurant,
@@ -18,7 +17,7 @@ import {
   getRestaurantSubscription,
   getRestaurantSubscriptionHistory,
   listPackages,
-  listRestaurants,
+  listRestaurantsOverview,
   listRestaurantUsers,
   refreshRestaurantWebhookHealth,
   revealRestaurantUserTemporaryPassword,
@@ -258,12 +257,16 @@ export default function SuperAdminRestaurants() {
   async function loadPage() {
     setLoading(true);
     try {
-      const [restaurants, packageItems] = await Promise.all([
-        listRestaurants(),
+      const [overview, packageItems] = await Promise.all([
+        listRestaurantsOverview(),
         canManageBilling ? listPackages() : Promise.resolve<PackageDetailResponse[]>([]),
       ]);
-      const statusMap = await buildSubscriptionStatusMap(restaurants);
-      setList(restaurants);
+
+      const statusMap = Object.fromEntries(
+        overview.subscriptions.map((item) => [item.restaurant_id, item.status]),
+      );
+
+      setList(overview.items);
       setPackages(packageItems);
       setSubscriptionStatusByHotel(statusMap);
       setFetchError(null);

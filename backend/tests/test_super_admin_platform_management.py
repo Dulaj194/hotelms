@@ -911,6 +911,41 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         self.assertIn("settings_request_submitted", event_types)
         self.assertIn("subscription_updated", event_types)
 
+    def test_super_admin_pending_counts_cover_registration_and_settings_queues(self) -> None:
+        first_restaurant, first_owner = self._create_pending_restaurant()
+        second_restaurant = self._create_active_restaurant()
+        second_owner = self._create_owner_for_restaurant(second_restaurant)
+
+        settings_service.create_settings_request(
+            self.db,
+            restaurant_id=first_restaurant.id,
+            requested_by=first_owner.id,
+            payload=SettingsRequestCreateRequest(
+                requested_changes={"reports": False},
+                request_reason="Count endpoint coverage for first restaurant.",
+            ),
+        )
+        settings_service.create_settings_request(
+            self.db,
+            restaurant_id=second_restaurant.id,
+            requested_by=second_owner.id,
+            payload=SettingsRequestCreateRequest(
+                requested_changes={"cashier": True},
+                request_reason="Count endpoint coverage for second restaurant.",
+            ),
+        )
+
+        registration_count = restaurants_service.get_pending_restaurant_registrations_count(self.db)
+        settings_count_all = settings_service.get_pending_settings_requests_count(self.db)
+        settings_count_first_restaurant = settings_service.get_pending_settings_requests_count(
+            self.db,
+            restaurant_id=first_restaurant.id,
+        )
+
+        self.assertEqual(registration_count, 1)
+        self.assertEqual(settings_count_all, 2)
+        self.assertEqual(settings_count_first_restaurant, 1)
+
     def test_notification_queue_supports_assignment_read_acknowledge_and_snooze(self) -> None:
         restaurant = self._create_active_restaurant()
         owner = self._create_owner_for_restaurant(restaurant)
@@ -976,6 +1011,10 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
             SuperAdminNotificationUpdateRequest(
                 is_acknowledged=True,
                 snoozed_until=None,
+                action_reason=(
+                    "Policy: queue closure protocol; Evidence: request reviewed and owner verified; "
+                    "Decision: acknowledge and finalize queue state."
+                ),
             ),
             self.current_super_admin,
         )

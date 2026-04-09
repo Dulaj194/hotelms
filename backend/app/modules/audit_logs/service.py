@@ -27,6 +27,9 @@ from app.modules.audit_logs.schemas import (
     AuditLogRestaurantResponse,
     SuperAdminNotificationAssigneeListResponse,
     SuperAdminNotificationAssigneeResponse,
+    SuperAdminNotificationBulkUpdateRequest,
+    SuperAdminNotificationBulkUpdateResponse,
+    SuperAdminNotificationBulkUpdateResultItem,
     SuperAdminNotificationListResponse,
     SuperAdminNotificationResponse,
     SuperAdminNotificationUpdateRequest,
@@ -1271,3 +1274,59 @@ def update_super_admin_notification(
         pass
 
     return response
+
+
+def bulk_update_super_admin_notifications(
+    db: Session,
+    *,
+    payload: SuperAdminNotificationBulkUpdateRequest,
+    current_user: object,
+) -> SuperAdminNotificationBulkUpdateResponse:
+    unique_ids = list(dict.fromkeys(payload.notification_ids))
+    action_payload: dict[str, Any] = {}
+    if payload.assigned_user_id is not None:
+        action_payload["assigned_user_id"] = payload.assigned_user_id
+    if payload.is_read is not None:
+        action_payload["is_read"] = payload.is_read
+    if payload.is_acknowledged is not None:
+        action_payload["is_acknowledged"] = payload.is_acknowledged
+    if payload.is_archived is not None:
+        action_payload["is_archived"] = payload.is_archived
+    if payload.action_reason:
+        action_payload["action_reason"] = payload.action_reason
+
+    results: list[SuperAdminNotificationBulkUpdateResultItem] = []
+    succeeded = 0
+
+    for notification_id in unique_ids:
+        try:
+            update_super_admin_notification(
+                db,
+                notification_id,
+                SuperAdminNotificationUpdateRequest(**action_payload),
+                current_user,
+            )
+            results.append(
+                SuperAdminNotificationBulkUpdateResultItem(
+                    notification_id=notification_id,
+                    status="ok",
+                    message="Updated successfully.",
+                )
+            )
+            succeeded += 1
+        except HTTPException as exc:
+            results.append(
+                SuperAdminNotificationBulkUpdateResultItem(
+                    notification_id=notification_id,
+                    status="error",
+                    message=str(exc.detail),
+                )
+            )
+
+    failed = len(unique_ids) - succeeded
+    return SuperAdminNotificationBulkUpdateResponse(
+        total_requested=len(unique_ids),
+        succeeded=succeeded,
+        failed=failed,
+        results=results,
+    )

@@ -32,7 +32,9 @@ from app.modules.restaurants.integration_service import DEFAULT_WEBHOOK_SECRET_H
 from app.modules.realtime import service as realtime_service
 from app.modules.reference_data import service as reference_data_service
 from app.modules.restaurants import repository
+from app.modules.subscriptions import repository as subscription_repository
 from app.modules.subscriptions import service as subscription_service
+from app.modules.subscriptions.model import RestaurantSubscription, SubscriptionStatus
 from app.modules.restaurants.model import (
     RegistrationStatus,
     RestaurantPasswordRevealToken,
@@ -51,7 +53,11 @@ from app.modules.restaurants.schemas import (
     RestaurantIntegrationResponse,
     RestaurantIntegrationSettingsResponse,
     RestaurantIntegrationUpdateRequest,
+    RestaurantOverviewListResponse,
     RestaurantRegistrationHistoryListResponse,
+    RestaurantRegistrationBulkReviewRequest,
+    RestaurantRegistrationBulkReviewResponse,
+    RestaurantRegistrationBulkReviewResultItem,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
     RestaurantRegistrationReviewRequest,
@@ -60,6 +66,7 @@ from app.modules.restaurants.schemas import (
     RestaurantStaffPasswordRevealResponse,
     RestaurantStaffPasswordResetRequest,
     RestaurantStaffPasswordResetResponse,
+    RestaurantSubscriptionSnapshotResponse,
     RestaurantUpdateRequest,
     RestaurantWebhookSecretSummaryResponse,
     RestaurantWebhookHealthRefreshResponse,
@@ -496,6 +503,73 @@ def list_all_restaurants(db: Session) -> list[RestaurantMeResponse]:
     return [_serialize_restaurant(r) for r in restaurants]
 
 
+def _build_subscription_snapshot(
+    restaurant_id: int,
+    subscription: RestaurantSubscription | None,
+) -> RestaurantSubscriptionSnapshotResponse:
+    if subscription is None:
+        return RestaurantSubscriptionSnapshotResponse(
+            restaurant_id=restaurant_id,
+            status="none",
+            is_trial=False,
+            is_active=False,
+            is_expired=False,
+            package_id=None,
+            package_name=None,
+            package_code=None,
+            started_at=None,
+            expires_at=None,
+        )
+
+    effective_expires_at = (
+        subscription.trial_expires_at if subscription.is_trial else subscription.expires_at
+    )
+    status_value = subscription.status.value
+    if (
+        status_value in {SubscriptionStatus.active.value, SubscriptionStatus.trial.value}
+        and effective_expires_at is not None
+        and effective_expires_at <= datetime.utcnow()
+    ):
+        status_value = SubscriptionStatus.expired.value
+
+    return RestaurantSubscriptionSnapshotResponse(
+        restaurant_id=restaurant_id,
+        status=status_value,
+        is_trial=bool(subscription.is_trial),
+        is_active=status_value in {SubscriptionStatus.active.value, SubscriptionStatus.trial.value},
+        is_expired=status_value == SubscriptionStatus.expired.value,
+        package_id=subscription.package_id,
+        package_name=subscription.package.name if subscription.package else None,
+        package_code=subscription.package.code if subscription.package else None,
+        started_at=subscription.started_at,
+        expires_at=effective_expires_at,
+    )
+
+
+def list_restaurants_overview(db: Session) -> RestaurantOverviewListResponse:
+    """List restaurants with latest subscription snapshots in a single backend call."""
+    restaurants = repository.list_all_for_super_admin(db)
+    restaurant_ids = [restaurant.id for restaurant in restaurants]
+    latest_subscriptions = subscription_repository.list_latest_subscriptions_by_restaurant_ids(
+        db,
+        restaurant_ids,
+    )
+    subscription_by_restaurant_id = {
+        subscription.restaurant_id: subscription for subscription in latest_subscriptions
+    }
+
+    return RestaurantOverviewListResponse(
+        items=[_serialize_restaurant(restaurant) for restaurant in restaurants],
+        subscriptions=[
+            _build_subscription_snapshot(
+                restaurant.id,
+                subscription_by_restaurant_id.get(restaurant.id),
+            )
+            for restaurant in restaurants
+        ],
+    )
+
+
 def list_pending_restaurant_registrations(
     db: Session,
     *,
@@ -535,6 +609,10 @@ def list_pending_restaurant_registrations(
         next_cursor=next_cursor,
         has_more=has_more,
     )
+
+
+def get_pending_restaurant_registrations_count(db: Session) -> int:
+    return repository.count_by_registration_status(db, RegistrationStatus.PENDING)
 
 
 def list_restaurant_registration_history(
@@ -1198,6 +1276,53 @@ def review_restaurant_registration(
     return RestaurantRegistrationReviewResponse(
         message=message,
         registration=_serialize_registration_summary_with_db(db, restaurant),
+    )
+
+
+def bulk_review_restaurant_registrations(
+    db: Session,
+    *,
+    reviewer_user_id: int,
+    payload: RestaurantRegistrationBulkReviewRequest,
+) -> RestaurantRegistrationBulkReviewResponse:
+    unique_ids = list(dict.fromkeys(payload.restaurant_ids))
+    results: list[RestaurantRegistrationBulkReviewResultItem] = []
+    succeeded = 0
+
+    for restaurant_id in unique_ids:
+        try:
+            review_restaurant_registration(
+                db,
+                restaurant_id=restaurant_id,
+                reviewer_user_id=reviewer_user_id,
+                payload=RestaurantRegistrationReviewRequest(
+                    status=payload.status,
+                    review_notes=payload.review_notes,
+                ),
+            )
+            results.append(
+                RestaurantRegistrationBulkReviewResultItem(
+                    restaurant_id=restaurant_id,
+                    status="ok",
+                    message="Reviewed successfully.",
+                )
+            )
+            succeeded += 1
+        except HTTPException as exc:
+            results.append(
+                RestaurantRegistrationBulkReviewResultItem(
+                    restaurant_id=restaurant_id,
+                    status="error",
+                    message=str(exc.detail),
+                )
+            )
+
+    failed = len(unique_ids) - succeeded
+    return RestaurantRegistrationBulkReviewResponse(
+        total_requested=len(unique_ids),
+        succeeded=succeeded,
+        failed=failed,
+        results=results,
     )
 
 

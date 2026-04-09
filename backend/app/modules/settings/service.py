@@ -15,6 +15,9 @@ from app.modules.restaurants import repository as restaurant_repository
 from app.modules.settings import repository
 from app.modules.settings.model import SettingsRequestStatus
 from app.modules.settings.schemas import (
+    SettingsRequestBulkReviewRequest,
+    SettingsRequestBulkReviewResponse,
+    SettingsRequestBulkReviewResultItem,
     SettingsRequestCreateRequest,
     SettingsRequestListResponse,
     SettingsRequestResponse,
@@ -211,6 +214,17 @@ def list_pending_settings_requests(
     )
 
 
+def get_pending_settings_requests_count(
+    db: Session,
+    *,
+    restaurant_id: int | None = None,
+) -> int:
+    return repository.count_pending_requests(
+        db,
+        restaurant_id=restaurant_id,
+    )
+
+
 def list_reviewed_settings_requests(
     db: Session,
     *,
@@ -333,4 +347,51 @@ def review_settings_request(
     return SettingsRequestReviewResponse(
         message=message,
         request=SettingsRequestResponse.model_validate(request),
+    )
+
+
+def bulk_review_settings_requests(
+    db: Session,
+    *,
+    reviewer_user_id: int,
+    payload: SettingsRequestBulkReviewRequest,
+) -> SettingsRequestBulkReviewResponse:
+    unique_ids = list(dict.fromkeys(payload.request_ids))
+    results: list[SettingsRequestBulkReviewResultItem] = []
+    succeeded = 0
+
+    for request_id in unique_ids:
+        try:
+            review_settings_request(
+                db,
+                request_id=request_id,
+                reviewer_user_id=reviewer_user_id,
+                payload=SettingsRequestReviewRequest(
+                    status=payload.status,
+                    review_notes=payload.review_notes,
+                ),
+            )
+            results.append(
+                SettingsRequestBulkReviewResultItem(
+                    request_id=request_id,
+                    status="ok",
+                    message="Reviewed successfully.",
+                )
+            )
+            succeeded += 1
+        except HTTPException as exc:
+            results.append(
+                SettingsRequestBulkReviewResultItem(
+                    request_id=request_id,
+                    status="error",
+                    message=str(exc.detail),
+                )
+            )
+
+    failed = len(unique_ids) - succeeded
+    return SettingsRequestBulkReviewResponse(
+        total_requested=len(unique_ids),
+        succeeded=succeeded,
+        failed=failed,
+        results=results,
     )

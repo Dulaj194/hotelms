@@ -70,6 +70,29 @@ export interface SuperAdminNotificationUpdateRequest {
   is_acknowledged?: boolean;
   snoozed_until?: string | null;
   is_archived?: boolean;
+  action_reason?: string | null;
+}
+
+export interface SuperAdminNotificationBulkUpdateRequest {
+  notification_ids: string[];
+  assigned_user_id?: number | null;
+  is_read?: boolean;
+  is_acknowledged?: boolean;
+  is_archived?: boolean;
+  action_reason?: string | null;
+}
+
+export interface SuperAdminNotificationBulkUpdateResultItem {
+  notification_id: string;
+  status: "ok" | "error";
+  message: string;
+}
+
+export interface SuperAdminNotificationBulkUpdateResponse {
+  total_requested: number;
+  succeeded: number;
+  failed: number;
+  results: SuperAdminNotificationBulkUpdateResultItem[];
 }
 
 export interface SuperAdminNotificationAssigneeResponse {

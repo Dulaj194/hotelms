@@ -32,6 +32,25 @@ export interface SettingsRequestReviewRequest {
   review_notes?: string | null;
 }
 
+export interface SettingsRequestBulkReviewRequest {
+  request_ids: number[];
+  status: Extract<SettingsRequestStatus, "APPROVED" | "REJECTED">;
+  review_notes?: string | null;
+}
+
+export interface SettingsRequestBulkReviewResultItem {
+  request_id: number;
+  status: "ok" | "error";
+  message: string;
+}
+
+export interface SettingsRequestBulkReviewResponse {
+  total_requested: number;
+  succeeded: number;
+  failed: number;
+  results: SettingsRequestBulkReviewResultItem[];
+}
+
 export interface SettingsRequestReviewResponse {
   message: string;
   request: SettingsRequestResponse;

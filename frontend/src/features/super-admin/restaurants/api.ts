@@ -10,6 +10,7 @@ import type {
   RestaurantWebhookDeliveryActionResponse,
   RestaurantLogoUploadResponse,
   RestaurantMeResponse,
+  RestaurantOverviewListResponse,
   RestaurantWebhookSecretProvisionResponse,
   RestaurantWebhookSecretSummary,
   RestaurantWebhookHealthRefreshResponse,
@@ -32,6 +33,10 @@ import type {
 
 export async function listRestaurants(): Promise<RestaurantMeResponse[]> {
   return api.get<RestaurantMeResponse[]>("/restaurants");
+}
+
+export async function listRestaurantsOverview(): Promise<RestaurantOverviewListResponse> {
+  return api.get<RestaurantOverviewListResponse>("/restaurants/overview");
 }
 
 export async function listPackages(): Promise<PackageDetailResponse[]> {
@@ -264,20 +269,4 @@ export async function deleteRestaurantUser(
   userId: number,
 ): Promise<GenericMessageResponse> {
   return api.delete<GenericMessageResponse>(`/restaurants/${restaurantId}/users/${userId}`);
-}
-
-export async function buildSubscriptionStatusMap(
-  restaurants: RestaurantMeResponse[],
-): Promise<Record<number, string>> {
-  const entries = await Promise.all(
-    restaurants.map(async (restaurant) => {
-      try {
-        const subscription = await getRestaurantSubscription(restaurant.id);
-        return [restaurant.id, subscription.status] as const;
-      } catch {
-        return [restaurant.id, "none"] as const;
-      }
-    }),
-  );
-  return Object.fromEntries(entries);
 }

@@ -8,6 +8,7 @@ import { canPerformPlatformAction } from "@/features/platform-access/permissions
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import type {
+  SettingsRequestBulkReviewResponse,
   SettingsRequestListResponse,
   SettingsRequestResponse,
   SettingsRequestReviewResponse,
@@ -24,6 +25,9 @@ type ReviewDialogState = {
   request: SettingsRequestResponse;
   status: ReviewStatus;
 } | null;
+
+const REVIEW_REASON_TEMPLATE =
+  "Policy: <policy-check>; Evidence: <facts>; Decision: <approve/reject impact>.";
 
 function formatDateTime(value: string | null): string {
   if (!value) return "-";
@@ -77,6 +81,9 @@ export default function SuperAdminSettingsRequests() {
   const [reviewNotes, setReviewNotes] = useState("");
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [bulkSelectedRequestIds, setBulkSelectedRequestIds] = useState<number[]>([]);
+  const [bulkReason, setBulkReason] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const selectedRequest = useMemo(
     () => items.find((item) => item.request_id === selectedRequestId) ?? null,
@@ -140,6 +147,9 @@ export default function SuperAdminSettingsRequests() {
     if (!items.some((item) => item.request_id === selectedRequestId)) {
       setSelectedRequestId(items[0].request_id);
     }
+    setBulkSelectedRequestIds((current) =>
+      current.filter((id) => items.some((item) => item.request_id === id)),
+    );
   }, [items, selectedRequestId]);
 
   async function applyRestaurantFilter() {
@@ -162,6 +172,15 @@ export default function SuperAdminSettingsRequests() {
       return;
     }
     await loadPendingRequests(false);
+  }
+
+  function toggleBulkSelection(requestId: number, checked: boolean) {
+    setBulkSelectedRequestIds((current) => {
+      if (checked) {
+        return current.includes(requestId) ? current : [...current, requestId];
+      }
+      return current.filter((id) => id !== requestId);
+    });
   }
 
   function openReviewDialog(status: ReviewStatus) {
@@ -197,6 +216,57 @@ export default function SuperAdminSettingsRequests() {
       setReviewError(getErrorMessage(err, "Failed to review settings request."));
     } finally {
       setReviewBusy(false);
+    }
+  }
+
+  async function runBulkReview(status: ReviewStatus) {
+    if (!canApproveSettingsRequests) {
+      setActionMsg({
+        type: "err",
+        text: "Read-only access: only Tenant Admin scope can bulk review settings requests.",
+      });
+      return;
+    }
+    if (bulkSelectedRequestIds.length === 0) {
+      setActionMsg({ type: "err", text: "Select at least one request for bulk review." });
+      return;
+    }
+
+    setBulkBusy(true);
+    setActionMsg(null);
+    try {
+      const response = await api.post<SettingsRequestBulkReviewResponse>(
+        "/settings/requests/bulk-review",
+        {
+          request_ids: bulkSelectedRequestIds,
+          status,
+          review_notes: bulkReason.trim() || null,
+        },
+      );
+
+      const succeededIds = response.results
+        .filter((item) => item.status === "ok")
+        .map((item) => item.request_id);
+      if (succeededIds.length > 0) {
+        setItems((current) => current.filter((item) => !succeededIds.includes(item.request_id)));
+        setTotal((current) => Math.max(current - succeededIds.length, 0));
+      }
+      setBulkSelectedRequestIds((current) => current.filter((id) => !succeededIds.includes(id)));
+
+      setActionMsg({
+        type: response.failed > 0 ? "err" : "ok",
+        text:
+          response.failed > 0
+            ? `Bulk review partially completed (${response.succeeded} succeeded, ${response.failed} failed).`
+            : `Bulk ${status === "APPROVED" ? "approval" : "rejection"} completed for ${response.succeeded} request(s).`,
+      });
+    } catch (err) {
+      setActionMsg({
+        type: "err",
+        text: getErrorMessage(err, "Failed to run bulk settings review."),
+      });
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -282,6 +352,36 @@ export default function SuperAdminSettingsRequests() {
               </select>
             </label>
           </div>
+
+          <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Bulk Review</p>
+            <p className="mt-1 text-xs text-gray-600">Reason template: {REVIEW_REASON_TEMPLATE}</p>
+            <textarea
+              value={bulkReason}
+              onChange={(e) => setBulkReason(e.target.value)}
+              rows={3}
+              placeholder={REVIEW_REASON_TEMPLATE}
+              className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void runBulkReview("APPROVED")}
+                disabled={bulkBusy || bulkSelectedRequestIds.length === 0}
+                className="rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {bulkBusy ? "Processing..." : `Bulk Approve (${bulkSelectedRequestIds.length})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => void runBulkReview("REJECTED")}
+                disabled={bulkBusy || bulkSelectedRequestIds.length === 0}
+                className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {bulkBusy ? "Processing..." : `Bulk Reject (${bulkSelectedRequestIds.length})`}
+              </button>
+            </div>
+          </div>
         </div>
 
         {!canApproveSettingsRequests && (
@@ -340,6 +440,17 @@ export default function SuperAdminSettingsRequests() {
                           : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                       }`}
                     >
+                      <label className="mb-2 inline-flex items-center gap-2 text-xs text-gray-600">
+                        <input
+                          type="checkbox"
+                          checked={bulkSelectedRequestIds.includes(item.request_id)}
+                          onChange={(event) =>
+                            toggleBulkSelection(item.request_id, event.target.checked)
+                          }
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                        Select for bulk review
+                      </label>
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-semibold text-gray-900">Request #{item.request_id}</p>
                         <span

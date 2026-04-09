@@ -1,11 +1,16 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 RegistrationStatusValue = Literal["PENDING", "APPROVED", "REJECTED"]
 WebhookHealthStatusValue = Literal["not_configured", "healthy", "degraded", "disabled"]
 WebhookDeliveryStatusValue = Literal["success", "failed"]
+
+REVIEW_REASON_MIN_LENGTH = 24
+REVIEW_REASON_POLICY_TEMPLATE = (
+    "Policy: <policy-check>; Evidence: <facts>; Decision: <approve/reject impact>."
+)
 
 
 class RestaurantFeatureFlagsResponse(BaseModel):
@@ -310,6 +315,10 @@ class PendingRestaurantRegistrationListResponse(BaseModel):
     has_more: bool = False
 
 
+class PendingRestaurantRegistrationCountResponse(BaseModel):
+    pending_count: int
+
+
 class RestaurantRegistrationHistoryListResponse(BaseModel):
     items: list[RestaurantRegistrationSummaryResponse]
     total: int
@@ -320,6 +329,45 @@ class RestaurantRegistrationHistoryListResponse(BaseModel):
 class RestaurantRegistrationReviewRequest(BaseModel):
     status: Literal["APPROVED", "REJECTED"]
     review_notes: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_reason_policy(self):
+        if self.status == "REJECTED":
+            if not self.review_notes or len(self.review_notes.strip()) < REVIEW_REASON_MIN_LENGTH:
+                raise ValueError(
+                    "Rejected reviews require a structured reason. "
+                    f"Use template: {REVIEW_REASON_POLICY_TEMPLATE}"
+                )
+        return self
+
+
+class RestaurantRegistrationBulkReviewRequest(BaseModel):
+    restaurant_ids: list[int] = Field(default_factory=list, min_length=1, max_length=100)
+    status: Literal["APPROVED", "REJECTED"]
+    review_notes: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_bulk_reason_policy(self):
+        if self.status == "REJECTED":
+            if not self.review_notes or len(self.review_notes.strip()) < REVIEW_REASON_MIN_LENGTH:
+                raise ValueError(
+                    "Rejected bulk reviews require a structured reason. "
+                    f"Use template: {REVIEW_REASON_POLICY_TEMPLATE}"
+                )
+        return self
+
+
+class RestaurantRegistrationBulkReviewResultItem(BaseModel):
+    restaurant_id: int
+    status: Literal["ok", "error"]
+    message: str
+
+
+class RestaurantRegistrationBulkReviewResponse(BaseModel):
+    total_requested: int
+    succeeded: int
+    failed: int
+    results: list[RestaurantRegistrationBulkReviewResultItem]
 
 
 class RestaurantRegistrationReviewResponse(BaseModel):

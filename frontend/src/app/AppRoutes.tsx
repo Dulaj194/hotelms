@@ -435,6 +435,10 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/super-admin/pending-registrations"
+          element={<Navigate to="/super-admin/registrations" replace />}
+        />
+        <Route
           path="/super-admin/registrations/history"
           element={
             <ProtectedRoute
@@ -460,6 +464,10 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/super-admin/manage-restaurants"
+          element={<Navigate to="/super-admin/restaurants" replace />}
+        />
+        <Route
           path="/super-admin/packages"
           element={
             <ProtectedRoute
@@ -483,6 +491,10 @@ function AppRoutes() {
               <SuperAdminSettingsRequests />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/super-admin/pending-approvals"
+          element={<Navigate to="/super-admin/settings-requests" replace />}
         />
         <Route
           path="/super-admin/site-content"
@@ -544,6 +556,10 @@ function AppRoutes() {
               <SuperAdminAuditLogs />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/super-admin/login"
+          element={<Navigate to="/login/super-admin" replace />}
         />
 
         <Route path="/admin" element={<RootRedirect />} />
