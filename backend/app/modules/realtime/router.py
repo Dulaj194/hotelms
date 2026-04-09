@@ -36,12 +36,14 @@ from app.core.config import settings
 from app.core.security import decode_token
 from app.db.session import SessionLocal
 from app.modules.access import catalog as access_catalog
+from app.modules.access import role_catalog
 from app.modules.platform_access import catalog as platform_access_catalog
 from app.modules.realtime.repository import (
     get_billing_channel,
     get_order_channel,
     get_super_admin_channel,
 )
+from app.modules.users.model import UserRole
 from app.modules.users.repository import get_by_id_global
 
 logger = logging.getLogger(__name__)
@@ -49,9 +51,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Roles allowed to receive the kitchen real-time stream
-_KITCHEN_ROLES = frozenset({"owner", "admin", "steward"})
-_BILLING_ROLES = frozenset({"owner", "admin", "steward", "cashier", "accountant"})
-_SUPER_ADMIN_ROLES = frozenset({"super_admin"})
+_KITCHEN_ROLES = frozenset(role.value for role in role_catalog.QR_MENU_STAFF_ROLES)
+_BILLING_ROLES = frozenset(role.value for role in role_catalog.BILLING_STAFF_ROLES)
+_SUPER_ADMIN_ROLES = frozenset(role.value for role in role_catalog.SUPER_ADMIN_ONLY_ROLES)
+_STEWARD_ROLE = UserRole.steward.value
 
 # Close code 4001 = auth rejection for this endpoint.
 _WS_CODE_UNAUTHORIZED = 4001
@@ -150,7 +153,7 @@ def _restaurant_allows_kitchen_stream(db: Session, restaurant_id: int, role: str
     feature_flags = access_catalog.build_feature_flag_snapshot(restaurant)
     if not feature_flags.get("kds", True):
         return False
-    if role == "steward" and not feature_flags.get("steward", True):
+    if role == _STEWARD_ROLE and not feature_flags.get("steward", True):
         return False
     return True
 

@@ -8,6 +8,7 @@ from app.core.dependencies import (
     require_restaurant_user,
     require_roles,
 )
+from app.modules.access import role_catalog
 from app.modules.subscriptions import service
 from app.modules.subscriptions.schemas import (
     ActivateSubscriptionRequest,
@@ -25,6 +26,8 @@ from app.modules.subscriptions.schemas import (
 from app.modules.users.model import User
 
 router = APIRouter()
+
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 
 
 @router.get("/me", response_model=SubscriptionResponse)
@@ -63,7 +66,7 @@ def get_my_subscription_access(
 def start_trial(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
 ) -> StartTrialResponse:
     return service.start_trial(
         db,
@@ -77,7 +80,7 @@ def activate_subscription(
     payload: ActivateSubscriptionRequest,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
 ) -> ActivateSubscriptionResponse:
     return service.activate_subscription(
         db,
@@ -91,7 +94,7 @@ def activate_subscription(
 def cancel_subscription(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
 ) -> CancelSubscriptionResponse:
     return service.cancel_subscription(
         db,

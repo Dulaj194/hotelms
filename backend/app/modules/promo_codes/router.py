@@ -9,6 +9,7 @@ from app.core.dependencies import (
     require_platform_scopes,
     require_roles,
 )
+from app.modules.access import role_catalog
 from app.modules.promo_codes import service
 from app.modules.promo_codes.schemas import (
     PromoCodeConsumeRequest,
@@ -23,6 +24,8 @@ from app.modules.promo_codes.schemas import (
 from app.modules.users.model import User
 
 router = APIRouter()
+
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 
 
 @router.get("", response_model=PromoCodeListResponse)
@@ -46,7 +49,7 @@ def create_promo_code(
 def validate_promo_code(
     payload: PromoCodeValidateRequest,
     restaurant_id: int = Depends(get_current_restaurant_id),
-    _current_user: User = Depends(require_roles("owner", "admin")),
+    _current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> PromoCodeValidationResponse:
     return service.validate_promo_for_restaurant(
@@ -60,7 +63,7 @@ def validate_promo_code(
 def consume_promo_code(
     payload: PromoCodeConsumeRequest,
     restaurant_id: int = Depends(get_current_restaurant_id),
-    _current_user: User = Depends(require_roles("owner", "admin")),
+    _current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> PromoCodeUsageResponse:
     return service.consume_promo_for_restaurant(

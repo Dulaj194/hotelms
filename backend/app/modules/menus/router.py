@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
+from app.modules.access import role_catalog
 from app.modules.menus import service
 from app.modules.menus.schemas import (
     MenuCreateRequest,
@@ -13,10 +14,12 @@ from app.modules.users.model import User
 
 router = APIRouter()
 
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
+
 
 @router.get("", response_model=list[MenuResponse])
 def list_menus(
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> list[MenuResponse]:
     return service.list_menus(db, current_user.restaurant_id)  # type: ignore[arg-type]
@@ -25,7 +28,7 @@ def list_menus(
 @router.post("", response_model=MenuResponse, status_code=status.HTTP_201_CREATED)
 def add_menu(
     payload: MenuCreateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> MenuResponse:
     """SECURITY: restaurant_id comes from token, not payload."""
@@ -37,7 +40,7 @@ def add_menu(
 @router.get("/{menu_id}", response_model=MenuResponse)
 def get_menu(
     menu_id: int,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> MenuResponse:
     return service.get_menu(db, menu_id, current_user.restaurant_id)  # type: ignore[arg-type]
@@ -47,7 +50,7 @@ def get_menu(
 def update_menu(
     menu_id: int,
     payload: MenuUpdateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> MenuResponse:
     return service.update_menu(db, menu_id, current_user.restaurant_id, payload)  # type: ignore[arg-type]
@@ -56,7 +59,7 @@ def update_menu(
 @router.delete("/{menu_id}")
 def delete_menu(
     menu_id: int,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> dict:
     return service.delete_menu(db, menu_id, current_user.restaurant_id)  # type: ignore[arg-type]
@@ -66,7 +69,7 @@ def delete_menu(
 async def upload_menu_image(
     menu_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> MenuImageUploadResponse:
     """Upload/replace menu image. Owner/admin only.

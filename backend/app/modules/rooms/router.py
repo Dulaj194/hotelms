@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_restaurant_id, get_db, require_roles
+from app.modules.access import role_catalog
 from app.modules.rooms import service
 from app.modules.rooms.schemas import (
     RoomCreateRequest,
@@ -20,8 +21,8 @@ from app.modules.rooms.schemas import (
 
 router = APIRouter()
 
-_ROOM_READ_ROLES = ("owner", "admin", "housekeeper")
-_ROOM_WRITE_ROLES = ("owner", "admin")
+_ROOM_READ_ROLES = role_catalog.ROOM_READ_ROLES
+_ROOM_WRITE_ROLES = role_catalog.ROOM_WRITE_ROLES
 
 
 @router.get("", response_model=RoomListResponse)

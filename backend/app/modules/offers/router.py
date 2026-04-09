@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_module_access, require_roles
+from app.modules.access import role_catalog
 from app.modules.offers import service
 from app.modules.offers.schemas import (
     OfferCreateRequest,
@@ -14,9 +15,11 @@ from app.modules.users.model import User
 
 router = APIRouter()
 
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
+
 
 def _require_offers_restaurant_id(
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     _: None = Depends(require_module_access("offers")),
 ) -> int:
     if current_user.restaurant_id is None:

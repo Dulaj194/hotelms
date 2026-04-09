@@ -9,6 +9,7 @@ from app.core.dependencies import (
     require_platform_action,
     require_roles,
 )
+from app.modules.access import role_catalog
 from app.modules.settings import service
 from app.modules.settings.model import SettingsRequestStatus
 from app.modules.settings.schemas import (
@@ -25,11 +26,13 @@ from app.modules.users.model import User
 
 router = APIRouter()
 
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
+
 
 @router.post("/requests", response_model=SettingsRequestResponse, status_code=201)
 def create_settings_request(
     payload: SettingsRequestCreateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> SettingsRequestResponse:
@@ -44,7 +47,7 @@ def create_settings_request(
 @router.get("/requests", response_model=SettingsRequestListResponse)
 def list_my_settings_requests(
     limit: int = Query(default=100, ge=1, le=500),
-    _current_user: User = Depends(require_roles("owner", "admin")),
+    _current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
 ) -> SettingsRequestListResponse:

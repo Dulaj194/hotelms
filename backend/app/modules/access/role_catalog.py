@@ -12,6 +12,25 @@ RESTAURANT_ADMIN_ROLES: tuple[UserRole, ...] = (
     UserRole.admin,
 )
 
+SUPER_ADMIN_ONLY_ROLES: tuple[UserRole, ...] = (
+    UserRole.super_admin,
+)
+
+SUPER_ADMIN_OR_RESTAURANT_ADMIN_ROLES: tuple[UserRole, ...] = (
+    UserRole.super_admin,
+    UserRole.owner,
+    UserRole.admin,
+)
+
+TENANT_STAFF_ROLES: tuple[UserRole, ...] = (
+    UserRole.owner,
+    UserRole.admin,
+    UserRole.steward,
+    UserRole.housekeeper,
+    UserRole.cashier,
+    UserRole.accountant,
+)
+
 RESTAURANT_STAFF_LOGIN_ROLES: tuple[UserRole, ...] = (
     UserRole.steward,
     UserRole.housekeeper,
@@ -30,6 +49,11 @@ HOUSEKEEPING_TASK_ROLES: tuple[UserRole, ...] = (
     UserRole.admin,
     UserRole.housekeeper,
 )
+
+HOUSEKEEPING_SUPERVISOR_ROLES: tuple[UserRole, ...] = RESTAURANT_ADMIN_ROLES
+
+ROOM_READ_ROLES: tuple[UserRole, ...] = HOUSEKEEPING_TASK_ROLES
+ROOM_WRITE_ROLES: tuple[UserRole, ...] = RESTAURANT_ADMIN_ROLES
 
 BILLING_STAFF_ROLES: tuple[UserRole, ...] = (
     UserRole.owner,

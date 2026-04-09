@@ -23,6 +23,7 @@ from app.core.dependencies import (
     require_module_access,
     require_roles,
 )
+from app.modules.access import role_catalog
 from app.modules.orders import service
 from app.modules.orders.model import OrderStatus
 from app.modules.orders.schemas import (
@@ -39,7 +40,7 @@ from app.modules.table_sessions.model import TableSession
 router = APIRouter()
 
 # ── Staff auth shorthand ──────────────────────────────────────────────────────
-_STAFF_ROLES = ("owner", "admin", "steward")
+_STAFF_ROLES = role_catalog.QR_MENU_STAFF_ROLES
 
 
 # ── Guest endpoints ───────────────────────────────────────────────────────────

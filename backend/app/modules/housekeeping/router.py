@@ -15,6 +15,7 @@ from app.core.dependencies import (
     require_room_module_access,
     require_roles,
 )
+from app.modules.access import role_catalog
 from app.modules.housekeeping import service
 from app.modules.housekeeping.schemas import (
     GenericMessageResponse,
@@ -41,8 +42,8 @@ from app.modules.users.model import User
 
 router = APIRouter()
 
-_HK_ROLES = ("owner", "admin", "housekeeper")
-_SUPERVISOR_ROLES = ("owner", "admin")
+_HK_ROLES = role_catalog.HOUSEKEEPING_TASK_ROLES
+_SUPERVISOR_ROLES = role_catalog.HOUSEKEEPING_SUPERVISOR_ROLES
 
 
 @router.post("", response_model=HousekeepingRequestCreateResponse, status_code=201)

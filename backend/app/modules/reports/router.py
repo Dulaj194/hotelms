@@ -7,13 +7,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_restaurant_id, get_db, require_module_access, require_roles
+from app.modules.access import role_catalog
 from app.modules.reports import service
 from app.modules.reports.schemas import SalesReportHistoryListResponse, SalesReportResponse
 from app.modules.users.model import User
 
 router = APIRouter()
 
-_STAFF_ROLES = ("owner", "admin", "steward")
+_STAFF_ROLES = role_catalog.QR_MENU_STAFF_ROLES
 
 
 @router.get("/sales", response_model=SalesReportResponse)

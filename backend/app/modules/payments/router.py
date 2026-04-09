@@ -8,6 +8,7 @@ from app.core.dependencies import (
 	require_platform_scopes,
 	require_roles,
 )
+from app.modules.access import role_catalog
 from app.modules.payments import service
 from app.modules.payments.schemas import (
 	BillingTransactionListResponse,
@@ -20,13 +21,15 @@ from app.modules.payments.schemas import (
 
 router = APIRouter()
 
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
+
 
 @router.post("/checkout", response_model=CheckoutSessionResponse)
 def create_checkout_session(
 	payload: CheckoutSessionRequest,
 	restaurant_id: int = Depends(get_current_restaurant_id),
 	db: Session = Depends(get_db),
-	_=Depends(require_roles("owner", "admin")),
+	_=Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
 ) -> CheckoutSessionResponse:
 	return service.create_checkout_session(
 		db,
@@ -54,7 +57,7 @@ async def handle_stripe_webhook(
 def get_billing_history(
 	restaurant_id: int = Depends(get_current_restaurant_id),
 	db: Session = Depends(get_db),
-	_=Depends(require_roles("owner", "admin")),
+	_=Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
 	limit: int = Query(default=20, ge=1, le=100),
 	offset: int = Query(default=0, ge=0),
 ) -> BillingTransactionListResponse:
@@ -66,7 +69,7 @@ def get_billing_transaction_detail(
 	transaction_id: int,
 	restaurant_id: int = Depends(get_current_restaurant_id),
 	db: Session = Depends(get_db),
-	_=Depends(require_roles("owner", "admin")),
+	_=Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
 ) -> BillingTransactionResponse:
 	return service.get_billing_transaction_detail(
 		db,

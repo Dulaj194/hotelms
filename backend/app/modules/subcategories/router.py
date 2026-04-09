@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
+from app.modules.access import role_catalog
 from app.modules.subcategories import service
 from app.modules.subcategories.schemas import (
     SubcategoryCreateRequest,
@@ -13,10 +14,12 @@ from app.modules.users.model import User
 
 router = APIRouter()
 
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
+
 
 @router.get("", response_model=list[SubcategoryResponse])
 def list_subcategories(
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> list[SubcategoryResponse]:
     return service.list_subcategories(db, current_user.restaurant_id)  # type: ignore[arg-type]
@@ -25,7 +28,7 @@ def list_subcategories(
 @router.post("", response_model=SubcategoryResponse, status_code=status.HTTP_201_CREATED)
 def add_subcategory(
     payload: SubcategoryCreateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> SubcategoryResponse:
     """SECURITY: restaurant_id comes from token. category ownership verified server-side."""
@@ -37,7 +40,7 @@ def add_subcategory(
 @router.get("/{subcategory_id}", response_model=SubcategoryResponse)
 def get_subcategory(
     subcategory_id: int,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> SubcategoryResponse:
     return service.get_subcategory(db, subcategory_id, current_user.restaurant_id)  # type: ignore[arg-type]
@@ -47,7 +50,7 @@ def get_subcategory(
 def update_subcategory(
     subcategory_id: int,
     payload: SubcategoryUpdateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> SubcategoryResponse:
     return service.update_subcategory(db, subcategory_id, current_user.restaurant_id, payload)  # type: ignore[arg-type]
@@ -56,7 +59,7 @@ def update_subcategory(
 @router.delete("/{subcategory_id}")
 def delete_subcategory(
     subcategory_id: int,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> dict:
     return service.delete_subcategory(db, subcategory_id, current_user.restaurant_id)  # type: ignore[arg-type]
@@ -66,7 +69,7 @@ def delete_subcategory(
 async def upload_subcategory_image(
     subcategory_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> SubcategoryImageUploadResponse:
     """Upload/replace subcategory image. Owner/admin only.

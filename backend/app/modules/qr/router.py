@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_module_access, require_roles
+from app.modules.access import role_catalog
 from app.modules.qr import service
 from app.modules.qr.schemas import (
     BulkQRCodeResponse,
@@ -14,6 +15,8 @@ from app.modules.qr.schemas import (
 from app.modules.users.model import User
 
 router = APIRouter()
+
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 
 # All QR administration endpoints are owner/admin only.
 # restaurant_id is always derived from the authenticated user context.
@@ -31,7 +34,7 @@ def _require_restaurant_context(current_user: User) -> int:
 @router.get("/table/{table_number}", response_model=QRCodeResponse)
 def get_table_qr(
     table_number: str,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeResponse:
@@ -46,7 +49,7 @@ def get_table_qr(
 
 @router.get("/tables", response_model=QRCodeListResponse)
 def list_table_qr(
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeListResponse:
@@ -57,7 +60,7 @@ def list_table_qr(
 @router.delete("/table/{table_number}", response_model=QRCodeDeleteResponse)
 def delete_table_qr(
     table_number: str,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeDeleteResponse:
@@ -71,7 +74,7 @@ def delete_table_qr(
 
 @router.delete("/tables", response_model=QRCodeDeleteResponse)
 def delete_all_table_qr(
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeDeleteResponse:
@@ -82,7 +85,7 @@ def delete_all_table_qr(
 @router.get("/room/{room_number}", response_model=QRCodeResponse)
 def get_room_qr(
     room_number: str,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeResponse:
@@ -98,7 +101,7 @@ def get_room_qr(
 @router.post("/tables/bulk", response_model=BulkQRCodeResponse)
 def bulk_table_qr(
     payload: BulkQRRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> BulkQRCodeResponse:
@@ -114,7 +117,7 @@ def bulk_table_qr(
 @router.post("/rooms/bulk", response_model=BulkQRCodeResponse)
 def bulk_room_qr(
     payload: RoomBulkQRRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> BulkQRCodeResponse:
@@ -128,7 +131,7 @@ def bulk_room_qr(
 
 @router.get("/rooms", response_model=QRCodeListResponse)
 def list_room_qr(
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeListResponse:
@@ -139,7 +142,7 @@ def list_room_qr(
 @router.delete("/room/{room_number}", response_model=QRCodeDeleteResponse)
 def delete_room_qr(
     room_number: str,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeDeleteResponse:
@@ -153,7 +156,7 @@ def delete_room_qr(
 
 @router.delete("/rooms", response_model=QRCodeDeleteResponse)
 def delete_all_room_qr(
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeDeleteResponse:
