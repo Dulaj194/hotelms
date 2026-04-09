@@ -2,6 +2,8 @@ import re
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.modules.users.model import UserRole
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -38,7 +40,7 @@ class UserMeResponse(BaseModel):
     id: int
     full_name: str
     email: str
-    role: str
+    role: UserRole
     restaurant_id: int | None
     is_active: bool
     must_change_password: bool = False
@@ -62,7 +64,7 @@ class TenantDataCountsResponse(BaseModel):
 class TenantContextResponse(BaseModel):
     user_id: int
     email: EmailStr
-    role: str
+    role: UserRole
     restaurant_id: int | None
     restaurant_name: str | None = None
     counts: TenantDataCountsResponse

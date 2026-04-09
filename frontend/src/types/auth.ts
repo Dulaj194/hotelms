@@ -1,4 +1,5 @@
 import type { FeatureFlagSnapshot, ModuleAccessSnapshot } from "@/types/access";
+import type { UserRole } from "@/types/user";
 
 export interface LoginRequest {
   email: string;
@@ -15,7 +16,7 @@ export interface UserMeResponse {
   id: number;
   full_name: string;
   email: string;
-  role: string;
+  role: UserRole;
   restaurant_id: number | null;
   is_active: boolean;
   must_change_password: boolean;
@@ -39,7 +40,7 @@ export interface TenantDataCountsResponse {
 export interface TenantContextResponse {
   user_id: number;
   email: string;
-  role: string;
+  role: UserRole;
   restaurant_id: number | null;
   restaurant_name: string | null;
   counts: TenantDataCountsResponse;

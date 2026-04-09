@@ -2,6 +2,7 @@
 
 Submodules:
 - catalog: Package privileges and feature flag definitions
+- role_catalog: Canonical role groups for routers/services
 - role_hierarchy: Role management permissions and assignments
 - types: TypedDicts for type-safe context maps
 """

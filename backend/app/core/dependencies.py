@@ -118,11 +118,20 @@ def get_current_user(
     return user
 
 
-def require_roles(*roles: str):
+def require_roles(*roles: object):
     """Dependency factory that enforces role-based access control."""
 
+    normalized_roles = {
+        str(role.value if hasattr(role, "value") else role).strip().lower()
+        for role in roles
+        if role
+    }
+
     def _check(current_user=Depends(get_current_user)):
-        if current_user.role.value not in roles:
+        current_role = str(
+            current_user.role.value if hasattr(current_user.role, "value") else current_user.role
+        ).strip().lower()
+        if current_role not in normalized_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to perform this action.",

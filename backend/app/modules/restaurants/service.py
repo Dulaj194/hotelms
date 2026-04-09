@@ -27,6 +27,7 @@ from app.core.security import (
     hash_token,
 )
 from app.modules.access import catalog as access_catalog
+from app.modules.access import role_catalog
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.restaurants.integration_service import DEFAULT_WEBHOOK_SECRET_HEADER_NAME
 from app.modules.realtime import service as realtime_service
@@ -74,7 +75,7 @@ from app.modules.restaurants.schemas import (
 
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
-_RESETTABLE_HOTEL_STAFF_ROLES = {UserRole.owner, UserRole.admin}
+_RESETTABLE_HOTEL_STAFF_ROLES = role_catalog.RESETTABLE_RESTAURANT_STAFF_ROLES
 _STAFF_PASSWORD_REVEAL_TTL_MINUTES = 15
 _STAFF_PASSWORD_REVEAL_INVALID_DETAIL = "Temporary password reveal token is invalid or expired."
 

@@ -8,6 +8,7 @@ from app.core.dependencies import (
     require_restaurant_user,
     require_roles,
 )
+from app.modules.access import role_catalog
 from app.modules.restaurants import integration_service
 from app.modules.restaurants import service
 from app.modules.restaurants.model import RegistrationStatus
@@ -52,6 +53,8 @@ from app.modules.users.schemas import (
 
 router = APIRouter()
 
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
+
 
 @router.get("/me", response_model=RestaurantMeResponse)
 def get_my_restaurant(
@@ -68,7 +71,7 @@ def get_my_restaurant(
 @router.patch("/me", response_model=RestaurantMeResponse)
 def update_my_restaurant(
     payload: RestaurantUpdateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Update current tenant's restaurant profile. Owner/admin only.
@@ -83,7 +86,7 @@ def update_my_restaurant(
 @router.post("/me/logo", response_model=RestaurantLogoUploadResponse)
 async def upload_logo(
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> RestaurantLogoUploadResponse:
     """Upload/replace the restaurant logo. Owner/admin only.

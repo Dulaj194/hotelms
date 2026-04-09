@@ -1,14 +1,10 @@
 from __future__ import annotations
 
+from app.modules.access import role_catalog
 from app.modules.users.model import UserRole
 
-RESTAURANT_ADMIN_LOGIN_ROLES = {UserRole.owner, UserRole.admin}
-STAFF_LOGIN_ROLES = {
-    UserRole.steward,
-    UserRole.housekeeper,
-    UserRole.cashier,
-    UserRole.accountant,
-}
+RESTAURANT_ADMIN_LOGIN_ROLES = set(role_catalog.RESTAURANT_ADMIN_ROLES)
+STAFF_LOGIN_ROLES = set(role_catalog.RESTAURANT_STAFF_LOGIN_ROLES)
 SUPER_ADMIN_LOGIN_ROLES = {UserRole.super_admin}
 
 

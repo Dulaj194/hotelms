@@ -14,6 +14,7 @@ from app.core.dependencies import (
     require_module_access,
     require_roles,
 )
+from app.modules.access import role_catalog
 from app.modules.billing import service as billing_service
 from app.modules.billing.model import BillContextType, BillHandoffStatus, BillReviewStatus
 from app.modules.billing.schemas import (
@@ -33,13 +34,13 @@ from app.modules.billing.schemas import (
 
 router = APIRouter()
 
-_STAFF_ROLES = ["owner", "admin", "steward", "cashier", "accountant"]
-_ROOM_HANDOFF_TO_CASHIER_ROLES = ["owner", "admin", "steward"]
-_ROOM_HANDOFF_TO_ACCOUNTANT_ROLES = ["owner", "admin", "cashier"]
-_CASHIER_REVIEW_ROLES = ["owner", "admin", "cashier"]
-_ACCOUNTANT_REVIEW_ROLES = ["owner", "admin", "accountant"]
-_ROOM_HANDOFF_COMPLETE_ROLES = ["owner", "admin", "accountant"]
-_ROOM_REOPEN_ROLES = ["owner", "admin", "accountant"]
+_STAFF_ROLES = role_catalog.BILLING_STAFF_ROLES
+_ROOM_HANDOFF_TO_CASHIER_ROLES = role_catalog.BILLING_ROOM_HANDOFF_TO_CASHIER_ROLES
+_ROOM_HANDOFF_TO_ACCOUNTANT_ROLES = role_catalog.BILLING_ROOM_HANDOFF_TO_ACCOUNTANT_ROLES
+_CASHIER_REVIEW_ROLES = role_catalog.BILLING_CASHIER_REVIEW_ROLES
+_ACCOUNTANT_REVIEW_ROLES = role_catalog.BILLING_ACCOUNTANT_REVIEW_ROLES
+_ROOM_HANDOFF_COMPLETE_ROLES = role_catalog.BILLING_ROOM_HANDOFF_COMPLETE_ROLES
+_ROOM_REOPEN_ROLES = role_catalog.BILLING_ROOM_REOPEN_ROLES
 
 
 @router.get(
