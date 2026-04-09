@@ -25,8 +25,6 @@ const EMPTY_FORM: FormData = {
   is_active: true,
 };
 
-const CARDS_PER_PAGE = 6;
-
 export default function Menus() {
   const navigate = useNavigate();
   const { tenantContext, error: tenantContextError } = useTenantContext();
@@ -48,7 +46,6 @@ export default function Menus() {
   const [uploadTarget, setUploadTarget] = useState<Menu | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [currentPage, setCurrentPage] = useState(1);
 
   const loadMenus = useCallback(async () => {
     setLoading(true);
@@ -69,13 +66,6 @@ export default function Menus() {
   useEffect(() => {
     loadMenus();
   }, [loadMenus]);
-
-  useEffect(() => {
-    const computedTotalPages = Math.max(1, Math.ceil(menus.length / CARDS_PER_PAGE));
-    if (currentPage > computedTotalPages) {
-      setCurrentPage(computedTotalPages);
-    }
-  }, [menus.length, currentPage]);
 
   function openCreate() {
     setEditingMenu(null);
@@ -230,19 +220,13 @@ export default function Menus() {
     return a.id - b.id;
   });
 
-  const totalPages = Math.max(1, Math.ceil(sortedMenus.length / CARDS_PER_PAGE));
-  const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * CARDS_PER_PAGE;
-  const endIndex = startIndex + CARDS_PER_PAGE;
-  const paginatedMenus = sortedMenus.slice(startIndex, endIndex);
-
   return (
     <DashboardLayout>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Menus</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Standard view: paginated menu cards with a clean action layout.
+            Standard view: scrollable menu cards with a clean action layout.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -280,111 +264,86 @@ export default function Menus() {
       )}
 
       {!loading && menus.length > 0 && (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {paginatedMenus.map((menu) => (
-            <article
-              key={menu.id}
-              className="flex h-full min-h-[410px] w-full flex-col rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div className="aspect-[16/10] w-full overflow-hidden rounded-lg bg-slate-100">
-                {menu.image_path ? (
-                  <img
-                    src={toAssetUrl(menu.image_path)}
-                    alt={menu.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm font-medium text-slate-500">
-                    No image available
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {sortedMenus.map((menu) => (
+                <article
+                  key={menu.id}
+                  className="flex h-full min-h-[410px] w-full flex-col rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="aspect-[16/10] w-full overflow-hidden rounded-lg bg-slate-100">
+                    {menu.image_path ? (
+                      <img
+                        src={toAssetUrl(menu.image_path)}
+                        alt={menu.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm font-medium text-slate-500">
+                        No image available
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <div className="mt-3 flex flex-1 flex-col">
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="line-clamp-1 text-2xl font-semibold leading-tight text-slate-900">
-                    {menu.name}
-                  </h2>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                      menu.is_active
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {menu.is_active ? "Active" : "Inactive"}
-                  </span>
-                </div>
+                  <div className="mt-3 flex flex-1 flex-col">
+                    <div className="flex items-start justify-between gap-2">
+                      <h2 className="line-clamp-1 text-2xl font-semibold leading-tight text-slate-900">
+                        {menu.name}
+                      </h2>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          menu.is_active
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {menu.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
 
-                <p className="mt-2 min-h-[38px] text-sm text-slate-600 line-clamp-2">
-                  {menu.description?.trim() || "No description added yet."}
-                </p>
+                    <p className="mt-2 min-h-[38px] text-sm text-slate-600 line-clamp-2">
+                      {menu.description?.trim() || "No description added yet."}
+                    </p>
 
-                <div className="mt-3 flex items-center justify-between text-xs font-medium text-slate-500">
-                  <span>Sort: {menu.sort_order}</span>
-                  <span>Menu #{menu.id}</span>
-                </div>
+                    <div className="mt-3 flex items-center justify-between text-xs font-medium text-slate-500">
+                      <span>Sort: {menu.sort_order}</span>
+                      <span>Menu #{menu.id}</span>
+                    </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => navigate(`/admin/menu/categories?menuId=${menu.id}`)}
-                    className="col-span-2 rounded-lg bg-cyan-500 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-600"
-                  >
-                    Explore
-                  </button>
-                  <button
-                    onClick={() => openEdit(menu)}
-                    className="rounded-lg bg-amber-400 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(menu)}
-                    className="rounded-lg bg-rose-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
-                  >
-                    Delete
-                  </button>
-                  <button
-                    onClick={() => openUpload(menu)}
-                    disabled={uploading && uploadTarget?.id === menu.id}
-                    className="col-span-2 rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {uploading && uploadTarget?.id === menu.id
-                      ? "Uploading image..."
-                      : "Change image"}
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-
-      {!loading && sortedMenus.length > CARDS_PER_PAGE && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-sm text-slate-600">
-            Showing {startIndex + 1}-{Math.min(endIndex, sortedMenus.length)} of {sortedMenus.length} menus
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={safePage === 1}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm font-medium text-slate-700">
-              Page {safePage} of {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={safePage === totalPages}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Next
-            </button>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => navigate(`/admin/menu/categories?menuId=${menu.id}`)}
+                        className="col-span-2 rounded-lg bg-cyan-500 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-600"
+                      >
+                        Explore
+                      </button>
+                      <button
+                        onClick={() => openEdit(menu)}
+                        className="rounded-lg bg-amber-400 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(menu)}
+                        className="rounded-lg bg-rose-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => openUpload(menu)}
+                        disabled={uploading && uploadTarget?.id === menu.id}
+                        className="col-span-2 rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {uploading && uploadTarget?.id === menu.id
+                          ? "Uploading image..."
+                          : "Change image"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       )}
