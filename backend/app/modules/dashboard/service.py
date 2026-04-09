@@ -74,6 +74,37 @@ def _build_setup_requirements(restaurant: Restaurant) -> tuple[list[DashboardSet
     return requirements, missing_keys, has_blocking_missing
 
 
+def _get_first_pending_step(requirements: list[DashboardSetupRequirement]) -> int:
+    for index, requirement in enumerate(requirements, start=1):
+        if not requirement.completed:
+            return index
+    return len(requirements) if requirements else 1
+
+
+def _normalize_current_setup_step(
+    requirements: list[DashboardSetupRequirement],
+    persisted_step: int | None,
+) -> int:
+    if not requirements:
+        return 1
+
+    total_steps = len(requirements)
+    first_pending_step = _get_first_pending_step(requirements)
+    has_pending = any(not requirement.completed for requirement in requirements)
+
+    if not has_pending:
+        return total_steps
+
+    raw_step = persisted_step if isinstance(persisted_step, int) else 1
+    clamped_step = min(max(raw_step, 1), total_steps)
+
+    # Keep wizard anchored to actionable work; skip stale completed steps.
+    if requirements[clamped_step - 1].completed:
+        return first_pending_step
+
+    return clamped_step
+
+
 def _build_module_lanes(*, role: str, privileges: list[str]) -> list[DashboardModuleLane]:
     normalized_privileges = {p.upper() for p in privileges}
     lanes: list[DashboardModuleLane] = []
@@ -212,10 +243,14 @@ def get_admin_dashboard_overview(
     requirements, missing_fields, has_blocking_missing = _build_setup_requirements(restaurant)
 
     setup_progress = repository.get_setup_progress(db, restaurant_id=restaurant_id)
-    completed_keys = repository.get_completed_keys(setup_progress)
+    completed_keys = [requirement.key for requirement in requirements if requirement.completed]
     total_steps = len(requirements)
     completed_count = len([req for req in requirements if req.completed])
     progress_percent = int((completed_count / total_steps) * 100) if total_steps else 100
+    normalized_current_step = _normalize_current_setup_step(
+        requirements,
+        setup_progress.current_step if setup_progress else None,
+    )
 
     alerts = _build_expiry_alerts(
         db,
@@ -279,7 +314,7 @@ def get_admin_dashboard_overview(
             should_show=len(missing_fields) > 0,
             has_blocking_missing=has_blocking_missing,
             progress_percent=progress_percent,
-            current_step=setup_progress.current_step if setup_progress else 1,
+            current_step=normalized_current_step,
             total_steps=total_steps,
             completed_keys=completed_keys,
             missing_fields=missing_fields,
