@@ -1,6 +1,7 @@
 import { normalizeRole } from "@/lib/auth";
 import type { ModuleAccessSnapshot } from "@/types/access";
 
+export const RESTAURANT_ADMIN_ROLES = ["owner", "admin"] as const;
 export const HOUSEKEEPING_TASK_ROLES = ["owner", "admin", "housekeeper"] as const;
 export const HOUSEKEEPING_SUPERVISOR_ROLES = ["owner", "admin"] as const;
 export const QR_MENU_STAFF_ROLES = ["owner", "admin", "steward"] as const;
@@ -11,6 +12,9 @@ export const BILLING_STAFF_ROLES = [
   "cashier",
   "accountant",
 ] as const;
+export const BILLING_CASHIER_REVIEW_ROLES = ["owner", "admin", "cashier"] as const;
+export const BILLING_ACCOUNTANT_REVIEW_ROLES = ["owner", "admin", "accountant"] as const;
+export const HOUSEKEEPING_ROOM_ROLES = ["owner", "admin", "housekeeper"] as const;
 
 export function hasRoleAccess(
   role: string | null | undefined,

@@ -1,5 +1,6 @@
 import redis as redis_lib
 import uuid
+from collections.abc import Callable
 
 from fastapi import APIRouter, Cookie, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy.orm import Session
@@ -32,6 +33,28 @@ def _user_agent(request: Request) -> str:
     return request.headers.get("user-agent", "unknown")
 
 
+def _handle_login_request(
+    *,
+    payload: LoginRequest,
+    request: Request,
+    response: Response,
+    db: Session,
+    redis_client: redis_lib.Redis,
+    refresh_token: str | None,
+    login_fn: Callable[..., TokenResponse],
+) -> TokenResponse:
+    return login_fn(
+        db,
+        redis_client,
+        response,
+        payload.email,
+        payload.password,
+        _client_ip(request),
+        _user_agent(request),
+        refresh_token,
+    )
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(
     payload: LoginRequest,
@@ -41,11 +64,14 @@ def login(
     redis_client: redis_lib.Redis = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
-    return service.login(
-        db, redis_client, response,
-        payload.email, payload.password,
-        _client_ip(request), _user_agent(request),
-        refresh_token,
+    return _handle_login_request(
+        payload=payload,
+        request=request,
+        response=response,
+        db=db,
+        redis_client=redis_client,
+        refresh_token=refresh_token,
+        login_fn=service.login,
     )
 
 
@@ -58,11 +84,14 @@ def login_restaurant_admin(
     redis_client: redis_lib.Redis = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
-    return service.login_restaurant_admin(
-        db, redis_client, response,
-        payload.email, payload.password,
-        _client_ip(request), _user_agent(request),
-        refresh_token,
+    return _handle_login_request(
+        payload=payload,
+        request=request,
+        response=response,
+        db=db,
+        redis_client=redis_client,
+        refresh_token=refresh_token,
+        login_fn=service.login_restaurant_admin,
     )
 
 
@@ -75,11 +104,14 @@ def login_staff(
     redis_client: redis_lib.Redis = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
-    return service.login_staff(
-        db, redis_client, response,
-        payload.email, payload.password,
-        _client_ip(request), _user_agent(request),
-        refresh_token,
+    return _handle_login_request(
+        payload=payload,
+        request=request,
+        response=response,
+        db=db,
+        redis_client=redis_client,
+        refresh_token=refresh_token,
+        login_fn=service.login_staff,
     )
 
 
@@ -92,11 +124,14 @@ def login_super_admin(
     redis_client: redis_lib.Redis = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
-    return service.login_super_admin(
-        db, redis_client, response,
-        payload.email, payload.password,
-        _client_ip(request), _user_agent(request),
-        refresh_token,
+    return _handle_login_request(
+        payload=payload,
+        request=request,
+        response=response,
+        db=db,
+        redis_client=redis_client,
+        refresh_token=refresh_token,
+        login_fn=service.login_super_admin,
     )
 
 

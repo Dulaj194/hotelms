@@ -22,28 +22,34 @@ from app.modules.users.model import UserRole
 # This is a hierarchical permission model where higher roles can manage
 # all lower roles (plus their own level for owner).
 
-MANAGEABLE_ROLES: dict[str, set[UserRole]] = {
-    "super_admin": {
-        UserRole.owner,
-        UserRole.admin,
-        UserRole.steward,
-        UserRole.housekeeper,
-        UserRole.cashier,
-        UserRole.accountant,
-    },
-    "owner": {
-        UserRole.admin,
-        UserRole.steward,
-        UserRole.housekeeper,
-        UserRole.cashier,
-        UserRole.accountant,
-    },
-    "admin": {
-        UserRole.steward,
-        UserRole.housekeeper,
-        UserRole.cashier,
-        UserRole.accountant,
-    },
+MANAGEABLE_ROLES: dict[UserRole, frozenset[UserRole]] = {
+    UserRole.super_admin: frozenset(
+        {
+            UserRole.owner,
+            UserRole.admin,
+            UserRole.steward,
+            UserRole.housekeeper,
+            UserRole.cashier,
+            UserRole.accountant,
+        }
+    ),
+    UserRole.owner: frozenset(
+        {
+            UserRole.admin,
+            UserRole.steward,
+            UserRole.housekeeper,
+            UserRole.cashier,
+            UserRole.accountant,
+        }
+    ),
+    UserRole.admin: frozenset(
+        {
+            UserRole.steward,
+            UserRole.housekeeper,
+            UserRole.cashier,
+            UserRole.accountant,
+        }
+    ),
 }
 
 
@@ -89,6 +95,15 @@ ALLOWED_ASSIGNED_AREAS: dict[UserRole, set[str | None]] = {
 # ============================================================================
 
 
+def _to_user_role(role: UserRole | str) -> UserRole | None:
+    if isinstance(role, UserRole):
+        return role
+    try:
+        return UserRole(role)
+    except ValueError:
+        return None
+
+
 def can_manage_role(manager_role: UserRole | str, target_role: UserRole | str) -> bool:
     """Check if a manager role is allowed to manage a target role.
 
@@ -99,16 +114,26 @@ def can_manage_role(manager_role: UserRole | str, target_role: UserRole | str) -
     Returns:
         True if manager can manage target, False otherwise
     """
-    manager_key = manager_role.value if isinstance(manager_role, UserRole) else manager_role
-    manageable = MANAGEABLE_ROLES.get(manager_key, set())
-    
-    if isinstance(target_role, str):
-        try:
-            target_role = UserRole(target_role)
-        except ValueError:
-            return False
-    
-    return target_role in manageable
+    manager = _to_user_role(manager_role)
+    target = _to_user_role(target_role)
+    if manager is None or target is None:
+        return False
+
+    manageable = MANAGEABLE_ROLES.get(manager, frozenset())
+    return target in manageable
+
+
+def get_manageable_roles(manager_role: UserRole | str) -> frozenset[UserRole]:
+    """Return all roles the given manager role can manage."""
+    manager = _to_user_role(manager_role)
+    if manager is None:
+        return frozenset()
+    return MANAGEABLE_ROLES.get(manager, frozenset())
+
+
+def get_manageable_role_values(manager_role: UserRole | str) -> list[str]:
+    """Return manageable roles as sorted string values."""
+    return sorted(role.value for role in get_manageable_roles(manager_role))
 
 
 def get_default_assigned_area(role: UserRole | str) -> str | None:

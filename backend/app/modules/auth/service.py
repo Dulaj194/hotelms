@@ -28,9 +28,10 @@ from app.modules.auth.repository import (
 )
 from app.modules.auth import registration_repository
 from app.modules.auth.login_scope import (
-    RESTAURANT_ADMIN_LOGIN_ROLES,
-    STAFF_LOGIN_ROLES,
-    SUPER_ADMIN_LOGIN_ROLES,
+    GENERAL_LOGIN_SCOPE,
+    RESTAURANT_ADMIN_LOGIN_SCOPE,
+    STAFF_LOGIN_SCOPE,
+    SUPER_ADMIN_LOGIN_SCOPE,
     is_login_scope_allowed,
 )
 from app.modules.auth.schemas import (
@@ -623,8 +624,9 @@ def login(
     ip: str,
     user_agent: str,
     existing_refresh_token: str | None = None,
-    allowed_roles: set[UserRole] | None = None,
-    require_restaurant_context: bool = False,
+    allowed_roles: frozenset[UserRole] | set[UserRole] | None = GENERAL_LOGIN_SCOPE.allowed_roles,
+    require_restaurant_context: bool = GENERAL_LOGIN_SCOPE.require_restaurant_context,
+    scope_key: str = GENERAL_LOGIN_SCOPE.scope_key,
 ) -> TokenResponse:
     _check_rate_limit(redis_client, ip)
 
@@ -640,6 +642,7 @@ def login(
             user_id=user.id if user else None,
             ip_address=ip,
             user_agent=user_agent,
+            metadata={"reason": "invalid_credentials", "login_scope": scope_key},
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -661,6 +664,7 @@ def login(
             user_agent=user_agent,
             metadata={
                 "reason": "login_scope_mismatch",
+                "login_scope": scope_key,
                 "user_role": user.role.value,
                 "has_restaurant_context": user.restaurant_id is not None,
                 "required_roles": allowed_role_values,
@@ -681,7 +685,7 @@ def login(
             user_id=user.id,
             ip_address=ip,
             user_agent=user_agent,
-            metadata={"reason": "inactive_account"},
+            metadata={"reason": "inactive_account", "login_scope": scope_key},
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -714,6 +718,11 @@ def login(
         user_id=user.id,
         ip_address=ip,
         user_agent=user_agent,
+        metadata={
+            "login_scope": scope_key,
+            "user_role": user.role.value,
+            "restaurant_id": user.restaurant_id,
+        },
     )
 
     return TokenResponse(access_token=access_token, must_change_password=user.must_change_password)
@@ -738,8 +747,9 @@ def login_restaurant_admin(
         ip,
         user_agent,
         existing_refresh_token,
-        allowed_roles=RESTAURANT_ADMIN_LOGIN_ROLES,
-        require_restaurant_context=True,
+        allowed_roles=RESTAURANT_ADMIN_LOGIN_SCOPE.allowed_roles,
+        require_restaurant_context=RESTAURANT_ADMIN_LOGIN_SCOPE.require_restaurant_context,
+        scope_key=RESTAURANT_ADMIN_LOGIN_SCOPE.scope_key,
     )
 
 
@@ -762,8 +772,9 @@ def login_staff(
         ip,
         user_agent,
         existing_refresh_token,
-        allowed_roles=STAFF_LOGIN_ROLES,
-        require_restaurant_context=True,
+        allowed_roles=STAFF_LOGIN_SCOPE.allowed_roles,
+        require_restaurant_context=STAFF_LOGIN_SCOPE.require_restaurant_context,
+        scope_key=STAFF_LOGIN_SCOPE.scope_key,
     )
 
 
@@ -786,8 +797,9 @@ def login_super_admin(
         ip,
         user_agent,
         existing_refresh_token,
-        allowed_roles=SUPER_ADMIN_LOGIN_ROLES,
-        require_restaurant_context=False,
+        allowed_roles=SUPER_ADMIN_LOGIN_SCOPE.allowed_roles,
+        require_restaurant_context=SUPER_ADMIN_LOGIN_SCOPE.require_restaurant_context,
+        scope_key=SUPER_ADMIN_LOGIN_SCOPE.scope_key,
     )
 
 

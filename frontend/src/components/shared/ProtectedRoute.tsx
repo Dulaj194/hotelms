@@ -8,6 +8,7 @@ import {
   isAuthenticated,
   normalizeRole,
 } from "@/lib/auth";
+import { isUserRole } from "@/types/user";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -27,12 +28,14 @@ export default function ProtectedRoute({
   }
 
   const user = getUser();
+  const normalizedUserRole = normalizeRole(user?.role);
+  const userRole = isUserRole(normalizedUserRole) ? normalizedUserRole : null;
   if (user?.must_change_password && location.pathname !== "/first-time-password") {
     return <Navigate to="/first-time-password" replace />;
   }
 
   if (allowedRoles?.length) {
-    const role = normalizeRole(user?.role);
+    const role = normalizedUserRole;
     const normalizedAllowedRoles = allowedRoles.map((r) => normalizeRole(r));
 
     if (!normalizedAllowedRoles.includes(role)) {
@@ -41,7 +44,7 @@ export default function ProtectedRoute({
   }
 
   if (
-    normalizeRole(user?.role) === "super_admin" &&
+    userRole === "super_admin" &&
     requiredSuperAdminScopes?.length &&
     !hasSuperAdminScope(requiredSuperAdminScopes, user?.super_admin_scopes)
   ) {

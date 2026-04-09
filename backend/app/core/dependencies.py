@@ -13,6 +13,13 @@ from app.db.session import SessionLocal
 
 _bearer = HTTPBearer()
 
+_AUTH_SELF_SERVICE_ALLOWED_PATHS = {
+    "/api/v1/auth/me",
+    "/api/v1/auth/logout",
+    "/api/v1/auth/change-initial-password",
+    "/api/v1/auth/refresh",
+}
+
 
 def get_db() -> Generator[Session, None, None]:
     """Yield a SQLAlchemy database session and ensure it is closed afterward."""
@@ -67,19 +74,14 @@ def get_current_user(
             detail="Account is inactive.",
         )
 
+    request_path = request.url.path if request else None
+
     if user.restaurant_id is not None:
         from app.modules.auth.service import _assert_role_feature_access
         from app.modules.restaurants.model import RegistrationStatus, Restaurant
 
         restaurant = db.query(Restaurant).filter(Restaurant.id == user.restaurant_id).first()
-        allowed_paths = {
-            "/api/v1/auth/me",
-            "/api/v1/auth/logout",
-            "/api/v1/auth/change-initial-password",
-            "/api/v1/auth/refresh",
-        }
-        request_path = request.url.path if request else None
-        if request_path not in allowed_paths:
+        if request_path not in _AUTH_SELF_SERVICE_ALLOWED_PATHS:
             if restaurant is None:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -103,13 +105,7 @@ def get_current_user(
             _assert_role_feature_access(user, restaurant)
 
     if user.must_change_password:
-        allowed_paths = {
-            "/api/v1/auth/me",
-            "/api/v1/auth/logout",
-            "/api/v1/auth/change-initial-password",
-            "/api/v1/auth/refresh",
-        }
-        if request.url.path not in allowed_paths:
+        if request_path not in _AUTH_SELF_SERVICE_ALLOWED_PATHS:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Password change required before accessing this resource.",

@@ -203,3 +203,30 @@ export function getAllowedAssignedAreasForRole(role: UserRole): AssignedArea[] {
 export function getDefaultAssignedAreaForRole(role: UserRole): AssignedArea | null {
   return ROLE_DEFAULT_AREA[role] ?? null;
 }
+
+const ROLE_MANAGEABLE_ROLES: Partial<Record<UserRole, UserRole[]>> = {
+  super_admin: ["owner", "admin", "steward", "housekeeper", "cashier", "accountant"],
+  owner: ["admin", "steward", "housekeeper", "cashier", "accountant"],
+  admin: ["steward", "housekeeper", "cashier", "accountant"],
+};
+
+export function isUserRole(value: string | null | undefined): value is UserRole {
+  if (!value) return false;
+  return (
+    value === "owner" ||
+    value === "admin" ||
+    value === "steward" ||
+    value === "housekeeper" ||
+    value === "cashier" ||
+    value === "accountant" ||
+    value === "super_admin"
+  );
+}
+
+export function getManageableRolesForRole(role: UserRole): UserRole[] {
+  return ROLE_MANAGEABLE_ROLES[role] ?? [];
+}
+
+export function canManageUserRole(managerRole: UserRole, targetRole: UserRole): boolean {
+  return getManageableRolesForRole(managerRole).includes(targetRole);
+}

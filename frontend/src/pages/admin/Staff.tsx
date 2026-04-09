@@ -11,8 +11,10 @@ import type {
 } from "@/types/user";
 import {
   ASSIGNED_AREA_LABELS,
+  canManageUserRole,
   getAllowedAssignedAreasForRole,
   getDefaultAssignedAreaForRole,
+  isUserRole,
   ROLE_LABELS,
   STAFF_ROLES,
 } from "@/types/user";
@@ -40,19 +42,14 @@ const EMPTY_CREATE: StaffCreateRequest = {
 };
 
 export default function Staff() {
-  const currentUserRole = normalizeRole(getUser()?.role);
+  const normalizedCurrentUserRole = normalizeRole(getUser()?.role);
+  const currentUserRole: UserRole | null = isUserRole(normalizedCurrentUserRole)
+    ? normalizedCurrentUserRole
+    : null;
 
   function canManageRole(targetRole: UserRole): boolean {
-    if (currentUserRole === "owner") return targetRole !== "owner" && targetRole !== "super_admin";
-    if (currentUserRole === "admin") {
-      return (
-        targetRole === "steward" ||
-        targetRole === "housekeeper" ||
-        targetRole === "cashier" ||
-        targetRole === "accountant"
-      );
-    }
-    return false;
+    if (!currentUserRole) return false;
+    return canManageUserRole(currentUserRole, targetRole);
   }
 
   const [staffList, setStaffList] = useState<StaffListItemResponse[]>([]);
@@ -72,13 +69,10 @@ export default function Staff() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const allowedRoles = useMemo<UserRole[]>(() => {
-    if (currentUserRole === "owner") {
-      return STAFF_ROLES.filter((role) => role !== "owner");
-    }
-    if (currentUserRole === "admin") {
+    if (!currentUserRole) {
       return ["steward", "housekeeper", "cashier", "accountant"];
     }
-    return ["steward", "housekeeper", "cashier", "accountant"];
+    return STAFF_ROLES.filter((role) => canManageUserRole(currentUserRole, role));
   }, [currentUserRole]);
 
   const allowedAssignedAreas = useMemo(
