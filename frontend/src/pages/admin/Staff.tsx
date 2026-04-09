@@ -12,8 +12,6 @@ import type {
 } from "@/types/user";
 import {
   ASSIGNED_AREA_LABELS,
-  getAllowedAssignedAreasForRole,
-  getDefaultAssignedAreaForRole,
   isUserRole,
   ROLE_LABELS,
 } from "@/types/user";
@@ -35,7 +33,7 @@ const EMPTY_CREATE: StaffCreateRequest = {
   phone: "",
   password: "",
   role: "steward",
-  assigned_area: getDefaultAssignedAreaForRole("steward"),
+  assigned_area: null,
   is_active: true,
 };
 
@@ -79,16 +77,13 @@ export default function Staff() {
     if (policyDefault !== undefined) {
       return policyDefault;
     }
-    return getDefaultAssignedAreaForRole(role);
+      return null;
   }
 
   const allowedAssignedAreas = useMemo(
     () => {
       const policyAreas = staffManagementPolicy?.allowed_assigned_areas_by_role?.[formData.role];
-      if (policyAreas !== undefined) {
-        return policyAreas;
-      }
-      return getAllowedAssignedAreasForRole(formData.role);
+      return policyAreas ?? [];
     },
     [formData.role, staffManagementPolicy],
   );
@@ -606,7 +601,8 @@ export default function Staff() {
                 onChange={(e) =>
                   setFormData((f) => {
                     const nextRole = e.target.value as UserRole;
-                    const nextAreas = getAllowedAssignedAreasForRole(nextRole);
+                    const nextAreas =
+                      staffManagementPolicy?.allowed_assigned_areas_by_role?.[nextRole] ?? [];
                     const nextAssignedArea =
                       f.assigned_area && nextAreas.includes(f.assigned_area)
                         ? f.assigned_area

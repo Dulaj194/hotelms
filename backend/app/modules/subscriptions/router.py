@@ -23,11 +23,12 @@ from app.modules.subscriptions.schemas import (
     SubscriptionStatusResponse,
     SuperAdminSubscriptionUpdateRequest,
 )
-from app.modules.users.model import User
+from app.modules.users.model import User, UserRole
 
 router = APIRouter()
 
 _RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
+_SUPER_ADMIN_SOURCE = UserRole.super_admin.value
 
 
 @router.get("/me", response_model=SubscriptionResponse)
@@ -115,7 +116,7 @@ def expire_overdue_subscriptions(
     count = service.expire_overdue_subscriptions(
         db,
         actor_user_id=current_user.id,
-        source="super_admin",
+        source=_SUPER_ADMIN_SOURCE,
     )
     return ExpireOverdueResponse(
         message=f"Expired {count} overdue subscription(s).",

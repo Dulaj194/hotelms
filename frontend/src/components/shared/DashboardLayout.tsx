@@ -30,6 +30,11 @@ import {
   BILLING_STAFF_ROLES,
   canAccessModuleItem,
   canAccessHousekeepingTasks,
+  hasRoleAccess,
+  HOUSEKEEPING_ROOM_ROLES,
+  HOUSEKEEPING_TASK_ROLES,
+  QR_MENU_STAFF_ROLES,
+  RESTAURANT_ADMIN_ROLES,
 } from "@/lib/moduleAccess";
 import {
   clearInAppNavigationHistory,
@@ -40,7 +45,7 @@ interface NavItem {
   path: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  roles: string[] | null;
+  roles: readonly string[] | null;
   privilege?: string;
   moduleKey?: string;
 }
@@ -49,7 +54,7 @@ interface MenuSubItem {
   path: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  roles?: string[];
+  roles?: readonly string[];
   privilege?: string;
   moduleKey?: string;
 }
@@ -97,44 +102,44 @@ const ALL_NAV_ITEMS: NavItem[] = [
     path: "/admin/restaurant-profile",
     label: "Restaurant",
     icon: UtensilsCrossed,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
   {
     path: "/admin/subscription",
     label: "Subscription",
     icon: Package,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
-  { path: "/admin/staff", label: "Staff", icon: Users, roles: ["owner", "admin"] },
+  { path: "/admin/staff", label: "Staff", icon: Users, roles: RESTAURANT_ADMIN_ROLES },
   {
     path: "/admin/menu/menus",
     label: "Menus",
     icon: SquareMenu,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
   {
     path: "/admin/menu/categories",
     label: "Categories",
     icon: ClipboardList,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
   {
     path: "/admin/menu/subcategories",
     label: "Subcategories",
     icon: Tags,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
   {
     path: "/admin/menu/items",
     label: "Menu Items",
     icon: HandPlatter,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
   {
     path: "/admin/reports",
     label: "Reports",
     icon: ReceiptText,
-    roles: ["owner", "admin", "steward"],
+    roles: QR_MENU_STAFF_ROLES,
     privilege: "QR_MENU",
     moduleKey: "reports",
   },
@@ -142,7 +147,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
     path: "/admin/billing",
     label: "Billing",
     icon: Ticket,
-    roles: [...BILLING_STAFF_ROLES],
+    roles: BILLING_STAFF_ROLES,
     privilege: "QR_MENU",
     moduleKey: "billing",
   },
@@ -223,7 +228,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         path: "/admin/qr/tables",
         label: "All Table QR Codes",
         icon: QrCode,
-        roles: ["owner", "admin"],
+        roles: RESTAURANT_ADMIN_ROLES,
         privilege: "QR_MENU",
         moduleKey: "qr",
       },
@@ -231,7 +236,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         path: "/admin/qr/tables/generate",
         label: "Generate Table QR Codes",
         icon: LayoutGrid,
-        roles: ["owner", "admin"],
+        roles: RESTAURANT_ADMIN_ROLES,
         privilege: "QR_MENU",
         moduleKey: "qr",
       },
@@ -239,7 +244,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         path: "/admin/qr/rooms",
         label: "All Room QR Codes",
         icon: QrCode,
-        roles: ["owner", "admin"],
+        roles: RESTAURANT_ADMIN_ROLES,
         privilege: "QR_MENU",
         moduleKey: "qr",
       },
@@ -247,7 +252,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         path: "/admin/qr/rooms/generate",
         label: "Generate Room QR Codes",
         icon: LayoutGrid,
-        roles: ["owner", "admin"],
+        roles: RESTAURANT_ADMIN_ROLES,
         privilege: "QR_MENU",
         moduleKey: "qr",
       },
@@ -261,14 +266,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         path: "/admin/housekeeping/rooms",
         label: "Rooms",
         icon: BedDouble,
-        roles: ["owner", "admin", "housekeeper"],
+        roles: HOUSEKEEPING_ROOM_ROLES,
         moduleKey: "housekeeping",
       },
       {
         path: "/admin/housekeeping",
         label: "Messages",
         icon: Handshake,
-        roles: ["owner", "admin", "housekeeper"],
+        roles: HOUSEKEEPING_TASK_ROLES,
         privilege: "HOUSEKEEPING",
         moduleKey: "housekeeping",
       },
@@ -337,7 +342,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       ),
     [moduleAccess, offerSubItems, privileges, role]
   );
-  const isMenuGroupVisible = role === "owner" || role === "admin";
+  const isMenuGroupVisible = hasRoleAccess(role, RESTAURANT_ADMIN_ROLES);
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
   const isKitchenGroupVisible = !privilegesLoading && visibleKitchenSubItems.length > 0;
   const isKitchenGroupActive =
@@ -352,7 +357,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
   const offerPrivilegeEnabled = hasModuleAccess("offers");
-  const isOfferGroupVisible = role === "owner" || role === "admin";
+  const isOfferGroupVisible = hasRoleAccess(role, RESTAURANT_ADMIN_ROLES);
   const isOfferGroupActive = offerPaths.some((path) =>
     path === "/admin/offers"
       ? location.pathname === "/admin/offers" || location.pathname.startsWith("/admin/offers/")

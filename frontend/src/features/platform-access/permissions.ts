@@ -5,7 +5,12 @@ export type PlatformPermissionResource =
   | "notifications_queue"
   | "registrations"
   | "settings_requests"
-  | "audit_logs";
+  | "audit_logs"
+  | "restaurants"
+  | "packages"
+  | "site_content"
+  | "promo_codes"
+  | "platform_users";
 
 export type PlatformPermissionAction = "view" | "review" | "approve" | "mutate";
 
@@ -70,6 +75,36 @@ const PLATFORM_PERMISSION_RULES: PlatformPermissionRule[] = [
     action: "view",
     requiredScopes: ["ops_viewer", "security_admin"],
     description: "View and export audit logs.",
+  },
+  {
+    resource: "restaurants",
+    action: "view",
+    requiredScopes: ["tenant_admin", "billing_admin", "security_admin"],
+    description: "View and manage tenant restaurants.",
+  },
+  {
+    resource: "packages",
+    action: "view",
+    requiredScopes: ["billing_admin"],
+    description: "View and manage billing packages.",
+  },
+  {
+    resource: "site_content",
+    action: "view",
+    requiredScopes: ["tenant_admin"],
+    description: "View and manage public site content.",
+  },
+  {
+    resource: "promo_codes",
+    action: "view",
+    requiredScopes: ["billing_admin"],
+    description: "View and manage promo codes.",
+  },
+  {
+    resource: "platform_users",
+    action: "view",
+    requiredScopes: ["security_admin"],
+    description: "View and manage platform users.",
   },
 ];
 

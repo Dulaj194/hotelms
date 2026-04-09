@@ -24,9 +24,13 @@ const SUPER_ADMIN_NAV = [
   {
     path: "/super-admin/restaurants",
     label: "Hotels",
-    scopes: ["tenant_admin", "billing_admin", "security_admin"],
+    scopes: getRequiredScopesForPlatformAction("restaurants", "view"),
   },
-  { path: "/super-admin/packages", label: "Packages", scopes: ["billing_admin"] },
+  {
+    path: "/super-admin/packages",
+    label: "Packages",
+    scopes: getRequiredScopesForPlatformAction("packages", "view"),
+  },
   {
     path: "/super-admin/settings-requests",
     label: "Settings Requests",
@@ -35,13 +39,17 @@ const SUPER_ADMIN_NAV = [
   {
     path: "/super-admin/site-content",
     label: "Site Content",
-    scopes: ["tenant_admin"],
+    scopes: getRequiredScopesForPlatformAction("site_content", "view"),
   },
-  { path: "/super-admin/promo-codes", label: "Promo Codes", scopes: ["billing_admin"] },
+  {
+    path: "/super-admin/promo-codes",
+    label: "Promo Codes",
+    scopes: getRequiredScopesForPlatformAction("promo_codes", "view"),
+  },
   {
     path: "/super-admin/platform-users",
     label: "Platform Users",
-    scopes: ["security_admin"],
+    scopes: getRequiredScopesForPlatformAction("platform_users", "view"),
   },
   {
     path: "/super-admin/audit-logs",

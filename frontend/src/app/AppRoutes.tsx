@@ -462,7 +462,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={["tenant_admin", "billing_admin", "security_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "restaurants",
+                "view",
+              )}
             >
               <SuperAdminRestaurants />
             </ProtectedRoute>
@@ -477,7 +480,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={["billing_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "packages",
+                "view",
+              )}
             >
               <SuperAdminPackages />
             </ProtectedRoute>
@@ -506,7 +512,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={["tenant_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "site_content",
+                "view",
+              )}
             >
               <SuperAdminSiteContent />
             </ProtectedRoute>
@@ -531,7 +540,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={["billing_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "promo_codes",
+                "view",
+              )}
             >
               <SuperAdminPromoCodes />
             </ProtectedRoute>
@@ -542,7 +554,10 @@ function AppRoutes() {
           element={
             <ProtectedRoute
               allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={["security_admin"]}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "platform_users",
+                "view",
+              )}
             >
               <SuperAdminPlatformUsers />
             </ProtectedRoute>
