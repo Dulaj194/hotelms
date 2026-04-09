@@ -2,6 +2,7 @@ import { normalizeRole } from "@/lib/auth";
 import type { ModuleAccessSnapshot } from "@/types/access";
 
 export const RESTAURANT_ADMIN_ROLES = ["owner", "admin"] as const;
+export const SUPER_ADMIN_ONLY_ROLES = ["super_admin"] as const;
 export const HOUSEKEEPING_TASK_ROLES = ["owner", "admin", "housekeeper"] as const;
 export const HOUSEKEEPING_SUPERVISOR_ROLES = ["owner", "admin"] as const;
 export const QR_MENU_STAFF_ROLES = ["owner", "admin", "steward"] as const;

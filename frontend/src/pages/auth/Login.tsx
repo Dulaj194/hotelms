@@ -20,13 +20,44 @@ type LoginFlowConfig = {
   submitLabel: string;
 };
 
-const LOGIN_CONFIG: LoginFlowConfig = {
+const DEFAULT_LOGIN_CONFIG: LoginFlowConfig = {
   title: "HotelMS Sign In",
   subtitle: "Use your email address and password. Your role is detected automatically after sign in.",
   endpoint: "/auth/login",
   invalidCredentialsMessage: "Invalid email or password.",
   submitLabel: "Sign in",
 };
+
+const PORTAL_LOGIN_CONFIG: Record<string, LoginFlowConfig> = {
+  "restaurant-admin": {
+    title: "Restaurant Admin Sign In",
+    subtitle: "Owner and admin accounts must sign in through the restaurant admin portal.",
+    endpoint: "/auth/login/restaurant-admin",
+    invalidCredentialsMessage: "Invalid restaurant admin credentials.",
+    submitLabel: "Sign in as Admin",
+  },
+  staff: {
+    title: "Staff Sign In",
+    subtitle: "Steward, housekeeper, cashier, and accountant accounts sign in here.",
+    endpoint: "/auth/login/staff",
+    invalidCredentialsMessage: "Invalid staff credentials.",
+    submitLabel: "Sign in as Staff",
+  },
+  "super-admin": {
+    title: "Super Admin Sign In",
+    subtitle: "Platform super admin access only.",
+    endpoint: "/auth/login/super-admin",
+    invalidCredentialsMessage: "Invalid super admin credentials.",
+    submitLabel: "Sign in as Super Admin",
+  },
+};
+
+function getLoginConfigForPortal(portal: string | undefined): LoginFlowConfig {
+  if (!portal) {
+    return DEFAULT_LOGIN_CONFIG;
+  }
+  return PORTAL_LOGIN_CONFIG[portal] ?? DEFAULT_LOGIN_CONFIG;
+}
 
 type AccessTokenClaims = {
   sub?: string | number;
@@ -71,6 +102,8 @@ function getLoginErrorMessage(err: unknown, invalidCredentialsMessage: string): 
 export default function Login() {
   const navigate = useNavigate();
   const { portal } = useParams<{ portal?: string }>();
+  const normalizedPortal = portal?.trim().toLowerCase();
+  const loginConfig = getLoginConfigForPortal(normalizedPortal);
   const [searchParams, setSearchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -97,18 +130,11 @@ export default function Login() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    if (!portal) return;
-
-    const query = searchParams.toString();
-    navigate(query ? `/login?${query}` : "/login", { replace: true });
-  }, [navigate, portal, searchParams]);
-
-  useEffect(() => {
     trackAnalyticsEvent("login_view", {
       entry_point: searchParams.get("entry_point") ?? undefined,
-      intent: searchParams.get("intent") ?? portal ?? undefined,
+      intent: searchParams.get("intent") ?? normalizedPortal ?? undefined,
     });
-  }, [portal, searchParams]);
+  }, [normalizedPortal, searchParams]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -116,19 +142,19 @@ export default function Login() {
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
-      setError(LOGIN_CONFIG.invalidCredentialsMessage);
+      setError(loginConfig.invalidCredentialsMessage);
       return;
     }
 
     setLoading(true);
     try {
-      const data = await api.post<TokenResponse>(LOGIN_CONFIG.endpoint, {
+      const data = await api.post<TokenResponse>(loginConfig.endpoint, {
         email: normalizedEmail,
         password,
       });
       trackAnalyticsEvent("login_submit_success", {
         entry_point: searchParams.get("entry_point") ?? undefined,
-        intent: searchParams.get("intent") ?? portal ?? undefined,
+        intent: searchParams.get("intent") ?? normalizedPortal ?? undefined,
       });
       setAccessToken(data.access_token);
 
@@ -168,9 +194,9 @@ export default function Login() {
     } catch (err) {
       trackAnalyticsEvent("login_submit_failure", {
         entry_point: searchParams.get("entry_point") ?? undefined,
-        intent: searchParams.get("intent") ?? portal ?? undefined,
+        intent: searchParams.get("intent") ?? normalizedPortal ?? undefined,
       });
-      setError(getLoginErrorMessage(err, LOGIN_CONFIG.invalidCredentialsMessage));
+      setError(getLoginErrorMessage(err, loginConfig.invalidCredentialsMessage));
     } finally {
       setLoading(false);
     }
@@ -179,8 +205,8 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-10 flex items-center justify-center">
       <SeoHead
-        title={LOGIN_CONFIG.title}
-        description={LOGIN_CONFIG.subtitle}
+        title={loginConfig.title}
+        description={loginConfig.subtitle}
         path={typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "/login"}
         robots="noindex, nofollow"
         trackAs="login"
@@ -200,10 +226,10 @@ export default function Login() {
           </div>
 
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            {LOGIN_CONFIG.title}
+            {loginConfig.title}
           </h1>
           <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
-            {LOGIN_CONFIG.subtitle}
+            {loginConfig.subtitle}
           </p>
         </div>
 
@@ -268,7 +294,7 @@ export default function Login() {
             disabled={loading}
             className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Signing in..." : LOGIN_CONFIG.submitLabel}
+            {loading ? "Signing in..." : loginConfig.submitLabel}
           </button>
         </form>
 

@@ -122,6 +122,13 @@ class StaffStatusResponse(BaseModel):
     message: str
 
 
+class StaffManagementPolicyResponse(BaseModel):
+    manager_role: UserRole
+    manageable_roles: list[UserRole]
+    allowed_assigned_areas_by_role: dict[UserRole, list[AssignedArea]]
+    default_assigned_area_by_role: dict[UserRole, AssignedArea | None]
+
+
 class GenericMessageResponse(BaseModel):
     message: str
 

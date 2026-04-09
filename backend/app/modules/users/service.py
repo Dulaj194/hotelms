@@ -43,6 +43,7 @@ from app.modules.users.schemas import (
     StaffCreateRequest,
     StaffDetailResponse,
     StaffListItemResponse,
+    StaffManagementPolicyResponse,
     StaffStatusResponse,
     StaffUpdateRequest,
     UserCreate,
@@ -155,6 +156,27 @@ def create_user(db: Session, data: UserCreate) -> UserResponse:
 def list_staff(db: Session, restaurant_id: int) -> list[StaffListItemResponse]:
     """List all staff for the current tenant restaurant."""
     return list_staff_filtered(db, restaurant_id)
+
+
+def get_staff_management_policy(current_user: User) -> StaffManagementPolicyResponse:
+    manageable_roles = role_hierarchy.get_manageable_roles(current_user.role)
+
+    allowed_assigned_areas_by_role: dict[UserRole, list[str]] = {}
+    default_assigned_area_by_role: dict[UserRole, str | None] = {}
+    for role in sorted(manageable_roles, key=lambda role_item: role_item.value):
+        allowed_assigned_areas_by_role[role] = sorted(
+            area
+            for area in role_hierarchy.get_allowed_assigned_areas(role)
+            if area is not None
+        )
+        default_assigned_area_by_role[role] = role_hierarchy.get_default_assigned_area(role)
+
+    return StaffManagementPolicyResponse(
+        manager_role=current_user.role,
+        manageable_roles=sorted(manageable_roles, key=lambda role_item: role_item.value),
+        allowed_assigned_areas_by_role=allowed_assigned_areas_by_role,
+        default_assigned_area_by_role=default_assigned_area_by_role,
+    )
 
 
 def list_staff_filtered(

@@ -43,7 +43,7 @@ export const DEFAULT_PLATFORM_SCOPES: PlatformScopeValue[] = PLATFORM_SCOPE_CATA
 );
 
 export function normalizePlatformScopes(
-  values: string[] | null | undefined,
+  values: readonly string[] | null | undefined,
 ): PlatformScopeValue[] {
   if (!values) {
     return [];
@@ -64,8 +64,8 @@ export function normalizePlatformScopes(
 }
 
 export function hasAnyPlatformScope(
-  scopes: string[] | null | undefined,
-  requiredScopes: string[],
+  scopes: readonly string[] | null | undefined,
+  requiredScopes: readonly string[],
 ): boolean {
   const normalizedScopes = new Set(normalizePlatformScopes(scopes));
   return requiredScopes.some((scope) =>
@@ -74,7 +74,7 @@ export function hasAnyPlatformScope(
 }
 
 export function getDefaultSuperAdminPath(
-  scopes: string[] | null | undefined,
+  scopes: readonly string[] | null | undefined,
 ): string {
   const normalizedScopes = normalizePlatformScopes(scopes);
   const firstScopedMatch = PLATFORM_SCOPE_CATALOG.find((item) =>

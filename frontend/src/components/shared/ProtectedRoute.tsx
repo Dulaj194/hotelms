@@ -12,8 +12,8 @@ import { isUserRole } from "@/types/user";
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  allowedRoles?: string[];
-  requiredSuperAdminScopes?: string[];
+  allowedRoles?: readonly string[];
+  requiredSuperAdminScopes?: readonly string[];
 }
 
 export default function ProtectedRoute({

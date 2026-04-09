@@ -15,6 +15,7 @@ from app.modules.users.schemas import (
     StaffCreateRequest,
     StaffDetailResponse,
     StaffListItemResponse,
+    StaffManagementPolicyResponse,
     StaffStatusResponse,
     StaffUpdateRequest,
 )
@@ -106,6 +107,13 @@ def list_staff(
         role=role,
         is_active=is_active,
     )
+
+
+@router.get("/management-policy", response_model=StaffManagementPolicyResponse)
+def get_staff_management_policy(
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+) -> StaffManagementPolicyResponse:
+    return service.get_staff_management_policy(current_user)
 
 
 @router.post("", response_model=StaffDetailResponse, status_code=status.HTTP_201_CREATED)

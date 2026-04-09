@@ -13,6 +13,7 @@ import {
   RESTAURANT_ADMIN_ROLES,
   HOUSEKEEPING_TASK_ROLES,
   QR_MENU_STAFF_ROLES,
+  SUPER_ADMIN_ONLY_ROLES,
 } from "@/lib/moduleAccess";
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
@@ -149,7 +150,7 @@ function AppRoutes() {
         <Route
           path="/admin/restaurant-profile"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <AdminRestaurantProfile />
             </ProtectedRoute>
           }
@@ -157,7 +158,7 @@ function AppRoutes() {
         <Route
           path="/admin/staff"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <Staff />
             </ProtectedRoute>
           }
@@ -165,7 +166,7 @@ function AppRoutes() {
         <Route
           path="/admin/offers"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <PrivilegeRoute requiredModuleKey="offers">
                 <OfferListPage />
               </PrivilegeRoute>
@@ -175,7 +176,7 @@ function AppRoutes() {
         <Route
           path="/admin/offers/new"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <PrivilegeRoute requiredModuleKey="offers">
                 <OfferFormPage />
               </PrivilegeRoute>
@@ -185,7 +186,7 @@ function AppRoutes() {
         <Route
           path="/admin/offers/:offerId/edit"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <PrivilegeRoute requiredModuleKey="offers">
                 <OfferFormPage />
               </PrivilegeRoute>
@@ -195,7 +196,7 @@ function AppRoutes() {
         <Route
           path="/admin/steward"
           element={
-            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+            <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
               <PrivilegeRoute requiredModuleKey="steward_ops">
                 <Steward />
               </PrivilegeRoute>
@@ -205,7 +206,7 @@ function AppRoutes() {
         <Route
           path="/admin/reports"
           element={
-            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+            <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
               <PrivilegeRoute requiredModuleKey="reports">
                 <Reports />
               </PrivilegeRoute>
@@ -216,7 +217,7 @@ function AppRoutes() {
         <Route
           path="/admin/kitchen/orders"
           element={
-            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+            <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
               <PrivilegeRoute requiredModuleKey="kds">
                 <Kitchen />
               </PrivilegeRoute>
@@ -226,7 +227,7 @@ function AppRoutes() {
         <Route
           path="/admin/kitchen/old-orders"
           element={
-            <ProtectedRoute allowedRoles={[...QR_MENU_STAFF_ROLES]}>
+            <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
               <PrivilegeRoute requiredModuleKey="kds">
                 <KitchenOldOrders />
               </PrivilegeRoute>
@@ -236,7 +237,7 @@ function AppRoutes() {
         <Route
           path="/admin/billing"
           element={
-            <ProtectedRoute allowedRoles={[...BILLING_STAFF_ROLES]}>
+            <ProtectedRoute allowedRoles={BILLING_STAFF_ROLES}>
               <PrivilegeRoute requiredModuleKey="billing">
                 <BillingRouteEntry />
               </PrivilegeRoute>
@@ -246,7 +247,7 @@ function AppRoutes() {
         <Route
           path="/admin/billing/cashier"
           element={
-            <ProtectedRoute allowedRoles={[...BILLING_CASHIER_REVIEW_ROLES]}>
+            <ProtectedRoute allowedRoles={BILLING_CASHIER_REVIEW_ROLES}>
               <PrivilegeRoute requiredModuleKey="billing">
                 <CashierBillingDashboard />
               </PrivilegeRoute>
@@ -256,7 +257,7 @@ function AppRoutes() {
         <Route
           path="/admin/billing/accountant"
           element={
-            <ProtectedRoute allowedRoles={[...BILLING_ACCOUNTANT_REVIEW_ROLES]}>
+            <ProtectedRoute allowedRoles={BILLING_ACCOUNTANT_REVIEW_ROLES}>
               <PrivilegeRoute requiredModuleKey="billing">
                 <AccountantBillingDashboard />
               </PrivilegeRoute>
@@ -267,7 +268,7 @@ function AppRoutes() {
         <Route
           path="/admin/housekeeping/rooms"
           element={
-            <ProtectedRoute allowedRoles={[...HOUSEKEEPING_ROOM_ROLES]}>
+            <ProtectedRoute allowedRoles={HOUSEKEEPING_ROOM_ROLES}>
               <PrivilegeRoute requiredModuleKey="housekeeping">
                 <Rooms />
               </PrivilegeRoute>
@@ -285,7 +286,7 @@ function AppRoutes() {
         <Route
           path="/admin/qr/rooms"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <PrivilegeRoute requiredModuleKey="qr">
                 <AllRoomQRCodes />
               </PrivilegeRoute>
@@ -303,7 +304,7 @@ function AppRoutes() {
         <Route
           path="/admin/qr/rooms/generate"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <PrivilegeRoute requiredModuleKey="qr">
                 <GenerateRoomQRCodes />
               </PrivilegeRoute>
@@ -318,7 +319,7 @@ function AppRoutes() {
         <Route
           path="/admin/qr/tables"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <PrivilegeRoute requiredModuleKey="qr">
                 <AllTableQRCodes />
               </PrivilegeRoute>
@@ -328,7 +329,7 @@ function AppRoutes() {
         <Route
           path="/admin/qr/tables/generate"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <PrivilegeRoute requiredModuleKey="qr">
                 <GenerateTableQRCodes />
               </PrivilegeRoute>
@@ -338,7 +339,7 @@ function AppRoutes() {
         <Route
           path="/admin/housekeeping"
           element={
-            <ProtectedRoute allowedRoles={[...HOUSEKEEPING_TASK_ROLES]}>
+            <ProtectedRoute allowedRoles={HOUSEKEEPING_TASK_ROLES}>
               <PrivilegeRoute requiredModuleKey="housekeeping">
                 <Housekeeping />
               </PrivilegeRoute>
@@ -348,7 +349,7 @@ function AppRoutes() {
         <Route
           path="/admin/menu/menus"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <Menus />
             </ProtectedRoute>
           }
@@ -356,7 +357,7 @@ function AppRoutes() {
         <Route
           path="/admin/menu/categories"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <MenuCategories />
             </ProtectedRoute>
           }
@@ -364,7 +365,7 @@ function AppRoutes() {
         <Route
           path="/admin/menu/subcategories"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <Subcategories />
             </ProtectedRoute>
           }
@@ -372,7 +373,7 @@ function AppRoutes() {
         <Route
           path="/admin/menu/items"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <MenuItems />
             </ProtectedRoute>
           }
@@ -380,7 +381,7 @@ function AppRoutes() {
         <Route
           path="/admin/subscription"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <SubscriptionPage />
             </ProtectedRoute>
           }
@@ -388,7 +389,7 @@ function AppRoutes() {
         <Route
           path="/admin/subscription/payment/success"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <SubscriptionPaymentSuccess />
             </ProtectedRoute>
           }
@@ -396,7 +397,7 @@ function AppRoutes() {
         <Route
           path="/admin/subscription/payment/cancel"
           element={
-            <ProtectedRoute allowedRoles={[...RESTAURANT_ADMIN_ROLES]}>
+            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <SubscriptionPaymentCancel />
             </ProtectedRoute>
           }
@@ -405,7 +406,7 @@ function AppRoutes() {
         <Route
           path="/super-admin"
           element={
-            <ProtectedRoute allowedRoles={["super_admin"]}>
+            <ProtectedRoute allowedRoles={SUPER_ADMIN_ONLY_ROLES}>
               <SuperAdminOverview />
             </ProtectedRoute>
           }
@@ -414,7 +415,7 @@ function AppRoutes() {
           path="/super-admin/notifications"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
                 "notifications_queue",
                 "view",
@@ -428,7 +429,7 @@ function AppRoutes() {
           path="/super-admin/registrations"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
                 "registrations",
                 "view",
@@ -446,7 +447,7 @@ function AppRoutes() {
           path="/super-admin/registrations/history"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
                 "registrations",
                 "view",
@@ -460,7 +461,7 @@ function AppRoutes() {
           path="/super-admin/restaurants"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={["tenant_admin", "billing_admin", "security_admin"]}
             >
               <SuperAdminRestaurants />
@@ -475,7 +476,7 @@ function AppRoutes() {
           path="/super-admin/packages"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={["billing_admin"]}
             >
               <SuperAdminPackages />
@@ -486,7 +487,7 @@ function AppRoutes() {
           path="/super-admin/settings-requests"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
                 "settings_requests",
                 "view",
@@ -504,7 +505,7 @@ function AppRoutes() {
           path="/super-admin/site-content"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={["tenant_admin"]}
             >
               <SuperAdminSiteContent />
@@ -515,7 +516,7 @@ function AppRoutes() {
           path="/super-admin/settings-requests/history"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
                 "settings_requests",
                 "view",
@@ -529,7 +530,7 @@ function AppRoutes() {
           path="/super-admin/promo-codes"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={["billing_admin"]}
             >
               <SuperAdminPromoCodes />
@@ -540,7 +541,7 @@ function AppRoutes() {
           path="/super-admin/platform-users"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={["security_admin"]}
             >
               <SuperAdminPlatformUsers />
@@ -551,7 +552,7 @@ function AppRoutes() {
           path="/super-admin/audit-logs"
           element={
             <ProtectedRoute
-              allowedRoles={["super_admin"]}
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
               requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
                 "audit_logs",
                 "view",

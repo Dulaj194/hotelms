@@ -135,8 +135,8 @@ export function isAuthenticated(): boolean {
 }
 
 export function hasSuperAdminScope(
-  requiredScopes: string[],
-  scopes: string[] | null | undefined,
+  requiredScopes: readonly string[],
+  scopes: readonly string[] | null | undefined,
 ): boolean {
   return hasAnyPlatformScope(scopes, requiredScopes);
 }

@@ -76,6 +76,13 @@ export interface StaffStatusResponse {
   message: string;
 }
 
+export interface StaffManagementPolicyResponse {
+  manager_role: UserRole;
+  manageable_roles: UserRole[];
+  allowed_assigned_areas_by_role: Partial<Record<UserRole, AssignedArea[]>>;
+  default_assigned_area_by_role: Partial<Record<UserRole, AssignedArea | null>>;
+}
+
 export interface GenericMessageResponse {
   message: string;
 }
@@ -204,12 +211,6 @@ export function getDefaultAssignedAreaForRole(role: UserRole): AssignedArea | nu
   return ROLE_DEFAULT_AREA[role] ?? null;
 }
 
-const ROLE_MANAGEABLE_ROLES: Partial<Record<UserRole, UserRole[]>> = {
-  super_admin: ["owner", "admin", "steward", "housekeeper", "cashier", "accountant"],
-  owner: ["admin", "steward", "housekeeper", "cashier", "accountant"],
-  admin: ["steward", "housekeeper", "cashier", "accountant"],
-};
-
 export function isUserRole(value: string | null | undefined): value is UserRole {
   if (!value) return false;
   return (
@@ -221,12 +222,4 @@ export function isUserRole(value: string | null | undefined): value is UserRole 
     value === "accountant" ||
     value === "super_admin"
   );
-}
-
-export function getManageableRolesForRole(role: UserRole): UserRole[] {
-  return ROLE_MANAGEABLE_ROLES[role] ?? [];
-}
-
-export function canManageUserRole(managerRole: UserRole, targetRole: UserRole): boolean {
-  return getManageableRolesForRole(managerRole).includes(targetRole);
 }

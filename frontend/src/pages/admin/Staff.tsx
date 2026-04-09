@@ -4,6 +4,7 @@ import ActionDialog from "@/components/shared/ActionDialog";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import type {
   AssignedArea,
+  StaffManagementPolicyResponse,
   StaffListItemResponse,
   StaffCreateRequest,
   StaffUpdateRequest,
@@ -11,15 +12,12 @@ import type {
 } from "@/types/user";
 import {
   ASSIGNED_AREA_LABELS,
-  canManageUserRole,
   getAllowedAssignedAreasForRole,
   getDefaultAssignedAreaForRole,
   isUserRole,
   ROLE_LABELS,
-  STAFF_ROLES,
 } from "@/types/user";
 import { ApiError } from "@/lib/api";
-import { getUser, normalizeRole } from "@/lib/auth";
 
 type DialogMode = { type: "add" } | { type: "edit"; staff: StaffListItemResponse } | null;
 type ConfirmActionState = {
@@ -42,17 +40,8 @@ const EMPTY_CREATE: StaffCreateRequest = {
 };
 
 export default function Staff() {
-  const normalizedCurrentUserRole = normalizeRole(getUser()?.role);
-  const currentUserRole: UserRole | null = isUserRole(normalizedCurrentUserRole)
-    ? normalizedCurrentUserRole
-    : null;
-
-  function canManageRole(targetRole: UserRole): boolean {
-    if (!currentUserRole) return false;
-    return canManageUserRole(currentUserRole, targetRole);
-  }
-
   const [staffList, setStaffList] = useState<StaffListItemResponse[]>([]);
+  const [staffManagementPolicy, setStaffManagementPolicy] = useState<StaffManagementPolicyResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -69,15 +58,39 @@ export default function Staff() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const allowedRoles = useMemo<UserRole[]>(() => {
-    if (!currentUserRole) {
-      return ["steward", "housekeeper", "cashier", "accountant"];
+    const policyRoles = (staffManagementPolicy?.manageable_roles ?? []).filter(isUserRole);
+    return policyRoles;
+  }, [staffManagementPolicy]);
+
+  const roleFilterOptions = useMemo<UserRole[]>(() => {
+    const seen = new Set<UserRole>();
+    for (const staff of staffList) {
+      seen.add(staff.role);
     }
-    return STAFF_ROLES.filter((role) => canManageUserRole(currentUserRole, role));
-  }, [currentUserRole]);
+    return Array.from(seen);
+  }, [staffList]);
+
+  function canManageRole(targetRole: UserRole): boolean {
+    return allowedRoles.includes(targetRole);
+  }
+
+  function getDefaultAssignedArea(role: UserRole): AssignedArea | null {
+    const policyDefault = staffManagementPolicy?.default_assigned_area_by_role?.[role];
+    if (policyDefault !== undefined) {
+      return policyDefault;
+    }
+    return getDefaultAssignedAreaForRole(role);
+  }
 
   const allowedAssignedAreas = useMemo(
-    () => getAllowedAssignedAreasForRole(formData.role),
-    [formData.role],
+    () => {
+      const policyAreas = staffManagementPolicy?.allowed_assigned_areas_by_role?.[formData.role];
+      if (policyAreas !== undefined) {
+        return policyAreas;
+      }
+      return getAllowedAssignedAreasForRole(formData.role);
+    },
+    [formData.role, staffManagementPolicy],
   );
 
   function loadStaff() {
@@ -98,13 +111,33 @@ export default function Staff() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { loadStaff(); }, []);
+  function loadStaffManagementPolicy() {
+    api
+      .get<StaffManagementPolicyResponse>("/users/management-policy")
+      .then(setStaffManagementPolicy)
+      .catch((err: unknown) => {
+        const msg =
+          err instanceof ApiError
+            ? err.detail
+            : err instanceof Error
+              ? err.message
+              : "Failed to load staff management policy.";
+        setFetchError(msg);
+        // Fail closed for role-management UI when policy cannot be loaded.
+        setStaffManagementPolicy(null);
+      });
+  }
+
+  useEffect(() => {
+    loadStaff();
+    loadStaffManagementPolicy();
+  }, []);
 
   function openAdd() {
     setFormData({
       ...EMPTY_CREATE,
       role: allowedRoles[0] ?? "steward",
-      assigned_area: getDefaultAssignedAreaForRole(allowedRoles[0] ?? "steward"),
+      assigned_area: getDefaultAssignedArea(allowedRoles[0] ?? "steward"),
     });
     setFormError(null);
     setDialog({ type: "add" });
@@ -302,6 +335,7 @@ export default function Staff() {
           <h1 className="text-2xl font-semibold">Staff</h1>
           <button
             onClick={openAdd}
+            disabled={allowedRoles.length === 0}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             + Add staff
@@ -340,7 +374,7 @@ export default function Staff() {
               onChange={(e) => setRoleFilter(e.target.value as UserRole | "all")}
             >
               <option value="all">All roles</option>
-              {STAFF_ROLES.map((role) => (
+              {roleFilterOptions.map((role) => (
                 <option key={role} value={role}>
                   {ROLE_LABELS[role]}
                 </option>
@@ -576,7 +610,7 @@ export default function Staff() {
                     const nextAssignedArea =
                       f.assigned_area && nextAreas.includes(f.assigned_area)
                         ? f.assigned_area
-                        : getDefaultAssignedAreaForRole(nextRole);
+                        : getDefaultAssignedArea(nextRole);
                     return { ...f, role: nextRole, assigned_area: nextAssignedArea };
                   })
                 }
