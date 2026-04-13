@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { ApiError, api } from "@/lib/api";
+import { ACCEPTED_LOGO_INPUT, validateLogoFile } from "@/lib/logoUpload";
 import type {
   RegisterRestaurantRequest,
   RegisterRestaurantResponse,
@@ -11,8 +12,24 @@ interface RegisterFormState extends RegisterRestaurantRequest {
   logo: File | null;
 }
 
-const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_LOGO_SIZE_MB = 5;
+function createRequestId(): string {
+  const webCrypto = globalThis.crypto;
+  if (webCrypto?.randomUUID) {
+    return webCrypto.randomUUID();
+  }
+
+  if (webCrypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    webCrypto.getRandomValues(bytes);
+    // RFC 4122 v4 bits
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`;
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+}
 
 function validatePasswordPolicy(password: string): string | null {
   if (password.length < 8) return "Password must be at least 8 characters.";
@@ -73,13 +90,9 @@ export default function Register() {
       return;
     }
 
-    if (!ALLOWED_LOGO_TYPES.includes(form.logo.type)) {
-      setError("Logo must be jpg, png, webp, or gif.");
-      return;
-    }
-
-    if (form.logo.size > MAX_LOGO_SIZE_MB * 1024 * 1024) {
-      setError(`Logo size must be less than ${MAX_LOGO_SIZE_MB} MB.`);
+    const logoValidationError = validateLogoFile(form.logo);
+    if (logoValidationError) {
+      setError(logoValidationError);
       return;
     }
 
@@ -97,8 +110,8 @@ export default function Register() {
       payload.append("closing_time", form.closing_time);
       payload.append("logo", form.logo);
 
-      const correlationId = crypto.randomUUID();
-      const idempotencyKey = crypto.randomUUID();
+      const correlationId = createRequestId();
+      const idempotencyKey = createRequestId();
 
       const response = await api.post<RegisterRestaurantResponse>(
         "/auth/register-restaurant",
@@ -282,7 +295,7 @@ export default function Register() {
               <input
                 id="logo"
                 type="file"
-                accept="image/*"
+                accept={ACCEPTED_LOGO_INPUT}
                 required
                 onChange={(e) => updateField("logo", e.target.files?.[0] ?? null)}
                 className="w-full px-3 py-2 text-sm border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1 file:text-primary-foreground"

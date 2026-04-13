@@ -846,7 +846,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       </Link>
                     );
                   })}
-                  {!offerPrivilegeEnabled && (
+                  {!privilegesLoading && !offerPrivilegeEnabled && (
                     <p className="px-3 py-2 text-xs text-gray-400">
                       Unlock the Offers module from package access to open these tools.
                     </p>

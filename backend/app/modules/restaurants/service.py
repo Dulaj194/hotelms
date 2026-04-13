@@ -73,8 +73,13 @@ from app.modules.restaurants.schemas import (
     RestaurantWebhookHealthRefreshResponse,
 )
 
-_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
-_EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+_EXT_MAP = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
 _RESETTABLE_HOTEL_STAFF_ROLES = role_catalog.RESETTABLE_RESTAURANT_STAFF_ROLES
 _STAFF_PASSWORD_REVEAL_TTL_MINUTES = 15
 _STAFF_PASSWORD_REVEAL_INVALID_DETAIL = "Temporary password reveal token is invalid or expired."
@@ -449,7 +454,7 @@ async def upload_logo(
     if file.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type '{file.content_type}'. Allowed: jpg, jpeg, png, webp.",
+            detail=f"Invalid file type '{file.content_type}'. Allowed: jpg, jpeg, png, webp, gif.",
         )
 
     content = await file.read()

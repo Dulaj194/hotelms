@@ -6,6 +6,12 @@ import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Star } from "lucide-rea
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { getFeatureFlagEntries } from "@/features/access/catalog";
 import { ApiError, api } from "@/lib/api";
+import { toAssetUrl } from "@/lib/assets";
+import {
+  ACCEPTED_LOGO_INPUT,
+  MAX_LOGO_SIZE_MB,
+  validateLogoFile,
+} from "@/lib/logoUpload";
 import type { SettingsRequestListResponse, SettingsRequestResponse } from "@/types/settings";
 import type {
   AdminDashboardOverviewResponse,
@@ -432,6 +438,15 @@ export default function RestaurantProfile() {
       return;
     }
 
+    const validationError = validateLogoFile(file);
+    if (validationError) {
+      setUploadNotice({ tone: "error", text: validationError });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
     setUploading(true);
     setUploadNotice(null);
 
@@ -451,7 +466,10 @@ export default function RestaurantProfile() {
         return;
       }
 
-      setUploadNotice({ tone: "success", text: "Logo uploaded successfully." });
+      setUploadNotice({
+        tone: "success",
+        text: restaurant.logo_url ? "Logo updated successfully." : "Logo uploaded successfully.",
+      });
     } catch (err) {
       if (!aliveRef.current) {
         return;
@@ -499,9 +517,7 @@ export default function RestaurantProfile() {
     );
   }
 
-  const logoSrc = restaurant.logo_url
-    ? `${import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"}${restaurant.logo_url}`
-    : null;
+  const logoSrc = toAssetUrl(restaurant.logo_url) ?? null;
 
   const trialDaysRemaining = subscriptionSummary?.days_remaining ?? null;
   const showTrialBanner =
@@ -692,36 +708,42 @@ export default function RestaurantProfile() {
             description="Upload a logo to represent your restaurant in menus and dashboard views."
           />
 
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            {logoSrc ? (
-              <img
-                src={logoSrc}
-                alt="Restaurant logo"
-                className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
-              />
-            ) : (
-              <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs font-medium text-slate-400">
-                No logo
-              </div>
-            )}
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="mx-auto sm:mx-0">
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  alt="Restaurant logo"
+                  className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
+                />
+              ) : (
+                <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs font-medium text-slate-400">
+                  No logo
+                </div>
+              )}
+            </div>
 
-            <div className="space-y-2">
-              <label
-                htmlFor="logo-upload"
-                className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            <div className="w-full space-y-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
-                {uploading ? "Uploading..." : "Upload logo"}
-              </label>
+                {uploading ? "Saving Logo..." : logoSrc ? "Edit Logo" : "Upload Logo"}
+              </button>
               <input
                 id="logo-upload"
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept={ACCEPTED_LOGO_INPUT}
                 className="hidden"
                 onChange={handleLogoUpload}
                 disabled={uploading}
               />
-              <p className="text-xs text-slate-500">Supported: JPG, PNG, WebP. Max size: 5 MB.</p>
+              <p className="text-xs text-slate-500">
+                Supported: JPG, PNG, WebP, GIF. Max size: {MAX_LOGO_SIZE_MB} MB.
+              </p>
               {uploadNotice && <NoticeText tone={uploadNotice.tone}>{uploadNotice.text}</NoticeText>}
             </div>
           </div>

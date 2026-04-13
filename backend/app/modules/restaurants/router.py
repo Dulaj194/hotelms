@@ -91,7 +91,7 @@ async def upload_logo(
 ) -> RestaurantLogoUploadResponse:
     """Upload/replace the restaurant logo. Owner/admin only.
 
-    Multipart/form-data. Allowed: jpg, jpeg, png, webp. Max: 5 MB.
+    Multipart/form-data. Allowed: jpg, jpeg, png, webp, gif. Max: 5 MB.
 
     SECURITY: Original filename never used. UUID path assigned server-side.
     restaurant_id from authenticated user.

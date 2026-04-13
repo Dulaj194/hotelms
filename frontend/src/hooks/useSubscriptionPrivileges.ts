@@ -36,9 +36,11 @@ function hasAccessSnapshot(user: ReturnType<typeof getUser>): boolean {
 
 export function useSubscriptionPrivileges() {
   const user = getUser();
-  const [loading, setLoading] = useState(Boolean(user?.restaurant_id && !hasAccessSnapshot(user)));
+  const [loading, setLoading] = useState(Boolean(user?.restaurant_id));
   const [error, setError] = useState<string | null>(null);
-  const [privileges, setPrivileges] = useState<string[]>(user?.privileges ?? []);
+  const [privileges, setPrivileges] = useState<string[]>(
+    user?.privileges?.map((item) => item.toUpperCase()) ?? [],
+  );
   const [featureFlags, setFeatureFlags] = useState<FeatureFlagSnapshot>(
     user?.feature_flags ?? EMPTY_FEATURE_FLAGS,
   );
@@ -48,7 +50,9 @@ export function useSubscriptionPrivileges() {
 
   useEffect(() => {
     async function load() {
-      if (!user?.restaurant_id) {
+      const currentUser = getUser();
+
+      if (!currentUser?.restaurant_id) {
         setPrivileges([]);
         setFeatureFlags(EMPTY_FEATURE_FLAGS);
         setModuleAccess(EMPTY_MODULE_ACCESS);
@@ -56,12 +60,11 @@ export function useSubscriptionPrivileges() {
         return;
       }
 
-      if (hasAccessSnapshot(user)) {
-        setPrivileges(user.privileges?.map((item) => item.toUpperCase()) ?? []);
-        setFeatureFlags(user.feature_flags ?? EMPTY_FEATURE_FLAGS);
-        setModuleAccess(user.module_access ?? EMPTY_MODULE_ACCESS);
-        setLoading(false);
-        return;
+      // Hydrate quickly from the locally stored snapshot while a fresh sync runs.
+      if (hasAccessSnapshot(currentUser)) {
+        setPrivileges(currentUser.privileges?.map((item) => item.toUpperCase()) ?? []);
+        setFeatureFlags(currentUser.feature_flags ?? EMPTY_FEATURE_FLAGS);
+        setModuleAccess(currentUser.module_access ?? EMPTY_MODULE_ACCESS);
       }
 
       setLoading(true);
@@ -78,16 +81,13 @@ export function useSubscriptionPrivileges() {
         } else {
           setError("Failed to load access snapshot.");
         }
-        setPrivileges([]);
-        setFeatureFlags(EMPTY_FEATURE_FLAGS);
-        setModuleAccess(EMPTY_MODULE_ACCESS);
       } finally {
         setLoading(false);
       }
     }
 
     void load();
-  }, [user?.restaurant_id]);
+  }, [user?.id, user?.restaurant_id]);
 
   const privilegeSet = useMemo(() => new Set(privileges), [privileges]);
   const moduleAccessSet = useMemo(() => new Set(

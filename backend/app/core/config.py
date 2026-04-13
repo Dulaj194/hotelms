@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_v1_prefix: str = "/api/v1"
     frontend_url: str = "http://localhost:5173"
+    # Comma-separated list of allowed frontend origins for CORS.
+    # Example: http://localhost:5173,http://192.168.43.199:5173
+    frontend_urls: str = ""
 
     # Database / Cache
     database_url: str = "mysql+pymysql://root:@localhost:3306/hotelms"
@@ -168,6 +171,36 @@ class Settings(BaseSettings):
             )
 
         return self
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        """Return normalized CORS origins with backward-compatible defaults."""
+        origins: list[str] = []
+
+        if self.frontend_urls.strip():
+            origins.extend(
+                item.strip() for item in self.frontend_urls.split(",") if item.strip()
+            )
+
+        if self.frontend_url.strip():
+            origins.append(self.frontend_url.strip())
+
+        # Safe defaults for local development, regardless of FRONTEND_URL value.
+        origins.extend([
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ])
+
+        # Deduplicate while preserving order and normalize trailing slashes.
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for origin in origins:
+            normalized = origin.rstrip("/")
+            if normalized and normalized not in seen:
+                deduped.append(normalized)
+                seen.add(normalized)
+
+        return deduped
 
 
 settings = Settings()
