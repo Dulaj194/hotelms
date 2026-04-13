@@ -8,9 +8,9 @@
 
 import { getAccessToken } from "@/lib/auth";
 import { clearAuth, setAccessToken } from "@/lib/auth";
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 
-const BASE_URL =
-  import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+const BASE_URL = RESOLVED_API_BASE_URL;
 const REFRESH_PATH = "/auth/refresh";
 const NO_REFRESH_RETRY_PATHS = new Set([
   "/auth/login",

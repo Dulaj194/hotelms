@@ -6,9 +6,10 @@
  * then subsequent calls use the session-specific hooks).
  */
 
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
+
 const BASE_URL =
-  (import.meta as { env: Record<string, string | undefined> }).env.VITE_API_URL ??
-  "http://localhost:8000/api/v1";
+  RESOLVED_API_BASE_URL;
 
 export async function publicGet<T>(path: string): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`);

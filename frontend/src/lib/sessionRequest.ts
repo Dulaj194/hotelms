@@ -10,9 +10,10 @@
  *   const roomRequest  = createSessionRequest("X-Room-Session",  getRoomToken);
  */
 
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
+
 const BASE_URL =
-  (import.meta as { env: Record<string, string | undefined> }).env.VITE_API_URL ??
-  "http://localhost:8000/api/v1";
+  RESOLVED_API_BASE_URL;
 
 export function createSessionRequest(
   headerName: string,

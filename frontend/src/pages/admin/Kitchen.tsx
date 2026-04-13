@@ -100,11 +100,8 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
         ]);
 
         const map = new Map<number, KitchenOrderCard>();
-        // Table orders should appear only after steward confirmation.
         for (const order of pendingRes.orders) {
-          if (order.order_source === "room") {
-            map.set(order.id, order);
-          }
+          map.set(order.id, order);
         }
         for (const order of processingRes.orders) map.set(order.id, order);
 
@@ -245,7 +242,7 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
       sortedOrders.filter(
         (order) =>
           order.order_source !== "room" &&
-          (order.status === "confirmed" || order.status === "processing")
+          (order.status === "pending" || order.status === "confirmed" || order.status === "processing")
       ),
     [sortedOrders]
   );

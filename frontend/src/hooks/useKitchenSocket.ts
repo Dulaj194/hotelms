@@ -14,20 +14,12 @@ import { useEffect, useRef, useState } from "react";
 
 import { getAccessToken } from "@/lib/auth";
 import { refreshAccessToken } from "@/lib/api";
+import { RESOLVED_WS_BASE_URL } from "@/lib/networkBase";
 import type {
   KitchenEvent,
   NewOrderEvent,
   OrderStatusUpdatedEvent,
 } from "@/types/realtime";
-
-// Derive WS base from VITE_WS_URL, or fall back to transforming VITE_API_URL,
-// or hard-fall to the default local dev URL.
-const _apiBase =
-  (import.meta as { env: Record<string, string | undefined> }).env.VITE_API_URL ??
-  "http://localhost:8000/api/v1";
-const WS_BASE_URL =
-  (import.meta as { env: Record<string, string | undefined> }).env.VITE_WS_URL ??
-  _apiBase.replace(/^http/, "ws") + "/ws";
 
 // Reconnect delay schedule (ms) — exponential back-off capped at 15s
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000];
@@ -83,7 +75,7 @@ export function useKitchenSocket({
         return;
       }
 
-      const url = `${WS_BASE_URL}/kitchen/${restaurantId}?token=${encodeURIComponent(token)}`;
+      const url = `${RESOLVED_WS_BASE_URL}/kitchen/${restaurantId}?token=${encodeURIComponent(token)}`;
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
