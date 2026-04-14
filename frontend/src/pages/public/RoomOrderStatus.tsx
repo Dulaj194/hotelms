@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { getRoomToken, setRoomSession } from "@/hooks/useRoomSession";
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import { publicPost } from "@/lib/publicApi";
 import {
   ORDER_STATUS_COLOR,
@@ -13,9 +14,8 @@ import type {
   RoomSessionStartResponse,
 } from "@/types/roomSession";
 
-const BASE_URL =
-  (import.meta as { env: Record<string, string | undefined> }).env.VITE_API_URL ??
-  "http://localhost:8000/api/v1";
+const BASE_URL = RESOLVED_API_BASE_URL;
+const CANCEL_WINDOW_SECONDS = 5;
 
 const POLL_INTERVAL_MS = 15_000;
 const FINALIZED: Set<OrderStatus> = new Set(["completed", "paid", "rejected"]);
@@ -39,6 +39,38 @@ async function fetchRoomOrder(orderId: string): Promise<RoomOrderDetailResponse>
   }
 
   return response.json() as Promise<RoomOrderDetailResponse>;
+}
+
+async function cancelRoomOrder(orderId: string): Promise<void> {
+  const token = getRoomToken();
+  if (!token) {
+    throw new Error("Room session expired. Please scan the room QR code again.");
+  }
+
+  const response = await fetch(`${BASE_URL}/room-orders/${orderId}/cancel`, {
+    method: "POST",
+    headers: { "X-Room-Session": token },
+  });
+
+  if (!response.ok) {
+    let detail = `Failed to cancel room order - ${response.status}`;
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload?.detail) detail = payload.detail;
+    } catch {
+      // fallback keeps base detail
+    }
+    throw new Error(detail);
+  }
+}
+
+function getRemainingCancelSeconds(order: RoomOrderDetailResponse | null): number {
+  if (!order) return 0;
+  if (order.status !== "pending" && order.status !== "confirmed") return 0;
+  const placedMs = new Date(order.placed_at).getTime();
+  if (Number.isNaN(placedMs)) return 0;
+  const elapsedSeconds = Math.floor((Date.now() - placedMs) / 1000);
+  return Math.max(0, CANCEL_WINDOW_SECONDS - elapsedSeconds);
 }
 
 function OrderTimeline({ order }: { order: RoomOrderDetailResponse }) {
@@ -116,6 +148,9 @@ export default function RoomOrderStatus() {
   const [sessionReady, setSessionReady] = useState<boolean>(Boolean(getRoomToken()));
   const [order, setOrder] = useState<RoomOrderDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancelRemaining, setCancelRemaining] = useState(0);
+  const [canceling, setCanceling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   useEffect(() => {
     if (getRoomToken()) {
@@ -155,12 +190,29 @@ export default function RoomOrderStatus() {
       setError(null);
       const data = await fetchRoomOrder(orderId);
       setOrder(data);
+      setCancelRemaining(getRemainingCancelSeconds(data));
     } catch (loadError) {
       setError(
         loadError instanceof Error ? loadError.message : "Could not load room order.",
       );
     }
   }, [orderId, sessionReady]);
+
+  const handleCancelOrder = useCallback(async () => {
+    if (!orderId || cancelRemaining <= 0 || canceling) return;
+    setCancelError(null);
+    setCanceling(true);
+    try {
+      await cancelRoomOrder(orderId);
+      await loadOrder();
+    } catch (cancelErr) {
+      setCancelError(
+        cancelErr instanceof Error ? cancelErr.message : "Could not cancel room order.",
+      );
+    } finally {
+      setCanceling(false);
+    }
+  }, [cancelRemaining, canceling, loadOrder, orderId]);
 
   useEffect(() => {
     void loadOrder();
@@ -180,6 +232,17 @@ export default function RoomOrderStatus() {
 
     return () => window.clearInterval(timer);
   }, [loadOrder, orderStatus]);
+
+  useEffect(() => {
+    setCancelRemaining(getRemainingCancelSeconds(order));
+    if (!order || (order.status !== "pending" && order.status !== "confirmed")) return;
+
+    const timer = window.setInterval(() => {
+      setCancelRemaining(getRemainingCancelSeconds(order));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [order]);
 
   if (error) {
     return (
@@ -277,6 +340,30 @@ export default function RoomOrderStatus() {
               Notes
             </p>
             <p className="text-slate-700">{order.notes}</p>
+          </section>
+        )}
+
+        {(order.status === "pending" || order.status === "confirmed") && (
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 text-sm shadow-sm space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Quick Cancel Window
+            </p>
+            <p className="text-slate-600">
+              You can cancel this room order within 5 seconds after placing it.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleCancelOrder()}
+              disabled={canceling || cancelRemaining <= 0}
+              className="w-full rounded-2xl bg-red-600 px-4 py-2.5 font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {canceling
+                ? "Cancelling..."
+                : cancelRemaining > 0
+                ? `Cancel Order (${cancelRemaining}s)`
+                : "Cancel window expired"}
+            </button>
+            {cancelError ? <p className="text-xs text-red-600">{cancelError}</p> : null}
           </section>
         )}
 

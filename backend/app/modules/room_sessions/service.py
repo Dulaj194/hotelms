@@ -49,6 +49,7 @@ from app.modules.rooms.repository import get_room_by_number_and_restaurant
 
 # Redis key prefix for room carts — keeps room carts distinct from table carts
 _ROOM_CART_PREFIX = "room_cart"
+GUEST_CANCEL_WINDOW_SECONDS = 5
 
 
 # ── Session start ─────────────────────────────────────────────────────────────
@@ -511,3 +512,71 @@ def get_room_order_for_guest(
             detail="Order not found.",
         )
     return _build_room_order_detail(order)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def cancel_room_order_for_guest(
+    db: Session,
+    r: redis_lib.Redis,
+    order_id: int,
+    session: RoomSession,
+) -> GenericMessageResponse:
+    """Cancel a guest room order within 5 seconds while status is pending/confirmed.
+
+    Room orders are auto-confirmed at placement, so both pending and confirmed
+    are treated as customer-cancellable during the short grace window.
+    """
+    order = order_repo.get_order_by_id_and_session(
+        db, order_id, session.session_id, session.restaurant_id
+    )
+    if order is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found.",
+        )
+
+    if order.order_source.value != "room":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found.",
+        )
+
+    if order.status not in {OrderStatus.pending, OrderStatus.confirmed}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only pending or confirmed room orders can be cancelled by customer.",
+        )
+
+    elapsed_seconds = (datetime.now(UTC) - _as_utc(order.placed_at)).total_seconds()
+    if elapsed_seconds > GUEST_CANCEL_WINDOW_SECONDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cancellation window expired. Orders can be cancelled within 5 seconds only.",
+        )
+
+    updated = order_repo.update_order_status(db, order, OrderStatus.rejected)
+    db.commit()
+    db.refresh(updated)
+
+    try:
+        realtime_service.publish_order_status_updated(
+            r,
+            restaurant_id=session.restaurant_id,
+            order_id=updated.id,
+            order_number=updated.order_number,
+            table_number=updated.table_number,
+            order_source=updated.order_source.value,
+            room_id=updated.room_id,
+            room_number=updated.room_number,
+            status=updated.status.value,
+            updated_at=datetime.now(UTC),
+        )
+    except Exception:
+        pass
+
+    return GenericMessageResponse(message="Room order cancelled successfully.")

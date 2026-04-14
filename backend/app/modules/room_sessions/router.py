@@ -145,3 +145,14 @@ def get_room_order(
     SECURITY: scoped to the guest's room session — cannot access other sessions' orders.
     """
     return service.get_room_order_for_guest(db, order_id, session)
+
+
+@orders_router.post("/{order_id}/cancel", response_model=GenericMessageResponse)
+def cancel_room_order(
+    order_id: int,
+    session: RoomSession = Depends(get_current_room_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+) -> GenericMessageResponse:
+    """Cancel a guest room order within the 5-second grace window."""
+    return service.cancel_room_order_for_guest(db, r, order_id, session)

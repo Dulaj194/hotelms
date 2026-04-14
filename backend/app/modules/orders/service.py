@@ -40,6 +40,9 @@ from app.modules.realtime import service as realtime_service
 from app.modules.table_sessions.model import TableSession
 
 
+GUEST_CANCEL_WINDOW_SECONDS = 10
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _build_order_detail(order) -> OrderDetailResponse:
@@ -308,6 +311,76 @@ def get_order_for_guest(
             detail="Order not found.",
         )
     return _build_order_detail(order)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def cancel_order_for_guest(
+    db: Session,
+    order_id: int,
+    session: TableSession,
+    r: redis_lib.Redis | None = None,
+) -> OrderStatusResponse:
+    """Allow guests to cancel their own pending order within 5 seconds.
+
+    Guardrails:
+    - Order must belong to the same guest session and restaurant.
+    - Only pending orders can be cancelled by guests.
+    - Cancellation window is strictly limited to GUEST_CANCEL_WINDOW_SECONDS.
+    """
+    order = order_repo.get_order_by_id_and_session(
+        db, order_id, session.session_id, session.restaurant_id
+    )
+    if order is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found.",
+        )
+
+    if order.status != OrderStatus.pending:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only pending orders can be cancelled by customer.",
+        )
+
+    elapsed_seconds = (datetime.now(UTC) - _as_utc(order.placed_at)).total_seconds()
+    if elapsed_seconds > GUEST_CANCEL_WINDOW_SECONDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cancellation window expired. Orders can be cancelled within 10 seconds only.",
+        )
+
+    updated = order_repo.update_order_status(db, order, OrderStatus.rejected)
+    db.commit()
+    db.refresh(updated)
+
+    if r is not None:
+        try:
+            realtime_service.publish_order_status_updated(
+                r,
+                restaurant_id=session.restaurant_id,
+                order_id=updated.id,
+                order_number=updated.order_number,
+                table_number=updated.table_number,
+                order_source=updated.order_source.value,
+                room_id=updated.room_id,
+                room_number=updated.room_number,
+                status=updated.status.value,
+                updated_at=datetime.now(UTC),
+            )
+        except Exception:
+            pass
+
+    return OrderStatusResponse(
+        id=updated.id,
+        order_number=updated.order_number,
+        status=updated.status,
+        updated_at=updated.updated_at,
+    )
 
 
 # ── Staff / admin order retrieval ─────────────────────────────────────────────

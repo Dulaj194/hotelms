@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { getGuestToken } from "@/hooks/useGuestSession";
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import type { OrderDetailResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 
-const BASE_URL =
-  (import.meta as { env: Record<string, string | undefined> }).env.VITE_API_URL ??
-  "http://localhost:8000/api/v1";
+const BASE_URL = RESOLVED_API_BASE_URL;
+const CANCEL_WINDOW_SECONDS = 10;
+
+function parseServerTimestamp(value: string): number {
+  // Backend may return naive datetime strings (no timezone suffix).
+  // Treat those as UTC so countdown doesn't expire incorrectly on client timezone.
+  const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(value);
+  const normalized = hasTimezone ? value : `${value}Z`;
+  return new Date(normalized).getTime();
+}
 
 async function fetchOrderForGuest(orderId: string): Promise<OrderDetailResponse> {
   const token = getGuestToken();
@@ -17,6 +25,32 @@ async function fetchOrderForGuest(orderId: string): Promise<OrderDetailResponse>
     throw new Error(`Failed to load order — ${response.status}`);
   }
   return response.json() as Promise<OrderDetailResponse>;
+}
+
+async function cancelOrderForGuest(orderId: string): Promise<void> {
+  const token = getGuestToken();
+  const response = await fetch(`${BASE_URL}/orders/my/${orderId}/cancel`, {
+    method: "POST",
+    headers: token ? { "X-Guest-Session": token } : {},
+  });
+  if (!response.ok) {
+    let detail = `Failed to cancel order — ${response.status}`;
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload?.detail) detail = payload.detail;
+    } catch {
+      // fallback to default detail
+    }
+    throw new Error(detail);
+  }
+}
+
+function getRemainingCancelSeconds(order: OrderDetailResponse | null): number {
+  if (!order || order.status !== "pending") return 0;
+  const placedMs = parseServerTimestamp(order.placed_at);
+  if (Number.isNaN(placedMs)) return 0;
+  const elapsedSeconds = Math.floor((Date.now() - placedMs) / 1000);
+  return Math.max(0, CANCEL_WINDOW_SECONDS - elapsedSeconds);
 }
 
 const POLL_INTERVAL_MS = 15_000; // refresh every 15 s
@@ -34,16 +68,34 @@ export default function TableOrderStatus() {
 
   const [order, setOrder] = useState<OrderDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancelRemaining, setCancelRemaining] = useState(0);
+  const [canceling, setCanceling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!orderId) return;
     try {
       const data = await fetchOrderForGuest(orderId);
       setOrder(data);
+      setCancelRemaining(getRemainingCancelSeconds(data));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load order.");
     }
   }, [orderId]);
+
+  const handleCancelOrder = useCallback(async () => {
+    if (!orderId || cancelRemaining <= 0 || canceling) return;
+    setCancelError(null);
+    setCanceling(true);
+    try {
+      await cancelOrderForGuest(orderId);
+      await load();
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Could not cancel order.");
+    } finally {
+      setCanceling(false);
+    }
+  }, [cancelRemaining, canceling, load, orderId]);
 
   // Initial load
   useEffect(() => {
@@ -57,18 +109,29 @@ export default function TableOrderStatus() {
     return () => clearInterval(timer);
   }, [order, load]);
 
+  useEffect(() => {
+    setCancelRemaining(getRemainingCancelSeconds(order));
+    if (!order || order.status !== "pending") return;
+    const timer = setInterval(() => {
+      setCancelRemaining(getRemainingCancelSeconds(order));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [order]);
+
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-red-600 text-center max-w-sm">{error}</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-sm rounded-2xl border border-rose-200 bg-white p-5 text-center shadow-sm">
+          <p className="text-sm font-medium text-rose-600">{error}</p>
+        </div>
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-400 animate-pulse">Loading order…</p>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="animate-pulse text-sm text-slate-500">Loading order...</p>
       </div>
     );
   }
@@ -77,71 +140,73 @@ export default function TableOrderStatus() {
   const statusColor = ORDER_STATUS_COLOR[order.status];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
-        <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
-          <div>
-            <p className="font-semibold text-base">{order.order_number}</p>
-            <p className="text-xs text-gray-500">Table {order.table_number}</p>
+      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+        <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold text-slate-900">{order.order_number}</p>
+            <p className="text-xs text-slate-500">Table {order.table_number}</p>
           </div>
           <span
-            className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor}`}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusColor}`}
           >
             {statusLabel}
           </span>
         </div>
       </header>
 
-      <main className="flex-1 max-w-lg w-full mx-auto px-4 py-6 space-y-6">
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col space-y-4 px-4 py-4 pb-28 sm:px-5 sm:py-6 sm:pb-8">
         {/* Status timeline */}
-        <section className="bg-white rounded-xl border p-4">
-          <h2 className="text-sm font-semibold text-gray-500 mb-3 uppercase tracking-wider">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-sm">
             Order Status
           </h2>
           <OrderTimeline order={order} />
         </section>
 
         {/* Items */}
-        <section className="bg-white rounded-xl border p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-sm">
             Items
           </h2>
-          {order.items.map((item) => (
-            <div
-              key={item.id}
-              className="flex justify-between items-start text-sm"
-            >
-              <div className="flex-1">
-                <p className="font-medium">{item.item_name_snapshot}</p>
-                <p className="text-xs text-gray-400">
+          <div className="mt-3 space-y-3">
+            {order.items.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-sm"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-slate-900">{item.item_name_snapshot}</p>
+                  <p className="text-xs text-slate-500">
                   {item.quantity} × ${item.unit_price_snapshot.toFixed(2)}
-                </p>
+                  </p>
+                </div>
+                <p className="ml-2 shrink-0 font-semibold text-slate-900">${item.line_total.toFixed(2)}</p>
               </div>
-              <p className="font-semibold ml-4">${item.line_total.toFixed(2)}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </section>
 
         {/* Totals */}
-        <section className="bg-white rounded-xl border p-4 space-y-1 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-500">Subtotal</span>
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5">
+          <div className="flex justify-between py-1">
+            <span className="text-slate-500">Subtotal</span>
             <span>${order.subtotal_amount.toFixed(2)}</span>
           </div>
           {order.tax_amount > 0 && (
-            <div className="flex justify-between">
-              <span className="text-gray-500">Tax</span>
+            <div className="flex justify-between py-1">
+              <span className="text-slate-500">Tax</span>
               <span>${order.tax_amount.toFixed(2)}</span>
             </div>
           )}
           {order.discount_amount > 0 && (
-            <div className="flex justify-between text-green-600">
+            <div className="flex justify-between py-1 text-emerald-600">
               <span>Discount</span>
               <span>−${order.discount_amount.toFixed(2)}</span>
             </div>
           )}
-          <div className="flex justify-between font-bold text-base border-t pt-2 mt-2">
+          <div className="mt-2 flex justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-900">
             <span>Total</span>
             <span>${order.total_amount.toFixed(2)}</span>
           </div>
@@ -149,16 +214,16 @@ export default function TableOrderStatus() {
 
         {/* Notes */}
         {order.notes && (
-          <section className="bg-white rounded-xl border p-4 text-sm">
-            <p className="text-gray-500 text-xs uppercase font-semibold mb-1">
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               Notes
             </p>
-            <p>{order.notes}</p>
+            <p className="text-slate-700">{order.notes}</p>
           </section>
         )}
 
         {!FINALIZED.has(order.status) && (
-          <p className="text-center text-xs text-gray-400">
+          <p className="text-center text-xs text-slate-400">
             This page refreshes automatically every 15 seconds.
           </p>
         )}
@@ -172,13 +237,37 @@ export default function TableOrderStatus() {
                   ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
                   : `/menu/${restaurantId}/table/${tableNumber}`
               }
-              className="text-sm text-orange-600 hover:underline"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-orange-200 px-4 text-sm font-semibold text-orange-700 transition hover:bg-orange-50"
             >
               ← Back to menu
             </Link>
           </div>
         )}
       </main>
+
+      {order.status === "pending" && cancelRemaining > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:mx-auto sm:w-full sm:max-w-lg sm:border-t-0 sm:bg-transparent sm:px-5 sm:pb-0 sm:pt-0 sm:shadow-none">
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 sm:mb-6 sm:bg-white">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">
+                Quick Cancel Window
+              </p>
+              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">
+                {cancelRemaining}s
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleCancelOrder()}
+              disabled={canceling}
+              className="min-h-12 w-full rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {canceling ? "Cancelling..." : `Cancel Order (${cancelRemaining}s)`}
+            </button>
+            {cancelError && <p className="mt-2 text-xs text-red-600">{cancelError}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -196,8 +285,8 @@ const LIFECYCLE_STEPS: Array<{ status: OrderDetailResponse["status"]; label: str
 function OrderTimeline({ order }: { order: OrderDetailResponse }) {
   if (order.status === "rejected") {
     return (
-      <div className="flex items-center gap-2 text-red-600">
-        <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
+      <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">
+        <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
         <span className="text-sm font-medium">Order rejected</span>
       </div>
     );
@@ -206,12 +295,12 @@ function OrderTimeline({ order }: { order: OrderDetailResponse }) {
   const statusIndex = LIFECYCLE_STEPS.findIndex((s) => s.status === order.status);
 
   return (
-    <ol className="flex flex-col gap-2">
+    <ol className="flex flex-col gap-2.5">
       {LIFECYCLE_STEPS.map((step, idx) => {
         const done = idx < statusIndex;
         const current = idx === statusIndex;
         return (
-          <li key={step.status} className="flex items-center gap-3 text-sm">
+          <li key={step.status} className="flex items-center gap-3 rounded-lg px-1 py-1 text-sm">
             <span
               className={`w-3 h-3 rounded-full shrink-0 ${
                 done

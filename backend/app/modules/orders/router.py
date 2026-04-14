@@ -60,6 +60,19 @@ def place_order(
     return service.place_order(db, r, session, payload)
 
 
+@router.get("/my", response_model=ActiveOrderListResponse)
+def list_my_orders(
+    session: TableSession = Depends(get_current_guest_session),
+    db: Session = Depends(get_db),
+) -> ActiveOrderListResponse:
+    """Return all orders for the guest's current session.
+
+    Includes all order statuses (pending, confirmed, processing, completed, paid, rejected).
+    Scoped to the guest session — a guest can only see their own orders.
+    """
+    return service.list_orders_for_guest(db, session)
+
+
 @router.get("/my/{order_id}", response_model=OrderDetailResponse)
 def get_my_order(
     order_id: int,
@@ -71,6 +84,17 @@ def get_my_order(
     Scoped to the guest session — a guest cannot view another session's order.
     """
     return service.get_order_for_guest(db, order_id, session)
+
+
+@router.post("/my/{order_id}/cancel", response_model=OrderStatusResponse)
+def cancel_my_order(
+    order_id: int,
+    session: TableSession = Depends(get_current_guest_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+) -> OrderStatusResponse:
+    """Cancel a guest's own pending order within the 5-second grace window."""
+    return service.cancel_order_for_guest(db, order_id, session, r)
 
 
 # ── Kitchen dashboard endpoints ───────────────────────────────────────────────
