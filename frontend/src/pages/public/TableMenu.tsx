@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import CartDrawer from "@/components/shared/CartDrawer";
 import { useCart } from "@/hooks/useCart";
-import { setGuestSession } from "@/hooks/useGuestSession";
+import { getGuestDisplayName, setGuestSession } from "@/hooks/useGuestSession";
 import { publicGet, publicPost } from "@/lib/publicApi";
 import type {
   PublicItemSummaryResponse,
@@ -21,6 +21,9 @@ export default function TableMenu() {
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [guestNameInput, setGuestNameInput] = useState("");
+  const [guestName, setGuestName] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
@@ -29,9 +32,20 @@ export default function TableMenu() {
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, refetch } =
     useCart();
 
-  // 1. Start a guest session using signed table QR credential
   useEffect(() => {
     if (!restaurantId || !tableNumber) return;
+    const parsedRestaurantId = Number(restaurantId);
+    if (Number.isNaN(parsedRestaurantId)) return;
+    const existingName = getGuestDisplayName(parsedRestaurantId, tableNumber);
+    if (existingName) {
+      setGuestName(existingName);
+      setGuestNameInput(existingName);
+    }
+  }, [restaurantId, tableNumber]);
+
+  // 1. Start a guest session only after customer name is available.
+  useEffect(() => {
+    if (!restaurantId || !tableNumber || !guestName) return;
 
     const init = async () => {
       if (!qrAccessKey) {
@@ -44,6 +58,7 @@ export default function TableMenu() {
           {
             restaurant_id: Number(restaurantId),
             table_number: tableNumber,
+            customer_name: guestName,
             qr_access_key: qrAccessKey,
           }
         );
@@ -55,7 +70,7 @@ export default function TableMenu() {
     };
 
     void init();
-  }, [restaurantId, tableNumber, qrAccessKey]);
+  }, [restaurantId, tableNumber, qrAccessKey, guestName]);
 
   // 2. Fetch public menu
   useEffect(() => {
@@ -105,6 +120,16 @@ export default function TableMenu() {
     return orderId;
   }, [placeOrder, navigate, restaurantId, tableNumber, qrAccessKey]);
 
+  const handleNameSubmit = useCallback(() => {
+    const trimmed = guestNameInput.trim();
+    if (!trimmed) {
+      setNameError("Please enter your name to start ordering.");
+      return;
+    }
+    setNameError(null);
+    setGuestName(trimmed);
+  }, [guestNameInput]);
+
   if (pageError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -128,6 +153,45 @@ export default function TableMenu() {
     activeCategory?.subcategories.filter((subcat) => subcat.items.length > 0) ?? [];
   const hasDirectItems = (activeCategory?.items.length ?? 0) > 0;
   const hasAnyItems = hasDirectItems || visibleSubcategories.length > 0;
+
+  if (!guestName) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-sm rounded-3xl border border-orange-100 bg-white p-5 shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-500">Table Session</p>
+          <h1 className="mt-2 text-xl font-bold text-slate-900">Welcome to Table {tableNumber}</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Enter your name to start your session and place orders.
+          </p>
+
+          <label className="mt-5 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Your name
+          </label>
+          <input
+            value={guestNameInput}
+            onChange={(event) => setGuestNameInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                handleNameSubmit();
+              }
+            }}
+            placeholder="e.g. Kasun"
+            className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+          />
+          {nameError && <p className="mt-2 text-xs text-red-600">{nameError}</p>}
+
+          <button
+            type="button"
+            onClick={handleNameSubmit}
+            className="mt-4 w-full rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
+          >
+            Start session
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const renderItemCard = (item: PublicItemSummaryResponse) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
@@ -209,7 +273,7 @@ export default function TableMenu() {
       {/* Top bar */}
       <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
         <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
               <img
                 src={menu.restaurant.logo_url}
@@ -217,8 +281,8 @@ export default function TableMenu() {
                 className="h-9 w-9 rounded-full object-cover"
               />
             )}
-            <div>
-              <p className="font-semibold text-sm leading-tight">
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-sm leading-tight">
                 {menu.restaurant.name}
               </p>
               {tableNumber && (
@@ -227,32 +291,63 @@ export default function TableMenu() {
             </div>
           </div>
 
-          {/* Cart button */}
-          <button
-            onClick={() => setCartOpen(true)}
-            className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
-            aria-label="Open cart"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
-            {(cart?.item_count ?? 0) > 0 && (
-              <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {cart!.item_count}
-              </span>
+          <div className="ml-2 flex items-center gap-2">
+            {guestName && (
+              <div className="max-w-[120px] text-right sm:max-w-[180px]">
+                <p className="truncate text-sm font-extrabold leading-tight text-orange-600 sm:text-base">
+                  {guestName}
+                </p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Guest
+                </p>
+              </div>
             )}
-          </button>
+
+            <button
+              onClick={() => setCartOpen(true)}
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-gray-100"
+              aria-label="Open cart"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+              {(cart?.item_count ?? 0) > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-orange-500 px-1 text-xs font-bold text-white">
+                  {cart!.item_count}
+                </span>
+              )}
+            </button>
+
+            {restaurantId && tableNumber && (
+              <Link
+                to={`/orders/my/${restaurantId}/${tableNumber}`}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-orange-200 bg-orange-50 text-orange-600 transition-colors hover:bg-orange-100"
+                aria-label="View my orders"
+                title="View my orders"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                </svg>
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Category tabs */}

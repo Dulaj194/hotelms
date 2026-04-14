@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.modules.table_sessions.model import TableSession
+from app.modules.table_sessions.model import TableSession, TableSessionStatus
 
 
 def create_session(
@@ -10,6 +10,7 @@ def create_session(
     session_id: str,
     restaurant_id: int,
     table_number: str,
+    customer_name: str,
     expires_at: datetime,
 ) -> TableSession:
     """Persist a new table session record."""
@@ -17,8 +18,10 @@ def create_session(
         session_id=session_id,
         restaurant_id=restaurant_id,
         table_number=table_number,
+        customer_name=customer_name,
         expires_at=expires_at,
         is_active=True,
+        session_status=TableSessionStatus.OPEN,
     )
     db.add(session)
     db.flush()
@@ -50,6 +53,7 @@ def deactivate_active_sessions_for_table(
 
     for session in sessions:
         session.is_active = False
+        session.session_status = TableSessionStatus.CLOSED
 
     if sessions:
         db.flush()
@@ -67,6 +71,7 @@ def get_active_session_by_session_id(
         .filter(
             TableSession.session_id == session_id,
             TableSession.is_active.is_(True),
+            TableSession.session_status == TableSessionStatus.OPEN,
             TableSession.expires_at > now,
         )
         .first()
@@ -94,6 +99,7 @@ def deactivate_session(db: Session, session_id: str) -> None:
     )
     if session:
         session.is_active = False
+        session.session_status = TableSessionStatus.CLOSED
         db.flush()
 
 
@@ -179,5 +185,6 @@ def close_session_by_id(
     session = get_session_by_id_and_restaurant(db, session_id, restaurant_id)
     if session:
         session.is_active = False
+        session.session_status = TableSessionStatus.CLOSED
         db.flush()
     return session

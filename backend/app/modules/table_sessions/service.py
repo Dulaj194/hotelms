@@ -38,6 +38,13 @@ def start_table_session(
             detail="Table number is required.",
         )
 
+    customer_name = data.customer_name.strip()
+    if not customer_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Customer name is required.",
+        )
+
     restaurant = get_restaurant(db, data.restaurant_id)
     if not restaurant:
         raise HTTPException(
@@ -87,6 +94,7 @@ def start_table_session(
             session_id=session_id,
             restaurant_id=data.restaurant_id,
             table_number=table_number,
+            customer_name=customer_name,
             expires_at=expires_at,
         )
 
@@ -108,5 +116,7 @@ def start_table_session(
         guest_token=guest_token,
         restaurant_id=data.restaurant_id,
         table_number=table_number,
+        customer_name=customer_name,
+        session_status="OPEN",
         expires_at=expires_at,
     )

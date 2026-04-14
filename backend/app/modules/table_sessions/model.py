@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import enum
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -12,6 +13,11 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.modules.restaurants.model import Restaurant
+
+
+class TableSessionStatus(str, enum.Enum):
+    OPEN = "OPEN"
+    CLOSED = "CLOSED"
 
 
 class TableSession(Base):
@@ -36,6 +42,7 @@ class TableSession(Base):
     )
 
     table_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    customer_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -46,6 +53,12 @@ class TableSession(Base):
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    session_status: Mapped[TableSessionStatus] = mapped_column(
+        Enum(TableSessionStatus, native_enum=False),
+        nullable=False,
+        default=TableSessionStatus.OPEN,
+        index=True,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

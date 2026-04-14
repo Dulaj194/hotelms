@@ -3,6 +3,7 @@
 export interface TableSessionStartRequest {
   restaurant_id: number;
   table_number: string;
+  customer_name: string;
   qr_access_key: string;
 }
 
@@ -12,6 +13,8 @@ export interface TableSessionStartResponse {
   guest_token: string;
   restaurant_id: number;
   table_number: string;
+  customer_name: string;
+  session_status: "OPEN" | "CLOSED";
   expires_at: string;
 }
 
@@ -27,3 +30,4 @@ export interface GuestSessionInfoResponse {
 
 /** Key used to persist the guest session token in sessionStorage. */
 export const GUEST_SESSION_KEY = "hotelms_guest_session";
+export const GUEST_PROFILE_KEY = "hotelms_guest_profile";

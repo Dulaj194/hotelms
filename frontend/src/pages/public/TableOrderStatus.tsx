@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getGuestToken } from "@/hooks/useGuestSession";
+import { getGuestDisplayName, getGuestToken } from "@/hooks/useGuestSession";
 import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import type { OrderDetailResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
@@ -138,6 +138,10 @@ export default function TableOrderStatus() {
 
   const statusLabel = ORDER_STATUS_LABEL[order.status];
   const statusColor = ORDER_STATUS_COLOR[order.status];
+  const guestName =
+    restaurantId && tableNumber
+      ? getGuestDisplayName(Number(restaurantId), tableNumber)
+      : null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -147,6 +151,7 @@ export default function TableOrderStatus() {
           <div className="min-w-0">
             <p className="truncate text-base font-semibold text-slate-900">{order.order_number}</p>
             <p className="text-xs text-slate-500">Table {order.table_number}</p>
+            {guestName && <p className="text-xs text-orange-600">Guest: {guestName}</p>}
           </div>
           <span
             className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusColor}`}
