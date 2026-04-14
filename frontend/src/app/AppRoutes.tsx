@@ -52,7 +52,9 @@ const BlogArticle = lazy(() => import("@/pages/public/BlogArticle"));
 const Contact = lazy(() => import("@/pages/public/Contact"));
 const Landing = lazy(() => import("@/pages/public/Landing"));
 const Pricing = lazy(() => import("@/pages/public/Pricing"));
+const GuestOrdersList = lazy(() => import("@/pages/public/GuestOrdersList"));
 const RoomMenu = lazy(() => import("@/pages/public/RoomMenu"));
+const RoomOrdersList = lazy(() => import("@/pages/public/RoomOrdersList"));
 const RoomOrderStatus = lazy(() => import("@/pages/public/RoomOrderStatus"));
 const TableMenu = lazy(() => import("@/pages/public/TableMenu"));
 const TableOrderStatus = lazy(() => import("@/pages/public/TableOrderStatus"));
@@ -120,11 +122,13 @@ function AppRoutes() {
           path="/menu/:restaurantId/table/:tableNumber/order/:orderId"
           element={<TableOrderStatus />}
         />
+        <Route path="/orders/my/:restaurantId/:tableNumber" element={<GuestOrdersList />} />
         <Route path="/menu/:restaurantId/room/:roomNumber" element={<RoomMenu />} />
         <Route
           path="/menu/:restaurantId/room/:roomNumber/order/:orderId"
           element={<RoomOrderStatus />}
         />
+        <Route path="/room-orders/my/:restaurantId/:roomNumber" element={<RoomOrdersList />} />
         <Route
           path="/menu/:restaurantId/room/:roomNumber/service-request"
           element={<ServiceRequest />}

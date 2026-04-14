@@ -228,9 +228,15 @@ export default function TableOrderStatus() {
           </p>
         )}
 
-        {/* Back to menu link */}
+        {/* Navigation buttons */}
         {restaurantId && tableNumber && (
-          <div className="text-center">
+          <div className="flex flex-col gap-2">
+            <Link
+              to={`/orders/my/${restaurantId}/${tableNumber}`}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+            >
+              📋 View my orders
+            </Link>
             <Link
               to={
                 qrAccessKey

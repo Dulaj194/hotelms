@@ -23,6 +23,7 @@ from app.modules.room_sessions.schemas import (
     PlaceRoomOrderResponse,
     RoomCartResponse,
     RoomOrderDetailResponse,
+    RoomOrderListResponse,
     RoomSessionStartRequest,
     RoomSessionStartResponse,
     UpdateRoomCartItemRequest,
@@ -132,6 +133,18 @@ def place_room_order(
     from the validated session — not from the request body.
     """
     return service.place_room_order(db, r, session, payload)
+
+
+@orders_router.get("", response_model=RoomOrderListResponse)
+def list_room_orders(
+    session: RoomSession = Depends(get_current_room_session),
+    db: Session = Depends(get_db),
+) -> RoomOrderListResponse:
+    """Return all room orders for the guest's current session.
+
+    SECURITY: scoped to the guest's room session — cannot access other sessions' orders.
+    """
+    return service.list_room_orders_for_guest(db, session)
 
 
 @orders_router.get("/{order_id}", response_model=RoomOrderDetailResponse)

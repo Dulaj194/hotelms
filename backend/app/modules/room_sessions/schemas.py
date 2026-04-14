@@ -136,3 +136,9 @@ class RoomOrderDetailResponse(BaseModel):
 class PlaceRoomOrderResponse(BaseModel):
     order: RoomOrderDetailResponse
     message: str = "Room order placed successfully."
+
+
+class RoomOrderListResponse(BaseModel):
+    """List of room orders for a guest's room session."""
+    orders: list[RoomOrderDetailResponse]
+    total: int

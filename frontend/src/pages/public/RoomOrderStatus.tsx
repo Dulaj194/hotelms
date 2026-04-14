@@ -15,10 +15,16 @@ import type {
 } from "@/types/roomSession";
 
 const BASE_URL = RESOLVED_API_BASE_URL;
-const CANCEL_WINDOW_SECONDS = 5;
+const CANCEL_WINDOW_SECONDS = 10;
 
 const POLL_INTERVAL_MS = 15_000;
 const FINALIZED: Set<OrderStatus> = new Set(["completed", "paid", "rejected"]);
+
+function parseServerTimestamp(value: string): number {
+  const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(value);
+  const normalized = hasTimezone ? value : `${value}Z`;
+  return new Date(normalized).getTime();
+}
 
 function isKnownOrderStatus(value: string): value is OrderStatus {
   return value in ORDER_STATUS_LABEL;
@@ -67,7 +73,7 @@ async function cancelRoomOrder(orderId: string): Promise<void> {
 function getRemainingCancelSeconds(order: RoomOrderDetailResponse | null): number {
   if (!order) return 0;
   if (order.status !== "pending" && order.status !== "confirmed") return 0;
-  const placedMs = new Date(order.placed_at).getTime();
+  const placedMs = parseServerTimestamp(order.placed_at);
   if (Number.isNaN(placedMs)) return 0;
   const elapsedSeconds = Math.floor((Date.now() - placedMs) / 1000);
   return Math.max(0, CANCEL_WINDOW_SECONDS - elapsedSeconds);
@@ -343,25 +349,21 @@ export default function RoomOrderStatus() {
           </section>
         )}
 
-        {(order.status === "pending" || order.status === "confirmed") && (
+        {(order.status === "pending" || order.status === "confirmed") && cancelRemaining > 0 && (
           <section className="rounded-3xl border border-slate-200 bg-white p-5 text-sm shadow-sm space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
               Quick Cancel Window
             </p>
             <p className="text-slate-600">
-              You can cancel this room order within 5 seconds after placing it.
+              You can cancel this room order within 10 seconds after placing it.
             </p>
             <button
               type="button"
               onClick={() => void handleCancelOrder()}
-              disabled={canceling || cancelRemaining <= 0}
+              disabled={canceling}
               className="w-full rounded-2xl bg-red-600 px-4 py-2.5 font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {canceling
-                ? "Cancelling..."
-                : cancelRemaining > 0
-                ? `Cancel Order (${cancelRemaining}s)`
-                : "Cancel window expired"}
+              {canceling ? "Cancelling..." : `Cancel Order (${cancelRemaining}s)`}
             </button>
             {cancelError ? <p className="text-xs text-red-600">{cancelError}</p> : null}
           </section>
@@ -373,8 +375,15 @@ export default function RoomOrderStatus() {
           </p>
         ) : null}
 
+        {/* Navigation buttons */}
         {restaurantId && roomNumber && (
-          <div className="text-center">
+          <div className="flex flex-col gap-2">
+            <Link
+              to={`/room-orders/my/${restaurantId}/${roomNumber}`}
+              className="inline-flex min-h-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+            >
+              📋 View my orders
+            </Link>
             <Link
               to={
                 qrAccessKey

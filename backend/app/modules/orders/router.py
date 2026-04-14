@@ -2,6 +2,7 @@
 
 Route groups:
   POST   /orders               — guest: place order from cart
+  GET    /orders/my            — guest: list all own orders (X-Guest-Session required)
   GET    /orders/my/{order_id} — guest: view own order (X-Guest-Session required)
   GET    /orders/pending       — staff: pending orders (kitchen dashboard)
   GET    /orders/processing    — staff: confirmed + processing orders (kitchen)

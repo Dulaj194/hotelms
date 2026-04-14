@@ -41,6 +41,7 @@ from app.modules.room_sessions.schemas import (
     RoomCartResponse,
     RoomOrderDetailResponse,
     RoomOrderItemResponse,
+    RoomOrderListResponse,
     RoomSessionStartRequest,
     RoomSessionStartResponse,
     UpdateRoomCartItemRequest,
@@ -491,6 +492,26 @@ def place_room_order(
     )
 
     return PlaceRoomOrderResponse(order=_build_room_order_detail(placed))
+
+
+def list_room_orders_for_guest(
+    db: Session,
+    session: RoomSession,
+) -> RoomOrderListResponse:
+    """Return all room orders for the guest's current session.
+
+    Includes all statuses (pending, confirmed, processing, completed, paid, rejected)
+    so the guest can see their complete order history within the current room session.
+    """
+    orders = order_repo.list_orders_by_session(
+        db,
+        session.session_id,
+        session.restaurant_id,
+    )
+    return RoomOrderListResponse(
+        orders=[_build_room_order_detail(o) for o in orders],
+        total=len(orders),
+    )
 
 
 def get_room_order_for_guest(

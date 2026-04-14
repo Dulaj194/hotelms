@@ -296,6 +296,26 @@ def place_order(
 
 # ── Guest order retrieval ─────────────────────────────────────────────────────
 
+def list_orders_for_guest(
+    db: Session,
+    session: TableSession,
+) -> ActiveOrderListResponse:
+    """Return all orders for the guest's current session.
+
+    Includes all statuses (pending, confirmed, processing, completed, paid, rejected)
+    so the guest can see their complete order history within the current QR session.
+    """
+    orders = order_repo.list_orders_by_session(
+        db,
+        session.session_id,
+        session.restaurant_id,
+    )
+    return ActiveOrderListResponse(
+        orders=[_build_order_header(o) for o in orders],
+        total=len(orders),
+    )
+
+
 def get_order_for_guest(
     db: Session,
     order_id: int,
