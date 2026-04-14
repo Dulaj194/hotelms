@@ -915,6 +915,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         first_restaurant, first_owner = self._create_pending_restaurant()
         second_restaurant = self._create_active_restaurant()
         second_owner = self._create_owner_for_restaurant(second_restaurant)
+        second_cashier_target = not bool(second_restaurant.enable_cashier)
 
         settings_service.create_settings_request(
             self.db,
@@ -930,7 +931,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
             restaurant_id=second_restaurant.id,
             requested_by=second_owner.id,
             payload=SettingsRequestCreateRequest(
-                requested_changes={"cashier": True},
+                requested_changes={"cashier": second_cashier_target},
                 request_reason="Count endpoint coverage for second restaurant.",
             ),
         )
