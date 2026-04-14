@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import CartDrawer from "@/components/shared/CartDrawer";
 import { useCart } from "@/hooks/useCart";
-import { getGuestDisplayName, setGuestSession } from "@/hooks/useGuestSession";
+import { getGuestDisplayName, hasGuestSession, setGuestSession } from "@/hooks/useGuestSession";
 import { publicGet, publicPost } from "@/lib/publicApi";
 import type {
   PublicItemSummaryResponse,
@@ -46,6 +46,13 @@ export default function TableMenu() {
   // 1. Start a guest session only after customer name is available.
   useEffect(() => {
     if (!restaurantId || !tableNumber || !guestName) return;
+
+    // Allow returning from other pages (e.g. orders list) without requiring QR query param again
+    // when a valid guest session token is already in storage for this context.
+    if (hasGuestSession()) {
+      setSessionReady(true);
+      return;
+    }
 
     const init = async () => {
       if (!qrAccessKey) {
@@ -331,7 +338,11 @@ export default function TableMenu() {
 
             {restaurantId && tableNumber && (
               <Link
-                to={`/orders/my/${restaurantId}/${tableNumber}`}
+                to={
+                  qrAccessKey
+                    ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                    : `/orders/my/${restaurantId}/${tableNumber}`
+                }
                 className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-orange-200 bg-orange-50 text-orange-600 transition-colors hover:bg-orange-100"
                 aria-label="View my orders"
                 title="View my orders"

@@ -30,6 +30,13 @@ export interface OrderItemResponse {
   notes: string | null;
 }
 
+export interface OrderItemPreviewResponse {
+  item_name_snapshot: string;
+  unit_price_snapshot: number;
+  quantity: number;
+  line_total: number;
+}
+
 export interface PaymentResponse {
   id: number;
   order_id: number;
@@ -64,6 +71,8 @@ export interface OrderHeaderResponse {
   order_source: string;
   room_id: number | null;
   room_number: string | null;
+  primary_item_name: string | null;
+  item_previews: OrderItemPreviewResponse[];
 }
 
 export interface OrderDetailResponse extends OrderHeaderResponse {

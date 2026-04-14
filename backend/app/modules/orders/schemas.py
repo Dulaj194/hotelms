@@ -41,6 +41,13 @@ class OrderItemResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class OrderItemPreviewResponse(BaseModel):
+    item_name_snapshot: str
+    unit_price_snapshot: float
+    quantity: int
+    line_total: float
+
+
 class OrderHeaderResponse(BaseModel):
     """Lightweight order summary (used in list views)."""
 
@@ -65,6 +72,8 @@ class OrderHeaderResponse(BaseModel):
     completed_at: datetime | None
     rejected_at: datetime | None
     paid_at: datetime | None
+    primary_item_name: str | None = None
+    item_previews: list[OrderItemPreviewResponse] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

@@ -174,6 +174,7 @@ def list_active_orders_by_restaurant(
     active_statuses = {OrderStatus.pending, OrderStatus.confirmed, OrderStatus.processing}
     return (
         db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
         .filter(
             OrderHeader.restaurant_id == restaurant_id,
             OrderHeader.status.in_(active_statuses),
@@ -190,6 +191,7 @@ def list_history_orders_by_restaurant(
     history_statuses = {OrderStatus.completed, OrderStatus.paid, OrderStatus.rejected}
     return (
         db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
         .filter(
             OrderHeader.restaurant_id == restaurant_id,
             OrderHeader.status.in_(history_statuses),

@@ -29,6 +29,7 @@ from app.modules.orders.schemas import (
     KitchenOrderListResponse,
     OrderDetailResponse,
     OrderHeaderResponse,
+    OrderItemPreviewResponse,
     OrderItemResponse,
     OrderStatusResponse,
     PlaceOrderRequest,
@@ -99,6 +100,16 @@ def _build_order_detail(order) -> OrderDetailResponse:
 
 
 def _build_order_header(order) -> OrderHeaderResponse:
+    item_previews = [
+        OrderItemPreviewResponse(
+            item_name_snapshot=oi.item_name_snapshot,
+            unit_price_snapshot=float(oi.unit_price_snapshot),
+            quantity=oi.quantity,
+            line_total=float(oi.line_total),
+        )
+        for oi in order.items
+    ]
+
     return OrderHeaderResponse(
         id=order.id,
         order_number=order.order_number,
@@ -121,6 +132,8 @@ def _build_order_header(order) -> OrderHeaderResponse:
         completed_at=order.completed_at,
         rejected_at=order.rejected_at,
         paid_at=order.paid_at,
+        primary_item_name=item_previews[0].item_name_snapshot if item_previews else None,
+        item_previews=item_previews,
     )
 
 

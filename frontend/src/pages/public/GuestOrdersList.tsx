@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { getGuestToken } from "@/hooks/useGuestSession";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { getGuestDisplayName, getGuestToken } from "@/hooks/useGuestSession";
 import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import type { OrderHeaderResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
@@ -21,10 +21,16 @@ async function fetchGuestOrdersList(): Promise<{ orders: OrderHeaderResponse[]; 
 const POLL_INTERVAL_MS = 15_000;
 
 export default function GuestOrdersList() {
+  const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber } = useParams<{
     restaurantId: string;
     tableNumber: string;
   }>();
+  const qrAccessKey = searchParams.get("k")?.trim() ?? "";
+  const guestName =
+    restaurantId && tableNumber
+      ? getGuestDisplayName(Number(restaurantId), tableNumber)
+      : null;
 
   const [orders, setOrders] = useState<OrderHeaderResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +67,26 @@ export default function GuestOrdersList() {
     [orders]
   );
 
+  const formatOrderItemTitle = (order: OrderHeaderResponse): string => {
+    const primaryName = order.primary_item_name?.trim();
+    if (primaryName) return primaryName;
+    const firstPreview = order.item_previews?.[0];
+    if (firstPreview?.item_name_snapshot) return firstPreview.item_name_snapshot;
+    return order.order_number;
+  };
+
+  const formatBreakdownText = (order: OrderHeaderResponse): string => {
+    const previews = order.item_previews ?? [];
+    if (previews.length === 0) {
+      return `$${order.subtotal_amount.toFixed(2)} + $${order.tax_amount.toFixed(2)} tax`;
+    }
+    const parts = previews.map(
+      (item) => `${item.quantity} x $${item.unit_price_snapshot.toFixed(2)}`,
+    );
+    const leftSide = parts.join(" + ");
+    return `${leftSide} + $${order.tax_amount.toFixed(2)} tax`;
+  };
+
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
@@ -89,6 +115,7 @@ export default function GuestOrdersList() {
             {restaurantId && tableNumber && (
               <p className="text-xs text-slate-500">Table {tableNumber}</p>
             )}
+            {guestName && <p className="text-xs font-medium text-orange-600">Guest: {guestName}</p>}
           </div>
           <span className="text-sm font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-700">
             {orders.length}
@@ -102,7 +129,11 @@ export default function GuestOrdersList() {
             <p className="text-sm text-slate-500 mb-4">No orders yet</p>
             {restaurantId && tableNumber && (
               <Link
-                to={`/menu/${restaurantId}/table/${tableNumber}`}
+                to={
+                  qrAccessKey
+                    ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                    : `/menu/${restaurantId}/table/${tableNumber}`
+                }
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white transition hover:bg-orange-600"
               >
                 Place an order
@@ -113,16 +144,17 @@ export default function GuestOrdersList() {
           sortedOrders.map((order) => (
             <Link
               key={order.id}
-              to={`/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`}
+              to={
+                qrAccessKey
+                  ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(qrAccessKey)}`
+                  : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
+              }
               className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-slate-300 sm:p-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-slate-900">
-                    {order.order_number}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {new Date(order.placed_at).toLocaleString()}
+                  <p className="truncate text-base font-semibold text-slate-900 capitalize">
+                    {formatOrderItemTitle(order)}
                   </p>
                 </div>
                 <span
@@ -136,7 +168,7 @@ export default function GuestOrdersList() {
 
               <div className="mt-3 flex items-end justify-between gap-3">
                 <div className="text-sm text-slate-500">
-                  ${order.subtotal_amount.toFixed(2)} + ${order.tax_amount.toFixed(2)} tax
+                  {formatBreakdownText(order)}
                 </div>
                 <p className="text-lg font-bold text-slate-900">
                   ${order.total_amount.toFixed(2)}
@@ -151,7 +183,11 @@ export default function GuestOrdersList() {
       {restaurantId && tableNumber && (
         <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.05)] backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
           <Link
-            to={`/menu/${restaurantId}/table/${tableNumber}`}
+            to={
+              qrAccessKey
+                ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                : `/menu/${restaurantId}/table/${tableNumber}`
+            }
             className="block w-full rounded-xl border border-orange-200 bg-orange-50 py-3 text-center text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
           >
             ← Back to menu
