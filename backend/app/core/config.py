@@ -202,6 +202,20 @@ class Settings(BaseSettings):
 
         return deduped
 
+    @property
+    def cors_allowed_origin_regex(self) -> str | None:
+        """Allow private-network frontend hosts in development for WiFi testing."""
+        if self.app_env.lower() != "development":
+            return None
+        return (
+            r"^https?://(" 
+            r"localhost|127\.0\.0\.1|" 
+            r"192\.168\.\d{1,3}\.\d{1,3}|" 
+            r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|" 
+            r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}" 
+            r")(:\d+)?$"
+        )
+
 
 settings = Settings()
 

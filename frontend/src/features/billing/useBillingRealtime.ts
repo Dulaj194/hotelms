@@ -2,14 +2,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { getAccessToken } from "@/lib/auth";
 import { refreshAccessToken } from "@/lib/api";
+import { RESOLVED_WS_BASE_URL } from "@/lib/networkBase";
 import type { BillingRealtimeEnvelope } from "@/types/billing";
 
-const API_BASE_URL =
-  (import.meta as { env: Record<string, string | undefined> }).env.VITE_API_URL ??
-  "http://localhost:8000/api/v1";
-const WS_BASE_URL =
-  (import.meta as { env: Record<string, string | undefined> }).env.VITE_WS_URL ??
-  API_BASE_URL.replace(/^http/, "ws") + "/ws";
+const WS_BASE_URL = RESOLVED_WS_BASE_URL;
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000];
 const WS_CODE_UNAUTHORIZED = 4001;
 

@@ -37,6 +37,18 @@ export function hasGuestSession(): boolean {
   return !!getGuestToken();
 }
 
+/**
+ * Returns true only when both token and profile exist for the exact table context.
+ * This prevents reusing a token from another restaurant/table QR scan.
+ */
+export function hasGuestSessionForContext(
+  restaurantId: number,
+  tableNumber: string,
+): boolean {
+  if (!hasGuestSession()) return false;
+  return getGuestDisplayName(restaurantId, tableNumber) !== null;
+}
+
 export function getGuestDisplayName(
   restaurantId: number,
   tableNumber: string,

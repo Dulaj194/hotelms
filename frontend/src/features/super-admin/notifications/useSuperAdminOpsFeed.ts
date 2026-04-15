@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ApiError } from "@/lib/api";
 import { getAccessToken, getUser, normalizeRole } from "@/lib/auth";
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import type {
   SuperAdminNotificationAssigneeResponse,
   SuperAdminNotificationResponse,
@@ -18,8 +19,7 @@ import {
   sortNotificationsWithUnresolvedPinning,
 } from "@/features/super-admin/notifications/helpers";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
-const WS_BASE_URL = API_BASE_URL.replace(/^http/i, (value) =>
+const WS_BASE_URL = RESOLVED_API_BASE_URL.replace(/^http/i, (value) =>
   value.toLowerCase() === "https" ? "wss" : "ws",
 );
 

@@ -1,14 +1,40 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  Bell,
+  ChevronRight,
+  Home,
+  LogOut,
+  Search,
+  ShoppingCart,
+  Sparkles,
+  Store,
+  UserRound,
+  UtensilsCrossed,
+  X,
+} from "lucide-react";
 import CartDrawer from "@/components/shared/CartDrawer";
 import { useCart } from "@/hooks/useCart";
-import { getGuestDisplayName, hasGuestSession, setGuestSession } from "@/hooks/useGuestSession";
+import {
+  clearGuestSession,
+  getGuestDisplayName,
+  hasGuestSessionForContext,
+  setGuestSession,
+} from "@/hooks/useGuestSession";
 import { publicGet, publicPost } from "@/lib/publicApi";
+import { toAssetUrl } from "@/lib/assets";
 import type {
   PublicItemSummaryResponse,
   PublicMenuResponse,
 } from "@/types/publicMenu";
 import type { TableSessionStartResponse } from "@/types/session";
+
+type MenuTile = {
+  item: PublicItemSummaryResponse;
+  categoryId: number;
+  categoryName: string;
+  subcategoryName: string | null;
+};
 
 export default function TableMenu() {
   const [searchParams] = useSearchParams();
@@ -18,6 +44,7 @@ export default function TableMenu() {
   }>();
   const qrAccessKey = searchParams.get("k")?.trim() ?? "";
   const navigate = useNavigate();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -26,11 +53,54 @@ export default function TableMenu() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
 
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, refetch } =
     useCart();
+
+  const flattenedTiles = useMemo<MenuTile[]>(() => {
+    if (!menu) return [];
+
+    const categorySource =
+      activeCategoryId === null
+        ? menu.categories
+        : menu.categories.filter((category) => category.id === activeCategoryId);
+
+    return categorySource.flatMap((category) => {
+      const categoryItems: MenuTile[] = category.items.map((item) => ({
+        item,
+        categoryId: category.id,
+        categoryName: category.name,
+        subcategoryName: null,
+      }));
+
+      const subcategoryItems: MenuTile[] = category.subcategories.flatMap((subcategory) =>
+        subcategory.items.map((item) => ({
+          item,
+          categoryId: category.id,
+          categoryName: category.name,
+          subcategoryName: subcategory.name,
+        })),
+      );
+
+      return [...categoryItems, ...subcategoryItems];
+    });
+  }, [activeCategoryId, menu]);
+
+  const visibleTiles = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return flattenedTiles;
+
+    return flattenedTiles.filter(({ item, categoryName, subcategoryName }) => {
+      return [item.name, item.description ?? "", categoryName, subcategoryName ?? ""].some(
+        (value) => value.toLowerCase().includes(query),
+      );
+    });
+  }, [flattenedTiles, searchQuery]);
 
   useEffect(() => {
     if (!restaurantId || !tableNumber) return;
@@ -46,10 +116,15 @@ export default function TableMenu() {
   // 1. Start a guest session only after customer name is available.
   useEffect(() => {
     if (!restaurantId || !tableNumber || !guestName) return;
+    const parsedRestaurantId = Number(restaurantId);
+    if (Number.isNaN(parsedRestaurantId)) {
+      setPageError("Invalid restaurant context. Please scan the table QR code again.");
+      return;
+    }
 
     // Allow returning from other pages (e.g. orders list) without requiring QR query param again
     // when a valid guest session token is already in storage for this context.
-    if (hasGuestSession()) {
+    if (!qrAccessKey && hasGuestSessionForContext(parsedRestaurantId, tableNumber)) {
       setSessionReady(true);
       return;
     }
@@ -63,7 +138,7 @@ export default function TableMenu() {
         const session = await publicPost<TableSessionStartResponse>(
           "/table-sessions/start",
           {
-            restaurant_id: Number(restaurantId),
+            restaurant_id: parsedRestaurantId,
             table_number: tableNumber,
             customer_name: guestName,
             qr_access_key: qrAccessKey,
@@ -137,6 +212,29 @@ export default function TableMenu() {
     setGuestName(trimmed);
   }, [guestNameInput]);
 
+  const handleScrollTo = useCallback((elementId: string) => {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
+  const handleFocusSearch = useCallback(() => {
+    setSearchPanelOpen(true);
+    searchInputRef.current?.focus();
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setSearchPanelOpen(false);
+    setSearchQuery("");
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    clearGuestSession();
+    setProfileDrawerOpen(false);
+    window.location.replace("/");
+  }, []);
+
   if (pageError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -153,108 +251,160 @@ export default function TableMenu() {
     );
   }
 
-  const activeCategory =
-    menu.categories.find((c) => c.id === activeCategoryId) ??
-    menu.categories[0];
-  const visibleSubcategories =
-    activeCategory?.subcategories.filter((subcat) => subcat.items.length > 0) ?? [];
-  const hasDirectItems = (activeCategory?.items.length ?? 0) > 0;
-  const hasAnyItems = hasDirectItems || visibleSubcategories.length > 0;
-
   if (!guestName) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50 flex items-center justify-center px-4 py-8">
-        <div className="w-full max-w-sm rounded-3xl border border-orange-100 bg-white p-5 shadow-lg">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-500">Table Session</p>
-          <h1 className="mt-2 text-xl font-bold text-slate-900">Welcome to Table {tableNumber}</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Enter your name to start your session and place orders.
-          </p>
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.12),_transparent_34%),linear-gradient(180deg,#fff8f1_0%,#ffffff_28%,#f8fafc_100%)] px-4 py-6 text-slate-900">
+        <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md items-center justify-center">
+          <div className="w-full overflow-hidden rounded-[2rem] border border-orange-100 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur">
+            <div className="bg-gradient-to-br from-orange-500 via-orange-500 to-amber-500 px-6 pb-8 pt-6 text-white">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/80">
+                Table Session
+              </p>
+              <div className="mt-4 flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-3xl font-black leading-tight tracking-tight">
+                    {menu?.restaurant.name ?? "Welcome"}
+                  </h1>
+                  <p className="mt-2 text-sm text-white/85">
+                    Enter your name once and continue to menu, cart, and order tracking.
+                  </p>
+                </div>
+                {menu?.restaurant.logo_url ? (
+                  <img
+                    src={toAssetUrl(menu.restaurant.logo_url)}
+                    alt={menu.restaurant.name}
+                    className="h-14 w-14 shrink-0 rounded-2xl bg-white/15 object-cover ring-4 ring-white/20"
+                  />
+                ) : (
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/15 ring-4 ring-white/20">
+                    <Store className="h-6 w-6" />
+                  </div>
+                )}
+              </div>
 
-          <label className="mt-5 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Your name
-          </label>
-          <input
-            value={guestNameInput}
-            onChange={(event) => setGuestNameInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                handleNameSubmit();
-              }
-            }}
-            placeholder="e.g. Kasun"
-            className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
-          />
-          {nameError && <p className="mt-2 text-xs text-red-600">{nameError}</p>}
+              <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+                <span className="rounded-full bg-white/15 px-3 py-1.5">Table {tableNumber}</span>
+                <span className="rounded-full bg-white/15 px-3 py-1.5">QR Menu</span>
+                <span className="rounded-full bg-white/15 px-3 py-1.5">Fast ordering</span>
+              </div>
+            </div>
 
-          <button
-            type="button"
-            onClick={handleNameSubmit}
-            className="mt-4 w-full rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600"
-          >
-            Start session
-          </button>
+            <div className="px-6 py-6">
+              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Your name
+              </label>
+              <input
+                value={guestNameInput}
+                onChange={(event) => setGuestNameInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleNameSubmit();
+                  }
+                }}
+                placeholder="e.g. Kasun"
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+              />
+              {nameError && <p className="mt-2 text-xs text-red-600">{nameError}</p>}
+
+              <button
+                type="button"
+                onClick={handleNameSubmit}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Start session
+                <ChevronRight className="h-4 w-4" />
+              </button>
+
+              <p className="mt-4 text-center text-xs leading-5 text-slate-500">
+                By continuing, you will get a mobile menu, cart, and order tracking flow.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  const renderItemCard = (item: PublicItemSummaryResponse) => {
+  const renderItemCard = ({ item, categoryName, subcategoryName }: MenuTile) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
+    const imageUrl = toAssetUrl(item.image_path);
 
     return (
       <div
         key={item.id}
-        className={`bg-white rounded-xl border overflow-hidden flex flex-col ${
-          !item.is_available ? "opacity-60" : ""
+        className={`group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(15,23,42,0.1)] ${
+          !item.is_available ? "opacity-55" : ""
         }`}
       >
-        {item.image_path && (
+        {imageUrl ? (
           <img
-            src={item.image_path}
+            src={imageUrl}
             alt={item.name}
-            className="w-full h-36 object-cover"
+            className="h-40 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
           />
+        ) : (
+          <div className="flex h-40 w-full items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300">
+            <UtensilsCrossed className="h-10 w-10" />
+          </div>
         )}
-        <div className="p-3 flex flex-col gap-2 flex-1">
-          <div className="flex-1">
-            <p className="font-semibold text-sm">{item.name}</p>
-            {item.description && (
-              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                {item.description}
+        <div className="flex flex-1 flex-col gap-3 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-slate-900">{item.name}</p>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+                {item.description || `Fresh ${categoryName.toLowerCase()} item prepared for your table.`}
               </p>
+            </div>
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-base font-black text-orange-600">
+                ${item.price.toFixed(2)}
+              </span>
+              {item.is_available ? (
+                <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">
+                  Available
+                </span>
+              ) : (
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                  Sold out
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+              {categoryName}
+            </span>
+            {subcategoryName && (
+              <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[11px] font-medium text-orange-700">
+                {subcategoryName}
+              </span>
             )}
           </div>
 
-          <div className="flex items-center justify-between mt-1">
-            <span className="font-bold text-sm text-orange-600">
-              ${item.price.toFixed(2)}
-            </span>
-
-            {!item.is_available ? (
-              <span className="text-xs text-gray-400">Unavailable</span>
-            ) : qtyInCart > 0 ? (
-              <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+            {qtyInCart > 0 ? (
+              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 p-1">
                 <button
                   onClick={() =>
                     qtyInCart > 1
                       ? updateItem(item.id, qtyInCart - 1)
                       : removeItem(item.id)
                   }
-                  className="w-7 h-7 flex items-center justify-center rounded-full border hover:bg-gray-100 transition-colors text-sm font-bold"
+                  className="grid h-8 w-8 place-items-center rounded-full text-sm font-bold text-slate-700 transition hover:bg-white"
                   aria-label="Decrease"
                 >
                   -
                 </button>
-                <span className="text-sm font-semibold w-5 text-center">
+                <span className="min-w-6 text-center text-sm font-semibold text-slate-900">
                   {qtyInCart}
                 </span>
                 <button
                   onClick={() => updateItem(item.id, qtyInCart + 1)}
-                  className="w-7 h-7 flex items-center justify-center rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors text-sm font-bold"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-sm font-bold text-white transition hover:bg-orange-600"
                   aria-label="Increase"
                 >
                   +
@@ -264,78 +414,56 @@ export default function TableMenu() {
               <button
                 disabled={isAdding || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded-full text-xs font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isAdding ? "Adding..." : "+ Add"}
+                {isAdding ? "Adding..." : "Add to cart"}
+                {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
               </button>
             )}
+
+            <span className="text-xs font-medium text-slate-400">Quick order</span>
           </div>
         </div>
       </div>
     );
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Top bar */}
-      <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
-        <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            {menu.restaurant.logo_url && (
-              <img
-                src={menu.restaurant.logo_url}
-                alt={menu.restaurant.name}
-                className="h-9 w-9 rounded-full object-cover"
-              />
-            )}
-            <div className="min-w-0">
-              <p className="truncate font-semibold text-sm leading-tight">
-                {menu.restaurant.name}
-              </p>
-              {tableNumber && (
-                <p className="text-xs text-gray-500">Table {tableNumber}</p>
-              )}
-            </div>
-          </div>
+  const selectedCategory =
+    activeCategoryId === null
+      ? null
+      : menu.categories.find((category) => category.id === activeCategoryId) ?? null;
+  const activeCategoryLabel = selectedCategory?.name ?? "All items";
+  const cartItemCount = cart?.item_count ?? 0;
 
-          <div className="ml-2 flex items-center gap-2">
-            {guestName && (
-              <div className="max-w-[120px] text-right sm:max-w-[180px]">
-                <p className="truncate text-sm font-extrabold leading-tight text-orange-600 sm:text-base">
-                  {guestName}
-                </p>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  Guest
-                </p>
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
+      <header id="menu-top" className="sticky top-0 z-30 border-b border-white/60 bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-5 lg:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            {menu.restaurant.logo_url ? (
+              <img
+                src={toAssetUrl(menu.restaurant.logo_url)}
+                alt={menu.restaurant.name}
+                className="h-11 w-11 rounded-2xl object-cover ring-1 ring-slate-200"
+              />
+            ) : (
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-900 text-white">
+                <Store className="h-5 w-5" />
               </div>
             )}
 
-            <button
-              onClick={() => setCartOpen(true)}
-              className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-gray-100"
-              aria-label="Open cart"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              {(cart?.item_count ?? 0) > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-orange-500 px-1 text-xs font-bold text-white">
-                  {cart!.item_count}
-                </span>
-              )}
-            </button>
+            <div className="min-w-0">
+              <p className="truncate text-base font-black leading-tight text-slate-900 sm:text-lg">
+                {menu.restaurant.name}
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
+                {tableNumber && <span className="rounded-full bg-slate-100 px-2.5 py-1">Table {tableNumber}</span>}
+                {guestName && <span className="rounded-full bg-orange-50 px-2.5 py-1 text-orange-700">Guest: {guestName}</span>}
+              </div>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-2">
             {restaurantId && tableNumber && (
               <Link
                 to={
@@ -343,108 +471,224 @@ export default function TableMenu() {
                     ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
                     : `/orders/my/${restaurantId}/${tableNumber}`
                 }
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-orange-200 bg-orange-50 text-orange-600 transition-colors hover:bg-orange-100"
-                aria-label="View my orders"
-                title="View my orders"
+                className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-                </svg>
+                <Bell className="h-4 w-4 text-orange-500" />
+                Orders
               </Link>
             )}
+
+            <button
+              onClick={() => setCartOpen(true)}
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800"
+              aria-label="Open cart"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {cartItemCount > 0 && (
+                <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-orange-500 px-1 text-[11px] font-bold text-white">
+                  {cartItemCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setProfileDrawerOpen(true)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-900 transition hover:bg-slate-200"
+              aria-label="Open profile menu"
+            >
+              <UserRound className="h-5 w-5" />
+            </button>
           </div>
         </div>
 
-        {/* Category tabs */}
-        {menu.categories.length > 1 && (
-          <div className="max-w-2xl mx-auto flex gap-1 overflow-x-auto px-4 pb-2 scrollbar-hide">
-            {menu.categories.map((cat) => (
+        <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-5 lg:px-6">
+          <div
+            className={`overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ${
+              searchPanelOpen ? "max-h-24 opacity-100" : "max-h-0 border-transparent opacity-0"
+            }`}
+          >
+            <div className="p-3 sm:p-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search dishes, ingredients, or category"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                />
+                <button
+                  type="button"
+                  onClick={handleCloseSearch}
+                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                  aria-label="Close search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mx-auto max-w-6xl px-4 pb-3 sm:px-5 lg:px-6">
+          <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => setActiveCategoryId(null)}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                activeCategoryId === null
+                  ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
+                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              All
+            </button>
+            {menu.categories.map((category) => (
               <button
-                key={cat.id}
-                onClick={() => setActiveCategoryId(cat.id)}
-                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  activeCategoryId === cat.id
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                key={category.id}
+                onClick={() => setActiveCategoryId(category.id)}
+                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  activeCategoryId === category.id
+                    ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
+                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                 }`}
               >
-                {cat.name}
+                {category.name}
               </button>
             ))}
           </div>
-        )}
+        </div>
       </header>
 
-      {/* Item grid */}
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-4 space-y-6">
-        {activeCategory && (
-          <section>
-            {activeCategory.description && (
-              <p className="text-sm text-gray-500 mb-4">
-                {activeCategory.description}
-              </p>
-            )}
-
-            {!hasAnyItems ? (
-              <p className="text-center text-gray-400 py-12">
-                No items in this category.
-              </p>
-            ) : (
-              <div className="space-y-6">
-                {hasDirectItems && (
-                  <div>
-                    {visibleSubcategories.length > 0 && (
-                      <h2 className="text-sm font-semibold text-gray-700 mb-3">
-                        Other items
-                      </h2>
-                    )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {activeCategory.items.map(renderItemCard)}
-                    </div>
-                  </div>
-                )}
-
-                {visibleSubcategories.map((subcategory) => (
-                  <div key={subcategory.id}>
-                    <h2 className="text-sm font-semibold text-gray-800">
-                      {subcategory.name}
-                    </h2>
-                    {subcategory.description && (
-                      <p className="text-xs text-gray-500 mt-1 mb-3">
-                        {subcategory.description}
-                      </p>
-                    )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                      {subcategory.items.map(renderItemCard)}
-                    </div>
-                  </div>
-                ))}
+      <main id="menu-content" className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-4 pb-28 sm:px-5 lg:px-6">
+        <section>
+          <div className="relative overflow-hidden rounded-[2rem] bg-slate-950 px-6 py-6 text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] sm:px-8 sm:py-8">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.12),_transparent_30%)]" />
+            <div className="relative z-10 flex h-full flex-col justify-between gap-4">
+              <div>
+                <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Featured picks
+                </p>
+                <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-4xl">
+                  Order like a modern mobile app, but built for your table.
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75 sm:text-base">
+                  Browse the menu, adjust quantities instantly, and keep the flow clean from name entry to checkout.
+                </p>
               </div>
+
+              <div className="flex flex-wrap gap-2 text-xs font-semibold text-white/80">
+                <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add-to-cart</span>
+                <span className="rounded-full bg-white/10 px-3 py-1.5">Search-first layout</span>
+                <span className="rounded-full bg-white/10 px-3 py-1.5">Table aware session</span>
+              </div>
+            </div>
+          </div>
+            <button
+              type="button"
+              onClick={handleFocusSearch}
+              className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            >
+              <Sparkles className="h-4 w-4" />
+              Open search
+            </button>
+        </section>
+
+        <section id="menu-list" className="space-y-4">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-500">Menu</p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                {searchQuery ? "Search results" : activeCategoryLabel}
+              </h2>
+              {selectedCategory?.description && !searchQuery && (
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                  {selectedCategory.description}
+                </p>
+              )}
+            </div>
+
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </button>
             )}
-          </section>
-        )}
+          </div>
+
+          {visibleTiles.length === 0 ? (
+            <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
+              No items match the current filter.
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {visibleTiles.map(renderItemCard)}
+            </div>
+          )}
+        </section>
       </main>
 
-      {/* Cart FAB for mobile */}
-      {(cart?.item_count ?? 0) > 0 && !cartOpen && (
-        <div className="fixed bottom-4 left-0 right-0 px-4 z-30">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/70 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+        <div className="mx-auto grid max-w-6xl grid-cols-5 items-end gap-2">
           <button
-            onClick={() => setCartOpen(true)}
-            className="w-full max-w-2xl mx-auto flex items-center justify-between bg-orange-500 text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-orange-600 transition-colors"
+            type="button"
+            onClick={() => handleScrollTo("menu-top")}
+            className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
           >
-            <span className="font-semibold">
-              {cart!.item_count} item{cart!.item_count !== 1 ? "s" : ""} in cart
-            </span>
-            <span className="font-bold">${cart!.total.toFixed(2)}</span>
+            <Home className="h-5 w-5" />
+            Home
+          </button>
+
+          <button
+            type="button"
+            onClick={handleFocusSearch}
+            className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+          >
+            <Search className="h-5 w-5" />
+            Search
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCartOpen(true)}
+            className="-mt-7 mx-auto grid h-14 w-14 place-items-center rounded-full bg-orange-500 text-white shadow-[0_18px_36px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
+            aria-label="Open cart"
+          >
+            <ShoppingCart className="h-6 w-6" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!restaurantId || !tableNumber) return;
+              const target = qrAccessKey
+                ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                : `/orders/my/${restaurantId}/${tableNumber}`;
+              navigate(target);
+            }}
+            className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+          >
+            <Bell className="h-5 w-5" />
+            Orders
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              handleCloseSearch();
+              handleScrollTo("menu-list");
+            }}
+            className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+          >
+            <UserRound className="h-5 w-5" />
+            Menu
           </button>
         </div>
-      )}
+      </div>
 
       {/* Cart drawer */}
       <CartDrawer
@@ -456,6 +700,143 @@ export default function TableMenu() {
         onClearCart={clearCart}
         onPlaceOrder={handlePlaceOrder}
       />
+
+      {/* Profile drawer */}
+      {profileDrawerOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 transition-opacity animate-in fade-in-0 duration-300"
+            onClick={() => setProfileDrawerOpen(false)}
+          />
+
+          {/* Drawer Panel */}
+          <div className="absolute bottom-0 right-0 top-0 flex w-full max-w-sm flex-col bg-white shadow-2xl transition-all duration-300 animate-in slide-in-from-right-40">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h2 className="text-lg font-bold text-slate-900">Profile</h2>
+              <button
+                onClick={() => setProfileDrawerOpen(false)}
+                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Close profile menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Guest Info Section */}
+              <div className="border-b border-slate-200 px-6 py-6">
+                <div className="mb-4 flex items-center gap-4">
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-2xl font-bold text-white">
+                    {guestName?.charAt(0).toUpperCase() ?? "G"}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-500">Guest Name</p>
+                    <p className="text-lg font-bold text-slate-900">{guestName ?? "Guest"}</p>
+                  </div>
+                </div>
+
+                {tableNumber && restaurantId && (
+                  <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm">
+                    <p className="text-slate-600">
+                      <span className="font-semibold text-slate-900">Table:</span> {tableNumber}
+                    </p>
+                    <p className="text-slate-600">
+                      <span className="font-semibold text-slate-900">Restaurant:</span> {menu?.restaurant.name}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Menu Items */}
+              <div className="py-4">
+                {restaurantId && tableNumber && (
+                  <Link
+                    to={
+                      qrAccessKey
+                        ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                        : `/orders/my/${restaurantId}/${tableNumber}`
+                    }
+                    onClick={() => setProfileDrawerOpen(false)}
+                    className="flex items-center justify-between px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                  >
+                    <span>My Orders</span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </Link>
+                )}
+
+                <button
+                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                  onClick={() => setProfileDrawerOpen(false)}
+                  disabled
+                >
+                  <div className="flex items-center justify-between">
+                    <span>My Profile</span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </div>
+                </button>
+
+                <button
+                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                  onClick={() => setProfileDrawerOpen(false)}
+                  disabled
+                >
+                  <div className="flex items-center justify-between">
+                    <span>Payment Methods</span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </div>
+                </button>
+
+                <button
+                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                  onClick={() => setProfileDrawerOpen(false)}
+                  disabled
+                >
+                  <div className="flex items-center justify-between">
+                    <span>Contact Us</span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </div>
+                </button>
+
+                <button
+                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                  onClick={() => setProfileDrawerOpen(false)}
+                  disabled
+                >
+                  <div className="flex items-center justify-between">
+                    <span>Settings</span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </div>
+                </button>
+
+                <button
+                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                  onClick={() => setProfileDrawerOpen(false)}
+                  disabled
+                >
+                  <div className="flex items-center justify-between">
+                    <span>Help & FAQs</span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Footer - Logout Button */}
+            <div className="border-t border-slate-200 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-50 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100"
+              >
+                <LogOut className="h-4 w-4" />
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

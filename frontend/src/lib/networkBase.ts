@@ -47,3 +47,4 @@ export const WS_BASE_URL = normalizeBase(
 
 export const RESOLVED_API_BASE_URL = remapLoopbackHost(API_BASE_URL);
 export const RESOLVED_WS_BASE_URL = remapLoopbackHost(WS_BASE_URL);
+export const RESOLVED_BACKEND_ORIGIN = RESOLVED_API_BASE_URL.replace(/\/api\/v1\/?$/, "");

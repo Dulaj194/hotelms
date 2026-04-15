@@ -1,3 +1,5 @@
+import { RESOLVED_BACKEND_ORIGIN } from "@/lib/networkBase";
+
 export function getBooleanStatusBadgeClass(isActive: boolean): string {
   return isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700";
 }
@@ -24,7 +26,7 @@ export function formatSubscriptionStatusLabel(status: string | undefined): strin
 
 export function getRestaurantLogoUrl(logoUrl: string | null | undefined): string | null {
   if (!logoUrl) return null;
-  return `${import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"}${logoUrl}`;
+  return `${RESOLVED_BACKEND_ORIGIN}${logoUrl}`;
 }
 
 export function getWebhookStatusBadgeClass(status: string): string {

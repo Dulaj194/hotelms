@@ -7,6 +7,20 @@ import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 
 const BASE_URL = RESOLVED_API_BASE_URL;
 
+type OrdersFilterTab = "active" | "completed" | "canceled";
+
+const TAB_TO_STATUSES: Record<OrdersFilterTab, OrderHeaderResponse["status"][]> = {
+  active: ["pending", "confirmed", "processing"],
+  completed: ["completed", "paid"],
+  canceled: ["rejected"],
+};
+
+const TAB_LABEL: Record<OrdersFilterTab, string> = {
+  active: "Active",
+  completed: "Completed",
+  canceled: "Canceled",
+};
+
 async function fetchGuestOrdersList(): Promise<{ orders: OrderHeaderResponse[]; total: number }> {
   const token = getGuestToken();
   const response = await fetch(`${BASE_URL}/orders/my`, {
@@ -35,6 +49,7 @@ export default function GuestOrdersList() {
   const [orders, setOrders] = useState<OrderHeaderResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<OrdersFilterTab>("active");
 
   const load = useCallback(async () => {
     try {
@@ -67,12 +82,43 @@ export default function GuestOrdersList() {
     [orders]
   );
 
+  const tabCounts = useMemo(() => {
+    return {
+      active: sortedOrders.filter((order) => TAB_TO_STATUSES.active.includes(order.status)).length,
+      completed: sortedOrders.filter((order) => TAB_TO_STATUSES.completed.includes(order.status)).length,
+      canceled: sortedOrders.filter((order) => TAB_TO_STATUSES.canceled.includes(order.status)).length,
+    };
+  }, [sortedOrders]);
+
+  const filteredOrders = useMemo(
+    () =>
+      sortedOrders.filter((order) => {
+        return TAB_TO_STATUSES[activeTab].includes(order.status);
+      }),
+    [activeTab, sortedOrders],
+  );
+
+  const emptyTabMessage: Record<OrdersFilterTab, string> = {
+    active: "No active orders right now",
+    completed: "No completed orders yet",
+    canceled: "No canceled orders",
+  };
+
   const formatOrderItemTitle = (order: OrderHeaderResponse): string => {
     const primaryName = order.primary_item_name?.trim();
     if (primaryName) return primaryName;
     const firstPreview = order.item_previews?.[0];
     if (firstPreview?.item_name_snapshot) return firstPreview.item_name_snapshot;
     return order.order_number;
+  };
+
+  const formatPlacedAt = (dateString: string): string => {
+    return new Date(dateString).toLocaleString([], {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const getItemImageUrl = (imagePath: string | null | undefined): string | null => {
@@ -111,27 +157,48 @@ export default function GuestOrdersList() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
-        <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 py-3 sm:px-5">
-          <div className="min-w-0">
-            <p className="truncate text-lg font-semibold text-slate-900">My Orders</p>
-            {restaurantId && tableNumber && (
-              <p className="text-xs text-slate-500">Table {tableNumber}</p>
-            )}
-            {guestName && <p className="text-xs font-medium text-orange-600">Guest: {guestName}</p>}
+    <div className="min-h-screen bg-[linear-gradient(180deg,#fbeaec_0%,#f8fafc_35%,#f8fafc_100%)] text-slate-900">
+      <header className="sticky top-0 z-30 border-b border-rose-100/80 bg-white/95 backdrop-blur-xl">
+        <div className="mx-auto w-full max-w-lg px-4 pb-4 pt-3 sm:px-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-xl font-black tracking-tight text-slate-900">My Orders</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                {tableNumber && <span className="rounded-full bg-slate-100 px-2.5 py-1">Table {tableNumber}</span>}
+                {guestName && <span className="rounded-full bg-rose-50 px-2.5 py-1 font-semibold text-rose-600">{guestName}</span>}
+              </div>
+            </div>
+            <span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">
+              {orders.length}
+            </span>
           </div>
-          <span className="text-sm font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-700">
-            {orders.length}
-          </span>
+
+          <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-rose-100 bg-white p-1.5 shadow-sm">
+            {(["active", "completed", "canceled"] as OrdersFilterTab[]).map((tab) => {
+              const isActive = tab === activeTab;
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setActiveTab(tab)}
+                  className={`rounded-xl px-2 py-2 text-xs font-bold transition sm:text-sm ${
+                    isActive
+                      ? "bg-rose-500 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-rose-50 hover:text-rose-600"
+                  }`}
+                >
+                  {TAB_LABEL[tab]} ({tabCounts[tab]})
+                </button>
+              );
+            })}
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col space-y-3 px-4 py-4 sm:px-5 sm:py-6">
-        {sortedOrders.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <p className="text-sm text-slate-500 mb-4">No orders yet</p>
+      <main className="mx-auto flex w-full max-w-lg flex-col gap-3 px-4 pb-28 pt-4 sm:px-5 sm:pt-5">
+        {orders.length === 0 ? (
+          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <p className="mb-4 text-sm text-slate-500">No orders yet</p>
             {restaurantId && tableNumber && (
               <Link
                 to={
@@ -139,87 +206,119 @@ export default function GuestOrdersList() {
                     ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
                     : `/menu/${restaurantId}/table/${tableNumber}`
                 }
-                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white transition hover:bg-orange-600"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-500 px-4 text-sm font-semibold text-white transition hover:bg-rose-600"
               >
                 Place an order
               </Link>
             )}
           </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <p className="text-sm font-medium text-slate-500">{emptyTabMessage[activeTab]}</p>
+          </div>
         ) : (
-          sortedOrders.map((order) => (
-            <Link
-              key={order.id}
-              to={
-                qrAccessKey
-                  ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(qrAccessKey)}`
-                  : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
-              }
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-slate-300 sm:p-5"
-            >
-              {/* Image + Name/Status Section */}
-              <div className="flex items-start gap-3">
-                {/* Circular Image */}
-                <div className="shrink-0">
-                  {order.item_previews?.[0]?.item_image_snapshot ? (
-                    <img
-                      src={getItemImageUrl(order.item_previews[0].item_image_snapshot) ?? undefined}
-                      alt={formatOrderItemTitle(order)}
-                      className="h-16 w-16 rounded-full border-2 border-slate-100 object-cover shadow-sm"
-                      onError={(e) => {
-                        // Fallback to placeholder if image fails
-                        const img = e.currentTarget;
-                        img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e2e8f0' width='100' height='100'/%3E%3C/svg%3E";
-                      }}
-                    />
-                  ) : (
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-slate-100 bg-slate-100 shadow-sm">
-                      <span className="text-xs text-slate-400">No image</span>
-                    </div>
-                  )}
-                </div>
+          filteredOrders.map((order) => {
+            const primaryPreview = order.item_previews?.[0];
+            const itemCount = order.item_previews?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
 
-                {/* Name, Status, Breakdown */}
-                <div className="flex-1 min-w-0">
-                  <div className="mb-1 flex items-start justify-between gap-2">
-                    <p className="text-base font-semibold text-slate-900 capitalize truncate">
-                      {formatOrderItemTitle(order)}
-                    </p>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
-                        ORDER_STATUS_COLOR[order.status]
-                      }`}
-                    >
-                      {ORDER_STATUS_LABEL[order.status]}
-                    </span>
+            return (
+              <Link
+                key={order.id}
+                to={
+                  qrAccessKey
+                    ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(qrAccessKey)}`
+                    : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
+                }
+                className="rounded-3xl border border-rose-100 bg-white p-4 shadow-sm transition hover:border-rose-200 hover:shadow-md"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="shrink-0">
+                    {primaryPreview?.item_image_snapshot ? (
+                      <img
+                        src={getItemImageUrl(primaryPreview.item_image_snapshot) ?? undefined}
+                        alt={formatOrderItemTitle(order)}
+                        className="h-16 w-16 rounded-2xl object-cover ring-1 ring-rose-100"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3C/svg%3E";
+                        }}
+                      />
+                    ) : (
+                      <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-[11px] font-semibold text-slate-400">
+                        No img
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="line-clamp-2 text-sm font-bold text-slate-900 sm:text-[15px]">
+                        {formatOrderItemTitle(order)}
+                      </p>
+                      <p className="shrink-0 text-sm font-extrabold text-rose-600">
+                        ${order.total_amount.toFixed(2)}
+                      </p>
+                    </div>
+
+                    <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+                      <span>{formatPlacedAt(order.placed_at)}</span>
+                      <span>x{itemCount || 1}</span>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          ORDER_STATUS_COLOR[order.status]
+                        }`}
+                      >
+                        {ORDER_STATUS_LABEL[order.status]}
+                      </span>
+                      <span className="truncate text-[11px] text-slate-500">{formatBreakdownText(order)}</span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {activeTab === "active" && (
+                        <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
+                          Track order
+                        </span>
+                      )}
+                      {activeTab === "completed" && (
+                        <>
+                          <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
+                            Leave a review
+                          </span>
+                          {restaurantId && tableNumber && (
+                            <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
+                              Order again
+                            </span>
+                          )}
+                        </>
+                      )}
+                      {activeTab === "canceled" && (
+                        <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold text-rose-600">
+                          Order canceled
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="mt-3 flex items-end justify-between gap-3">
-                <div className="text-sm text-slate-500">
-                  {formatBreakdownText(order)}
-                </div>
-                <div className="shrink-0 text-lg font-bold text-slate-900">
-                  ${order.total_amount.toFixed(2)}
-                </div>
-              </div>
-            </Link>
-          ))
+              </Link>
+            );
+          })
         )}
       </main>
 
-      {/* Back to menu button */}
       {restaurantId && tableNumber && (
-        <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.05)] backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-rose-100 bg-white/95 px-4 py-3 backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
           <Link
             to={
               qrAccessKey
                 ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
                 : `/menu/${restaurantId}/table/${tableNumber}`
             }
-            className="block w-full rounded-xl border border-orange-200 bg-orange-50 py-3 text-center text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
+            className="block w-full rounded-2xl bg-slate-900 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"
           >
-            ← Back to menu
+            Back to menu
           </Link>
         </div>
       )}

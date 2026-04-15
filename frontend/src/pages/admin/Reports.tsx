@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api, ApiError, refreshAccessToken } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import type {
   SalesReportHistoryItemResponse,
   SalesReportHistoryListResponse,
@@ -10,8 +11,6 @@ import type {
 } from "@/types/report";
 
 type ReportViewMode = "daily" | "monthly" | "range" | "history";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
 function formatDate(value: string | null): string {
   if (!value) return "-";
@@ -79,7 +78,7 @@ async function fetchCsvWithAuthRetry(pathWithQuery: string): Promise<Response> {
   const requestOnce = async (token: string | null): Promise<Response> => {
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
-    return fetch(`${API_BASE_URL}${pathWithQuery}`, {
+    return fetch(`${RESOLVED_API_BASE_URL}${pathWithQuery}`, {
       method: "GET",
       headers,
       credentials: "include",

@@ -1,4 +1,5 @@
 import { getAccessToken } from "@/lib/auth";
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 
 export type AuditLogSeverity = "" | "info" | "success" | "warning" | "danger";
 
@@ -19,7 +20,6 @@ export interface SavedAuditLogFilter {
 }
 
 const SAVED_AUDIT_FILTERS_STORAGE_KEY = "hotelms.superAdmin.auditFilters";
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
 export const EMPTY_AUDIT_LOG_FILTERS: AuditLogFilterState = {
   search: "",
@@ -104,7 +104,7 @@ export async function downloadAuditLogCsv(filters: AuditLogFilterState): Promise
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}/audit-logs/export?${buildAuditLogQueryParams(filters, 5000).toString()}`, {
+  const response = await fetch(`${RESOLVED_API_BASE_URL}/audit-logs/export?${buildAuditLogQueryParams(filters, 5000).toString()}`, {
     method: "GET",
     headers,
     credentials: "include",

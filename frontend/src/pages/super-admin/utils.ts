@@ -1,11 +1,7 @@
 import { ApiError } from "@/lib/api";
+import { RESOLVED_BACKEND_ORIGIN } from "@/lib/networkBase";
 import type { PromoCodeResponse } from "@/types/promo";
 import type { RestaurantRegistrationStatus } from "@/types/restaurant";
-
-const BACKEND_BASE_URL = (import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000").replace(
-  /\/+$/,
-  "",
-);
 
 export type BadgeTone = "amber" | "blue" | "green" | "red" | "slate";
 
@@ -34,7 +30,7 @@ export function buildAssetUrl(publicPath: string | null | undefined): string | n
   if (publicPath.startsWith("http://") || publicPath.startsWith("https://")) {
     return publicPath;
   }
-  return `${BACKEND_BASE_URL}${publicPath}`;
+  return `${RESOLVED_BACKEND_ORIGIN}${publicPath}`;
 }
 
 export function badgeClassName(tone: BadgeTone): string {

@@ -1,7 +1,6 @@
 import { getAccessToken } from "@/lib/auth";
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import type { ContactLeadStatus } from "@/types/siteContent";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
 
 export function joinLines(values: string[]): string {
   return values.join("\n");
@@ -74,7 +73,7 @@ export async function downloadContactLeadCsv(filters: {
     params.set("assigned_to_user_id", filters.assigned_to_user_id);
   }
 
-  const response = await fetch(`${API_BASE_URL}/site-content/admin/leads/export?${params.toString()}`, {
+  const response = await fetch(`${RESOLVED_API_BASE_URL}/site-content/admin/leads/export?${params.toString()}`, {
     method: "GET",
     headers,
     credentials: "include",

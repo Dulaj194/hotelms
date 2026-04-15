@@ -1,12 +1,8 @@
 import { ApiError } from "@/lib/api";
+import { RESOLVED_BACKEND_ORIGIN } from "@/lib/networkBase";
 import type { QRCodeResponse } from "@/types/publicMenu";
 
-export const QR_API_ORIGIN =
-  import.meta.env.VITE_BACKEND_URL ??
-  (import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1").replace(
-    /\/api\/v1\/?$/,
-    "",
-  );
+export const QR_API_ORIGIN = RESOLVED_BACKEND_ORIGIN;
 
 export function buildQrImageUrl(path: string): string {
   return `${QR_API_ORIGIN}${path}`;
