@@ -5,6 +5,8 @@ import {
   ChevronRight,
   Home,
   LogOut,
+  Menu,
+  MessageCircle,
   Search,
   ShoppingCart,
   Sparkles,
@@ -636,11 +638,11 @@ export default function TableMenu() {
         <div className="mx-auto grid max-w-6xl grid-cols-5 items-end gap-2">
           <button
             type="button"
-            onClick={() => handleScrollTo("menu-top")}
+            onClick={() => handleScrollTo("menu-list")}
             className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
           >
-            <Home className="h-5 w-5" />
-            Home
+            <Menu className="h-5 w-5" />
+            Menu
           </button>
 
           <button
@@ -654,11 +656,11 @@ export default function TableMenu() {
 
           <button
             type="button"
-            onClick={() => setCartOpen(true)}
-            className="-mt-7 mx-auto grid h-14 w-14 place-items-center rounded-full bg-orange-500 text-white shadow-[0_18px_36px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
-            aria-label="Open cart"
+            onClick={() => handleScrollTo("menu-top")}
+            className="-mt-7 mx-auto grid h-16 w-16 place-items-center rounded-full bg-orange-500 text-white shadow-[0_20px_40px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
+            aria-label="Go to home"
           >
-            <ShoppingCart className="h-6 w-6" />
+            <Home className="h-7 w-7" />
           </button>
 
           <button
@@ -678,14 +680,11 @@ export default function TableMenu() {
 
           <button
             type="button"
-            onClick={() => {
-              handleCloseSearch();
-              handleScrollTo("menu-list");
-            }}
+            onClick={() => setProfileDrawerOpen(true)}
             className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
           >
-            <UserRound className="h-5 w-5" />
-            Menu
+            <MessageCircle className="h-5 w-5" />
+            Chat
           </button>
         </div>
       </div>
