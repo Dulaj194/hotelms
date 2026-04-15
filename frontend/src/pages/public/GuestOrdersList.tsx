@@ -75,6 +75,11 @@ export default function GuestOrdersList() {
     return order.order_number;
   };
 
+  const getItemImageUrl = (imagePath: string | null | undefined): string | null => {
+    if (!imagePath) return null;
+    return `${BASE_URL}/uploads${imagePath}`;
+  };
+
   const formatBreakdownText = (order: OrderHeaderResponse): string => {
     const previews = order.item_previews ?? [];
     if (previews.length === 0) {
@@ -151,28 +156,52 @@ export default function GuestOrdersList() {
               }
               className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-slate-300 sm:p-5"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-slate-900 capitalize">
-                    {formatOrderItemTitle(order)}
-                  </p>
+              {/* Image + Name/Status Section */}
+              <div className="flex items-start gap-3">
+                {/* Circular Image */}
+                <div className="shrink-0">
+                  {order.item_previews?.[0]?.item_image_snapshot ? (
+                    <img
+                      src={getItemImageUrl(order.item_previews[0].item_image_snapshot) ?? undefined}
+                      alt={formatOrderItemTitle(order)}
+                      className="h-16 w-16 rounded-full border-2 border-slate-100 object-cover shadow-sm"
+                      onError={(e) => {
+                        // Fallback to placeholder if image fails
+                        const img = e.currentTarget;
+                        img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23e2e8f0' width='100' height='100'/%3E%3C/svg%3E";
+                      }}
+                    />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-slate-100 bg-slate-100 shadow-sm">
+                      <span className="text-xs text-slate-400">No image</span>
+                    </div>
+                  )}
                 </div>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
-                    ORDER_STATUS_COLOR[order.status]
-                  }`}
-                >
-                  {ORDER_STATUS_LABEL[order.status]}
-                </span>
+
+                {/* Name, Status, Breakdown */}
+                <div className="flex-1 min-w-0">
+                  <div className="mb-1 flex items-start justify-between gap-2">
+                    <p className="text-base font-semibold text-slate-900 capitalize truncate">
+                      {formatOrderItemTitle(order)}
+                    </p>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${
+                        ORDER_STATUS_COLOR[order.status]
+                      }`}
+                    >
+                      {ORDER_STATUS_LABEL[order.status]}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-3 flex items-end justify-between gap-3">
                 <div className="text-sm text-slate-500">
                   {formatBreakdownText(order)}
                 </div>
-                <p className="text-lg font-bold text-slate-900">
+                <div className="shrink-0 text-lg font-bold text-slate-900">
                   ${order.total_amount.toFixed(2)}
-                </p>
+                </div>
               </div>
             </Link>
           ))

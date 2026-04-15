@@ -24,6 +24,7 @@ export interface OrderItemResponse {
   id: number;
   item_id: number;
   item_name_snapshot: string;
+  item_image_snapshot: string | null;
   unit_price_snapshot: number;
   quantity: number;
   line_total: number;
@@ -32,6 +33,7 @@ export interface OrderItemResponse {
 
 export interface OrderItemPreviewResponse {
   item_name_snapshot: string;
+  item_image_snapshot: string | null;
   unit_price_snapshot: number;
   quantity: number;
   line_total: number;

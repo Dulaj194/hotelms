@@ -87,7 +87,7 @@ def create_order_items(
     """Insert all order line items.
 
     Each dict in `items` must have:
-      item_id, item_name_snapshot, unit_price_snapshot, quantity, line_total
+      item_id, item_name_snapshot, item_image_snapshot, unit_price_snapshot, quantity, line_total
     """
     order_items = []
     for item_data in items:
@@ -96,6 +96,7 @@ def create_order_items(
             restaurant_id=restaurant_id,
             item_id=item_data["item_id"],
             item_name_snapshot=item_data["item_name_snapshot"],
+            item_image_snapshot=item_data.get("item_image_snapshot"),
             unit_price_snapshot=round(item_data["unit_price_snapshot"], 2),
             quantity=item_data["quantity"],
             line_total=round(item_data["line_total"], 2),

@@ -75,6 +75,7 @@ def _build_order_detail(order) -> OrderDetailResponse:
                 id=oi.id,
                 item_id=oi.item_id,
                 item_name_snapshot=oi.item_name_snapshot,
+                item_image_snapshot=oi.item_image_snapshot,
                 unit_price_snapshot=float(oi.unit_price_snapshot),
                 quantity=oi.quantity,
                 line_total=float(oi.line_total),
@@ -103,6 +104,7 @@ def _build_order_header(order) -> OrderHeaderResponse:
     item_previews = [
         OrderItemPreviewResponse(
             item_name_snapshot=oi.item_name_snapshot,
+            item_image_snapshot=oi.item_image_snapshot,
             unit_price_snapshot=float(oi.unit_price_snapshot),
             quantity=oi.quantity,
             line_total=float(oi.line_total),
@@ -222,6 +224,7 @@ def place_order(
             {
                 "item_id": item.id,
                 "item_name_snapshot": item.name,
+                "item_image_snapshot": item.image_path,
                 "unit_price_snapshot": unit_price,
                 "quantity": quantity,
                 "line_total": line_total,

@@ -33,6 +33,7 @@ class OrderItemResponse(BaseModel):
     id: int
     item_id: int
     item_name_snapshot: str
+    item_image_snapshot: str | None
     unit_price_snapshot: float
     quantity: int
     line_total: float
@@ -43,6 +44,7 @@ class OrderItemResponse(BaseModel):
 
 class OrderItemPreviewResponse(BaseModel):
     item_name_snapshot: str
+    item_image_snapshot: str | None
     unit_price_snapshot: float
     quantity: int
     line_total: float
