@@ -22,7 +22,9 @@ import { useCart } from "@/hooks/useCart";
 import {
   clearGuestSession,
   getGuestDisplayName,
+  getGuestQrAccessKey,
   hasGuestSessionForContext,
+  setGuestQrAccessKey,
   setGuestSession,
 } from "@/hooks/useGuestSession";
 import { publicGet, publicPost } from "@/lib/publicApi";
@@ -158,6 +160,13 @@ export default function TableMenu() {
       return;
     }
 
+    if (qrAccessKey) {
+      setGuestQrAccessKey(parsedRestaurantId, tableNumber, qrAccessKey);
+    }
+
+    const restoredQrAccessKey = getGuestQrAccessKey(parsedRestaurantId, tableNumber);
+    const effectiveQrAccessKey = qrAccessKey || restoredQrAccessKey || "";
+
     // Allow returning from other pages (e.g. orders list) without requiring QR query param again
     // when a valid guest session token is already in storage for this context.
     if (!qrAccessKey && hasGuestSessionForContext(parsedRestaurantId, tableNumber)) {
@@ -166,7 +175,7 @@ export default function TableMenu() {
     }
 
     const init = async () => {
-      if (!qrAccessKey) {
+      if (!effectiveQrAccessKey) {
         setPageError("Invalid table QR link. Please scan the table QR code again.");
         return;
       }
@@ -177,7 +186,7 @@ export default function TableMenu() {
             restaurant_id: parsedRestaurantId,
             table_number: tableNumber,
             customer_name: guestName,
-            qr_access_key: qrAccessKey,
+            qr_access_key: effectiveQrAccessKey,
           }
         );
         setGuestSession(session);

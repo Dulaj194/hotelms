@@ -14,6 +14,7 @@ from app.modules.qr.schemas import (
     QRCodeResponse,
     QRRebuildResponse,
     RoomBulkQRRequest,
+    SingleTargetQRRequest,
 )
 from app.modules.users.model import User
 
@@ -67,14 +68,37 @@ def get_table_qr(
     )
 
 
+@router.post("/table", response_model=QRCodeResponse)
+def create_table_qr(
+    payload: SingleTargetQRRequest,
+    request: Request,
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+    db: Session = Depends(get_db),
+    __: bool = Depends(require_module_access("qr")),
+) -> QRCodeResponse:
+    """Generate or fetch QR code for a single table via standard write endpoint."""
+    return service.generate_qr(
+        db,
+        _require_restaurant_context(current_user),
+        "table",
+        payload.target_number,
+        frontend_base_url=_request_frontend_base_url(request),
+    )
+
+
 @router.get("/tables", response_model=QRCodeListResponse)
 def list_table_qr(
+    request: Request,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeListResponse:
     """List all table QR codes for the current restaurant."""
-    return service.list_table_qr(db, _require_restaurant_context(current_user))
+    return service.list_table_qr(
+        db,
+        _require_restaurant_context(current_user),
+        frontend_base_url=_request_frontend_base_url(request),
+    )
 
 
 @router.delete("/table/{table_number}", response_model=QRCodeDeleteResponse)
@@ -199,12 +223,17 @@ def rebuild_room_qr_links(
 
 @router.get("/rooms", response_model=QRCodeListResponse)
 def list_room_qr(
+    request: Request,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
 ) -> QRCodeListResponse:
     """List all room QR codes for the current restaurant."""
-    return service.list_room_qr(db, _require_restaurant_context(current_user))
+    return service.list_room_qr(
+        db,
+        _require_restaurant_context(current_user),
+        frontend_base_url=_request_frontend_base_url(request),
+    )
 
 
 @router.delete("/room/{room_number}", response_model=QRCodeDeleteResponse)

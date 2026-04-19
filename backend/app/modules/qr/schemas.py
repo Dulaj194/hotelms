@@ -17,6 +17,10 @@ class BulkQRRequest(BaseModel):
     end: int = Field(..., ge=1)
 
 
+class SingleTargetQRRequest(BaseModel):
+    target_number: str = Field(..., min_length=1, max_length=50)
+
+
 class RoomBulkQRRequest(BaseModel):
     room_numbers: list[str]
 

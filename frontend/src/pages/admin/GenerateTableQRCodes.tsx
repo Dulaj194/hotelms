@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import type {
   BulkQRCodeResponse,
   QRCodeListResponse,
+  QRCodeResponse,
 } from "@/types/publicMenu";
 
 import {
@@ -16,6 +17,7 @@ import {
 } from "./qr/shared";
 
 export default function GenerateTableQRCodes() {
+  const [singleTableNumber, setSingleTableNumber] = useState("");
   const [start, setStart] = useState("1");
   const [end, setEnd] = useState("10");
   const [loading, setLoading] = useState(true);
@@ -92,6 +94,33 @@ export default function GenerateTableQRCodes() {
     }
   }, [loadExistingSummary, parsedRange]);
 
+  const handleGenerateSingle = useCallback(async () => {
+    const normalizedTable = singleTableNumber.trim();
+    if (!normalizedTable) {
+      setError("Enter a table number to generate one QR code.");
+      return;
+    }
+
+    setWorking(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const qr = await api.post<QRCodeResponse>("/qr/table", {
+        target_number: normalizedTable,
+      });
+
+      setResult({ generated: [qr], count: 1 });
+      setNotice(`Table ${normalizedTable} QR code is ready for print or download.`);
+      setSingleTableNumber("");
+      await loadExistingSummary();
+    } catch (generateError) {
+      setError(getApiErrorMessage(generateError, "Failed to generate table QR code."));
+    } finally {
+      setWorking(false);
+    }
+  }, [loadExistingSummary, singleTableNumber]);
+
   return (
     <DashboardLayout>
       <div className="app-page-stack mx-auto max-w-6xl">
@@ -142,6 +171,39 @@ export default function GenerateTableQRCodes() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           <div className="space-y-4 rounded-xl border bg-white p-6">
+            <div>
+              <h2 className="app-section-title text-gray-900">Single Table</h2>
+              <p className="app-muted-text mt-1 text-gray-500">
+                Generate or refresh one table QR when onboarding individual tables.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Table Number
+                </label>
+                <input
+                  type="text"
+                  value={singleTableNumber}
+                  onChange={(event) => setSingleTableNumber(event.target.value)}
+                  placeholder="e.g. 12 or VIP-1"
+                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void handleGenerateSingle()}
+                disabled={working}
+                className="app-btn-base bg-orange-500 text-white hover:bg-orange-600"
+              >
+                {working ? "Generating..." : "Generate Single QR"}
+              </button>
+            </div>
+
+            <div className="h-px bg-gray-100" />
+
             <div>
               <h2 className="app-section-title text-gray-900">Bulk Generate</h2>
               <p className="app-muted-text mt-1 text-gray-500">

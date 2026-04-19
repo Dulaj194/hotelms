@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ─── Restaurant ───────────────────────────────────────────────────────────────
@@ -14,7 +14,7 @@ class PublicRestaurantInfoResponse(BaseModel):
     phone: str | None
     address: str | None
     logo_url: str | None
-    public_menu_banner_urls: list[str] = []
+    public_menu_banner_urls: list[str] = Field(default_factory=list)
     is_active: bool
 
     model_config = {"from_attributes": True}

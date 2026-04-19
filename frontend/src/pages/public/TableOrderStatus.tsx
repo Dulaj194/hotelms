@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getGuestDisplayName, getGuestToken } from "@/hooks/useGuestSession";
+import {
+  getGuestDisplayName,
+  getGuestQrAccessKey,
+  getGuestToken,
+  setGuestSession,
+} from "@/hooks/useGuestSession";
+import { publicPost } from "@/lib/publicApi";
 import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import type { OrderDetailResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
+import type { TableSessionStartResponse } from "@/types/session";
 
 const BASE_URL = RESOLVED_API_BASE_URL;
 const CANCEL_WINDOW_SECONDS = 10;
@@ -65,6 +72,13 @@ export default function TableOrderStatus() {
     orderId: string;
   }>();
   const qrAccessKey = searchParams.get("k")?.trim() ?? "";
+  const parsedRestaurantId = restaurantId ? Number(restaurantId) : NaN;
+  const restoredQrAccessKey =
+    Number.isNaN(parsedRestaurantId) || !tableNumber
+      ? null
+      : getGuestQrAccessKey(parsedRestaurantId, tableNumber);
+  const effectiveQrAccessKey = qrAccessKey || restoredQrAccessKey || "";
+  const [sessionReady, setSessionReady] = useState(Boolean(getGuestToken()));
 
   const [order, setOrder] = useState<OrderDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +97,44 @@ export default function TableOrderStatus() {
     }
   }, [orderId]);
 
+  useEffect(() => {
+    if (getGuestToken()) {
+      setSessionReady(true);
+      return;
+    }
+
+    if (!restaurantId || !tableNumber || !effectiveQrAccessKey) {
+      setError("Guest session expired. Please scan the table QR code again.");
+      return;
+    }
+
+    const guestName = getGuestDisplayName(Number(restaurantId), tableNumber);
+    if (!guestName) {
+      setError("Guest session expired. Please scan the table QR code again.");
+      return;
+    }
+
+    const restoreSession = async () => {
+      try {
+        const session = await publicPost<TableSessionStartResponse>(
+          "/table-sessions/start",
+          {
+            restaurant_id: Number(restaurantId),
+            table_number: tableNumber,
+            customer_name: guestName,
+            qr_access_key: effectiveQrAccessKey,
+          },
+        );
+        setGuestSession(session);
+        setSessionReady(true);
+      } catch {
+        setError("Could not restore the table session. Please scan the QR code again.");
+      }
+    };
+
+    void restoreSession();
+  }, [effectiveQrAccessKey, restaurantId, tableNumber]);
+
   const handleCancelOrder = useCallback(async () => {
     if (!orderId || cancelRemaining <= 0 || canceling) return;
     setCancelError(null);
@@ -99,15 +151,16 @@ export default function TableOrderStatus() {
 
   // Initial load
   useEffect(() => {
+    if (!sessionReady) return;
     void load();
-  }, [load]);
+  }, [load, sessionReady]);
 
   // Poll until finalized
   useEffect(() => {
-    if (!order || FINALIZED.has(order.status)) return;
+    if (!order || FINALIZED.has(order.status) || !sessionReady) return;
     const timer = setInterval(() => void load(), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [order, load]);
+  }, [order, load, sessionReady]);
 
   useEffect(() => {
     setCancelRemaining(getRemainingCancelSeconds(order));
@@ -238,8 +291,8 @@ export default function TableOrderStatus() {
           <div className="flex flex-col gap-2">
             <Link
               to={
-                qrAccessKey
-                  ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                effectiveQrAccessKey
+                  ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
                   : `/orders/my/${restaurantId}/${tableNumber}`
               }
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
@@ -248,8 +301,8 @@ export default function TableOrderStatus() {
             </Link>
             <Link
               to={
-                qrAccessKey
-                  ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                effectiveQrAccessKey
+                  ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
                   : `/menu/${restaurantId}/table/${tableNumber}`
               }
               className="inline-flex min-h-11 items-center justify-center rounded-xl border border-orange-200 px-4 text-sm font-semibold text-orange-700 transition hover:bg-orange-50"

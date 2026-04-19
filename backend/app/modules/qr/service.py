@@ -1,3 +1,5 @@
+import hashlib
+import socket
 from pathlib import Path
 from urllib.parse import quote, urlencode, urlparse
 
@@ -19,6 +21,8 @@ from app.modules.rooms.repository import get_room_by_number_and_restaurant
 
 _QR_DIR = Path(settings.upload_dir) / "qrcodes"
 _VALID_QR_TYPES = {"table", "room"}
+_MAX_TARGET_LENGTH = 50
+_LOCALHOST_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 # Ensure the QR directory exists at import time (safe to call multiple times).
 _QR_DIR.mkdir(parents=True, exist_ok=True)
@@ -39,10 +43,73 @@ def _normalize_frontend_base_url(frontend_base_url: str | None) -> str | None:
     return None
 
 
+def _is_localhost_base_url(base_url: str) -> bool:
+    parsed = urlparse(base_url)
+    hostname = (parsed.hostname or "").strip().lower()
+    return hostname in _LOCALHOST_HOSTS
+
+
+def _first_configured_non_local_frontend_url() -> str | None:
+    candidates: list[str] = []
+
+    frontend_urls = getattr(settings, "frontend_urls", "")
+    if isinstance(frontend_urls, str) and frontend_urls.strip():
+        candidates.extend(
+            part.strip() for part in frontend_urls.split(",") if part.strip()
+        )
+
+    if settings.frontend_url:
+        candidates.append(settings.frontend_url)
+
+    for candidate in candidates:
+        normalized = _normalize_frontend_base_url(candidate)
+        if normalized and not _is_localhost_base_url(normalized):
+            return normalized
+
+    return None
+
+
+def _detect_lan_ipv4() -> str | None:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            ip = sock.getsockname()[0]
+    except OSError:
+        return None
+
+    if not ip or ip.startswith("127."):
+        return None
+    return ip
+
+
+def _replace_localhost_with_lan(base_url: str) -> str | None:
+    if not _is_localhost_base_url(base_url):
+        return None
+
+    lan_ip = _detect_lan_ipv4()
+    if not lan_ip:
+        return None
+
+    parsed = urlparse(base_url)
+    scheme = parsed.scheme or "http"
+    port_segment = f":{parsed.port}" if parsed.port else ""
+    return f"{scheme}://{lan_ip}{port_segment}"
+
+
 def _resolve_frontend_base_url(frontend_base_url: str | None = None) -> str:
     normalized = _normalize_frontend_base_url(frontend_base_url)
     if normalized:
-        return normalized
+        if not _is_localhost_base_url(normalized):
+            return normalized
+
+        configured_non_local = _first_configured_non_local_frontend_url()
+        if configured_non_local:
+            return configured_non_local
+
+        lan_reachable = _replace_localhost_with_lan(normalized)
+        if lan_reachable:
+            return lan_reachable
+
     return settings.frontend_url.rstrip("/")
 
 
@@ -79,8 +146,32 @@ def _build_frontend_url(
 
 
 def _qr_filename(restaurant_id: int, qr_type: str, target_number: str) -> str:
-    """Deterministic filename: reuse same file if QR already generated."""
-    return f"qr_{restaurant_id}_{qr_type}_{target_number}.png"
+    """Deterministic safe filename: independent from raw target characters."""
+    digest = hashlib.sha256(target_number.encode("utf-8")).hexdigest()[:16]
+    return f"qr_{restaurant_id}_{qr_type}_{digest}.png"
+
+
+def _normalize_target_number(target_number: str, qr_type: str) -> str:
+    normalized = target_number.strip()
+    if not normalized:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{_qr_label(qr_type)} number is required.",
+        )
+    if len(normalized) > _MAX_TARGET_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"{_qr_label(qr_type)} number must be at most "
+                f"{_MAX_TARGET_LENGTH} characters."
+            ),
+        )
+    if "/" in normalized or "\\" in normalized:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{_qr_label(qr_type)} number contains invalid characters.",
+        )
+    return normalized
 
 
 def _generate_qr_image(frontend_url: str, file_path: Path) -> None:
@@ -187,12 +278,7 @@ def generate_qr(
     """
     qr_type = _validate_qr_type(qr_type)
 
-    target_number = target_number.strip()
-    if not target_number:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Target number is required.",
-        )
+    target_number = _normalize_target_number(target_number, qr_type)
 
     if qr_type == "room":
         room = get_room_by_number_and_restaurant(db, target_number, restaurant_id)
@@ -324,21 +410,38 @@ def rebuild_qr_links_by_type(
     if not records:
         return 0, 0
 
+    refreshed = _refresh_qr_records_for_base_url(
+        db,
+        restaurant_id,
+        normalized_qr_type,
+        records,
+        frontend_base_url,
+    )
+
+    return refreshed, len(records)
+
+
+def _refresh_qr_records_for_base_url(
+    db: Session,
+    restaurant_id: int,
+    normalized_qr_type: str,
+    records,
+    frontend_base_url: str | None,
+) -> int:
     refreshed = 0
     for record in records:
-        target_number = record.target_number.strip()
-        if not target_number:
+        try:
+            target_number = _normalize_target_number(record.target_number, normalized_qr_type)
+        except HTTPException:
+            # Keep list/rebuild resilient for legacy malformed records.
             continue
-
         frontend_url = _build_frontend_url(
             restaurant_id,
             normalized_qr_type,
             target_number,
             frontend_base_url,
         )
-        filename = _qr_filename(restaurant_id, normalized_qr_type, target_number)
-        file_path = _QR_DIR / filename
-
+        file_path = _QR_DIR / _qr_filename(restaurant_id, normalized_qr_type, target_number)
         if _should_refresh_qr(file_path, record.frontend_url, frontend_url):
             _regenerate_and_upsert_qr(
                 db,
@@ -349,31 +452,42 @@ def rebuild_qr_links_by_type(
                 frontend_url=frontend_url,
             )
             refreshed += 1
-
-    return refreshed, len(records)
+    return refreshed
 
 
 def list_room_qr(
     db: Session,
     restaurant_id: int,
+    frontend_base_url: str | None = None,
 ) -> QRCodeListResponse:
-    return list_qr(db, restaurant_id, "room")
+    return list_qr(db, restaurant_id, "room", frontend_base_url=frontend_base_url)
 
 
 def list_table_qr(
     db: Session,
     restaurant_id: int,
+    frontend_base_url: str | None = None,
 ) -> QRCodeListResponse:
-    return list_qr(db, restaurant_id, "table")
+    return list_qr(db, restaurant_id, "table", frontend_base_url=frontend_base_url)
 
 
 def list_qr(
     db: Session,
     restaurant_id: int,
     qr_type: str,
+    frontend_base_url: str | None = None,
 ) -> QRCodeListResponse:
     normalized_qr_type = _validate_qr_type(qr_type)
     records = repository.list_qr_by_type(db, restaurant_id, normalized_qr_type)
+    if records and frontend_base_url is not None:
+        _refresh_qr_records_for_base_url(
+            db,
+            restaurant_id,
+            normalized_qr_type,
+            records,
+            frontend_base_url,
+        )
+        records = repository.list_qr_by_type(db, restaurant_id, normalized_qr_type)
     responses = [_to_response(record, restaurant_id) for record in records]
     return QRCodeListResponse(qrcodes=responses, total=len(responses))
 
@@ -401,12 +515,7 @@ def delete_qr(
     target_number: str,
 ) -> QRCodeDeleteResponse:
     normalized_qr_type = _validate_qr_type(qr_type)
-    normalized_target = target_number.strip()
-    if not normalized_target:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"{_qr_label(normalized_qr_type)} number is required.",
-        )
+    normalized_target = _normalize_target_number(target_number, normalized_qr_type)
 
     deleted = repository.delete_qr(db, restaurant_id, normalized_qr_type, normalized_target)
     if not deleted:

@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { getGuestDisplayName, getGuestToken } from "@/hooks/useGuestSession";
+import {
+  getGuestDisplayName,
+  getGuestQrAccessKey,
+  getGuestToken,
+  setGuestSession,
+} from "@/hooks/useGuestSession";
 import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
+import { publicPost } from "@/lib/publicApi";
 import type { OrderHeaderResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
+import type { TableSessionStartResponse } from "@/types/session";
 
 const BASE_URL = RESOLVED_API_BASE_URL;
 
@@ -41,6 +48,13 @@ export default function GuestOrdersList() {
     tableNumber: string;
   }>();
   const qrAccessKey = searchParams.get("k")?.trim() ?? "";
+  const parsedRestaurantId = restaurantId ? Number(restaurantId) : NaN;
+  const restoredQrAccessKey =
+    Number.isNaN(parsedRestaurantId) || !tableNumber
+      ? null
+      : getGuestQrAccessKey(parsedRestaurantId, tableNumber);
+  const effectiveQrAccessKey = qrAccessKey || restoredQrAccessKey || "";
+  const [sessionReady, setSessionReady] = useState(Boolean(getGuestToken()));
   const guestName =
     restaurantId && tableNumber
       ? getGuestDisplayName(Number(restaurantId), tableNumber)
@@ -62,16 +76,50 @@ export default function GuestOrdersList() {
     }
   }, []);
 
+  useEffect(() => {
+    if (getGuestToken()) {
+      setSessionReady(true);
+      return;
+    }
+
+    if (!restaurantId || !tableNumber || !effectiveQrAccessKey || !guestName) {
+      setError("Guest session expired. Please scan the table QR code again.");
+      return;
+    }
+
+    const restoreSession = async () => {
+      try {
+        const session = await publicPost<TableSessionStartResponse>(
+          "/table-sessions/start",
+          {
+            restaurant_id: Number(restaurantId),
+            table_number: tableNumber,
+            customer_name: guestName,
+            qr_access_key: effectiveQrAccessKey,
+          },
+        );
+        setGuestSession(session);
+        setSessionReady(true);
+      } catch {
+        setError("Could not restore the table session. Please scan the QR code again.");
+      }
+    };
+
+    void restoreSession();
+  }, [effectiveQrAccessKey, guestName, restaurantId, tableNumber]);
+
   // Initial load
   useEffect(() => {
+    if (!sessionReady) return;
     void load();
-  }, [load]);
+  }, [load, sessionReady]);
 
   // Poll for updates
   useEffect(() => {
+    if (!sessionReady) return;
     const timer = setInterval(() => void load(), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, sessionReady]);
 
   const sortedOrders = useMemo(
     () =>
@@ -202,8 +250,8 @@ export default function GuestOrdersList() {
             {restaurantId && tableNumber && (
               <Link
                 to={
-                  qrAccessKey
-                    ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                  effectiveQrAccessKey
+                    ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
                     : `/menu/${restaurantId}/table/${tableNumber}`
                 }
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-500 px-4 text-sm font-semibold text-white transition hover:bg-rose-600"
@@ -225,8 +273,8 @@ export default function GuestOrdersList() {
               <Link
                 key={order.id}
                 to={
-                  qrAccessKey
-                    ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(qrAccessKey)}`
+                  effectiveQrAccessKey
+                    ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(effectiveQrAccessKey)}`
                     : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
                 }
                 className="rounded-3xl border border-rose-100 bg-white p-4 shadow-sm transition hover:border-rose-200 hover:shadow-md"
@@ -312,8 +360,8 @@ export default function GuestOrdersList() {
         <div className="fixed inset-x-0 bottom-0 z-30 border-t border-rose-100 bg-white/95 px-4 py-3 backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
           <Link
             to={
-              qrAccessKey
-                ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
+              effectiveQrAccessKey
+                ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
                 : `/menu/${restaurantId}/table/${tableNumber}`
             }
             className="block w-full rounded-2xl bg-slate-900 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"

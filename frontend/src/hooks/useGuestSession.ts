@@ -1,5 +1,6 @@
 import {
   GUEST_PROFILE_KEY,
+  GUEST_QR_ACCESS_MAP_KEY,
   GUEST_SESSION_KEY,
   TableSessionStartResponse,
 } from "@/types/session";
@@ -9,6 +10,12 @@ type GuestProfile = {
   table_number: string;
   customer_name: string;
 };
+
+type GuestQrAccessMap = Record<string, string>;
+
+function buildGuestContextKey(restaurantId: number, tableNumber: string): string {
+  return `${restaurantId}:${tableNumber}`;
+}
 
 /** Returns the raw guest token string, or null if not present. */
 export function getGuestToken(): string | null {
@@ -30,6 +37,7 @@ export function setGuestSession(response: TableSessionStartResponse): void {
 export function clearGuestSession(): void {
   sessionStorage.removeItem(GUEST_SESSION_KEY);
   sessionStorage.removeItem(GUEST_PROFILE_KEY);
+  sessionStorage.removeItem(GUEST_QR_ACCESS_MAP_KEY);
 }
 
 /** Returns true when a guest token is stored. */
@@ -66,6 +74,46 @@ export function getGuestDisplayName(
     }
     const name = (profile.customer_name ?? "").trim();
     return name || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setGuestQrAccessKey(
+  restaurantId: number,
+  tableNumber: string,
+  qrAccessKey: string,
+): void {
+  const normalized = qrAccessKey.trim();
+  if (!normalized) return;
+
+  let existingMap: GuestQrAccessMap = {};
+  const raw = sessionStorage.getItem(GUEST_QR_ACCESS_MAP_KEY);
+  if (raw) {
+    try {
+      existingMap = JSON.parse(raw) as GuestQrAccessMap;
+    } catch {
+      existingMap = {};
+    }
+  }
+
+  const key = buildGuestContextKey(restaurantId, tableNumber);
+  existingMap[key] = normalized;
+  sessionStorage.setItem(GUEST_QR_ACCESS_MAP_KEY, JSON.stringify(existingMap));
+}
+
+export function getGuestQrAccessKey(
+  restaurantId: number,
+  tableNumber: string,
+): string | null {
+  const raw = sessionStorage.getItem(GUEST_QR_ACCESS_MAP_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as GuestQrAccessMap;
+    const key = buildGuestContextKey(restaurantId, tableNumber);
+    const value = (parsed[key] ?? "").trim();
+    return value || null;
   } catch {
     return null;
   }

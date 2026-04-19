@@ -31,3 +31,4 @@ export interface GuestSessionInfoResponse {
 /** Key used to persist the guest session token in sessionStorage. */
 export const GUEST_SESSION_KEY = "hotelms_guest_session";
 export const GUEST_PROFILE_KEY = "hotelms_guest_profile";
+export const GUEST_QR_ACCESS_MAP_KEY = "hotelms_guest_qr_access_map";
