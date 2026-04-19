@@ -1,5 +1,5 @@
 from pathlib import Path
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urlparse
 
 import qrcode
 import qrcode.image.pil
@@ -18,28 +18,61 @@ from app.modules.qr.schemas import (
 from app.modules.rooms.repository import get_room_by_number_and_restaurant
 
 _QR_DIR = Path(settings.upload_dir) / "qrcodes"
+_VALID_QR_TYPES = {"table", "room"}
 
 # Ensure the QR directory exists at import time (safe to call multiple times).
 _QR_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def _build_frontend_url(restaurant_id: int, qr_type: str, target_number: str) -> str:
-    """Build the public menu URL that gets encoded into the QR image."""
-    base = settings.frontend_url.rstrip("/")
-    safe_target = quote(target_number, safe="")
+def _normalize_frontend_base_url(frontend_base_url: str | None) -> str | None:
+    if not frontend_base_url:
+        return None
+
+    raw = frontend_base_url.strip()
+    if not raw:
+        return None
+
+    parsed = urlparse(raw)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+    return None
+
+
+def _resolve_frontend_base_url(frontend_base_url: str | None = None) -> str:
+    normalized = _normalize_frontend_base_url(frontend_base_url)
+    if normalized:
+        return normalized
+    return settings.frontend_url.rstrip("/")
+
+
+def _build_qr_access_key(restaurant_id: int, qr_type: str, target_number: str) -> str:
     if qr_type == "table":
-        qr_access_key = create_table_qr_access_token(
+        return create_table_qr_access_token(
             restaurant_id=restaurant_id,
             table_number=target_number,
             expire_days=settings.room_qr_key_expire_days,
         )
-        return f"{base}/menu/{restaurant_id}/{qr_type}/{safe_target}?{urlencode({'k': qr_access_key})}"
     if qr_type == "room":
-        qr_access_key = create_room_qr_access_token(
+        return create_room_qr_access_token(
             restaurant_id=restaurant_id,
             room_number=target_number,
             expire_days=settings.room_qr_key_expire_days,
         )
+    return ""
+
+
+def _build_frontend_url(
+    restaurant_id: int,
+    qr_type: str,
+    target_number: str,
+    frontend_base_url: str | None = None,
+) -> str:
+    """Build the public menu URL that gets encoded into the QR image."""
+    base = _resolve_frontend_base_url(frontend_base_url)
+    safe_target = quote(target_number, safe="")
+    qr_access_key = _build_qr_access_key(restaurant_id, qr_type, target_number)
+    if qr_access_key:
         return f"{base}/menu/{restaurant_id}/{qr_type}/{safe_target}?{urlencode({'k': qr_access_key})}"
     # /menu/{restaurant_id}/{type}/{number}
     return f"{base}/menu/{restaurant_id}/{qr_type}/{safe_target}"
@@ -78,7 +111,7 @@ def _to_response(qr_record, restaurant_id: int) -> QRCodeResponse:
 
 def _validate_qr_type(qr_type: str) -> str:
     normalized = qr_type.strip().lower()
-    if normalized not in {"table", "room"}:
+    if normalized not in _VALID_QR_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid QR type '{qr_type}'. Must be 'table' or 'room'.",
@@ -109,11 +142,43 @@ def _delete_qr_file_if_exists(file_path: str) -> None:
             return
 
 
+def _has_secure_qr_key(frontend_url: str | None) -> bool:
+    return "k=" in (frontend_url or "")
+
+
+def _should_refresh_qr(file_path: Path, stored_frontend_url: str | None, expected_frontend_url: str) -> bool:
+    return (
+        not file_path.exists()
+        or not _has_secure_qr_key(stored_frontend_url)
+        or (stored_frontend_url or "") != expected_frontend_url
+    )
+
+
+def _regenerate_and_upsert_qr(
+    db: Session,
+    restaurant_id: int,
+    qr_type: str,
+    target_number: str,
+    file_path: Path,
+    frontend_url: str,
+):
+    _generate_qr_image(frontend_url, file_path)
+    return repository.upsert_qr(
+        db,
+        restaurant_id=restaurant_id,
+        qr_type=qr_type,
+        target_number=target_number,
+        file_path=str(file_path),
+        frontend_url=frontend_url,
+    )
+
+
 def generate_qr(
     db: Session,
     restaurant_id: int,
     qr_type: str,
     target_number: str,
+    frontend_base_url: str | None = None,
 ) -> QRCodeResponse:
     """Generate (or reuse) a QR code for the given target.
 
@@ -143,35 +208,36 @@ def generate_qr(
             )
         target_number = room.room_number
 
-    frontend_url = _build_frontend_url(restaurant_id, qr_type, target_number)
+    frontend_url = _build_frontend_url(
+        restaurant_id,
+        qr_type,
+        target_number,
+        frontend_base_url,
+    )
     filename = _qr_filename(restaurant_id, qr_type, target_number)
     file_path = _QR_DIR / filename
 
     # Check DB first — if record exists, reuse (file should already be on disk)
     existing = repository.get_qr(db, restaurant_id, qr_type, target_number)
     if existing:
-        has_secure_qr_key = "k=" in (existing.frontend_url or "")
-        # Re-generate if file is missing or if this is a legacy QR without secure key.
-        if not file_path.exists() or not has_secure_qr_key:
-            _generate_qr_image(frontend_url, file_path)
-            existing = repository.upsert_qr(
+        if _should_refresh_qr(file_path, existing.frontend_url, frontend_url):
+            existing = _regenerate_and_upsert_qr(
                 db,
                 restaurant_id=restaurant_id,
                 qr_type=qr_type,
                 target_number=target_number,
-                file_path=str(file_path),
+                file_path=file_path,
                 frontend_url=frontend_url,
             )
         return _to_response(existing, restaurant_id)
 
     # New QR — generate image and persist metadata
-    _generate_qr_image(frontend_url, file_path)
-    qr_record = repository.upsert_qr(
+    qr_record = _regenerate_and_upsert_qr(
         db,
         restaurant_id=restaurant_id,
         qr_type=qr_type,
         target_number=target_number,
-        file_path=str(file_path),
+        file_path=file_path,
         frontend_url=frontend_url,
     )
     return _to_response(qr_record, restaurant_id)
@@ -182,6 +248,7 @@ def generate_bulk_table_qr(
     restaurant_id: int,
     start: int,
     end: int,
+    frontend_base_url: str | None = None,
 ) -> BulkQRCodeResponse:
     """Generate QR codes for a range of table numbers."""
     if start > end or end - start > 200:
@@ -191,7 +258,13 @@ def generate_bulk_table_qr(
         )
 
     results = [
-        generate_qr(db, restaurant_id, "table", str(n))
+        generate_qr(
+            db,
+            restaurant_id,
+            "table",
+            str(n),
+            frontend_base_url=frontend_base_url,
+        )
         for n in range(start, end + 1)
     ]
     return BulkQRCodeResponse(generated=results, count=len(results))
@@ -201,6 +274,7 @@ def generate_bulk_room_qr(
     db: Session,
     restaurant_id: int,
     room_numbers: list[str],
+    frontend_base_url: str | None = None,
 ) -> BulkQRCodeResponse:
     """Generate QR codes for an explicit list of existing room numbers."""
     normalized: list[str] = []
@@ -226,10 +300,57 @@ def generate_bulk_room_qr(
         )
 
     results = [
-        generate_qr(db, restaurant_id, "room", room_number)
+        generate_qr(
+            db,
+            restaurant_id,
+            "room",
+            room_number,
+            frontend_base_url=frontend_base_url,
+        )
         for room_number in normalized
     ]
     return BulkQRCodeResponse(generated=results, count=len(results))
+
+
+def rebuild_qr_links_by_type(
+    db: Session,
+    restaurant_id: int,
+    qr_type: str,
+    frontend_base_url: str | None = None,
+) -> tuple[int, int]:
+    """Refresh stored QR links/images for one QR type against the current frontend base URL."""
+    normalized_qr_type = _validate_qr_type(qr_type)
+    records = repository.list_qr_by_type(db, restaurant_id, normalized_qr_type)
+    if not records:
+        return 0, 0
+
+    refreshed = 0
+    for record in records:
+        target_number = record.target_number.strip()
+        if not target_number:
+            continue
+
+        frontend_url = _build_frontend_url(
+            restaurant_id,
+            normalized_qr_type,
+            target_number,
+            frontend_base_url,
+        )
+        filename = _qr_filename(restaurant_id, normalized_qr_type, target_number)
+        file_path = _QR_DIR / filename
+
+        if _should_refresh_qr(file_path, record.frontend_url, frontend_url):
+            _regenerate_and_upsert_qr(
+                db,
+                restaurant_id=restaurant_id,
+                qr_type=normalized_qr_type,
+                target_number=target_number,
+                file_path=file_path,
+                frontend_url=frontend_url,
+            )
+            refreshed += 1
+
+    return refreshed, len(records)
 
 
 def list_room_qr(

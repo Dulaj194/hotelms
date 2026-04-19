@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import type {
   QRCodeDeleteResponse,
   QRCodeListResponse,
+  QRRebuildResponse,
   QRCodeResponse,
 } from "@/types/publicMenu";
 
@@ -89,6 +90,21 @@ export default function AllTableQRCodes() {
     },
     [clearMessages, loadTableQRCodes],
   );
+
+  const rebuildTableLinks = useCallback(async () => {
+    setWorking(true);
+    clearMessages();
+
+    try {
+      const data = await api.post<QRRebuildResponse>("/qr/tables/rebuild-links", {});
+      setNotice(data.message);
+      await loadTableQRCodes();
+    } catch (rebuildError) {
+      setError(getApiErrorMessage(rebuildError, "Failed to rebuild table QR links."));
+    } finally {
+      setWorking(false);
+    }
+  }, [clearMessages, loadTableQRCodes]);
 
   const openDeleteSingleConfirm = useCallback(
     (tableNumber: string) => {
@@ -177,6 +193,15 @@ export default function AllTableQRCodes() {
               className="app-btn-base border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
             >
               Refresh
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void rebuildTableLinks()}
+              disabled={loading || working || qrcodes.length === 0}
+              className="app-btn-base border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+            >
+              Rebuild for Current WiFi
             </button>
 
             <button

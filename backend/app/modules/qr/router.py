@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from urllib.parse import urlparse
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_module_access, require_roles
@@ -10,6 +12,7 @@ from app.modules.qr.schemas import (
     QRCodeDeleteResponse,
     QRCodeListResponse,
     QRCodeResponse,
+    QRRebuildResponse,
     RoomBulkQRRequest,
 )
 from app.modules.users.model import User
@@ -31,9 +34,25 @@ def _require_restaurant_context(current_user: User) -> int:
     return current_user.restaurant_id
 
 
+def _request_frontend_base_url(request: Request) -> str | None:
+    origin = request.headers.get("origin", "").strip()
+    if origin:
+        return origin
+
+    referer = request.headers.get("referer", "").strip()
+    if not referer:
+        return None
+
+    parsed = urlparse(referer)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return None
+
+
 @router.get("/table/{table_number}", response_model=QRCodeResponse)
 def get_table_qr(
     table_number: str,
+    request: Request,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
@@ -44,6 +63,7 @@ def get_table_qr(
         _require_restaurant_context(current_user),
         "table",
         table_number,
+        frontend_base_url=_request_frontend_base_url(request),
     )
 
 
@@ -85,6 +105,7 @@ def delete_all_table_qr(
 @router.get("/room/{room_number}", response_model=QRCodeResponse)
 def get_room_qr(
     room_number: str,
+    request: Request,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
@@ -95,12 +116,14 @@ def get_room_qr(
         _require_restaurant_context(current_user),
         "room",
         room_number,
+        frontend_base_url=_request_frontend_base_url(request),
     )
 
 
 @router.post("/tables/bulk", response_model=BulkQRCodeResponse)
 def bulk_table_qr(
     payload: BulkQRRequest,
+    request: Request,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
@@ -111,12 +134,14 @@ def bulk_table_qr(
         _require_restaurant_context(current_user),
         payload.start,
         payload.end,
+        frontend_base_url=_request_frontend_base_url(request),
     )
 
 
 @router.post("/rooms/bulk", response_model=BulkQRCodeResponse)
 def bulk_room_qr(
     payload: RoomBulkQRRequest,
+    request: Request,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
     __: bool = Depends(require_module_access("qr")),
@@ -126,6 +151,49 @@ def bulk_room_qr(
         db,
         _require_restaurant_context(current_user),
         payload.room_numbers,
+        frontend_base_url=_request_frontend_base_url(request),
+    )
+
+
+@router.post("/tables/rebuild-links", response_model=QRRebuildResponse)
+def rebuild_table_qr_links(
+    request: Request,
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+    db: Session = Depends(get_db),
+    __: bool = Depends(require_module_access("qr")),
+) -> QRRebuildResponse:
+    """Refresh all existing table QR links/images using the current frontend host."""
+    refreshed_count, total_count = service.rebuild_qr_links_by_type(
+        db,
+        _require_restaurant_context(current_user),
+        "table",
+        frontend_base_url=_request_frontend_base_url(request),
+    )
+    return QRRebuildResponse(
+        message=f"Refreshed {refreshed_count} of {total_count} table QR code(s).",
+        refreshed_count=refreshed_count,
+        total_count=total_count,
+    )
+
+
+@router.post("/rooms/rebuild-links", response_model=QRRebuildResponse)
+def rebuild_room_qr_links(
+    request: Request,
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+    db: Session = Depends(get_db),
+    __: bool = Depends(require_module_access("qr")),
+) -> QRRebuildResponse:
+    """Refresh all existing room QR links/images using the current frontend host."""
+    refreshed_count, total_count = service.rebuild_qr_links_by_type(
+        db,
+        _require_restaurant_context(current_user),
+        "room",
+        frontend_base_url=_request_frontend_base_url(request),
+    )
+    return QRRebuildResponse(
+        message=f"Refreshed {refreshed_count} of {total_count} room QR code(s).",
+        refreshed_count=refreshed_count,
+        total_count=total_count,
     )
 
 

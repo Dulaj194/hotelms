@@ -99,3 +99,9 @@ export interface QRCodeListResponse {
 export interface QRCodeDeleteResponse {
   message: string;
 }
+
+export interface QRRebuildResponse {
+  message: string;
+  refreshed_count: number;
+  total_count: number;
+}

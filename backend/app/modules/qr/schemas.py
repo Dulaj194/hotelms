@@ -33,3 +33,9 @@ class QRCodeListResponse(BaseModel):
 
 class QRCodeDeleteResponse(BaseModel):
     message: str
+
+
+class QRRebuildResponse(BaseModel):
+    message: str
+    refreshed_count: int
+    total_count: int

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import type {
   QRCodeDeleteResponse,
   QRCodeListResponse,
+  QRRebuildResponse,
   QRCodeResponse,
 } from "@/types/publicMenu";
 
@@ -89,6 +90,21 @@ export default function AllRoomQRCodes() {
     },
     [clearMessages, loadRoomQRCodes],
   );
+
+  const rebuildRoomLinks = useCallback(async () => {
+    setWorking(true);
+    clearMessages();
+
+    try {
+      const data = await api.post<QRRebuildResponse>("/qr/rooms/rebuild-links", {});
+      setNotice(data.message);
+      await loadRoomQRCodes();
+    } catch (rebuildError) {
+      setError(getApiErrorMessage(rebuildError, "Failed to rebuild room QR links."));
+    } finally {
+      setWorking(false);
+    }
+  }, [clearMessages, loadRoomQRCodes]);
 
   const openDeleteSingleConfirm = useCallback(
     (roomNumber: string) => {
@@ -177,6 +193,15 @@ export default function AllRoomQRCodes() {
               className="app-btn-base border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
             >
               Refresh
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void rebuildRoomLinks()}
+              disabled={loading || working || qrcodes.length === 0}
+              className="app-btn-base border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+            >
+              Rebuild for Current WiFi
             </button>
 
             <button
