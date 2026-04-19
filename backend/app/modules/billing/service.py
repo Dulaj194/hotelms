@@ -233,6 +233,18 @@ def _load_table_session_or_404(db: Session, lookup: str, restaurant_id: int):
     candidate = (lookup or "").strip()
     session = table_session_repo.get_session_by_id_and_restaurant(db, candidate, restaurant_id)
 
+    # Billing staff commonly search by table number first. Resolve that before
+    # trying short session-id prefixes so numeric inputs like "4" do not get
+    # treated as ambiguous session prefixes.
+    if session is None and candidate:
+        fallback = table_session_repo.get_latest_session_by_table_number(
+            db,
+            restaurant_id=restaurant_id,
+            table_number=candidate,
+        )
+        if fallback is not None:
+            session = fallback
+
     if session is None and candidate:
         matches = table_session_repo.list_sessions_by_id_prefix(
             db,
@@ -250,15 +262,6 @@ def _load_table_session_or_404(db: Session, lookup: str, restaurant_id: int):
                     "or use the table number."
                 ),
             )
-
-    if session is None and candidate:
-        fallback = table_session_repo.get_latest_session_by_table_number(
-            db,
-            restaurant_id=restaurant_id,
-            table_number=candidate,
-        )
-        if fallback is not None:
-            session = fallback
 
     if session is None:
         raise HTTPException(
@@ -296,6 +299,21 @@ def _load_room_session_or_404(db: Session, lookup: str, restaurant_id: int):
     candidate = (lookup or "").strip()
     session = room_session_repo.get_room_session_by_id_and_restaurant(db, candidate, restaurant_id)
 
+    # Room billing lookups should also prefer an exact room number match before
+    # falling back to short session-id prefix matching.
+    if session is None and candidate:
+        sessions = room_session_repo.list_sessions_by_room_number(
+            db,
+            restaurant_id=restaurant_id,
+            room_number=candidate,
+            limit=5,
+        )
+        session = _pick_relevant_room_session(
+            db,
+            restaurant_id=restaurant_id,
+            sessions=sessions,
+        )
+
     if session is None and candidate:
         matches = room_session_repo.list_sessions_by_id_prefix(
             db,
@@ -313,19 +331,6 @@ def _load_room_session_or_404(db: Session, lookup: str, restaurant_id: int):
                     "or use the room number."
                 ),
             )
-
-    if session is None and candidate:
-        sessions = room_session_repo.list_sessions_by_room_number(
-            db,
-            restaurant_id=restaurant_id,
-            room_number=candidate,
-            limit=5,
-        )
-        session = _pick_relevant_room_session(
-            db,
-            restaurant_id=restaurant_id,
-            sessions=sessions,
-        )
 
     if session is None:
         raise HTTPException(

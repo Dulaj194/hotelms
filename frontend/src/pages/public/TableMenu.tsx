@@ -167,9 +167,9 @@ export default function TableMenu() {
     const restoredQrAccessKey = getGuestQrAccessKey(parsedRestaurantId, tableNumber);
     const effectiveQrAccessKey = qrAccessKey || restoredQrAccessKey || "";
 
-    // Allow returning from other pages (e.g. orders list) without requiring QR query param again
-    // when a valid guest session token is already in storage for this context.
-    if (!qrAccessKey && hasGuestSessionForContext(parsedRestaurantId, tableNumber)) {
+    // Reuse an existing same-table guest session to keep cart/orders continuity.
+    // Starting a new session would hide previous orders because guest endpoints are session-scoped.
+    if (hasGuestSessionForContext(parsedRestaurantId, tableNumber)) {
       setSessionReady(true);
       return;
     }

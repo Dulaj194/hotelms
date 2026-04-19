@@ -345,9 +345,9 @@ export default function Billing() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">Billing Workspace</p>
-              <h1 className="app-page-title">Room Folio and Session Settlement</h1>
+              <h1 className="app-page-title">Table and Room Billing Settlement</h1>
               <p className="app-body-text text-slate-300">
-                Handle table settlements, room charge posting, invoice printing, and cashier to accountant handoff in one responsive view.
+                Handle table number billing, room number folios, invoice printing, and cashier to accountant handoff in one responsive view.
               </p>
               <div className="flex flex-wrap gap-2 pt-2">
                 {["owner", "admin", "cashier"].includes(role) && (
@@ -392,20 +392,21 @@ export default function Billing() {
           <>
             <form onSubmit={onLookup} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4">
-                <h2 className="app-section-title text-slate-900">{mode === "room" ? "Room folio lookup" : "Table billing lookup"}</h2>
+                <h2 className="app-section-title text-slate-900">{mode === "room" ? "Room billing lookup" : "Table billing lookup"}</h2>
                 <p className="app-muted-text text-slate-500">
-                  Search by full session ID, short prefix, or the physical {mode === "room" ? "room" : "table"} number.
+                  Search by room/table number first. You can also paste a full session ID or a short session prefix if needed.
                 </p>
               </div>
               <div className="app-form-grid items-end">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">
-                    {mode === "room" ? "Room Session / Room Number" : "Table Session"}
+                    {mode === "room" ? "Room Number / Session ID" : "Table Number / Session ID"}
                   </label>
                   <input
                     type="text"
                     value={lookup}
                     onChange={(event) => (mode === "room" ? setRoomLookup(event.target.value) : setTableLookup(event.target.value))}
+                    placeholder={mode === "room" ? "e.g. 101 or room session id" : "e.g. 4 or table session id"}
                     className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
                   />
                 </div>
