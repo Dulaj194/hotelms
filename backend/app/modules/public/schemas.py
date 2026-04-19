@@ -14,6 +14,7 @@ class PublicRestaurantInfoResponse(BaseModel):
     phone: str | None
     address: str | None
     logo_url: str | None
+    public_menu_banner_urls: list[str] = []
     is_active: bool
 
     model_config = {"from_attributes": True}

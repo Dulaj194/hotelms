@@ -1,7 +1,8 @@
 from datetime import datetime
+import json
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 RegistrationStatusValue = Literal["PENDING", "APPROVED", "REJECTED"]
 WebhookHealthStatusValue = Literal["not_configured", "healthy", "degraded", "disabled"]
@@ -11,6 +12,57 @@ REVIEW_REASON_MIN_LENGTH = 24
 REVIEW_REASON_POLICY_TEMPLATE = (
     "Policy: <policy-check>; Evidence: <facts>; Decision: <approve/reject impact>."
 )
+MAX_PUBLIC_MENU_BANNERS = 8
+
+
+def _normalize_public_menu_banner_urls(
+    value: object,
+    *,
+    allow_none: bool,
+) -> list[str] | None:
+    if value is None:
+        return None if allow_none else []
+
+    raw_values: list[object]
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None if allow_none else []
+        if text.startswith("["):
+            try:
+                parsed = json.loads(text)
+                raw_values = parsed if isinstance(parsed, list) else [text]
+            except Exception:
+                raw_values = [line.strip() for line in text.splitlines() if line.strip()]
+        else:
+            raw_values = [line.strip() for line in text.splitlines() if line.strip()]
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw_values:
+        if item is None:
+            continue
+        candidate = str(item).strip()
+        if not candidate:
+            continue
+        if len(candidate) > 500:
+            raise ValueError("Each banner URL must be 500 characters or fewer.")
+        if candidate not in seen:
+            normalized.append(candidate)
+            seen.add(candidate)
+
+    if len(normalized) > MAX_PUBLIC_MENU_BANNERS:
+        raise ValueError(
+            f"A maximum of {MAX_PUBLIC_MENU_BANNERS} banner URLs is allowed."
+        )
+
+    if allow_none and not normalized:
+        return None
+    return normalized
 
 
 class RestaurantFeatureFlagsResponse(BaseModel):
@@ -126,6 +178,7 @@ class RestaurantResponse(BaseModel):
     country: str | None
     currency: str | None
     billing_email: str | None
+    public_menu_banner_urls: list[str] = Field(default_factory=list)
     opening_time: str | None
     closing_time: str | None
     logo_url: str | None
@@ -142,6 +195,12 @@ class RestaurantResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @field_validator("public_menu_banner_urls", mode="before")
+    @classmethod
+    def normalize_public_menu_banner_urls_response(cls, value: object) -> list[str]:
+        normalized = _normalize_public_menu_banner_urls(value, allow_none=False)
+        return normalized if isinstance(normalized, list) else []
 
 
 # Alias used in /me endpoints for clarity in OpenAPI docs.
@@ -183,8 +242,14 @@ class RestaurantUpdateRequest(BaseModel):
     country: str | None = Field(None, max_length=120)
     currency: str | None = Field(None, max_length=12)
     billing_email: EmailStr | None = None
+    public_menu_banner_urls: list[str] | None = None
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
+
+    @field_validator("public_menu_banner_urls", mode="before")
+    @classmethod
+    def normalize_public_menu_banner_urls(cls, value: object) -> list[str] | None:
+        return _normalize_public_menu_banner_urls(value, allow_none=True)
 
 
 class RestaurantCreateRequest(BaseModel):
@@ -199,9 +264,15 @@ class RestaurantCreateRequest(BaseModel):
     country: str | None = Field(None, max_length=120)
     currency: str | None = Field(None, max_length=12)
     billing_email: EmailStr | None = None
+    public_menu_banner_urls: list[str] | None = None
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
     change_reason: str | None = Field(default=None, min_length=3, max_length=500)
+
+    @field_validator("public_menu_banner_urls", mode="before")
+    @classmethod
+    def normalize_public_menu_banner_urls(cls, value: object) -> list[str] | None:
+        return _normalize_public_menu_banner_urls(value, allow_none=True)
 
 
 class RestaurantAdminUpdateRequest(BaseModel):
@@ -216,11 +287,17 @@ class RestaurantAdminUpdateRequest(BaseModel):
     country: str | None = Field(None, max_length=120)
     currency: str | None = Field(None, max_length=12)
     billing_email: EmailStr | None = None
+    public_menu_banner_urls: list[str] | None = None
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
     feature_flags: RestaurantFeatureFlagsUpdateRequest | None = None
     is_active: bool | None = None
     change_reason: str | None = Field(default=None, min_length=3, max_length=500)
+
+    @field_validator("public_menu_banner_urls", mode="before")
+    @classmethod
+    def normalize_public_menu_banner_urls(cls, value: object) -> list[str] | None:
+        return _normalize_public_menu_banner_urls(value, allow_none=True)
 
 
 class RestaurantIntegrationUpdateRequest(BaseModel):

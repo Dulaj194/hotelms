@@ -375,7 +375,7 @@ export default function AccountantBillingDashboard() {
                 Approve cashier transfers, reopen exceptions, and monitor same-day billing health from a responsive workspace.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
               <span className="rounded-full bg-white/15 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em]">
                 {connected ? "Realtime connected" : "Realtime reconnecting"}
               </span>
@@ -386,7 +386,7 @@ export default function AccountantBillingDashboard() {
                 type="date"
                 value={businessDate}
                 onChange={(event) => setBusinessDate(event.target.value)}
-                className="rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white outline-none"
+                className="w-full rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white outline-none sm:w-auto sm:min-w-[170px]"
               />
             </div>
           </div>
@@ -440,11 +440,11 @@ export default function AccountantBillingDashboard() {
                   Pending transfers require accountant confirmation. Completed folios can be reopened when exceptions appear.
                 </p>
               </div>
-              <div className="flex rounded-full bg-slate-100 p-1">
+              <div className="flex w-full rounded-full bg-slate-100 p-1 sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setView("pending")}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                  className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold sm:flex-none ${
                     view === "pending"
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-600"
@@ -455,7 +455,7 @@ export default function AccountantBillingDashboard() {
                 <button
                   type="button"
                   onClick={() => setView("completed")}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                  className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold sm:flex-none ${
                     view === "completed"
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-600"

@@ -24,6 +24,7 @@ describe("IntegrationPanel", () => {
           country: null,
           currency: null,
           billing_email: null,
+          public_menu_banner_urls: [],
           opening_time: null,
           closing_time: null,
           logo_url: null,

@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 import CartDrawer from "@/components/shared/CartDrawer";
+import MenuBrowserRail from "@/components/public/MenuBrowserRail";
+import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { useCart } from "@/hooks/useCart";
 import {
   clearGuestSession,
@@ -57,20 +59,27 @@ export default function TableMenu() {
   const [cartOpen, setCartOpen] = useState(false);
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
-  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
 
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, refetch } =
     useCart();
+
+  const {
+    activeCategoryId,
+    setActiveCategoryId,
+    visibleCategories,
+    selectedCategory,
+  } = usePublicMenuBrowser(menu);
 
   const flattenedTiles = useMemo<MenuTile[]>(() => {
     if (!menu) return [];
 
     const categorySource =
       activeCategoryId === null
-        ? menu.categories
-        : menu.categories.filter((category) => category.id === activeCategoryId);
+        ? visibleCategories
+        : visibleCategories.filter((category) => category.id === activeCategoryId);
 
     return categorySource.flatMap((category) => {
       const categoryItems: MenuTile[] = category.items.map((item) => ({
@@ -91,7 +100,32 @@ export default function TableMenu() {
 
       return [...categoryItems, ...subcategoryItems];
     });
-  }, [activeCategoryId, menu]);
+  }, [activeCategoryId, menu, visibleCategories]);
+
+  const featuredBannerUrls = useMemo(() => {
+    const urls = menu?.restaurant.public_menu_banner_urls ?? [];
+    return urls
+      .map((url) => toAssetUrl(url) ?? "")
+      .filter((url) => url.length > 0);
+  }, [menu?.restaurant.public_menu_banner_urls]);
+
+  useEffect(() => {
+    setActiveBannerIndex(0);
+  }, [featuredBannerUrls.length]);
+
+  useEffect(() => {
+    if (featuredBannerUrls.length <= 1) {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      setActiveBannerIndex((current) => (current + 1) % featuredBannerUrls.length);
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [featuredBannerUrls.length]);
 
   const visibleTiles = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -166,9 +200,6 @@ export default function TableMenu() {
           `/public/restaurants/${restaurantId}/menu`
         );
         setMenu(data);
-        if (data.categories.length > 0) {
-          setActiveCategoryId(data.categories[0].id);
-        }
       } catch {
         setPageError("Failed to load the menu. Please try again.");
       }
@@ -430,11 +461,6 @@ export default function TableMenu() {
     );
   };
 
-  const selectedCategory =
-    activeCategoryId === null
-      ? null
-      : menu.categories.find((category) => category.id === activeCategoryId) ?? null;
-  const activeCategoryLabel = selectedCategory?.name ?? "All items";
   const cartItemCount = cart?.item_count ?? 0;
 
   return (
@@ -533,37 +559,25 @@ export default function TableMenu() {
         </div>
 
         <div className="mx-auto max-w-6xl px-4 pb-3 sm:px-5 lg:px-6">
-          <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1">
-            <button
-              onClick={() => setActiveCategoryId(null)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                activeCategoryId === null
-                  ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
-                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              All
-            </button>
-            {menu.categories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => setActiveCategoryId(category.id)}
-                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  activeCategoryId === category.id
-                    ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                {category.name}
-              </button>
-            ))}
-          </div>
+          <MenuBrowserRail
+            visibleCategories={visibleCategories}
+            activeCategoryId={activeCategoryId}
+            onSelectCategory={setActiveCategoryId}
+          />
         </div>
       </header>
 
       <main id="menu-content" className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-4 pb-28 sm:px-5 lg:px-6">
         <section>
-          <div className="relative overflow-hidden rounded-[2rem] bg-slate-950 px-6 py-6 text-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] sm:px-8 sm:py-8">
+          <div className="relative overflow-hidden rounded-[1.5rem] bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:px-6 sm:py-6">
+            {featuredBannerUrls.length > 0 && (
+              <img
+                src={featuredBannerUrls[activeBannerIndex]}
+                alt="Featured menu banner"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
+            <div className="absolute inset-0 bg-slate-950/65" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.12),_transparent_30%)]" />
             <div className="relative z-10 flex h-full flex-col justify-between gap-4">
               <div>
@@ -571,25 +585,27 @@ export default function TableMenu() {
                   <Sparkles className="h-3.5 w-3.5" />
                   Featured picks
                 </p>
-                <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight sm:text-4xl">
-                  Order like a modern mobile app, but built for your table.
+                <h2 className="mt-3 text-2xl font-black leading-tight tracking-tight sm:text-3xl">
+                  Order faster from your table.
                 </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75 sm:text-base">
-                  Browse the menu, adjust quantities instantly, and keep the flow clean from name entry to checkout.
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">
+                  Browse menu items, update quantities, and checkout with a clean one-page flow.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-2 text-xs font-semibold text-white/80">
                 <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add-to-cart</span>
                 <span className="rounded-full bg-white/10 px-3 py-1.5">Search-first layout</span>
-                <span className="rounded-full bg-white/10 px-3 py-1.5">Table aware session</span>
+                <span className="rounded-full bg-white/10 px-3 py-1.5">
+                  {featuredBannerUrls.length > 1 ? "Auto rotates every 1 min" : "Table aware session"}
+                </span>
               </div>
             </div>
           </div>
             <button
               type="button"
               onClick={handleFocusSearch}
-              className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+              className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               <Sparkles className="h-4 w-4" />
               Open search
@@ -599,9 +615,9 @@ export default function TableMenu() {
         <section id="menu-list" className="space-y-4">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-500">Menu</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-500">Our menu</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-                {searchQuery ? "Search results" : activeCategoryLabel}
+                {searchQuery ? "Search results" : selectedCategory?.name ?? "All items"}
               </h2>
               {selectedCategory?.description && !searchQuery && (
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">

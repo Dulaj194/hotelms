@@ -6,6 +6,7 @@ export interface PublicRestaurantInfoResponse {
   phone: string | null;
   address: string | null;
   logo_url: string | null;
+  public_menu_banner_urls: string[];
   is_active: boolean;
 }
 

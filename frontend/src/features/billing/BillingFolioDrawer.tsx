@@ -36,8 +36,8 @@ export default function BillingFolioDrawer({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-stretch justify-end bg-slate-950/55">
-      <div className="h-full w-full max-w-2xl overflow-y-auto bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[80] flex items-end justify-end bg-slate-950/55 sm:items-stretch sm:p-4">
+      <div className="h-[92dvh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:h-full sm:max-w-2xl sm:rounded-3xl">
         <div className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur md:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">

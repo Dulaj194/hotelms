@@ -86,6 +86,7 @@ export interface RestaurantResponse {
   country: string | null;
   currency: string | null;
   billing_email: string | null;
+  public_menu_banner_urls: string[];
   opening_time: string | null;
   closing_time: string | null;
   logo_url: string | null;
@@ -135,6 +136,7 @@ export interface RestaurantUpdateRequest {
   country?: string | null;
   currency?: string | null;
   billing_email?: string | null;
+  public_menu_banner_urls?: string[] | null;
   opening_time?: string | null;
   closing_time?: string | null;
 }
@@ -218,6 +220,7 @@ export interface RestaurantCreateRequest {
   country?: string | null;
   currency?: string | null;
   billing_email?: string | null;
+  public_menu_banner_urls?: string[] | null;
   opening_time?: string | null;
   closing_time?: string | null;
 }
@@ -232,6 +235,7 @@ export interface RestaurantAdminUpdateRequest {
   country?: string | null;
   currency?: string | null;
   billing_email?: string | null;
+  public_menu_banner_urls?: string[] | null;
   opening_time?: string | null;
   closing_time?: string | null;
   feature_flags?: Partial<RestaurantFeatureFlags> | null;

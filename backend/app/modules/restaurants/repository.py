@@ -209,6 +209,7 @@ def create_restaurant(
     country: str | None,
     currency: str | None,
     billing_email: str | None,
+    public_menu_banner_urls_json: str | None,
     opening_time: str | None,
     closing_time: str | None,
 ) -> Restaurant:
@@ -223,6 +224,7 @@ def create_restaurant(
         country=country,
         currency=currency,
         billing_email=billing_email,
+        public_menu_banner_urls_json=public_menu_banner_urls_json,
         opening_time=opening_time,
         closing_time=closing_time,
     )

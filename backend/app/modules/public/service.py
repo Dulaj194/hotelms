@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+import json
 from sqlalchemy.orm import Session
 
 from app.modules.public import repository
@@ -23,7 +24,24 @@ def _assert_restaurant_active(restaurant_id: int, db: Session) -> PublicRestaura
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
-    return PublicRestaurantInfoResponse.model_validate(restaurant)
+    banner_urls: list[str] = []
+    if restaurant.public_menu_banner_urls_json:
+        try:
+            parsed = json.loads(restaurant.public_menu_banner_urls_json)
+            if isinstance(parsed, list):
+                banner_urls = [str(item).strip() for item in parsed if str(item).strip()]
+        except Exception:
+            banner_urls = []
+
+    return PublicRestaurantInfoResponse(
+        id=restaurant.id,
+        name=restaurant.name,
+        phone=restaurant.phone,
+        address=restaurant.address,
+        logo_url=restaurant.logo_url,
+        public_menu_banner_urls=banner_urls,
+        is_active=restaurant.is_active,
+    )
 
 
 def get_public_restaurant_info(

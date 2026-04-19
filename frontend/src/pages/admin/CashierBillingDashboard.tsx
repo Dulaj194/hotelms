@@ -354,7 +354,7 @@ export default function CashierBillingDashboard() {
                 Review settled folios, record invoice prints, and push approved guest bills to the accountant queue with live updates.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
               <span className="rounded-full bg-white/15 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em]">
                 {connected ? "Realtime connected" : "Realtime reconnecting"}
               </span>
@@ -418,12 +418,12 @@ export default function CashierBillingDashboard() {
                 Pending folios need cashier review. Accepted folios are ready for accountant handoff.
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <div className="flex rounded-full bg-slate-100 p-1">
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap xl:w-auto">
+              <div className="flex w-full rounded-full bg-slate-100 p-1 sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setView("pending")}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                  className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold sm:flex-none ${
                     view === "pending"
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-600"
@@ -434,7 +434,7 @@ export default function CashierBillingDashboard() {
                 <button
                   type="button"
                   onClick={() => setView("ready")}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                  className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold sm:flex-none ${
                     view === "ready"
                       ? "bg-white text-slate-900 shadow-sm"
                       : "text-slate-600"

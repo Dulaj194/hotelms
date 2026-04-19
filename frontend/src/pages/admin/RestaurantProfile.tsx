@@ -43,6 +43,7 @@ interface BusinessFormState {
   country_id: string;
   currency_id: string;
   billing_email: string;
+  public_menu_banner_urls_text: string;
 }
 
 interface ScheduleFormState {
@@ -85,6 +86,7 @@ export default function RestaurantProfile() {
     country_id: "",
     currency_id: "",
     billing_email: "",
+    public_menu_banner_urls_text: "",
   });
 
   const [editingSchedule, setEditingSchedule] = useState(false);
@@ -227,6 +229,7 @@ export default function RestaurantProfile() {
       country_id: data.country_id ? String(data.country_id) : "",
       currency_id: data.currency_id ? String(data.currency_id) : "",
       billing_email: data.billing_email ?? data.email ?? "",
+      public_menu_banner_urls_text: toBannerUrlsText(data.public_menu_banner_urls ?? []),
     });
   }
 
@@ -358,6 +361,7 @@ export default function RestaurantProfile() {
 
     const primaryEmail = toNullable(businessForm.email);
     const billingEmail = toNullable(businessForm.billing_email) ?? primaryEmail;
+    const publicMenuBannerUrls = parseBannerUrlsText(businessForm.public_menu_banner_urls_text);
 
     const updated = await saveProfileChanges(
       {
@@ -368,6 +372,7 @@ export default function RestaurantProfile() {
         country_id: toNullableNumber(businessForm.country_id),
         currency_id: toNullableNumber(businessForm.currency_id),
         billing_email: billingEmail,
+        public_menu_banner_urls: publicMenuBannerUrls,
       },
       {
         success: "Business details updated successfully.",
@@ -849,6 +854,17 @@ export default function RestaurantProfile() {
                 onChange={(value) => setBusinessForm((prev) => ({ ...prev, address: value }))}
               />
 
+              <TextAreaField
+                label="Public Menu Featured Banner URLs"
+                value={businessForm.public_menu_banner_urls_text}
+                onChange={(value) =>
+                  setBusinessForm((prev) => ({ ...prev, public_menu_banner_urls_text: value }))
+                }
+              />
+              <p className="-mt-2 text-xs text-slate-500">
+                Add one image URL per line. These banners rotate every 1 minute on the guest menu.
+              </p>
+
               <p className="text-xs text-slate-500">
                 Country and currency are required to clear setup blockers. Billing email defaults
                 to the main email and is used for invoices and subscription notifications.
@@ -880,6 +896,14 @@ export default function RestaurantProfile() {
               <DetailItem label="Country" value={restaurant.country} />
               <DetailItem label="Currency" value={restaurant.currency} />
               <DetailItem label="Billing Email" value={restaurant.billing_email} />
+              <DetailItem
+                label="Menu Banners"
+                value={
+                  restaurant.public_menu_banner_urls.length > 0
+                    ? `${restaurant.public_menu_banner_urls.length} configured`
+                    : "Not configured"
+                }
+              />
               <DetailItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
               <DetailItem label="Address" value={restaurant.address} fullWidth />
             </dl>
@@ -1191,6 +1215,21 @@ function DetailItem({
 function toNullable(value: string): string | null {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function parseBannerUrlsText(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function toBannerUrlsText(urls: string[]): string {
+  return urls.join("\n");
 }
 
 function emailsEqual(left: string | null, right: string | null): boolean {

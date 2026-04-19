@@ -1,5 +1,6 @@
 import uuid
 import base64
+import json
 from datetime import UTC, datetime, timedelta
 import binascii
 from pathlib import Path
@@ -129,6 +130,9 @@ def _build_change_delta(
 
 
 def _restaurant_lifecycle_snapshot(restaurant) -> dict[str, object]:
+    banner_urls = _parse_json_document(restaurant.public_menu_banner_urls_json, [])
+    if not isinstance(banner_urls, list):
+        banner_urls = []
     return {
         "restaurant_id": restaurant.id,
         "name": restaurant.name,
@@ -140,6 +144,7 @@ def _restaurant_lifecycle_snapshot(restaurant) -> dict[str, object]:
         "currency": restaurant.currency,
         "currency_id": restaurant.currency_id,
         "billing_email": restaurant.billing_email,
+        "public_menu_banner_urls": [str(url) for url in banner_urls if url],
         "opening_time": restaurant.opening_time,
         "closing_time": restaurant.closing_time,
         "is_active": restaurant.is_active,
@@ -290,6 +295,15 @@ def _build_profile_update_data(
 ) -> dict:
     normalized_payload = _with_normalized_reference_fields(db, payload)
     update_data = normalized_payload.model_dump(exclude_unset=True)
+
+    if "public_menu_banner_urls" in update_data:
+        banner_urls = update_data.pop("public_menu_banner_urls")
+        update_data["public_menu_banner_urls_json"] = (
+            json.dumps(banner_urls or [], ensure_ascii=True)
+            if banner_urls is not None
+            else None
+        )
+
     feature_flag_updates = update_data.pop("feature_flags", None)
     if isinstance(feature_flag_updates, dict):
         update_data.update(access_catalog.flatten_feature_flag_updates(feature_flag_updates))
@@ -698,6 +712,11 @@ def create_restaurant(
         country=str(create_data["country"]) if create_data.get("country") else None,
         currency=str(create_data["currency"]) if create_data.get("currency") else None,
         billing_email=str(create_data["billing_email"]) if create_data.get("billing_email") else None,
+        public_menu_banner_urls_json=(
+            str(create_data["public_menu_banner_urls_json"])
+            if create_data.get("public_menu_banner_urls_json") is not None
+            else None
+        ),
         opening_time=str(create_data["opening_time"]) if create_data.get("opening_time") else None,
         closing_time=str(create_data["closing_time"]) if create_data.get("closing_time") else None,
     )

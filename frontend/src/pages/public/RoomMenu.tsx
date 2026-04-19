@@ -13,6 +13,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import MenuBrowserRail from "@/components/public/MenuBrowserRail";
+import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { setRoomSession } from "@/hooks/useRoomSession";
 import { useRoomCart } from "@/hooks/useRoomCart";
 import { publicGet, publicPost } from "@/lib/publicApi";
@@ -283,12 +285,18 @@ export default function RoomMenu() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [placedOrder, setPlacedOrder] = useState<RoomOrderDetailResponse | null>(null);
 
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing, refetch } =
     useRoomCart();
+
+  const {
+    activeCategoryId,
+    setActiveCategoryId,
+    visibleCategories,
+    selectedCategory,
+  } = usePublicMenuBrowser(menu);
 
   // 1. Start (or reuse) a room session
   useEffect(() => {
@@ -330,9 +338,6 @@ export default function RoomMenu() {
           `/public/restaurants/${restaurantId}/menu`
         );
         setMenu(data);
-        if (data.categories.length > 0) {
-          setActiveCategoryId(data.categories[0].id);
-        }
       } catch {
         setPageError("Failed to load the menu. Please try again.");
       }
@@ -396,12 +401,8 @@ export default function RoomMenu() {
     );
   }
 
-  const activeCategory =
-    menu.categories.find((c) => c.id === activeCategoryId) ?? menu.categories[0];
-  const visibleSubcategories =
-    activeCategory?.subcategories.filter((subcat) => subcat.items.length > 0) ?? [];
-  const hasDirectItems = (activeCategory?.items.length ?? 0) > 0;
-  const hasAnyItems = hasDirectItems || visibleSubcategories.length > 0;
+  const renderedCategories =
+    activeCategoryId === null ? visibleCategories : selectedCategory ? [selectedCategory] : [];
 
   const renderItemCard = (item: PublicItemSummaryResponse) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
@@ -549,72 +550,67 @@ export default function RoomMenu() {
         </div>
 
         {/* Category tabs */}
-        {menu.categories.length > 1 && (
-          <div className="max-w-2xl mx-auto flex gap-1 overflow-x-auto px-4 pb-2 scrollbar-hide">
-            {menu.categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategoryId(cat.id)}
-                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  activeCategoryId === cat.id
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="max-w-2xl mx-auto px-4 pb-2">
+          <MenuBrowserRail
+            visibleCategories={visibleCategories}
+            activeCategoryId={activeCategoryId}
+            onSelectCategory={setActiveCategoryId}
+          />
+        </div>
       </header>
 
       {/* Item grid */}
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-4 space-y-6">
-        {activeCategory && (
-          <section>
-            {activeCategory.description && (
-              <p className="text-sm text-gray-500 mb-4">
-                {activeCategory.description}
-              </p>
-            )}
+        {renderedCategories.length === 0 ? (
+          <p className="text-center text-gray-400 py-12">No categories available.</p>
+        ) : (
+          renderedCategories.map((category) => {
+            const visibleSubcategories = category.subcategories.filter(
+              (subcat) => subcat.items.length > 0,
+            );
+            const hasDirectItems = category.items.length > 0;
+            const hasAnyItems = hasDirectItems || visibleSubcategories.length > 0;
 
-            {!hasAnyItems ? (
-              <p className="text-center text-gray-400 py-12">
-                No items in this category.
-              </p>
-            ) : (
-              <div className="space-y-6">
-                {hasDirectItems && (
-                  <div>
-                    {visibleSubcategories.length > 0 && (
-                      <h2 className="text-sm font-semibold text-gray-700 mb-3">
-                        Other items
-                      </h2>
-                    )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {activeCategory.items.map(renderItemCard)}
-                    </div>
-                  </div>
+            return (
+              <section key={category.id}>
+                <h2 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h2>
+                {category.description && (
+                  <p className="text-sm text-gray-500 mb-4">{category.description}</p>
                 )}
 
-                {visibleSubcategories.map((subcategory) => (
-                  <div key={subcategory.id}>
-                    <h2 className="text-sm font-semibold text-gray-800">
-                      {subcategory.name}
-                    </h2>
-                    {subcategory.description && (
-                      <p className="text-xs text-gray-500 mt-1 mb-3">
-                        {subcategory.description}
-                      </p>
+                {!hasAnyItems ? (
+                  <p className="text-center text-gray-400 py-10">No items in this category.</p>
+                ) : (
+                  <div className="space-y-6">
+                    {hasDirectItems && (
+                      <div>
+                        {visibleSubcategories.length > 0 && (
+                          <h3 className="text-sm font-semibold text-gray-700 mb-3">Other items</h3>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {category.items.map(renderItemCard)}
+                        </div>
+                      </div>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                      {subcategory.items.map(renderItemCard)}
-                    </div>
+
+                    {visibleSubcategories.map((subcategory) => (
+                      <div key={subcategory.id}>
+                        <h3 className="text-sm font-semibold text-gray-800">{subcategory.name}</h3>
+                        {subcategory.description && (
+                          <p className="text-xs text-gray-500 mt-1 mb-3">
+                            {subcategory.description}
+                          </p>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                          {subcategory.items.map(renderItemCard)}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
+                )}
+              </section>
+            );
+          })
         )}
       </main>
 

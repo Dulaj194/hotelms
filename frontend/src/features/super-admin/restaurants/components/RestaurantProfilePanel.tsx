@@ -141,6 +141,30 @@ export function RestaurantProfilePanel({
                 }
               />
             </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Public Menu Featured Banner URLs</label>
+              <textarea
+                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                rows={4}
+                value={(editForm.public_menu_banner_urls ?? []).join("\n")}
+                onChange={(event) =>
+                  onStartEditChange({
+                    ...editForm,
+                    public_menu_banner_urls: Array.from(
+                      new Set(
+                        event.target.value
+                          .split(/\r?\n/)
+                          .map((line) => line.trim())
+                          .filter(Boolean),
+                      ),
+                    ),
+                  })
+                }
+              />
+              <p className="text-xs text-slate-500">
+                Add one image URL per line. Guest menu rotates configured banners every 1 minute.
+              </p>
+            </div>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
                 type="checkbox"
@@ -228,6 +252,14 @@ export function RestaurantProfilePanel({
               <InfoItem label="Email" value={selected.email} />
               <InfoItem label="Phone" value={selected.phone} />
               <InfoItem label="Hotel Status" value={selected.is_active ? "Active" : "Inactive"} />
+              <InfoItem
+                label="Menu Banners"
+                value={
+                  selected.public_menu_banner_urls.length > 0
+                    ? `${selected.public_menu_banner_urls.length} configured`
+                    : "Not configured"
+                }
+              />
               <div className="col-span-2">
                 <InfoItem label="Address" value={selected.address} />
               </div>

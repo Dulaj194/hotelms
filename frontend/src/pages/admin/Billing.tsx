@@ -368,20 +368,22 @@ export default function Billing() {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {TABS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setTab(item.id);
-                    if (item.id === "folios") resetState();
-                  }}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold ${tab === item.id ? "bg-white text-slate-900" : "bg-white/10 text-white hover:bg-white/15"}`}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="w-full overflow-x-auto pb-1 lg:w-auto">
+              <div className="flex min-w-max gap-2">
+                {TABS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setTab(item.id);
+                      if (item.id === "folios") resetState();
+                    }}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold ${tab === item.id ? "bg-white text-slate-900" : "bg-white/10 text-white hover:bg-white/15"}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -547,13 +549,15 @@ export default function Billing() {
                   <h2 className="app-section-title text-slate-900">Room Folio Queue</h2>
                   <p className="app-muted-text text-slate-500">Review settled room invoices, print again, and move them through cashier and accountant checkpoints.</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {FILTERS.map((item) => (
-                    <button key={item.value} type="button" onClick={() => setFilter(item.value)} className={`rounded-full px-4 py-2 text-sm font-semibold ${filter === item.value ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-                      {item.label}
-                    </button>
-                  ))}
-                  <button type="button" onClick={() => void loadFolios()} className="app-btn-base rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Refresh</button>
+                <div className="w-full overflow-x-auto pb-1 lg:w-auto">
+                  <div className="flex min-w-max gap-2">
+                    {FILTERS.map((item) => (
+                      <button key={item.value} type="button" onClick={() => setFilter(item.value)} className={`rounded-full px-4 py-2 text-sm font-semibold ${filter === item.value ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                        {item.label}
+                      </button>
+                    ))}
+                    <button type="button" onClick={() => void loadFolios()} className="app-btn-base rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Refresh</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -576,7 +580,11 @@ export default function Billing() {
                     bill={bill}
                     role={role}
                     busy={folioActionId === bill.id}
-                    onOpen={() => void (setTab("room"), setRoomLookup(bill.session_id), loadSummary("room", bill.session_id))}
+                    onOpen={() => {
+                      setTab("room");
+                      setRoomLookup(bill.session_id);
+                      void loadSummary("room", bill.session_id);
+                    }}
                     onPrint={() =>
                       void api
                         .post(`/billing/folios/${bill.id}/print`, {})
