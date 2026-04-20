@@ -93,7 +93,7 @@ export default function CartDrawer({
             cart.items.map((item) => (
               <div
                 key={item.item_id}
-                className="p-3 rounded-lg border space-y-2"
+                className="p-2 rounded-lg border space-y-1.5"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -131,24 +131,24 @@ export default function CartDrawer({
 
                 <div className="flex items-center justify-between gap-2">
                   {/* Quantity controls */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() =>
                         item.quantity > 1
                           ? onUpdateItem(item.item_id, item.quantity - 1)
                           : onRemoveItem(item.item_id)
                       }
-                      className="w-6 h-6 flex items-center justify-center rounded border hover:bg-gray-100 transition-colors text-xs font-medium"
+                      className="w-5 h-5 flex items-center justify-center rounded border hover:bg-gray-100 transition-colors text-[11px] font-medium"
                       aria-label="Decrease quantity"
                     >
                       −
                     </button>
-                    <span className="w-5 text-center text-xs font-medium">
+                    <span className="w-4 text-center text-[11px] font-medium">
                       {item.quantity}
                     </span>
                     <button
                       onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
-                      className="w-6 h-6 flex items-center justify-center rounded border hover:bg-gray-100 transition-colors text-xs font-medium"
+                      className="w-5 h-5 flex items-center justify-center rounded border hover:bg-gray-100 transition-colors text-[11px] font-medium"
                       aria-label="Increase quantity"
                     >
                       +
@@ -156,7 +156,7 @@ export default function CartDrawer({
                   </div>
 
                   {/* Line total */}
-                  <div className="text-sm font-semibold">
+                  <div className="text-xs font-semibold">
                     ${item.line_total.toFixed(2)}
                   </div>
                 </div>

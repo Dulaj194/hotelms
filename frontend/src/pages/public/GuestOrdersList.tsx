@@ -28,13 +28,23 @@ const TAB_LABEL: Record<OrdersFilterTab, string> = {
   canceled: "Canceled",
 };
 
+class HttpStatusError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "HttpStatusError";
+    this.status = status;
+  }
+}
+
 async function fetchGuestOrdersList(): Promise<{ orders: OrderHeaderResponse[]; total: number }> {
   const token = getGuestToken();
   const response = await fetch(`${BASE_URL}/orders/my`, {
     headers: token ? { "X-Guest-Session": token } : {},
   });
   if (!response.ok) {
-    throw new Error(`Failed to load orders — ${response.status}`);
+    throw new HttpStatusError(response.status, `Failed to load orders — ${response.status}`);
   }
   return response.json();
 }
@@ -65,16 +75,58 @@ export default function GuestOrdersList() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<OrdersFilterTab>("active");
 
+  const restoreGuestSession = useCallback(async (): Promise<boolean> => {
+    if (!restaurantId || !tableNumber || !effectiveQrAccessKey || !guestName) {
+      return false;
+    }
+
+    try {
+      const session = await publicPost<TableSessionStartResponse>(
+        "/table-sessions/start",
+        {
+          restaurant_id: Number(restaurantId),
+          table_number: tableNumber,
+          customer_name: guestName,
+          qr_access_key: effectiveQrAccessKey,
+        },
+      );
+      setGuestSession(session);
+      setSessionReady(true);
+      setError(null);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [effectiveQrAccessKey, guestName, restaurantId, tableNumber]);
+
   const load = useCallback(async () => {
+    setError(null);
     try {
       const data = await fetchGuestOrdersList();
       setOrders(data.orders);
     } catch (err) {
+      if (err instanceof HttpStatusError && err.status === 401) {
+        const restored = await restoreGuestSession();
+        if (restored) {
+          try {
+            const retried = await fetchGuestOrdersList();
+            setOrders(retried.orders);
+            return;
+          } catch (retryErr) {
+            setError(retryErr instanceof Error ? retryErr.message : "Could not load orders.");
+            return;
+          }
+        }
+
+        setError("Guest session expired. Please scan the table QR code again.");
+        return;
+      }
+
       setError(err instanceof Error ? err.message : "Could not load orders.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [restoreGuestSession]);
 
   useEffect(() => {
     if (getGuestToken()) {
@@ -88,25 +140,14 @@ export default function GuestOrdersList() {
     }
 
     const restoreSession = async () => {
-      try {
-        const session = await publicPost<TableSessionStartResponse>(
-          "/table-sessions/start",
-          {
-            restaurant_id: Number(restaurantId),
-            table_number: tableNumber,
-            customer_name: guestName,
-            qr_access_key: effectiveQrAccessKey,
-          },
-        );
-        setGuestSession(session);
-        setSessionReady(true);
-      } catch {
+      const restored = await restoreGuestSession();
+      if (!restored) {
         setError("Could not restore the table session. Please scan the QR code again.");
       }
     };
 
     void restoreSession();
-  }, [effectiveQrAccessKey, guestName, restaurantId, tableNumber]);
+  }, [effectiveQrAccessKey, guestName, restaurantId, restoreGuestSession, tableNumber]);
 
   // Initial load
   useEffect(() => {

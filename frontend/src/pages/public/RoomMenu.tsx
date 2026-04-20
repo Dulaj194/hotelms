@@ -12,6 +12,7 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
@@ -166,7 +167,7 @@ function RoomCartDrawer({
                 cart.items.map((item) => (
                   <div
                     key={item.item_id}
-                    className="p-3 rounded-lg border space-y-2"
+                    className="p-2 rounded-lg border space-y-1.5"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -204,26 +205,26 @@ function RoomCartDrawer({
 
                     <div className="flex items-center justify-between gap-2">
                       {/* Quantity controls */}
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
                         <button
                           onClick={() =>
                             item.quantity > 1
                               ? onUpdateItem(item.item_id, item.quantity - 1)
                               : onRemoveItem(item.item_id)
                           }
-                          className="w-6 h-6 flex items-center justify-center rounded border
-                                     hover:bg-gray-100 text-xs font-medium"
+                          className="w-5 h-5 flex items-center justify-center rounded border
+                                     hover:bg-gray-100 text-[11px] font-medium"
                           aria-label="Decrease"
                         >
                           -
                         </button>
-                        <span className="w-5 text-center text-xs font-medium">
+                        <span className="w-4 text-center text-[11px] font-medium">
                           {item.quantity}
                         </span>
                         <button
                           onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
-                          className="w-6 h-6 flex items-center justify-center rounded border
-                                     hover:bg-gray-100 text-xs font-medium"
+                          className="w-5 h-5 flex items-center justify-center rounded border
+                                     hover:bg-gray-100 text-[11px] font-medium"
                           aria-label="Increase"
                         >
                           +
@@ -231,7 +232,7 @@ function RoomCartDrawer({
                       </div>
 
                       {/* Line total */}
-                      <div className="text-sm font-semibold">
+                      <div className="text-xs font-semibold">
                         ${item.line_total.toFixed(2)}
                       </div>
                     </div>
@@ -415,6 +416,7 @@ export default function RoomMenu() {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
+    const metaLabel = item.description ?? "";
 
     return (
       <div
@@ -430,11 +432,13 @@ export default function RoomMenu() {
             className="w-full h-36 object-cover"
           />
         )}
-        <div className="p-3 flex flex-col gap-3 flex-1">
-          <div className="space-y-1">
-            <p className="font-semibold text-sm">{item.name}</p>
-            {item.description && (
-              <p className="text-xs text-gray-500 line-clamp-2">{item.description}</p>
+        <div className="p-3 flex flex-col gap-2 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
+            {metaLabel && (
+              <span className="max-w-[40%] truncate text-right text-[11px] text-gray-400">
+                {metaLabel}
+              </span>
             )}
           </div>
 
@@ -443,11 +447,11 @@ export default function RoomMenu() {
               ${item.price.toFixed(2)}
             </span>
             {item.is_available ? (
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">
+              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
                 Available
               </span>
             ) : (
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
                 Sold out
               </span>
             )}
@@ -461,8 +465,7 @@ export default function RoomMenu() {
                     ? updateItem(item.id, qtyInCart - 1)
                     : removeItem(item.id)
                 }
-                className="w-8 h-8 flex items-center justify-center rounded-full border
-                           hover:bg-gray-100 transition-colors text-sm font-bold"
+                className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold text-gray-600 transition-colors hover:bg-white"
                 aria-label="Decrease"
               >
                 -
@@ -470,9 +473,7 @@ export default function RoomMenu() {
               <span className="text-sm font-semibold w-6 text-center">{qtyInCart}</span>
               <button
                 onClick={() => updateItem(item.id, qtyInCart + 1)}
-                className="w-8 h-8 flex items-center justify-center rounded-full
-                           bg-orange-500 text-white hover:bg-orange-600 transition-colors
-                           text-sm font-bold"
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors text-xs font-bold"
                 aria-label="Increase"
               >
                 +
@@ -482,9 +483,10 @@ export default function RoomMenu() {
             <button
               disabled={isAdding || !sessionReady}
               onClick={() => handleAddToCart(item.id)}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-[11px] font-semibold text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
             >
               {isAdding ? "Adding..." : "Add to Cart"}
+              {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
             </button>
           )}
         </div>
