@@ -93,69 +93,73 @@ export default function CartDrawer({
             cart.items.map((item) => (
               <div
                 key={item.item_id}
-                className="flex items-start gap-3 p-3 rounded-lg border"
+                className="p-3 rounded-lg border space-y-2"
               >
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{item.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    ${item.unit_price.toFixed(2)} each
-                  </p>
-                  {!item.is_available && (
-                    <p className="text-xs text-red-500 mt-0.5">Unavailable</p>
-                  )}
-                </div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm break-words">{item.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      ${item.unit_price.toFixed(2)} each
+                    </p>
+                    {!item.is_available && (
+                      <p className="text-xs text-red-500 mt-0.5">Unavailable</p>
+                    )}
+                  </div>
 
-                {/* Quantity controls */}
-                <div className="flex items-center gap-2">
+                  {/* Remove button */}
                   <button
-                    onClick={() =>
-                      item.quantity > 1
-                        ? onUpdateItem(item.item_id, item.quantity - 1)
-                        : onRemoveItem(item.item_id)
-                    }
-                    className="w-7 h-7 flex items-center justify-center rounded-full border hover:bg-gray-100 transition-colors text-sm font-medium"
-                    aria-label="Decrease quantity"
+                    onClick={() => onRemoveItem(item.item_id)}
+                    className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                    aria-label={`Remove ${item.name}`}
                   >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-medium">
-                    {item.quantity}
-                  </span>
-                  <button
-                    onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
-                    className="w-7 h-7 flex items-center justify-center rounded-full border hover:bg-gray-100 transition-colors text-sm font-medium"
-                    aria-label="Increase quantity"
-                  >
-                    +
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
                   </button>
                 </div>
 
-                {/* Line total */}
-                <div className="text-sm font-semibold w-16 text-right">
-                  ${item.line_total.toFixed(2)}
-                </div>
+                <div className="flex items-center justify-between gap-2">
+                  {/* Quantity controls */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() =>
+                        item.quantity > 1
+                          ? onUpdateItem(item.item_id, item.quantity - 1)
+                          : onRemoveItem(item.item_id)
+                      }
+                      className="w-6 h-6 flex items-center justify-center rounded border hover:bg-gray-100 transition-colors text-xs font-medium"
+                      aria-label="Decrease quantity"
+                    >
+                      −
+                    </button>
+                    <span className="w-5 text-center text-xs font-medium">
+                      {item.quantity}
+                    </span>
+                    <button
+                      onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
+                      className="w-6 h-6 flex items-center justify-center rounded border hover:bg-gray-100 transition-colors text-xs font-medium"
+                      aria-label="Increase quantity"
+                    >
+                      +
+                    </button>
+                  </div>
 
-                {/* Remove */}
-                <button
-                  onClick={() => onRemoveItem(item.item_id)}
-                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                  aria-label={`Remove ${item.name}`}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                </button>
+                  {/* Line total */}
+                  <div className="text-sm font-semibold">
+                    ${item.line_total.toFixed(2)}
+                  </div>
+                </div>
               </div>
             ))
           )}

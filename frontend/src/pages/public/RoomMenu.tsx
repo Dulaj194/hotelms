@@ -166,68 +166,75 @@ function RoomCartDrawer({
                 cart.items.map((item) => (
                   <div
                     key={item.item_id}
-                    className="flex items-start gap-3 p-3 rounded-lg border"
+                    className="p-3 rounded-lg border space-y-2"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{item.name}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        ${item.unit_price.toFixed(2)} each
-                      </p>
-                      {!item.is_available && (
-                        <p className="text-xs text-red-500 mt-0.5">Unavailable</p>
-                      )}
-                    </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm break-words">{item.name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          ${item.unit_price.toFixed(2)} each
+                        </p>
+                        {!item.is_available && (
+                          <p className="text-xs text-red-500 mt-0.5">Unavailable</p>
+                        )}
+                      </div>
 
-                    <div className="flex items-center gap-2">
+                      {/* Remove button */}
                       <button
-                        onClick={() =>
-                          item.quantity > 1
-                            ? onUpdateItem(item.item_id, item.quantity - 1)
-                            : onRemoveItem(item.item_id)
-                        }
-                        className="w-7 h-7 flex items-center justify-center rounded-full border
-                                   hover:bg-gray-100 text-sm font-medium"
-                        aria-label="Decrease"
+                        onClick={() => onRemoveItem(item.item_id)}
+                        className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                        aria-label={`Remove ${item.name}`}
                       >
-                        -
-                      </button>
-                      <span className="w-6 text-center text-sm font-medium">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
-                        className="w-7 h-7 flex items-center justify-center rounded-full border
-                                   hover:bg-gray-100 text-sm font-medium"
-                        aria-label="Increase"
-                      >
-                        +
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
                       </button>
                     </div>
 
-                    <div className="text-sm font-semibold w-16 text-right">
-                      ${item.line_total.toFixed(2)}
-                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      {/* Quantity controls */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() =>
+                            item.quantity > 1
+                              ? onUpdateItem(item.item_id, item.quantity - 1)
+                              : onRemoveItem(item.item_id)
+                          }
+                          className="w-6 h-6 flex items-center justify-center rounded border
+                                     hover:bg-gray-100 text-xs font-medium"
+                          aria-label="Decrease"
+                        >
+                          -
+                        </button>
+                        <span className="w-5 text-center text-xs font-medium">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
+                          className="w-6 h-6 flex items-center justify-center rounded border
+                                     hover:bg-gray-100 text-xs font-medium"
+                          aria-label="Increase"
+                        >
+                          +
+                        </button>
+                      </div>
 
-                    <button
-                      onClick={() => onRemoveItem(item.item_id)}
-                      className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                      aria-label={`Remove ${item.name}`}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                    </button>
+                      {/* Line total */}
+                      <div className="text-sm font-semibold">
+                        ${item.line_total.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
@@ -423,62 +430,63 @@ export default function RoomMenu() {
             className="w-full h-36 object-cover"
           />
         )}
-        <div className="p-3 flex flex-col gap-2 flex-1">
-          <div className="flex-1">
+        <div className="p-3 flex flex-col gap-3 flex-1">
+          <div className="space-y-1">
             <p className="font-semibold text-sm">{item.name}</p>
             {item.description && (
-              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                {item.description}
-              </p>
+              <p className="text-xs text-gray-500 line-clamp-2">{item.description}</p>
             )}
           </div>
 
-          <div className="flex items-center justify-between mt-1">
+          <div className="flex items-center justify-between">
             <span className="font-bold text-sm text-orange-600">
               ${item.price.toFixed(2)}
             </span>
-
-            {!item.is_available ? (
-              <span className="text-xs text-gray-400">Unavailable</span>
-            ) : qtyInCart > 0 ? (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() =>
-                    qtyInCart > 1
-                      ? updateItem(item.id, qtyInCart - 1)
-                      : removeItem(item.id)
-                  }
-                  className="w-7 h-7 flex items-center justify-center rounded-full border
-                             hover:bg-gray-100 transition-colors text-sm font-bold"
-                  aria-label="Decrease"
-                >
-                  -
-                </button>
-                <span className="text-sm font-semibold w-5 text-center">
-                  {qtyInCart}
-                </span>
-                <button
-                  onClick={() => updateItem(item.id, qtyInCart + 1)}
-                  className="w-7 h-7 flex items-center justify-center rounded-full
-                             bg-orange-500 text-white hover:bg-orange-600 transition-colors
-                             text-sm font-bold"
-                  aria-label="Increase"
-                >
-                  +
-                </button>
-              </div>
+            {item.is_available ? (
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">
+                Available
+              </span>
             ) : (
-              <button
-                disabled={isAdding || !sessionReady}
-                onClick={() => handleAddToCart(item.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white
-                           rounded-full text-xs font-semibold hover:bg-orange-600
-                           transition-colors disabled:opacity-50"
-              >
-                {isAdding ? "Adding..." : "+ Add"}
-              </button>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                Sold out
+              </span>
             )}
           </div>
+
+          {qtyInCart > 0 ? (
+            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
+              <button
+                onClick={() =>
+                  qtyInCart > 1
+                    ? updateItem(item.id, qtyInCart - 1)
+                    : removeItem(item.id)
+                }
+                className="w-8 h-8 flex items-center justify-center rounded-full border
+                           hover:bg-gray-100 transition-colors text-sm font-bold"
+                aria-label="Decrease"
+              >
+                -
+              </button>
+              <span className="text-sm font-semibold w-6 text-center">{qtyInCart}</span>
+              <button
+                onClick={() => updateItem(item.id, qtyInCart + 1)}
+                className="w-8 h-8 flex items-center justify-center rounded-full
+                           bg-orange-500 text-white hover:bg-orange-600 transition-colors
+                           text-sm font-bold"
+                aria-label="Increase"
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <button
+              disabled={isAdding || !sessionReady}
+              onClick={() => handleAddToCart(item.id)}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-4 py-2 text-xs font-semibold text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
+            >
+              {isAdding ? "Adding..." : "Add to Cart"}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -587,7 +595,7 @@ export default function RoomMenu() {
                         {visibleSubcategories.length > 0 && (
                           <h3 className="text-sm font-semibold text-gray-700 mb-3">Other items</h3>
                         )}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                           {category.items.map(renderItemCard)}
                         </div>
                       </div>
@@ -601,7 +609,7 @@ export default function RoomMenu() {
                             {subcategory.description}
                           </p>
                         )}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                        <div className="grid grid-cols-2 gap-3 mt-3">
                           {subcategory.items.map(renderItemCard)}
                         </div>
                       </div>
