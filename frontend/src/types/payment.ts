@@ -1,6 +1,6 @@
 // Payment domain TypeScript types — mirrors payments/schemas.py (backend)
 
-export type PaymentStatus = "pending" | "paid" | "failed";
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "voided" | "reversed";
 export type BillingTransactionStatus = "pending" | "paid" | "failed" | "cancelled";
 export type BillingTransactionType = "subscription_purchase";
 

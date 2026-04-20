@@ -126,6 +126,36 @@ def update_payments_for_settlement(
     return payments
 
 
+def mark_payments_status_by_order_ids(
+    db: Session,
+    *,
+    order_ids: list[int],
+    restaurant_id: int,
+    payment_status: PaymentStatus,
+    notes: str | None = None,
+) -> list[Payment]:
+    """Bulk-update payment lifecycle state for refund/void/reversal flows."""
+    if not order_ids:
+        return []
+
+    payments = (
+        db.query(Payment)
+        .filter(
+            Payment.order_id.in_(order_ids),
+            Payment.restaurant_id == restaurant_id,
+        )
+        .all()
+    )
+
+    for payment in payments:
+        payment.payment_status = payment_status
+        if notes:
+            payment.notes = notes
+
+    db.flush()
+    return payments
+
+
 def create_billing_transaction(
     db: Session,
     *,

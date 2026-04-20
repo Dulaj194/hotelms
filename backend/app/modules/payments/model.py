@@ -19,6 +19,9 @@ class PaymentStatus(str, enum.Enum):
     pending = "pending"
     paid = "paid"
     failed = "failed"
+    refunded = "refunded"
+    voided = "voided"
+    reversed = "reversed"
 
 
 class BillingTransactionStatus(str, enum.Enum):

@@ -4,11 +4,12 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.modules.billing.model import (
     BillContextType,
     BillHandoffStatus,
+    BillPaymentAllocationStatus,
     BillReviewStatus,
     BillStatus,
 )
@@ -43,11 +44,16 @@ class BillRecordResponse(BaseModel):
     table_number: str | None
     room_id: int | None
     room_number: str | None
+    subtotal_amount: float
+    tax_amount: float
+    discount_amount: float
     total_amount: float
     payment_method: str | None
     payment_status: BillStatus
     transaction_reference: str | None
     notes: str | None
+    reversed_at: datetime | None = None
+    reversal_reason: str | None = None
     handoff_status: BillHandoffStatus
     sent_to_cashier_at: datetime | None
     sent_to_accountant_at: datetime | None
@@ -82,9 +88,72 @@ class BillSummaryResponse(BaseModel):
 
 
 class SettleSessionRequest(BaseModel):
-    payment_method: Literal["cash", "card", "manual"]
+    payment_method: Literal["cash", "card", "manual"] | None = None
     transaction_reference: str | None = Field(default=None, max_length=255)
     notes: str | None = Field(default=None, max_length=1000)
+    paid_amount: float | None = Field(default=None, gt=0)
+    tax_rule_mode: Literal["none", "percentage", "fixed"] = "none"
+    tax_rule_value: float = Field(default=0, ge=0)
+    discount_rule_mode: Literal["none", "percentage", "fixed"] = "none"
+    discount_rule_value: float = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def validate_adjustment_rules(self) -> "SettleSessionRequest":
+        if self.tax_rule_mode == "none" and self.tax_rule_value != 0:
+            raise ValueError("tax_rule_value must be 0 when tax_rule_mode is 'none'.")
+        if self.discount_rule_mode == "none" and self.discount_rule_value != 0:
+            raise ValueError("discount_rule_value must be 0 when discount_rule_mode is 'none'.")
+        if self.tax_rule_mode != "none" and self.tax_rule_value <= 0:
+            raise ValueError("tax_rule_value must be greater than 0 when a tax rule is enabled.")
+        if self.discount_rule_mode != "none" and self.discount_rule_value <= 0:
+            raise ValueError("discount_rule_value must be greater than 0 when a discount rule is enabled.")
+        if self.payment_method is None:
+            raise ValueError("payment_method is required.")
+        return self
+
+
+class SettlementSplitPaymentRequest(BaseModel):
+    payment_method: Literal["cash", "card", "manual"]
+    amount: float = Field(..., gt=0)
+    transaction_reference: str | None = Field(default=None, max_length=255)
+    gateway_provider: Literal["stripe"] | None = None
+    gateway_payment_intent_id: str | None = Field(default=None, max_length=255)
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def validate_gateway_fields(self) -> "SettlementSplitPaymentRequest":
+        if self.gateway_provider is None and self.gateway_payment_intent_id is not None:
+            raise ValueError("gateway_provider is required when gateway_payment_intent_id is provided.")
+        if self.gateway_provider is not None and self.payment_method != "card":
+            raise ValueError("gateway-backed split payments are only supported for card method.")
+        if self.gateway_provider == "stripe" and not self.gateway_payment_intent_id:
+            raise ValueError("gateway_payment_intent_id is required for stripe gateway settlements.")
+        return self
+
+
+class SettleSessionSplitRequest(SettleSessionRequest):
+    payments: list[SettlementSplitPaymentRequest] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_splits(self) -> "SettleSessionSplitRequest":
+        if not self.payments:
+            return self
+        total = round(sum(float(payment.amount) for payment in self.payments), 2)
+        if self.paid_amount is not None and round(float(self.paid_amount), 2) != total:
+            raise ValueError("paid_amount must equal the sum of split payment amounts.")
+        return self
+
+
+class BillPaymentAllocationResponse(BaseModel):
+    id: int
+    payment_method: str
+    amount: float
+    transaction_reference: str | None
+    gateway_provider: str | None
+    gateway_payment_intent_id: str | None
+    allocation_status: BillPaymentAllocationStatus
+    notes: str | None
+    created_at: datetime
 
 
 class SettleSessionResponse(BaseModel):
@@ -97,10 +166,15 @@ class SettleSessionResponse(BaseModel):
     room_number: str | None
     order_count: int
     total_amount: float
+    paid_amount: float
+    remaining_amount: float
     payment_method: str
     payment_status: BillStatus
     handoff_status: BillHandoffStatus
     settled_at: datetime
+    is_partial: bool
+    idempotent_replay: bool = False
+    allocations: list[BillPaymentAllocationResponse] = Field(default_factory=list)
     session_closed: bool
 
 
@@ -161,11 +235,18 @@ class BillWorkflowEventListResponse(BaseModel):
 class BillDetailResponse(BillSummaryResponse):
     payments: list[PaymentResponse]
     payment_count: int
+    allocations: list[BillPaymentAllocationResponse] = Field(default_factory=list)
     events: list[BillWorkflowEventResponse]
 
 
 class BillWorkflowActionRequest(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
+
+
+class ReverseBillRequest(BaseModel):
+    mode: Literal["refund", "void", "reversal"]
+    reason: str = Field(..., min_length=3, max_length=1000)
+    reopen_session: bool = True
 
 
 class BillingQueueSummaryResponse(BaseModel):

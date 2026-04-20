@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date
 
 import redis as redis_lib
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import (
@@ -24,11 +24,12 @@ from app.modules.billing.schemas import (
     BillingQueueSummaryResponse,
     BillingReconciliationResponse,
     BillSummaryResponse,
+    ReverseBillRequest,
     BillWorkflowActionRequest,
     BillWorkflowEventListResponse,
     SessionBillingStatusResponse,
     SessionPaymentHistoryResponse,
-    SettleSessionRequest,
+    SettleSessionSplitRequest,
     SettleSessionResponse,
 )
 
@@ -65,7 +66,8 @@ def get_bill_summary(
 )
 def settle_session(
     session_id: str,
-    payload: SettleSessionRequest,
+    payload: SettleSessionSplitRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
     restaurant_id: int = Depends(get_current_restaurant_id),
@@ -79,6 +81,7 @@ def settle_session(
         payload,
         current_user=current_user,
         r=r,
+        idempotency_key=idempotency_key,
     )
 
 
@@ -134,7 +137,8 @@ def get_room_bill_summary(
 )
 def settle_room_session(
     lookup: str,
-    payload: SettleSessionRequest,
+    payload: SettleSessionSplitRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
     restaurant_id: int = Depends(get_current_restaurant_id),
@@ -148,6 +152,7 @@ def settle_room_session(
         payload,
         current_user=current_user,
         r=r,
+        idempotency_key=idempotency_key,
     )
 
 
@@ -512,5 +517,29 @@ def reopen_room_folio(
         restaurant_id=restaurant_id,
         current_user=current_user,
         note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/reverse",
+    response_model=BillRecordResponse,
+    summary="Reverse/void/refund a bill and reopen operational context",
+)
+def reverse_bill(
+    bill_id: int,
+    payload: ReverseBillRequest,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.reverse_bill(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        payload=payload,
+        current_user=current_user,
         r=r,
     )

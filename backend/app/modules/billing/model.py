@@ -23,7 +23,11 @@ from app.db.base import Base
 
 class BillStatus(str, enum.Enum):
     pending = "pending"
+    partially_paid = "partially_paid"
     paid = "paid"
+    refunded = "refunded"
+    voided = "voided"
+    reversed = "reversed"
 
 
 class BillContextType(str, enum.Enum):
@@ -43,6 +47,19 @@ class BillReviewStatus(str, enum.Enum):
     pending = "pending"
     accepted = "accepted"
     rejected = "rejected"
+
+
+class BillPaymentAllocationStatus(str, enum.Enum):
+    captured = "captured"
+    refunded = "refunded"
+    voided = "voided"
+    reversed = "reversed"
+
+
+class BillSettleIdempotencyStatus(str, enum.Enum):
+    pending = "pending"
+    completed = "completed"
+    failed = "failed"
 
 
 def _gen_bill_number() -> str:
@@ -105,6 +122,8 @@ class Bill(Base):
 
     transaction_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reversal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     handoff_status: Mapped[BillHandoffStatus] = mapped_column(
         Enum(BillHandoffStatus),
@@ -189,4 +208,99 @@ class BillWorkflowEvent(Base):
         server_default=func.now(),
         nullable=False,
         index=True,
+    )
+
+
+class BillPaymentAllocation(Base):
+    __tablename__ = "bill_payment_allocations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    bill_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("bills.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    restaurant_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    payment_method: Mapped[str] = mapped_column(String(50), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    transaction_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    gateway_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    gateway_payment_intent_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    allocation_status: Mapped[BillPaymentAllocationStatus] = mapped_column(
+        Enum(BillPaymentAllocationStatus, native_enum=False),
+        nullable=False,
+        default=BillPaymentAllocationStatus.captured,
+        server_default=BillPaymentAllocationStatus.captured.value,
+        index=True,
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class BillSettleIdempotencyKey(Base):
+    __tablename__ = "bill_settle_idempotency_keys"
+    __table_args__ = (
+        UniqueConstraint(
+            "restaurant_id",
+            "operation",
+            "idempotency_key",
+            name="uq_bill_settle_idempotency",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    operation: Mapped[str] = mapped_column(String(32), nullable=False, default="settle")
+    idempotency_key: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    context_type: Mapped[BillContextType] = mapped_column(
+        Enum(BillContextType, native_enum=False),
+        nullable=False,
+    )
+    context_lookup: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    settle_status: Mapped[BillSettleIdempotencyStatus] = mapped_column(
+        Enum(BillSettleIdempotencyStatus, native_enum=False),
+        nullable=False,
+        default=BillSettleIdempotencyStatus.pending,
+        server_default=BillSettleIdempotencyStatus.pending.value,
+        index=True,
+    )
+    bill_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("bills.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )

@@ -345,3 +345,35 @@ def mark_orders_paid_by_ids(
         )
     )
     db.flush()
+
+
+def mark_orders_completed_by_ids(
+    db: Session,
+    *,
+    order_ids: list[int],
+    restaurant_id: int,
+    completed_at: datetime,
+) -> None:
+    """Bulk-update order statuses back to completed and clear paid_at.
+
+    Used by billing reversal flows (refund/void/reversal) to reopen
+    previously paid orders for reconciliation-safe recovery.
+    """
+    if not order_ids:
+        return
+    (
+        db.query(OrderHeader)
+        .filter(
+            OrderHeader.id.in_(order_ids),
+            OrderHeader.restaurant_id == restaurant_id,
+        )
+        .update(
+            {
+                OrderHeader.status: OrderStatus.completed,
+                OrderHeader.completed_at: completed_at,
+                OrderHeader.paid_at: None,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.flush()

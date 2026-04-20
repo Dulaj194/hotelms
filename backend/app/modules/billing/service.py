@@ -1,6 +1,7 @@
 """Billing service for table settlements, room folios, and workflow dashboards."""
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, date, datetime, time
 from typing import Any
@@ -11,12 +12,15 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.modules.billing import repository as billing_repo
 from app.modules.billing.model import (
     Bill,
     BillContextType,
     BillHandoffStatus,
+    BillPaymentAllocationStatus,
     BillReviewStatus,
+    BillSettleIdempotencyStatus,
     BillStatus,
     BillWorkflowEvent,
 )
@@ -25,30 +29,35 @@ from app.modules.billing.schemas import (
     BillListResponse,
     BillOrderItemResponse,
     BillOrderResponse,
+    BillPaymentAllocationResponse,
     BillRecordResponse,
     BillingActorResponse,
     BillingQueueSummaryResponse,
     BillingReconciliationPaymentMethodResponse,
     BillingReconciliationResponse,
+    ReverseBillRequest,
     BillSummaryResponse,
     BillWorkflowEventListResponse,
     BillWorkflowEventResponse,
     SessionBillingStatusResponse,
     SessionPaymentHistoryResponse,
-    SettleSessionRequest,
+    SettleSessionSplitRequest,
     SettleSessionResponse,
 )
 from app.modules.orders import repository as order_repo
 from app.modules.orders.model import OrderStatus
 from app.modules.payments import repository as payment_repo
+from app.modules.payments.model import PaymentStatus
 from app.modules.payments.schemas import PaymentResponse
 from app.modules.realtime.repository import get_billing_channel, publish_global_event
 from app.modules.room_sessions import repository as room_session_repo
 from app.modules.table_sessions import repository as table_session_repo
+from app.modules.table_sessions.model import TableSessionStatus
 from app.modules.users.model import User
 
 _RECENT_COMPLETED_LIMIT = 10
 _EVENT_LIMIT = 200
+_SETTLE_IDEMPOTENCY_OPERATION = "settle"
 
 
 def _utcnow() -> datetime:
@@ -83,11 +92,16 @@ def _to_bill_record(bill: Bill) -> BillRecordResponse:
         table_number=bill.table_number,
         room_id=bill.room_id,
         room_number=bill.room_number,
+        subtotal_amount=float(bill.subtotal_amount),
+        tax_amount=float(bill.tax_amount),
+        discount_amount=float(bill.discount_amount),
         total_amount=float(bill.total_amount),
         payment_method=bill.payment_method,
         payment_status=bill.payment_status,
         transaction_reference=bill.transaction_reference,
         notes=bill.notes,
+        reversed_at=bill.reversed_at,
+        reversal_reason=bill.reversal_reason,
         handoff_status=bill.handoff_status,
         sent_to_cashier_at=bill.sent_to_cashier_at,
         sent_to_accountant_at=bill.sent_to_accountant_at,
@@ -227,6 +241,161 @@ def _build_payment_history_response(
         ],
         total=len(payments),
     )
+
+
+def _get_stripe_module() -> Any:
+    try:
+        import stripe
+    except ImportError as exc:  # pragma: no cover - runtime env dependent
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe SDK not installed. Add stripe package to backend dependencies.",
+        ) from exc
+    return stripe
+
+
+def _to_cents(amount: float) -> int:
+    return int(round(float(amount) * 100))
+
+
+def _compute_adjustment_amount(*, base: float, mode: str, value: float) -> float:
+    if mode == "none":
+        return 0.0
+    if mode == "percentage":
+        return round((base * float(value)) / 100.0, 2)
+    if mode == "fixed":
+        return round(min(float(value), base), 2)
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="Unsupported adjustment rule mode.",
+    )
+
+
+def _calculate_totals(subtotal: float, payload: SettleSessionSplitRequest) -> tuple[float, float, float]:
+    tax_amount = _compute_adjustment_amount(
+        base=subtotal,
+        mode=payload.tax_rule_mode,
+        value=payload.tax_rule_value,
+    )
+    discount_amount = _compute_adjustment_amount(
+        base=subtotal,
+        mode=payload.discount_rule_mode,
+        value=payload.discount_rule_value,
+    )
+    total_amount = round(subtotal + tax_amount - discount_amount, 2)
+    if total_amount < 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Discount cannot exceed subtotal plus tax.",
+        )
+    return round(tax_amount, 2), round(discount_amount, 2), total_amount
+
+
+def _normalize_idempotency_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if len(normalized) > 120:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Idempotency key must be 120 characters or fewer.",
+        )
+    return normalized
+
+
+def _settle_payload_fingerprint(
+    *,
+    context_type: BillContextType,
+    session_id: str,
+    payload: SettleSessionSplitRequest,
+) -> str:
+    fingerprint_payload = {
+        "context_type": context_type.value,
+        "session_id": session_id,
+        "payload": payload.model_dump(mode="json", exclude_none=False),
+    }
+    encoded = json.dumps(fingerprint_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _validate_gateway_split(payment: Any) -> str | None:
+    if payment.gateway_provider is None:
+        return payment.transaction_reference
+
+    if payment.gateway_provider != "stripe":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unsupported gateway provider for settlement.",
+        )
+
+    if not settings.stripe_secret_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe is not configured. Missing STRIPE_SECRET_KEY.",
+        )
+
+    stripe = _get_stripe_module()
+    stripe.api_key = settings.stripe_secret_key
+
+    try:
+        payment_intent = stripe.PaymentIntent.retrieve(payment.gateway_payment_intent_id)
+    except Exception as exc:  # pragma: no cover - external dependency
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unable to verify Stripe payment intent.",
+        ) from exc
+
+    intent_status = str(payment_intent.get("status") or "")
+    if intent_status != "succeeded":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Stripe payment intent is not in succeeded status.",
+        )
+
+    amount_received = int(payment_intent.get("amount_received") or payment_intent.get("amount") or 0)
+    if amount_received < _to_cents(float(payment.amount)):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Stripe payment intent amount is lower than requested settlement amount.",
+        )
+
+    intent_currency = str(payment_intent.get("currency") or "").lower()
+    if intent_currency and intent_currency != settings.stripe_currency.lower():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Stripe payment currency does not match configured billing currency.",
+        )
+
+    return str(payment_intent.get("id") or payment.gateway_payment_intent_id)
+
+
+def _build_allocation_responses(
+    db: Session,
+    *,
+    bill_id: int,
+    restaurant_id: int,
+) -> list[BillPaymentAllocationResponse]:
+    allocations = billing_repo.list_bill_payment_allocations(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+    )
+    return [
+        BillPaymentAllocationResponse(
+            id=allocation.id,
+            payment_method=allocation.payment_method,
+            amount=float(allocation.amount),
+            transaction_reference=allocation.transaction_reference,
+            gateway_provider=allocation.gateway_provider,
+            gateway_payment_intent_id=allocation.gateway_payment_intent_id,
+            allocation_status=allocation.allocation_status,
+            notes=allocation.notes,
+            created_at=allocation.created_at,
+        )
+        for allocation in allocations
+    ]
 
 
 def _load_table_session_or_404(db: Session, lookup: str, restaurant_id: int):
@@ -679,6 +848,53 @@ def _commit_bill_workflow(
     return _to_bill_record(bill)
 
 
+def _build_settle_response_from_bill(
+    db: Session,
+    *,
+    bill: Bill,
+    context_type: BillContextType,
+    session_id: str,
+    table_number: str | None,
+    room_id: int | None,
+    room_number: str | None,
+    order_count: int,
+    idempotent_replay: bool,
+    session_closed: bool,
+) -> SettleSessionResponse:
+    paid_amount = billing_repo.sum_captured_allocation_amount(
+        db,
+        bill_id=bill.id,
+        restaurant_id=bill.restaurant_id,
+    )
+    remaining_amount = round(max(float(bill.total_amount) - paid_amount, 0), 2)
+
+    return SettleSessionResponse(
+        bill_id=bill.id,
+        bill_number=bill.bill_number,
+        context_type=context_type,
+        session_id=session_id,
+        table_number=table_number,
+        room_id=room_id,
+        room_number=room_number,
+        order_count=order_count,
+        total_amount=round(float(bill.total_amount), 2),
+        paid_amount=round(paid_amount, 2),
+        remaining_amount=remaining_amount,
+        payment_method=bill.payment_method or "manual",
+        payment_status=bill.payment_status,
+        handoff_status=bill.handoff_status,
+        settled_at=bill.settled_at or _utcnow(),
+        is_partial=bill.payment_status == BillStatus.partially_paid,
+        idempotent_replay=idempotent_replay,
+        allocations=_build_allocation_responses(
+            db,
+            bill_id=bill.id,
+            restaurant_id=bill.restaurant_id,
+        ),
+        session_closed=session_closed,
+    )
+
+
 def _settle_context_session(
     db: Session,
     *,
@@ -688,17 +904,31 @@ def _settle_context_session(
     table_number: str | None,
     room_id: int | None,
     room_number: str | None,
-    payload: SettleSessionRequest,
+    payload: SettleSessionSplitRequest,
     close_session,
     current_user: object | None = None,
     r: redis_lib.Redis | None = None,
+    idempotency_key: str | None = None,
 ) -> SettleSessionResponse:
     existing_bill = billing_repo.get_bill_by_session(db, session_id, restaurant_id)
-    if existing_bill is not None and existing_bill.payment_status == BillStatus.paid:
+    if existing_bill is not None and existing_bill.payment_status in {
+        BillStatus.paid,
+        BillStatus.refunded,
+        BillStatus.voided,
+        BillStatus.reversed,
+    }:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This session has already been settled.",
         )
+
+    normalized_idempotency_key = _normalize_idempotency_key(idempotency_key)
+    request_fingerprint = _settle_payload_fingerprint(
+        context_type=context_type,
+        session_id=session_id,
+        payload=payload,
+    )
+    idempotency_record = None
 
     billable_orders = order_repo.list_billable_orders_by_session(db, session_id, restaurant_id)
     if not billable_orders:
@@ -711,62 +941,251 @@ def _settle_context_session(
         )
 
     subtotal = sum(float(order.total_amount) for order in billable_orders)
-    tax_amount = 0.0
-    discount_amount = 0.0
-    total_amount = subtotal + tax_amount - discount_amount
-    settled_at = _utcnow()
+    if (
+        existing_bill is not None
+        and payload.tax_rule_mode == "none"
+        and payload.tax_rule_value == 0
+        and payload.discount_rule_mode == "none"
+        and payload.discount_rule_value == 0
+    ):
+        tax_amount = round(float(existing_bill.tax_amount), 2)
+        discount_amount = round(float(existing_bill.discount_amount), 2)
+        total_amount = round(subtotal + tax_amount - discount_amount, 2)
+    else:
+        tax_amount, discount_amount, total_amount = _calculate_totals(subtotal, payload)
     order_ids = [order.id for order in billable_orders]
 
+    existing_paid_amount = 0.0
+    if existing_bill is not None:
+        existing_paid_amount = billing_repo.sum_captured_allocation_amount(
+            db,
+            bill_id=existing_bill.id,
+            restaurant_id=restaurant_id,
+        )
+
+    requested_payments = list(getattr(payload, "payments", []) or [])
+    if not requested_payments:
+        fallback_amount = payload.paid_amount
+        if fallback_amount is None:
+            fallback_amount = round(max(total_amount - existing_paid_amount, 0), 2)
+        if float(fallback_amount) > 0:
+            requested_payments = [
+                type("AutoSettlementPayment", (), {
+                    "payment_method": payload.payment_method,
+                    "amount": float(fallback_amount),
+                    "transaction_reference": payload.transaction_reference,
+                    "gateway_provider": None,
+                    "gateway_payment_intent_id": None,
+                    "notes": payload.notes,
+                })()
+            ]
+
+    submitted_amount = round(sum(float(payment.amount) for payment in requested_payments), 2)
+    if payload.paid_amount is not None and submitted_amount != round(float(payload.paid_amount), 2):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="paid_amount must match submitted split payment amount total.",
+        )
+
+    if existing_paid_amount + submitted_amount > total_amount + 0.01:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Submitted settlement amount exceeds remaining balance.",
+        )
+
+    prepared_allocations: list[dict[str, Any]] = []
+    for payment in requested_payments:
+        transaction_reference = _validate_gateway_split(payment)
+        prepared_allocations.append(
+            {
+                "payment_method": payment.payment_method,
+                "amount": round(float(payment.amount), 2),
+                "transaction_reference": transaction_reference,
+                "gateway_provider": payment.gateway_provider,
+                "gateway_payment_intent_id": payment.gateway_payment_intent_id,
+                "notes": payment.notes or payload.notes,
+            }
+        )
+
+    new_paid_amount = round(existing_paid_amount + submitted_amount, 2)
+    should_mark_paid = new_paid_amount >= total_amount - 0.01
+    settled_at = _utcnow()
+    derived_payment_method = payload.payment_method or "manual"
+    if prepared_allocations:
+        unique_methods = {allocation["payment_method"] for allocation in prepared_allocations}
+        derived_payment_method = "split" if len(unique_methods) > 1 else prepared_allocations[0]["payment_method"]
+
+    if normalized_idempotency_key is not None:
+        existing_idempotency = billing_repo.get_settle_idempotency_key(
+            db,
+            restaurant_id=restaurant_id,
+            operation=_SETTLE_IDEMPOTENCY_OPERATION,
+            idempotency_key=normalized_idempotency_key,
+        )
+
+        if existing_idempotency is not None:
+            if existing_idempotency.context_type != context_type or existing_idempotency.context_lookup != session_id:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This idempotency key was used for a different settlement context.",
+                )
+            if existing_idempotency.request_fingerprint != request_fingerprint:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="This idempotency key was already used with a different settlement payload.",
+                )
+            if existing_idempotency.settle_status == BillSettleIdempotencyStatus.pending:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A settlement with this idempotency key is already in progress.",
+                )
+            if (
+                existing_idempotency.settle_status == BillSettleIdempotencyStatus.completed
+                and existing_idempotency.bill_id is not None
+            ):
+                replay_bill = billing_repo.get_bill_by_id(
+                    db,
+                    bill_id=existing_idempotency.bill_id,
+                    restaurant_id=restaurant_id,
+                )
+                if replay_bill is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Idempotent settlement response could not be replayed.",
+                    )
+                order_count = len(
+                    order_repo.list_orders_by_session(
+                        db,
+                        session_id,
+                        restaurant_id,
+                        statuses=[OrderStatus.paid, OrderStatus.completed],
+                    )
+                )
+                return _build_settle_response_from_bill(
+                    db,
+                    bill=replay_bill,
+                    context_type=context_type,
+                    session_id=session_id,
+                    table_number=table_number,
+                    room_id=room_id,
+                    room_number=room_number,
+                    order_count=order_count,
+                    idempotent_replay=True,
+                    session_closed=replay_bill.payment_status == BillStatus.paid,
+                )
+            idempotency_record = billing_repo.update_settle_idempotency_key(
+                db,
+                record=existing_idempotency,
+                settle_status=BillSettleIdempotencyStatus.pending,
+                bill_id=None,
+                last_error=None,
+            )
+        else:
+            idempotency_record = billing_repo.create_settle_idempotency_key(
+                db,
+                restaurant_id=restaurant_id,
+                operation=_SETTLE_IDEMPOTENCY_OPERATION,
+                idempotency_key=normalized_idempotency_key,
+                context_type=context_type,
+                context_lookup=session_id,
+                request_fingerprint=request_fingerprint,
+            )
+
     try:
-        bill = billing_repo.create_bill(
-            db,
-            restaurant_id=restaurant_id,
-            session_id=session_id,
-            context_type=context_type,
-            table_number=table_number,
-            room_id=room_id,
-            room_number=room_number,
-            subtotal_amount=subtotal,
-            tax_amount=tax_amount,
-            discount_amount=discount_amount,
-            total_amount=total_amount,
-            payment_method=payload.payment_method,
-            transaction_reference=payload.transaction_reference,
-            notes=payload.notes,
-        )
+        if existing_bill is None:
+            bill = billing_repo.create_bill(
+                db,
+                restaurant_id=restaurant_id,
+                session_id=session_id,
+                context_type=context_type,
+                table_number=table_number,
+                room_id=room_id,
+                room_number=room_number,
+                subtotal_amount=subtotal,
+                tax_amount=tax_amount,
+                discount_amount=discount_amount,
+                total_amount=total_amount,
+                payment_method=derived_payment_method,
+                transaction_reference=payload.transaction_reference,
+                notes=payload.notes,
+            )
+        else:
+            bill = billing_repo.update_bill_fields(
+                db,
+                bill=existing_bill,
+                subtotal_amount=round(subtotal, 2),
+                tax_amount=round(tax_amount, 2),
+                discount_amount=round(discount_amount, 2),
+                total_amount=round(total_amount, 2),
+                payment_method=derived_payment_method,
+                transaction_reference=payload.transaction_reference or existing_bill.transaction_reference,
+                notes=payload.notes or existing_bill.notes,
+            )
 
-        payment_repo.update_payments_for_settlement(
-            db,
-            order_ids=order_ids,
-            restaurant_id=restaurant_id,
-            payment_method=payload.payment_method,
-            transaction_reference=payload.transaction_reference,
-            notes=payload.notes,
-            paid_at=settled_at,
-        )
+        for allocation in prepared_allocations:
+            billing_repo.create_bill_payment_allocation(
+                db,
+                bill_id=bill.id,
+                restaurant_id=restaurant_id,
+                payment_method=allocation["payment_method"],
+                amount=allocation["amount"],
+                transaction_reference=allocation["transaction_reference"],
+                gateway_provider=allocation["gateway_provider"],
+                gateway_payment_intent_id=allocation["gateway_payment_intent_id"],
+                notes=allocation["notes"],
+            )
 
-        order_repo.mark_orders_paid_by_ids(
-            db,
-            order_ids=order_ids,
-            restaurant_id=restaurant_id,
-            paid_at=settled_at,
-        )
+        if should_mark_paid:
+            payment_repo.update_payments_for_settlement(
+                db,
+                order_ids=order_ids,
+                restaurant_id=restaurant_id,
+                payment_method=derived_payment_method,
+                transaction_reference=payload.transaction_reference,
+                notes=payload.notes,
+                paid_at=settled_at,
+            )
 
-        billing_repo.mark_bill_paid(db, bill, settled_at)
+            order_repo.mark_orders_paid_by_ids(
+                db,
+                order_ids=order_ids,
+                restaurant_id=restaurant_id,
+                paid_at=settled_at,
+            )
+
+            billing_repo.mark_bill_paid(db, bill, settled_at)
+            close_session()
+            action_type = "settled"
+        else:
+            billing_repo.mark_bill_partially_paid(db, bill)
+            action_type = "partially_settled"
+
         _record_bill_event(
             db,
             bill=bill,
-            action_type="settled",
+            action_type=action_type,
             current_user=current_user,
             note=payload.notes,
             metadata={
-                "payment_method": payload.payment_method,
+                "payment_method": derived_payment_method,
                 "transaction_reference": payload.transaction_reference,
                 "order_count": len(order_ids),
                 "total_amount": round(total_amount, 2),
+                "submitted_amount": submitted_amount,
+                "paid_amount": new_paid_amount,
+                "remaining_amount": round(max(total_amount - new_paid_amount, 0), 2),
             },
         )
-        close_session()
+
+        if idempotency_record is not None:
+            billing_repo.update_settle_idempotency_key(
+                db,
+                record=idempotency_record,
+                settle_status=BillSettleIdempotencyStatus.completed,
+                bill_id=bill.id,
+                last_error=None,
+            )
+
         db.commit()
         db.refresh(bill)
     except IntegrityError:
@@ -775,11 +1194,43 @@ def _settle_context_session(
             status_code=status.HTTP_409_CONFLICT,
             detail="This session has already been settled.",
         )
-    except HTTPException:
+    except HTTPException as exc:
         db.rollback()
+        if idempotency_record is not None:
+            retry_record = billing_repo.get_settle_idempotency_key(
+                db,
+                restaurant_id=restaurant_id,
+                operation=_SETTLE_IDEMPOTENCY_OPERATION,
+                idempotency_key=normalized_idempotency_key or "",
+            )
+            if retry_record is not None:
+                billing_repo.update_settle_idempotency_key(
+                    db,
+                    record=retry_record,
+                    settle_status=BillSettleIdempotencyStatus.failed,
+                    bill_id=None,
+                    last_error=str(exc.detail),
+                )
+                db.commit()
         raise
     except Exception:
         db.rollback()
+        if idempotency_record is not None:
+            retry_record = billing_repo.get_settle_idempotency_key(
+                db,
+                restaurant_id=restaurant_id,
+                operation=_SETTLE_IDEMPOTENCY_OPERATION,
+                idempotency_key=normalized_idempotency_key or "",
+            )
+            if retry_record is not None:
+                billing_repo.update_settle_idempotency_key(
+                    db,
+                    record=retry_record,
+                    settle_status=BillSettleIdempotencyStatus.failed,
+                    bill_id=None,
+                    last_error="Settlement failed.",
+                )
+                db.commit()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Settlement failed. Please try again.",
@@ -789,25 +1240,21 @@ def _settle_context_session(
         db,
         restaurant_id=restaurant_id,
         r=r,
-        action_type="settled",
+        action_type="settled" if should_mark_paid else "partially_settled",
         bill=bill,
     )
 
-    return SettleSessionResponse(
-        bill_id=bill.id,
-        bill_number=bill.bill_number,
+    return _build_settle_response_from_bill(
+        db,
+        bill=bill,
         context_type=context_type,
         session_id=session_id,
         table_number=table_number,
         room_id=room_id,
         room_number=room_number,
         order_count=len(order_ids),
-        total_amount=round(total_amount, 2),
-        payment_method=payload.payment_method,
-        payment_status=BillStatus.paid,
-        handoff_status=bill.handoff_status,
-        settled_at=settled_at,
-        session_closed=True,
+        idempotent_replay=False,
+        session_closed=should_mark_paid,
     )
 
 
@@ -851,10 +1298,11 @@ def settle_session(
     db: Session,
     session_id: str,
     restaurant_id: int,
-    payload: SettleSessionRequest,
+    payload: SettleSessionSplitRequest,
     *,
     current_user: object | None = None,
     r: redis_lib.Redis | None = None,
+    idempotency_key: str | None = None,
 ) -> SettleSessionResponse:
     session = _load_table_session_or_404(db, session_id, restaurant_id)
     return _settle_context_session(
@@ -873,6 +1321,7 @@ def settle_session(
         ),
         current_user=current_user,
         r=r,
+        idempotency_key=idempotency_key,
     )
 
 
@@ -880,10 +1329,11 @@ def settle_room_session(
     db: Session,
     lookup: str,
     restaurant_id: int,
-    payload: SettleSessionRequest,
+    payload: SettleSessionSplitRequest,
     *,
     current_user: object | None = None,
     r: redis_lib.Redis | None = None,
+    idempotency_key: str | None = None,
 ) -> SettleSessionResponse:
     session = _load_room_session_or_404(db, lookup, restaurant_id)
     return _settle_context_session(
@@ -902,6 +1352,7 @@ def settle_room_session(
         ),
         current_user=current_user,
         r=r,
+        idempotency_key=idempotency_key,
     )
 
 
@@ -1066,6 +1517,11 @@ def get_folio_detail(
             for payment in payments
         ],
         payment_count=len(payments),
+        allocations=_build_allocation_responses(
+            db,
+            bill_id=bill.id,
+            restaurant_id=restaurant_id,
+        ),
         events=_serialize_workflow_events(db, workflow_events),
     )
 
@@ -1508,6 +1964,159 @@ def reopen_room_folio(
         r=r,
         action_type="reopened",
     )
+
+
+def _reopen_context_session(db: Session, bill: Bill) -> None:
+    if bill.context_type == BillContextType.table:
+        session = table_session_repo.get_session_by_id_and_restaurant(
+            db,
+            bill.session_id,
+            bill.restaurant_id,
+        )
+        if session is not None:
+            session.is_active = True
+            session.session_status = TableSessionStatus.OPEN
+            session.last_activity_at = _utcnow()
+            db.flush()
+        return
+
+    session = room_session_repo.get_room_session_by_id_and_restaurant(
+        db,
+        bill.session_id,
+        bill.restaurant_id,
+    )
+    if session is not None:
+        session.is_active = True
+        session.last_activity_at = _utcnow()
+        db.flush()
+
+
+def reverse_bill(
+    db: Session,
+    *,
+    bill_id: int,
+    restaurant_id: int,
+    payload: ReverseBillRequest,
+    current_user: object | None = None,
+    r: redis_lib.Redis | None = None,
+) -> BillRecordResponse:
+    bill = _load_bill_or_404(db, bill_id, restaurant_id)
+
+    if bill.payment_status in {BillStatus.refunded, BillStatus.voided, BillStatus.reversed}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This bill has already been reversed.",
+        )
+
+    if payload.mode == "void":
+        if bill.payment_status not in {BillStatus.pending, BillStatus.partially_paid}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only pending/partial bills can be voided.",
+            )
+        next_bill_status = BillStatus.voided
+        next_allocation_status = BillPaymentAllocationStatus.voided
+        next_payment_status = PaymentStatus.voided
+        action_type = "voided"
+    elif payload.mode == "refund":
+        if bill.payment_status not in {BillStatus.paid, BillStatus.partially_paid}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only paid or partially paid bills can be refunded.",
+            )
+        next_bill_status = BillStatus.refunded
+        next_allocation_status = BillPaymentAllocationStatus.refunded
+        next_payment_status = PaymentStatus.refunded
+        action_type = "refunded"
+    else:
+        if bill.payment_status not in {BillStatus.paid, BillStatus.partially_paid}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only paid or partially paid bills can be reversed.",
+            )
+        next_bill_status = BillStatus.reversed
+        next_allocation_status = BillPaymentAllocationStatus.reversed
+        next_payment_status = PaymentStatus.reversed
+        action_type = "reversed"
+
+    paid_orders = order_repo.list_orders_by_session(
+        db,
+        bill.session_id,
+        restaurant_id,
+        statuses=[OrderStatus.paid],
+    )
+    paid_order_ids = [order.id for order in paid_orders]
+
+    if paid_order_ids:
+        order_repo.mark_orders_completed_by_ids(
+            db,
+            order_ids=paid_order_ids,
+            restaurant_id=restaurant_id,
+            completed_at=_utcnow(),
+        )
+
+    impacted_orders = order_repo.list_orders_by_session(
+        db,
+        bill.session_id,
+        restaurant_id,
+        statuses=[OrderStatus.completed, OrderStatus.paid],
+    )
+    impacted_order_ids = [order.id for order in impacted_orders]
+    payment_repo.mark_payments_status_by_order_ids(
+        db,
+        order_ids=impacted_order_ids,
+        restaurant_id=restaurant_id,
+        payment_status=next_payment_status,
+        notes=payload.reason,
+    )
+
+    billing_repo.mark_bill_payment_allocations_status(
+        db,
+        bill_id=bill.id,
+        restaurant_id=restaurant_id,
+        allocation_status=next_allocation_status,
+    )
+
+    billing_repo.update_bill_fields(
+        db,
+        bill=bill,
+        payment_status=next_bill_status,
+        reversed_at=_utcnow(),
+        reversal_reason=payload.reason,
+        handoff_status=BillHandoffStatus.none,
+        cashier_status=BillReviewStatus.not_sent,
+        accountant_status=BillReviewStatus.not_sent,
+        sent_to_cashier_at=None,
+        sent_to_accountant_at=None,
+        handoff_completed_at=None,
+    )
+
+    if payload.reopen_session:
+        _reopen_context_session(db, bill)
+
+    _record_bill_event(
+        db,
+        bill=bill,
+        action_type=action_type,
+        current_user=current_user,
+        note=payload.reason,
+        metadata={
+            "mode": payload.mode,
+            "reopen_session": payload.reopen_session,
+            "impacted_orders": len(impacted_order_ids),
+        },
+    )
+
+    db.commit()
+    db.refresh(bill)
+    _publish_billing_event(
+        db,
+        restaurant_id=restaurant_id,
+        r=r,
+        action_type=action_type,
+        bill=bill,
+    )
+    return _to_bill_record(bill)
 
 
 def get_billing_queue_summary(

@@ -8,7 +8,7 @@ export type OrderStatus =
   | "paid"
   | "rejected";
 
-export type PaymentStatus = "pending" | "paid" | "failed";
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "voided" | "reversed";
 
 export interface PlaceOrderRequest {
   notes?: string;

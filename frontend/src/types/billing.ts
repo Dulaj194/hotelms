@@ -2,7 +2,13 @@ import type { PaymentResponse } from "@/types/order";
 
 export type BillContextType = "table" | "room";
 export type BillPaymentMethod = "cash" | "card" | "manual";
-export type BillStatus = "pending" | "paid";
+export type BillStatus =
+  | "pending"
+  | "partially_paid"
+  | "paid"
+  | "refunded"
+  | "voided"
+  | "reversed";
 export type BillHandoffStatus =
   | "none"
   | "sent_to_cashier"
@@ -34,11 +40,16 @@ export interface BillRecord {
   table_number: string | null;
   room_id: number | null;
   room_number: string | null;
+  subtotal_amount?: number;
+  tax_amount?: number;
+  discount_amount?: number;
   total_amount: number;
   payment_method: string | null;
   payment_status: BillStatus;
   transaction_reference: string | null;
   notes: string | null;
+  reversed_at?: string | null;
+  reversal_reason?: string | null;
   handoff_status: BillHandoffStatus;
   sent_to_cashier_at: string | null;
   sent_to_accountant_at: string | null;
@@ -74,6 +85,23 @@ export interface SettleSessionRequest {
   payment_method: BillPaymentMethod;
   transaction_reference?: string;
   notes?: string;
+  paid_amount?: number;
+  tax_rule_mode?: "none" | "percentage" | "fixed";
+  tax_rule_value?: number;
+  discount_rule_mode?: "none" | "percentage" | "fixed";
+  discount_rule_value?: number;
+}
+
+export interface SettlementAllocation {
+  id: number;
+  payment_method: string;
+  amount: number;
+  transaction_reference: string | null;
+  gateway_provider: string | null;
+  gateway_payment_intent_id: string | null;
+  allocation_status: string;
+  notes: string | null;
+  created_at: string;
 }
 
 export interface SettleSessionResponse {
@@ -86,10 +114,15 @@ export interface SettleSessionResponse {
   room_number: string | null;
   order_count: number;
   total_amount: number;
+  paid_amount?: number;
+  remaining_amount?: number;
   payment_method: string;
   payment_status: BillStatus;
   handoff_status: BillHandoffStatus;
   settled_at: string;
+  is_partial?: boolean;
+  idempotent_replay?: boolean;
+  allocations?: SettlementAllocation[];
   session_closed: boolean;
 }
 
@@ -150,6 +183,7 @@ export interface BillWorkflowEventListResponse {
 export interface BillDetailResponse extends BillSummaryResponse {
   payments: PaymentResponse[];
   payment_count: number;
+  allocations?: SettlementAllocation[];
   events: BillWorkflowEvent[];
 }
 

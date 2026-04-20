@@ -4,14 +4,18 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.modules.billing.model import (
     Bill,
     BillContextType,
     BillHandoffStatus,
+    BillPaymentAllocation,
+    BillPaymentAllocationStatus,
     BillReviewStatus,
+    BillSettleIdempotencyKey,
+    BillSettleIdempotencyStatus,
     BillStatus,
     BillWorkflowEvent,
 )
@@ -94,6 +98,15 @@ def mark_bill_paid(
 ) -> Bill:
     bill.payment_status = BillStatus.paid
     bill.settled_at = settled_at or datetime.now(UTC)
+    db.flush()
+    return bill
+
+
+def mark_bill_partially_paid(
+    db: Session,
+    bill: Bill,
+) -> Bill:
+    bill.payment_status = BillStatus.partially_paid
     db.flush()
     return bill
 
@@ -204,6 +217,147 @@ def create_workflow_event(
     db.add(event)
     db.flush()
     return event
+
+
+def create_bill_payment_allocation(
+    db: Session,
+    *,
+    bill_id: int,
+    restaurant_id: int,
+    payment_method: str,
+    amount: float,
+    transaction_reference: str | None = None,
+    gateway_provider: str | None = None,
+    gateway_payment_intent_id: str | None = None,
+    notes: str | None = None,
+) -> BillPaymentAllocation:
+    allocation = BillPaymentAllocation(
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        payment_method=payment_method,
+        amount=round(amount, 2),
+        transaction_reference=transaction_reference,
+        gateway_provider=gateway_provider,
+        gateway_payment_intent_id=gateway_payment_intent_id,
+        allocation_status=BillPaymentAllocationStatus.captured,
+        notes=notes,
+    )
+    db.add(allocation)
+    db.flush()
+    return allocation
+
+
+def list_bill_payment_allocations(
+    db: Session,
+    *,
+    bill_id: int,
+    restaurant_id: int,
+) -> list[BillPaymentAllocation]:
+    return (
+        db.query(BillPaymentAllocation)
+        .filter(
+            BillPaymentAllocation.bill_id == bill_id,
+            BillPaymentAllocation.restaurant_id == restaurant_id,
+        )
+        .order_by(BillPaymentAllocation.created_at.asc(), BillPaymentAllocation.id.asc())
+        .all()
+    )
+
+
+def sum_captured_allocation_amount(
+    db: Session,
+    *,
+    bill_id: int,
+    restaurant_id: int,
+) -> float:
+    value = (
+        db.query(func.coalesce(func.sum(BillPaymentAllocation.amount), 0))
+        .filter(
+            BillPaymentAllocation.bill_id == bill_id,
+            BillPaymentAllocation.restaurant_id == restaurant_id,
+            BillPaymentAllocation.allocation_status == BillPaymentAllocationStatus.captured,
+        )
+        .scalar()
+    )
+    return round(float(value or 0), 2)
+
+
+def mark_bill_payment_allocations_status(
+    db: Session,
+    *,
+    bill_id: int,
+    restaurant_id: int,
+    allocation_status: BillPaymentAllocationStatus,
+) -> None:
+    allocations = (
+        db.query(BillPaymentAllocation)
+        .filter(
+            BillPaymentAllocation.bill_id == bill_id,
+            BillPaymentAllocation.restaurant_id == restaurant_id,
+            BillPaymentAllocation.allocation_status == BillPaymentAllocationStatus.captured,
+        )
+        .all()
+    )
+    for allocation in allocations:
+        allocation.allocation_status = allocation_status
+    db.flush()
+
+
+def get_settle_idempotency_key(
+    db: Session,
+    *,
+    restaurant_id: int,
+    operation: str,
+    idempotency_key: str,
+) -> BillSettleIdempotencyKey | None:
+    return (
+        db.query(BillSettleIdempotencyKey)
+        .filter(
+            BillSettleIdempotencyKey.restaurant_id == restaurant_id,
+            BillSettleIdempotencyKey.operation == operation,
+            BillSettleIdempotencyKey.idempotency_key == idempotency_key,
+        )
+        .first()
+    )
+
+
+def create_settle_idempotency_key(
+    db: Session,
+    *,
+    restaurant_id: int,
+    operation: str,
+    idempotency_key: str,
+    context_type: BillContextType,
+    context_lookup: str,
+    request_fingerprint: str,
+) -> BillSettleIdempotencyKey:
+    record = BillSettleIdempotencyKey(
+        restaurant_id=restaurant_id,
+        operation=operation,
+        idempotency_key=idempotency_key,
+        context_type=context_type,
+        context_lookup=context_lookup,
+        request_fingerprint=request_fingerprint,
+        settle_status=BillSettleIdempotencyStatus.pending,
+    )
+    db.add(record)
+    db.flush()
+    return record
+
+
+def update_settle_idempotency_key(
+    db: Session,
+    *,
+    record: BillSettleIdempotencyKey,
+    settle_status: BillSettleIdempotencyStatus,
+    bill_id: int | None = None,
+    last_error: str | None = None,
+) -> BillSettleIdempotencyKey:
+    record.settle_status = settle_status
+    record.bill_id = bill_id
+    record.last_error = last_error
+    db.flush()
+    return record
 
 
 def list_workflow_events(

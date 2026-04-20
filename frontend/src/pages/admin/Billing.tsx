@@ -297,12 +297,20 @@ export default function Billing() {
     setSettling(true);
     setSettleError(null);
     try {
+      const idempotencyKey =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random()}`;
       const payload = {
         payment_method: method,
         ...(transactionRef.trim() ? { transaction_reference: transactionRef.trim() } : {}),
         ...(notes.trim() ? { notes: notes.trim() } : {}),
       };
-      const done = await api.post<SettleSessionResponse>(settlePath(mode, summary.session_id), payload);
+      const done = await api.post<SettleSessionResponse>(
+        settlePath(mode, summary.session_id),
+        payload,
+        { headers: { "Idempotency-Key": idempotencyKey } },
+      );
       let refreshed = summary;
       try {
         refreshed = await api.get<BillSummaryResponse>(summaryPath(mode, summary.session_id));
