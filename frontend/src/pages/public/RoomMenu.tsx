@@ -16,11 +16,12 @@ import { ChevronRight } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
-import { setRoomSession } from "@/hooks/useRoomSession";
+import { getRoomToken } from "@/hooks/useRoomSession";
 import { useRoomCart } from "@/hooks/useRoomCart";
-import { publicGet, publicPost } from "@/lib/publicApi";
+import { fetchRoomSessionJson, restoreRoomSession } from "@/features/public/roomSession";
+import { publicGet } from "@/lib/publicApi";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
-import type { RoomSessionStartResponse, RoomOrderDetailResponse } from "@/types/roomSession";
+import type { RoomOrderDetailResponse } from "@/types/roomSession";
 
 // Sub-component: Cart Drawer (inline, room-specific)
 
@@ -310,27 +311,46 @@ export default function RoomMenu() {
   useEffect(() => {
     if (!restaurantId || !roomNumber) return;
 
-    const init = async () => {
-      if (!qrAccessKey) {
-        setPageError("Invalid room QR link. Please scan the room QR code again.");
+    const startFreshRoomSession = async () => {
+      const restored = await restoreRoomSession({
+        restaurantId,
+        roomNumber,
+        qrAccessKey,
+      });
+
+      if (restored) {
+        setSessionReady(true);
         return;
       }
+
+      setPageError(
+        qrAccessKey
+          ? "Could not start a room session. Please scan the QR code again."
+          : "Invalid room QR link. Please scan the room QR code again.",
+      );
+    };
+
+    const canReuseExistingSession = async (): Promise<boolean> => {
+      if (!getRoomToken()) return false;
+
       try {
-        const session = await publicPost<RoomSessionStartResponse>(
-          "/room-sessions/start",
-          {
-            restaurant_id: Number(restaurantId),
-            room_number: roomNumber,
-            qr_access_key: qrAccessKey,
-          }
-        );
-        setRoomSession(session);
-        setSessionReady(true);
+        await fetchRoomSessionJson("/room-cart");
+        return true;
       } catch {
-        setPageError(
-          "Could not start a room session. Please scan the QR code again."
-        );
+        return false;
       }
+    };
+
+    const init = async () => {
+      if (getRoomToken()) {
+        const reusable = await canReuseExistingSession();
+        if (reusable) {
+          setSessionReady(true);
+          return;
+        }
+      }
+
+      await startFreshRoomSession();
     };
 
     void init();
@@ -521,7 +541,11 @@ export default function RoomMenu() {
           <div className="flex items-center gap-2">
             {restaurantId && roomNumber && (
               <Link
-                to={`/menu/${restaurantId}/room/${roomNumber}/service-request`}
+                to={
+                  qrAccessKey
+                    ? `/menu/${restaurantId}/room/${roomNumber}/service-request?k=${encodeURIComponent(qrAccessKey)}`
+                    : `/menu/${restaurantId}/room/${roomNumber}/service-request`
+                }
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-orange-600
                            border border-orange-200 rounded-full hover:bg-orange-50 transition-colors"
                 aria-label="Service request"

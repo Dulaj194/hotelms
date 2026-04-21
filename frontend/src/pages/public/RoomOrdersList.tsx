@@ -1,34 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { getRoomToken } from "@/hooks/useRoomSession";
-import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
+import { isSessionHttpError } from "@/features/public/sessionHttp";
+import { fetchRoomSessionJson, restoreRoomSession } from "@/features/public/roomSession";
 import type { OrderStatus } from "@/types/order";
 import type { RoomOrderDetailResponse } from "@/types/roomSession";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
-
-const BASE_URL = RESOLVED_API_BASE_URL;
 
 type RoomOrderListResponse = {
   orders: RoomOrderDetailResponse[];
   total: number;
 };
-
-async function fetchRoomOrdersList(): Promise<RoomOrderListResponse> {
-  const token = getRoomToken();
-  if (!token) {
-    throw new Error("Room session expired. Please scan the room QR code again.");
-  }
-
-  const response = await fetch(`${BASE_URL}/room-orders`, {
-    headers: { "X-Room-Session": token },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to load room orders — ${response.status}`);
-  }
-
-  return response.json();
-}
 
 const POLL_INTERVAL_MS = 15_000;
 
@@ -37,36 +19,101 @@ function isKnownOrderStatus(value: string): value is OrderStatus {
 }
 
 export default function RoomOrdersList() {
+  const [searchParams] = useSearchParams();
   const { restaurantId, roomNumber } = useParams<{
     restaurantId: string;
     roomNumber: string;
   }>();
+  const qrAccessKey = searchParams.get("k")?.trim() ?? "";
 
+  const [sessionReady, setSessionReady] = useState(Boolean(getRoomToken()));
   const [orders, setOrders] = useState<RoomOrderDetailResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const restoreRoomGuestSession = useCallback(async (): Promise<boolean> => {
+    const restored = await restoreRoomSession({
+      restaurantId,
+      roomNumber,
+      qrAccessKey,
+    });
+
+    if (restored) {
+      setSessionReady(true);
+      setError(null);
+    }
+
+    return restored;
+  }, [qrAccessKey, restaurantId, roomNumber]);
+
   const load = useCallback(async () => {
+    if (!sessionReady) return;
+
+    setError(null);
     try {
-      const data = await fetchRoomOrdersList();
+      const data = await fetchRoomSessionJson<RoomOrderListResponse>("/room-orders");
       setOrders(data.orders);
     } catch (err) {
+      if (isSessionHttpError(err, 401)) {
+        const restored = await restoreRoomGuestSession();
+        if (restored) {
+          try {
+            const retried = await fetchRoomSessionJson<RoomOrderListResponse>("/room-orders");
+            setOrders(retried.orders);
+            return;
+          } catch (retryErr) {
+            setError(
+              retryErr instanceof Error ? retryErr.message : "Could not load room orders.",
+            );
+            return;
+          }
+        }
+
+        setError("Room session expired. Please scan the room QR code again.");
+        return;
+      }
+
       setError(err instanceof Error ? err.message : "Could not load room orders.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [restoreRoomGuestSession, sessionReady]);
+
+  useEffect(() => {
+    if (getRoomToken()) {
+      setSessionReady(true);
+      return;
+    }
+
+    if (!restaurantId || !roomNumber || !qrAccessKey) {
+      setError("Room session expired. Please scan the room QR code again.");
+      setLoading(false);
+      return;
+    }
+
+    const restore = async () => {
+      const restored = await restoreRoomGuestSession();
+      if (!restored) {
+        setError("Could not restore the room session. Please scan the room QR code again.");
+        setLoading(false);
+      }
+    };
+
+    void restore();
+  }, [qrAccessKey, restaurantId, restoreRoomGuestSession, roomNumber]);
 
   // Initial load
   useEffect(() => {
+    if (!sessionReady) return;
     void load();
-  }, [load]);
+  }, [load, sessionReady]);
 
   // Poll for updates
   useEffect(() => {
+    if (!sessionReady) return;
     const timer = setInterval(() => void load(), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, sessionReady]);
 
   const sortedOrders = useMemo(
     () =>
@@ -118,7 +165,11 @@ export default function RoomOrdersList() {
             <p className="text-sm text-slate-500 mb-4">No room orders yet</p>
             {restaurantId && roomNumber && (
               <Link
-                to={`/menu/${restaurantId}/room/${roomNumber}`}
+                to={
+                  qrAccessKey
+                    ? `/menu/${restaurantId}/room/${roomNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                    : `/menu/${restaurantId}/room/${roomNumber}`
+                }
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white transition hover:bg-orange-600"
               >
                 Place an order
@@ -134,7 +185,11 @@ export default function RoomOrdersList() {
             return (
               <Link
                 key={order.id}
-                to={`/menu/${order.restaurant_id}/room/${order.room_number}/order/${order.id}`}
+                to={
+                  qrAccessKey
+                    ? `/menu/${order.restaurant_id}/room/${order.room_number}/order/${order.id}?k=${encodeURIComponent(qrAccessKey)}`
+                    : `/menu/${order.restaurant_id}/room/${order.room_number}/order/${order.id}`
+                }
                 className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md hover:border-slate-300 sm:p-5"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -173,7 +228,11 @@ export default function RoomOrdersList() {
       {restaurantId && roomNumber && (
         <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.05)] backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
           <Link
-            to={`/menu/${restaurantId}/room/${roomNumber}`}
+            to={
+              qrAccessKey
+                ? `/menu/${restaurantId}/room/${roomNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                : `/menu/${restaurantId}/room/${roomNumber}`
+            }
             className="block w-full rounded-xl border border-orange-200 bg-orange-50 py-3 text-center text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
           >
             ← Back to room menu

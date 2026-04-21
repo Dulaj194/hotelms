@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { getRoomToken, setRoomSession } from "@/hooks/useRoomSession";
-import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
-import { publicPost } from "@/lib/publicApi";
+import { getRoomToken } from "@/hooks/useRoomSession";
+import { isSessionHttpError } from "@/features/public/sessionHttp";
+import { fetchRoomSessionJson, restoreRoomSession } from "@/features/public/roomSession";
 import {
   ORDER_STATUS_COLOR,
   ORDER_STATUS_LABEL,
@@ -11,10 +11,7 @@ import {
 } from "@/types/order";
 import type {
   RoomOrderDetailResponse,
-  RoomSessionStartResponse,
 } from "@/types/roomSession";
-
-const BASE_URL = RESOLVED_API_BASE_URL;
 const CANCEL_WINDOW_SECONDS = 10;
 
 const POLL_INTERVAL_MS = 15_000;
@@ -28,46 +25,6 @@ function parseServerTimestamp(value: string): number {
 
 function isKnownOrderStatus(value: string): value is OrderStatus {
   return value in ORDER_STATUS_LABEL;
-}
-
-async function fetchRoomOrder(orderId: string): Promise<RoomOrderDetailResponse> {
-  const token = getRoomToken();
-  if (!token) {
-    throw new Error("Room session expired. Please scan the room QR code again.");
-  }
-
-  const response = await fetch(`${BASE_URL}/room-orders/${orderId}`, {
-    headers: { "X-Room-Session": token },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to load room order - ${response.status}`);
-  }
-
-  return response.json() as Promise<RoomOrderDetailResponse>;
-}
-
-async function cancelRoomOrder(orderId: string): Promise<void> {
-  const token = getRoomToken();
-  if (!token) {
-    throw new Error("Room session expired. Please scan the room QR code again.");
-  }
-
-  const response = await fetch(`${BASE_URL}/room-orders/${orderId}/cancel`, {
-    method: "POST",
-    headers: { "X-Room-Session": token },
-  });
-
-  if (!response.ok) {
-    let detail = `Failed to cancel room order - ${response.status}`;
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload?.detail) detail = payload.detail;
-    } catch {
-      // fallback keeps base detail
-    }
-    throw new Error(detail);
-  }
 }
 
 function getRemainingCancelSeconds(order: RoomOrderDetailResponse | null): number {
@@ -158,6 +115,21 @@ export default function RoomOrderStatus() {
   const [canceling, setCanceling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
+  const restoreRoomGuestSession = useCallback(async (): Promise<boolean> => {
+    const restored = await restoreRoomSession({
+      restaurantId,
+      roomNumber,
+      qrAccessKey,
+    });
+
+    if (restored) {
+      setSessionReady(true);
+      setError(null);
+    }
+
+    return restored;
+  }, [qrAccessKey, restaurantId, roomNumber]);
+
   useEffect(() => {
     if (getRoomToken()) {
       setSessionReady(true);
@@ -170,55 +142,90 @@ export default function RoomOrderStatus() {
     }
 
     const startRoomSession = async () => {
-      try {
-        const session = await publicPost<RoomSessionStartResponse>(
-          "/room-sessions/start",
-          {
-            restaurant_id: Number(restaurantId),
-            room_number: roomNumber,
-            qr_access_key: qrAccessKey,
-          },
-        );
-        setRoomSession(session);
-        setSessionReady(true);
-      } catch {
+      const restored = await restoreRoomGuestSession();
+      if (!restored) {
         setError("Could not restore the room session. Please scan the room QR code again.");
       }
     };
 
     void startRoomSession();
-  }, [qrAccessKey, restaurantId, roomNumber]);
+  }, [qrAccessKey, restaurantId, restoreRoomGuestSession, roomNumber]);
 
   const loadOrder = useCallback(async () => {
     if (!sessionReady || !orderId) return;
 
     try {
       setError(null);
-      const data = await fetchRoomOrder(orderId);
+      const data = await fetchRoomSessionJson<RoomOrderDetailResponse>(`/room-orders/${orderId}`);
       setOrder(data);
       setCancelRemaining(getRemainingCancelSeconds(data));
     } catch (loadError) {
+      if (isSessionHttpError(loadError, 401)) {
+        const restored = await restoreRoomGuestSession();
+        if (restored) {
+          try {
+            const retried = await fetchRoomSessionJson<RoomOrderDetailResponse>(
+              `/room-orders/${orderId}`,
+            );
+            setOrder(retried);
+            setCancelRemaining(getRemainingCancelSeconds(retried));
+            return;
+          } catch (retryErr) {
+            setError(
+              retryErr instanceof Error ? retryErr.message : "Could not load room order.",
+            );
+            return;
+          }
+        }
+
+        setError("Room session expired. Please scan the room QR code again.");
+        return;
+      }
+
       setError(
         loadError instanceof Error ? loadError.message : "Could not load room order.",
       );
     }
-  }, [orderId, sessionReady]);
+  }, [orderId, restoreRoomGuestSession, sessionReady]);
 
   const handleCancelOrder = useCallback(async () => {
     if (!orderId || cancelRemaining <= 0 || canceling) return;
     setCancelError(null);
     setCanceling(true);
     try {
-      await cancelRoomOrder(orderId);
+      await fetchRoomSessionJson<unknown>(`/room-orders/${orderId}/cancel`, {
+        method: "POST",
+      });
       await loadOrder();
     } catch (cancelErr) {
+      if (isSessionHttpError(cancelErr, 401)) {
+        const restored = await restoreRoomGuestSession();
+        if (restored) {
+          try {
+            await fetchRoomSessionJson<unknown>(`/room-orders/${orderId}/cancel`, {
+              method: "POST",
+            });
+            await loadOrder();
+            return;
+          } catch (retryErr) {
+            setCancelError(
+              retryErr instanceof Error ? retryErr.message : "Could not cancel room order.",
+            );
+            return;
+          }
+        }
+
+        setCancelError("Room session expired. Please scan the room QR code again.");
+        return;
+      }
+
       setCancelError(
         cancelErr instanceof Error ? cancelErr.message : "Could not cancel room order.",
       );
     } finally {
       setCanceling(false);
     }
-  }, [cancelRemaining, canceling, loadOrder, orderId]);
+  }, [cancelRemaining, canceling, loadOrder, orderId, restoreRoomGuestSession]);
 
   useEffect(() => {
     void loadOrder();
@@ -379,7 +386,11 @@ export default function RoomOrderStatus() {
         {restaurantId && roomNumber && (
           <div className="flex flex-col gap-2">
             <Link
-              to={`/room-orders/my/${restaurantId}/${roomNumber}`}
+              to={
+                qrAccessKey
+                  ? `/room-orders/my/${restaurantId}/${roomNumber}?k=${encodeURIComponent(qrAccessKey)}`
+                  : `/room-orders/my/${restaurantId}/${roomNumber}`
+              }
               className="inline-flex min-h-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
             >
               📋 View my orders

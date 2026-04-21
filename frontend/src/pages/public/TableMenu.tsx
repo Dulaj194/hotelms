@@ -22,20 +22,17 @@ import { useCart } from "@/hooks/useCart";
 import {
   clearGuestSession,
   getGuestDisplayName,
-  getGuestToken,
   getGuestQrAccessKey,
   hasGuestSessionForContext,
   setGuestQrAccessKey,
-  setGuestSession,
 } from "@/hooks/useGuestSession";
-import { publicGet, publicPost } from "@/lib/publicApi";
-import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
+import { fetchGuestSessionJson, restoreTableGuestSession } from "@/features/public/tableSession";
+import { publicGet } from "@/lib/publicApi";
 import { toAssetUrl } from "@/lib/assets";
 import type {
   PublicItemSummaryResponse,
   PublicMenuResponse,
 } from "@/types/publicMenu";
-import type { TableSessionStartResponse } from "@/types/session";
 
 type MenuTile = {
   item: PublicItemSummaryResponse;
@@ -43,8 +40,6 @@ type MenuTile = {
   categoryName: string;
   subcategoryName: string | null;
 };
-
-const BASE_URL = RESOLVED_API_BASE_URL;
 
 export default function TableMenu() {
   const [searchParams] = useSearchParams();
@@ -172,37 +167,29 @@ export default function TableMenu() {
     const effectiveQrAccessKey = qrAccessKey || restoredQrAccessKey || "";
 
     const startFreshSession = async () => {
-      if (!effectiveQrAccessKey) {
-        setPageError("Invalid table QR link. Please scan the table QR code again.");
+      const restored = await restoreTableGuestSession({
+        restaurantId,
+        tableNumber,
+        qrAccessKey: effectiveQrAccessKey,
+        guestName,
+      });
+
+      if (restored) {
+        setSessionReady(true);
         return;
       }
 
-      try {
-        const session = await publicPost<TableSessionStartResponse>(
-          "/table-sessions/start",
-          {
-            restaurant_id: parsedRestaurantId,
-            table_number: tableNumber,
-            customer_name: guestName,
-            qr_access_key: effectiveQrAccessKey,
-          }
-        );
-        setGuestSession(session);
-        setSessionReady(true);
-      } catch {
-        setPageError("Could not start a guest session. Please scan the QR code again.");
-      }
+      setPageError(
+        effectiveQrAccessKey
+          ? "Could not start a guest session. Please scan the QR code again."
+          : "Invalid table QR link. Please scan the table QR code again.",
+      );
     };
 
     const canReuseExistingSession = async (): Promise<boolean> => {
-      const token = getGuestToken();
-      if (!token) return false;
-
       try {
-        const response = await fetch(`${BASE_URL}/cart`, {
-          headers: { "X-Guest-Session": token },
-        });
-        return response.ok;
+        await fetchGuestSessionJson("/cart");
+        return true;
       } catch {
         return false;
       }

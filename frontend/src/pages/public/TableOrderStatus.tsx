@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
-  getGuestDisplayName,
-  getGuestQrAccessKey,
   getGuestToken,
-  setGuestSession,
 } from "@/hooks/useGuestSession";
-import { publicPost } from "@/lib/publicApi";
-import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
+import { isSessionHttpError } from "@/features/public/sessionHttp";
+import {
+  fetchGuestSessionJson,
+  resolveTableGuestName,
+  resolveTableQrAccessKey,
+  restoreTableGuestSession,
+} from "@/features/public/tableSession";
 import type { OrderDetailResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
-import type { TableSessionStartResponse } from "@/types/session";
 
-const BASE_URL = RESOLVED_API_BASE_URL;
 const CANCEL_WINDOW_SECONDS = 10;
 
 function parseServerTimestamp(value: string): number {
@@ -21,35 +21,6 @@ function parseServerTimestamp(value: string): number {
   const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(value);
   const normalized = hasTimezone ? value : `${value}Z`;
   return new Date(normalized).getTime();
-}
-
-async function fetchOrderForGuest(orderId: string): Promise<OrderDetailResponse> {
-  const token = getGuestToken();
-  const response = await fetch(`${BASE_URL}/orders/my/${orderId}`, {
-    headers: token ? { "X-Guest-Session": token } : {},
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to load order — ${response.status}`);
-  }
-  return response.json() as Promise<OrderDetailResponse>;
-}
-
-async function cancelOrderForGuest(orderId: string): Promise<void> {
-  const token = getGuestToken();
-  const response = await fetch(`${BASE_URL}/orders/my/${orderId}/cancel`, {
-    method: "POST",
-    headers: token ? { "X-Guest-Session": token } : {},
-  });
-  if (!response.ok) {
-    let detail = `Failed to cancel order — ${response.status}`;
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload?.detail) detail = payload.detail;
-    } catch {
-      // fallback to default detail
-    }
-    throw new Error(detail);
-  }
 }
 
 function getRemainingCancelSeconds(order: OrderDetailResponse | null): number {
@@ -72,13 +43,9 @@ export default function TableOrderStatus() {
     orderId: string;
   }>();
   const qrAccessKey = searchParams.get("k")?.trim() ?? "";
-  const parsedRestaurantId = restaurantId ? Number(restaurantId) : NaN;
-  const restoredQrAccessKey =
-    Number.isNaN(parsedRestaurantId) || !tableNumber
-      ? null
-      : getGuestQrAccessKey(parsedRestaurantId, tableNumber);
-  const effectiveQrAccessKey = qrAccessKey || restoredQrAccessKey || "";
+  const effectiveQrAccessKey = resolveTableQrAccessKey(restaurantId, tableNumber, qrAccessKey);
   const [sessionReady, setSessionReady] = useState(Boolean(getGuestToken()));
+  const guestName = resolveTableGuestName(restaurantId, tableNumber);
 
   const [order, setOrder] = useState<OrderDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,16 +53,48 @@ export default function TableOrderStatus() {
   const [canceling, setCanceling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
+  const restoreGuestSession = useCallback(async (): Promise<boolean> => {
+    const restored = await restoreTableGuestSession({
+      restaurantId,
+      tableNumber,
+      qrAccessKey: effectiveQrAccessKey,
+      guestName,
+    });
+    if (restored) {
+      setSessionReady(true);
+      setError(null);
+    }
+    return restored;
+  }, [effectiveQrAccessKey, guestName, restaurantId, tableNumber]);
+
   const load = useCallback(async () => {
     if (!orderId) return;
     try {
-      const data = await fetchOrderForGuest(orderId);
+      const data = await fetchGuestSessionJson<OrderDetailResponse>(`/orders/my/${orderId}`);
       setOrder(data);
       setCancelRemaining(getRemainingCancelSeconds(data));
     } catch (err) {
+      if (isSessionHttpError(err, 401)) {
+        const restored = await restoreGuestSession();
+        if (restored) {
+          try {
+            const retried = await fetchGuestSessionJson<OrderDetailResponse>(`/orders/my/${orderId}`);
+            setOrder(retried);
+            setCancelRemaining(getRemainingCancelSeconds(retried));
+            return;
+          } catch (retryErr) {
+            setError(retryErr instanceof Error ? retryErr.message : "Could not load order.");
+            return;
+          }
+        }
+
+        setError("Guest session expired. Please scan the table QR code again.");
+        return;
+      }
+
       setError(err instanceof Error ? err.message : "Could not load order.");
     }
-  }, [orderId]);
+  }, [orderId, restoreGuestSession]);
 
   useEffect(() => {
     if (getGuestToken()) {
@@ -108,46 +107,53 @@ export default function TableOrderStatus() {
       return;
     }
 
-    const guestName = getGuestDisplayName(Number(restaurantId), tableNumber);
     if (!guestName) {
       setError("Guest session expired. Please scan the table QR code again.");
       return;
     }
 
     const restoreSession = async () => {
-      try {
-        const session = await publicPost<TableSessionStartResponse>(
-          "/table-sessions/start",
-          {
-            restaurant_id: Number(restaurantId),
-            table_number: tableNumber,
-            customer_name: guestName,
-            qr_access_key: effectiveQrAccessKey,
-          },
-        );
-        setGuestSession(session);
-        setSessionReady(true);
-      } catch {
+      const restored = await restoreGuestSession();
+      if (!restored) {
         setError("Could not restore the table session. Please scan the QR code again.");
       }
     };
 
     void restoreSession();
-  }, [effectiveQrAccessKey, restaurantId, tableNumber]);
+  }, [effectiveQrAccessKey, guestName, restaurantId, restoreGuestSession, tableNumber]);
 
   const handleCancelOrder = useCallback(async () => {
     if (!orderId || cancelRemaining <= 0 || canceling) return;
     setCancelError(null);
     setCanceling(true);
     try {
-      await cancelOrderForGuest(orderId);
+      await fetchGuestSessionJson<unknown>(`/orders/my/${orderId}/cancel`, { method: "POST" });
       await load();
     } catch (err) {
+      if (isSessionHttpError(err, 401)) {
+        const restored = await restoreGuestSession();
+        if (restored) {
+          try {
+            await fetchGuestSessionJson<unknown>(`/orders/my/${orderId}/cancel`, { method: "POST" });
+            await load();
+            return;
+          } catch (retryErr) {
+            setCancelError(
+              retryErr instanceof Error ? retryErr.message : "Could not cancel order.",
+            );
+            return;
+          }
+        }
+
+        setCancelError("Guest session expired. Please scan the table QR code again.");
+        return;
+      }
+
       setCancelError(err instanceof Error ? err.message : "Could not cancel order.");
     } finally {
       setCanceling(false);
     }
-  }, [cancelRemaining, canceling, load, orderId]);
+  }, [cancelRemaining, canceling, load, orderId, restoreGuestSession]);
 
   // Initial load
   useEffect(() => {
@@ -191,11 +197,6 @@ export default function TableOrderStatus() {
 
   const statusLabel = ORDER_STATUS_LABEL[order.status];
   const statusColor = ORDER_STATUS_COLOR[order.status];
-  const guestName =
-    restaurantId && tableNumber
-      ? getGuestDisplayName(Number(restaurantId), tableNumber)
-      : null;
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header */}

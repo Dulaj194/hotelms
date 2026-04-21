@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
-  getGuestDisplayName,
-  getGuestQrAccessKey,
   getGuestToken,
-  setGuestSession,
 } from "@/hooks/useGuestSession";
 import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
-import { publicPost } from "@/lib/publicApi";
+import { isSessionHttpError } from "@/features/public/sessionHttp";
+import {
+  fetchGuestSessionJson,
+  resolveTableGuestName,
+  resolveTableQrAccessKey,
+  restoreTableGuestSession,
+} from "@/features/public/tableSession";
 import type { OrderHeaderResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
-import type { TableSessionStartResponse } from "@/types/session";
 
 const BASE_URL = RESOLVED_API_BASE_URL;
 
@@ -28,27 +30,6 @@ const TAB_LABEL: Record<OrdersFilterTab, string> = {
   canceled: "Canceled",
 };
 
-class HttpStatusError extends Error {
-  status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = "HttpStatusError";
-    this.status = status;
-  }
-}
-
-async function fetchGuestOrdersList(): Promise<{ orders: OrderHeaderResponse[]; total: number }> {
-  const token = getGuestToken();
-  const response = await fetch(`${BASE_URL}/orders/my`, {
-    headers: token ? { "X-Guest-Session": token } : {},
-  });
-  if (!response.ok) {
-    throw new HttpStatusError(response.status, `Failed to load orders — ${response.status}`);
-  }
-  return response.json();
-}
-
 const POLL_INTERVAL_MS = 15_000;
 
 export default function GuestOrdersList() {
@@ -58,17 +39,9 @@ export default function GuestOrdersList() {
     tableNumber: string;
   }>();
   const qrAccessKey = searchParams.get("k")?.trim() ?? "";
-  const parsedRestaurantId = restaurantId ? Number(restaurantId) : NaN;
-  const restoredQrAccessKey =
-    Number.isNaN(parsedRestaurantId) || !tableNumber
-      ? null
-      : getGuestQrAccessKey(parsedRestaurantId, tableNumber);
-  const effectiveQrAccessKey = qrAccessKey || restoredQrAccessKey || "";
+  const effectiveQrAccessKey = resolveTableQrAccessKey(restaurantId, tableNumber, qrAccessKey);
   const [sessionReady, setSessionReady] = useState(Boolean(getGuestToken()));
-  const guestName =
-    restaurantId && tableNumber
-      ? getGuestDisplayName(Number(restaurantId), tableNumber)
-      : null;
+  const guestName = resolveTableGuestName(restaurantId, tableNumber);
 
   const [orders, setOrders] = useState<OrderHeaderResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -76,40 +49,35 @@ export default function GuestOrdersList() {
   const [activeTab, setActiveTab] = useState<OrdersFilterTab>("active");
 
   const restoreGuestSession = useCallback(async (): Promise<boolean> => {
-    if (!restaurantId || !tableNumber || !effectiveQrAccessKey || !guestName) {
-      return false;
-    }
-
-    try {
-      const session = await publicPost<TableSessionStartResponse>(
-        "/table-sessions/start",
-        {
-          restaurant_id: Number(restaurantId),
-          table_number: tableNumber,
-          customer_name: guestName,
-          qr_access_key: effectiveQrAccessKey,
-        },
-      );
-      setGuestSession(session);
+    const restored = await restoreTableGuestSession({
+      restaurantId,
+      tableNumber,
+      qrAccessKey: effectiveQrAccessKey,
+      guestName,
+    });
+    if (restored) {
       setSessionReady(true);
       setError(null);
-      return true;
-    } catch {
-      return false;
     }
+    return restored;
   }, [effectiveQrAccessKey, guestName, restaurantId, tableNumber]);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const data = await fetchGuestOrdersList();
+      const data = await fetchGuestSessionJson<{ orders: OrderHeaderResponse[]; total: number }>(
+        "/orders/my",
+      );
       setOrders(data.orders);
     } catch (err) {
-      if (err instanceof HttpStatusError && err.status === 401) {
+      if (isSessionHttpError(err, 401)) {
         const restored = await restoreGuestSession();
         if (restored) {
           try {
-            const retried = await fetchGuestOrdersList();
+            const retried = await fetchGuestSessionJson<{
+              orders: OrderHeaderResponse[];
+              total: number;
+            }>("/orders/my");
             setOrders(retried.orders);
             return;
           } catch (retryErr) {
