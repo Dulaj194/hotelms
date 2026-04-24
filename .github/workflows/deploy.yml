@@ -41,6 +41,10 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
+          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          if [ ! -d "~/hotelms" ]; then
+            git clone https://github.com/${{ github.repository }}.git ~/hotelms
+          fi
           cd ~/hotelms
           git pull origin main
           docker-compose -f docker-compose.prod.yml pull
