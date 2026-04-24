@@ -41,12 +41,13 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
+          set -e
           export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
           if [ ! -d "$HOME/hotelms" ]; then
-            git clone https://github.com/${{ github.repository }}.git $HOME/hotelms
+            git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git $HOME/hotelms
           fi
           cd $HOME/hotelms
-          git pull origin main
+          git pull https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
           docker-compose -f docker-compose.prod.yml pull
           docker-compose -f docker-compose.prod.yml up -d
           docker image prune -f
