@@ -4,47 +4,28 @@ function normalizeBase(url: string): string {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 }
 
-function isLoopbackHost(hostname: string): boolean {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-}
+export const API_BASE_URL = normalizeBase(env.VITE_API_URL || "/api/v1");
 
-function remapLoopbackHost(url: string): string {
-  if (typeof window === "undefined") return normalizeBase(url);
-
-  const browserHost = window.location.hostname;
-  if (!browserHost || isLoopbackHost(browserHost)) {
-    return normalizeBase(url);
-  }
-
-  try {
-    const parsed = new URL(url);
-    if (isLoopbackHost(parsed.hostname)) {
-      parsed.hostname = browserHost;
-      return normalizeBase(parsed.toString());
+function getWsBaseUrl(): string {
+  if (env.VITE_WS_URL) return normalizeBase(env.VITE_WS_URL);
+  
+  if (typeof window !== "undefined") {
+    // If API_BASE_URL is relative, construct absolute WS URL from current location
+    if (API_BASE_URL.startsWith("/")) {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const host = window.location.host;
+      return `${protocol}//${host}${API_BASE_URL}/ws`;
     }
-  } catch {
-    return normalizeBase(url);
+    // If API_BASE_URL is absolute, just replace http with ws
+    return API_BASE_URL.replace(/^http/i, "ws") + "/ws";
   }
-
-  return normalizeBase(url);
+  
+  return "ws://localhost:8000/api/v1/ws";
 }
 
-function deriveApiBaseFromBrowserLocation(): string {
-  if (typeof window === "undefined") {
-    return "http://localhost:8000/api/v1";
-  }
+export const WS_BASE_URL = normalizeBase(getWsBaseUrl());
 
-  const protocol = window.location.protocol === "https:" ? "https:" : "http:";
-  const host = window.location.hostname;
-  return `${protocol}//${host}:8000/api/v1`;
-}
+export const RESOLVED_API_BASE_URL = API_BASE_URL;
+export const RESOLVED_WS_BASE_URL = WS_BASE_URL;
+export const RESOLVED_BACKEND_ORIGIN = typeof window !== "undefined" ? window.location.origin : "http://localhost:8000";
 
-export const API_BASE_URL = normalizeBase(env.VITE_API_URL ?? deriveApiBaseFromBrowserLocation());
-
-export const WS_BASE_URL = normalizeBase(
-  env.VITE_WS_URL ?? `${API_BASE_URL.replace(/^http/i, "ws")}/ws`
-);
-
-export const RESOLVED_API_BASE_URL = remapLoopbackHost(API_BASE_URL);
-export const RESOLVED_WS_BASE_URL = remapLoopbackHost(WS_BASE_URL);
-export const RESOLVED_BACKEND_ORIGIN = RESOLVED_API_BASE_URL.replace(/\/api\/v1\/?$/, "");
