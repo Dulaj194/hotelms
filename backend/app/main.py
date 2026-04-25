@@ -22,6 +22,7 @@ Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
 (Path(settings.upload_dir) / "videos").mkdir(parents=True, exist_ok=True)
 
 
+
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting %s [env=%s]", settings.app_name, settings.app_env)
