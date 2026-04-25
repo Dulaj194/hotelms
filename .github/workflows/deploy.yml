@@ -48,6 +48,6 @@ jobs:
           fi
           cd $HOME/hotelms
           git pull https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
-          docker-compose -f docker-compose.prod.yml pull
-          docker-compose -f docker-compose.prod.yml up -d
+          docker compose -f docker-compose.prod.yml pull
+          docker compose -f docker-compose.prod.yml up -d
           docker image prune -f
