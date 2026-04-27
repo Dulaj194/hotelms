@@ -12,6 +12,7 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.modules.categories.model import Category
     from app.modules.restaurants.model import Restaurant
+    from app.modules.subcategories.model import Subcategory
 
 
 class Item(Base):
@@ -32,10 +33,13 @@ class Item(Base):
     blog_link: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     is_available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # Tenant scope — item belongs to both a category and a restaurant.
-    # Both FKs must come from authenticated context, never from client payload.
+    # Tenant scope — item belongs to a category, optional subcategory, and a restaurant.
+    # All FKs must come from authenticated context, never from client payload.
     category_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    subcategory_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("subcategories.id", ondelete="CASCADE"), nullable=True, index=True
     )
     restaurant_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, index=True
@@ -53,4 +57,5 @@ class Item(Base):
 
     # Relationships
     category: Mapped[Category] = relationship("Category", back_populates="items")
+    subcategory: Mapped[Subcategory | None] = relationship("Subcategory", back_populates="items")
     restaurant: Mapped[Restaurant] = relationship("Restaurant", back_populates="items")

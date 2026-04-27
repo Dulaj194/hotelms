@@ -51,7 +51,11 @@ class Category(Base):
     menu: Mapped[Menu | None] = relationship("Menu", back_populates="categories")
     restaurant: Mapped[Restaurant] = relationship("Restaurant", back_populates="categories")
     subcategories: Mapped[list[Subcategory]] = relationship(
-        "Subcategory", back_populates="category", cascade="all, delete-orphan"
+        "Subcategory", 
+        back_populates="category", 
+        cascade="all, delete-orphan",
+        order_by="Subcategory.sort_order.asc(), Subcategory.id.asc()",
+        lazy="selectin",  # Eager load subcategories
     )
     items: Mapped[list[Item]] = relationship(
         "Item", back_populates="category", cascade="all, delete-orphan"

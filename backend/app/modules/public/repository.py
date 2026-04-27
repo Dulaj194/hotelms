@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.modules.categories.model import Category
 from app.modules.items.model import Item
@@ -12,9 +12,13 @@ def get_public_restaurant_info(db: Session, restaurant_id: int) -> Restaurant | 
 
 
 def list_public_categories_by_restaurant(db: Session, restaurant_id: int) -> list[Category]:
-    """Return active categories for a restaurant, ordered by sort_order."""
+    """Return active categories for a restaurant, ordered by sort_order.
+    
+    Eagerly loads subcategories to avoid N+1 queries.
+    """
     return (
         db.query(Category)
+        .options(joinedload(Category.subcategories))
         .filter(Category.restaurant_id == restaurant_id, Category.is_active.is_(True))
         .order_by(Category.sort_order.asc(), Category.id.asc())
         .all()

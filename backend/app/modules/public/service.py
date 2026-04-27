@@ -9,6 +9,7 @@ from app.modules.public.schemas import (
     PublicItemSummaryResponse,
     PublicMenuResponse,
     PublicRestaurantInfoResponse,
+    PublicSubcategoryResponse,
 )
 from app.modules.public.schemas import PublicMenuSectionResponse
 
@@ -52,14 +53,49 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
 
     categories = repository.list_public_categories_by_restaurant(db, restaurant_id)
     all_items = repository.list_public_items_by_restaurant(db, restaurant_id)
-
     menus = repository.list_public_menus_by_restaurant(db, restaurant_id)
-    items_by_category: dict[int, list[PublicItemSummaryResponse]] = {}
+    
+    # Group items by category_id and then by subcategory_id
+    items_by_category_subcategory: dict[int, dict[int | None, list[PublicItemSummaryResponse]]] = {}
     for item in all_items:
         summary = PublicItemSummaryResponse.model_validate(item)
-        items_by_category.setdefault(item.category_id, []).append(summary)
+        cat_id = item.category_id
+        subcat_id = item.subcategory_id  # Can be None for items without subcategory
+        
+        if cat_id not in items_by_category_subcategory:
+            items_by_category_subcategory[cat_id] = {}
+        
+        if subcat_id not in items_by_category_subcategory[cat_id]:
+            items_by_category_subcategory[cat_id][subcat_id] = []
+        
+        items_by_category_subcategory[cat_id][subcat_id].append(summary)
 
     def _build_category(cat) -> PublicCategoryResponse:
+        """Build category with subcategories properly organized."""
+        subcategories: list[PublicSubcategoryResponse] = []
+        direct_items: list[PublicItemSummaryResponse] = []
+        
+        if cat.id in items_by_category_subcategory:
+            items_dict = items_by_category_subcategory[cat.id]
+            
+            # Items in subcategories (subcategory_id is not None)
+            for subcat in cat.subcategories:
+                if subcat.id in items_dict:
+                    subcategories.append(
+                        PublicSubcategoryResponse(
+                            id=subcat.id,
+                            name=subcat.name,
+                            description=subcat.description,
+                            image_path=subcat.image_path,
+                            sort_order=subcat.sort_order,
+                            items=items_dict[subcat.id],
+                        )
+                    )
+            
+            # Direct items in category (no subcategory)
+            if None in items_dict:
+                direct_items = items_dict[None]
+        
         return PublicCategoryResponse(
             id=cat.id,
             name=cat.name,
@@ -67,7 +103,8 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
             image_path=cat.image_path,
             sort_order=cat.sort_order,
             menu_id=cat.menu_id,
-            items=items_by_category.get(cat.id, []),
+            subcategories=subcategories,
+            items=direct_items,
         )
 
     # Index categories by menu_id
