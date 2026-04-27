@@ -134,7 +134,7 @@ def _set_refresh_cookie(response: Response, token_value: str) -> None:
         httponly=True,
         max_age=settings.refresh_token_expire_days * 86400,
         samesite="lax",
-        secure=settings.app_env == "production",
+        secure=settings.secure_cookies if hasattr(settings, "secure_cookies") else (settings.app_env == "production"),
     )
 
 

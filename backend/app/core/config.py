@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     reset_token_expire_minutes: int = 30
     session_idle_timeout_minutes: int = 60
     session_absolute_timeout_hours: int = 24
+    secure_cookies: bool = True
 
     # Rate limiting
     login_rate_limit_attempts: int = 5
