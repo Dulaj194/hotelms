@@ -129,6 +129,16 @@ def _build_change_delta(
     return delta
 
 
+def _parse_json_document(raw_value: str | None, fallback):
+    if not raw_value:
+        return fallback
+    try:
+        parsed = json.loads(raw_value)
+    except Exception:
+        return fallback
+    return parsed
+
+
 def _restaurant_lifecycle_snapshot(restaurant) -> dict[str, object]:
     banner_urls = _parse_json_document(restaurant.public_menu_banner_urls_json, [])
     if not isinstance(banner_urls, list):
