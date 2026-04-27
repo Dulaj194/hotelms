@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 import asyncio
+import traceback
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.response import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 
@@ -96,6 +98,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Log all unhandled exceptions as Internal Server Errors (500)."""
+    error_id = id(exc)  # Simple error ID for tracking
+    logger.error(
+        "Internal Server Error [%s] - %s %s - %s: %s",
+        error_id,
+        request.method,
+        request.url.path,
+        exc.__class__.__name__,
+        str(exc),
+        exc_info=exc,
+    )
+    # Log full traceback for debugging
+    logger.debug("Traceback for error [%s]:\n%s", error_id, traceback.format_exc())
+    
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error", "error_id": error_id},
+    )
+
 
 # Serve uploaded files (logos, etc.) at /uploads
 # In production replace with CDN/S3 pre-signed URL flow.
