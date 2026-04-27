@@ -36,7 +36,7 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "SQLAlchemy URL override. If omitted, uses DATABASE_URL env var, "
-            "then falls back to mysql+pymysql://root:hotelms123@localhost:3307/hotelms"
+            "Set DATABASE_URL environment variable to use a custom database URL."
         ),
     )
     parser.add_argument(
@@ -108,7 +108,14 @@ def main() -> int:
     database_url = (
         args.database_url
         or os.getenv("DATABASE_URL")
-        or "mysql+pymysql://root:hotelms123@localhost:3307/hotelms"
+        or "" # Fail fast if not set - never use hardcoded credentials
+    )
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable must be set. "
+            "Never use hardcoded credentials. Example: "
+            "export DATABASE_URL='mysql+pymysql://user:pass@localhost/db'"
+        )
     )
 
     engine = create_engine(database_url, pool_pre_ping=True, future=True)

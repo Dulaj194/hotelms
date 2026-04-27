@@ -598,53 +598,22 @@ export default function RoomMenu() {
         {renderedCategories.length === 0 ? (
           <p className="text-center text-gray-400 py-12">No categories available.</p>
         ) : (
-          renderedCategories.map((category) => {
-            const visibleSubcategories = category.subcategories.filter(
-              (subcat) => subcat.items.length > 0,
-            );
-            const hasDirectItems = category.items.length > 0;
-            const hasAnyItems = hasDirectItems || visibleSubcategories.length > 0;
+          renderedCategories.map((category) => (
+            <section key={category.id}>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h2>
+              {category.description && (
+                <p className="text-sm text-gray-500 mb-4">{category.description}</p>
+              )}
 
-            return (
-              <section key={category.id}>
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h2>
-                {category.description && (
-                  <p className="text-sm text-gray-500 mb-4">{category.description}</p>
-                )}
-
-                {!hasAnyItems ? (
-                  <p className="text-center text-gray-400 py-10">No items in this category.</p>
-                ) : (
-                  <div className="space-y-6">
-                    {hasDirectItems && (
-                      <div>
-                        {visibleSubcategories.length > 0 && (
-                          <h3 className="text-sm font-semibold text-gray-700 mb-3">Other items</h3>
-                        )}
-                        <div className="grid grid-cols-2 gap-3">
-                          {category.items.map(renderItemCard)}
-                        </div>
-                      </div>
-                    )}
-
-                    {visibleSubcategories.map((subcategory) => (
-                      <div key={subcategory.id}>
-                        <h3 className="text-sm font-semibold text-gray-800">{subcategory.name}</h3>
-                        {subcategory.description && (
-                          <p className="text-xs text-gray-500 mt-1 mb-3">
-                            {subcategory.description}
-                          </p>
-                        )}
-                        <div className="grid grid-cols-2 gap-3 mt-3">
-                          {subcategory.items.map(renderItemCard)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {category.items.length === 0 ? (
+                <p className="text-center text-gray-400 py-10">No items in this category.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {category.items.map(renderItemCard)}
+                </div>
+              )}
               </section>
-            );
-          })
+          ))
         )}
       </main>
 

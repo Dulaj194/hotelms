@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from app.modules.items.model import Item
     from app.modules.menus.model import Menu
     from app.modules.restaurants.model import Restaurant
-    from app.modules.subcategories.model import Subcategory
 
 
 class Category(Base):
@@ -50,13 +49,6 @@ class Category(Base):
     # Relationships
     menu: Mapped[Menu | None] = relationship("Menu", back_populates="categories")
     restaurant: Mapped[Restaurant] = relationship("Restaurant", back_populates="categories")
-    subcategories: Mapped[list[Subcategory]] = relationship(
-        "Subcategory", 
-        back_populates="category", 
-        cascade="all, delete-orphan",
-        order_by="Subcategory.sort_order.asc(), Subcategory.id.asc()",
-        lazy="selectin",  # Eager load subcategories
-    )
     items: Mapped[list[Item]] = relationship(
         "Item", back_populates="category", cascade="all, delete-orphan"
     )

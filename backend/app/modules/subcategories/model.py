@@ -11,7 +11,6 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.modules.categories.model import Category
-    from app.modules.items.model import Item
     from app.modules.restaurants.model import Restaurant
 
 
@@ -47,8 +46,5 @@ class Subcategory(Base):
     )
 
     # Relationships
-    category: Mapped[Category] = relationship("Category", back_populates="subcategories")
+    category: Mapped[Category] = relationship("Category")
     restaurant: Mapped[Restaurant] = relationship("Restaurant", back_populates="subcategories")
-    items: Mapped[list[Item]] = relationship(
-        "Item", back_populates="subcategory", cascade="all, delete-orphan"
-    )

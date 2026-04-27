@@ -37,10 +37,17 @@ if (-not $dockerOk) {
 
 Write-Step "Preparing .env files (if missing)"
 Ensure-EnvFile ".env" @"
-MYSQL_DATABASE=hotelms
-MYSQL_ROOT_PASSWORD=hotelms123
-DATABASE_URL=mysql+pymysql://root:hotelms123@mysql:3306/hotelms
-REDIS_URL=redis://redis:6379
+# Database configuration
+MYSQL_DATABASE=${env:MYSQL_DATABASE:-hotelms}
+# WARNING: Use strong password in production! Never commit credentials to Git.
+MYSQL_ROOT_PASSWORD=${env:MYSQL_ROOT_PASSWORD:-generate-a-random-password-here}
+DATABASE_URL=${env:DATABASE_URL:-mysql+pymysql://root:change-password@mysql:3306/hotelms}
+REDIS_URL=${env:REDIS_URL:-redis://redis:6379}
+
+# IMPORTANT: For production deployment, set these environment variables:
+# - export MYSQL_ROOT_PASSWORD='your-secure-password'
+# - export DATABASE_URL='mysql+pymysql://root:password@host:3306/hotelms'
+# - export REDIS_URL='redis://host:6379'
 "@
 
 Ensure-EnvFile "backend/.env" @"

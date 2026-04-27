@@ -6,6 +6,8 @@ from fastapi import APIRouter, Cookie, Depends, File, Form, Header, HTTPExceptio
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db, get_redis
+from app.core.rate_limiter import check_rate_limit
+from app.core.config import settings
 from app.modules.auth import service
 from app.modules.auth.schemas import (
     ForgotPasswordRequest,
@@ -56,7 +58,7 @@ def _handle_login_request(
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(
+async def login(
     payload: LoginRequest,
     request: Request,
     response: Response,
@@ -64,6 +66,13 @@ def login(
     redis_client: redis_lib.Redis = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
+    # Rate limit: 5 attempts per 15 minutes per IP
+    await check_rate_limit(
+        redis_client,
+        request,
+        max_attempts=settings.login_rate_limit_attempts,
+        window_minutes=settings.login_rate_limit_window_minutes,
+    )
     return _handle_login_request(
         payload=payload,
         request=request,
@@ -76,7 +85,7 @@ def login(
 
 
 @router.post("/login/restaurant-admin", response_model=TokenResponse)
-def login_restaurant_admin(
+async def login_restaurant_admin(
     payload: LoginRequest,
     request: Request,
     response: Response,
@@ -84,6 +93,13 @@ def login_restaurant_admin(
     redis_client: redis_lib.Redis = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
+    # Rate limit: 5 attempts per 15 minutes per IP
+    await check_rate_limit(
+        redis_client,
+        request,
+        max_attempts=settings.login_rate_limit_attempts,
+        window_minutes=settings.login_rate_limit_window_minutes,
+    )
     return _handle_login_request(
         payload=payload,
         request=request,
@@ -96,7 +112,7 @@ def login_restaurant_admin(
 
 
 @router.post("/login/staff", response_model=TokenResponse)
-def login_staff(
+async def login_staff(
     payload: LoginRequest,
     request: Request,
     response: Response,
@@ -104,6 +120,13 @@ def login_staff(
     redis_client: redis_lib.Redis = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
+    # Rate limit: 5 attempts per 15 minutes per IP
+    await check_rate_limit(
+        redis_client,
+        request,
+        max_attempts=settings.login_rate_limit_attempts,
+        window_minutes=settings.login_rate_limit_window_minutes,
+    )
     return _handle_login_request(
         payload=payload,
         request=request,
@@ -116,7 +139,7 @@ def login_staff(
 
 
 @router.post("/login/super-admin", response_model=TokenResponse)
-def login_super_admin(
+async def login_super_admin(
     payload: LoginRequest,
     request: Request,
     response: Response,
@@ -124,6 +147,13 @@ def login_super_admin(
     redis_client: redis_lib.Redis = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
+    # Rate limit: 5 attempts per 15 minutes per IP
+    await check_rate_limit(
+        redis_client,
+        request,
+        max_attempts=settings.login_rate_limit_attempts,
+        window_minutes=settings.login_rate_limit_window_minutes,
+    )
     return _handle_login_request(
         payload=payload,
         request=request,
@@ -174,22 +204,38 @@ def logout(
     response_model=ForgotPasswordResponse,
     response_model_exclude_none=True,
 )
-def forgot_password(
+async def forgot_password(
     payload: ForgotPasswordRequest,
     request: Request,
     db: Session = Depends(get_db),
+    redis_client: redis_lib.Redis = Depends(get_redis),
 ) -> ForgotPasswordResponse:
+    # Rate limit: 3 attempts per 30 minutes per IP
+    await check_rate_limit(
+        redis_client,
+        request,
+        max_attempts=settings.password_reset_rate_limit_attempts,
+        window_minutes=settings.password_reset_rate_limit_window_minutes,
+    )
     return service.forgot_password(
         db, payload.email, _client_ip(request), _user_agent(request),
     )
 
 
 @router.post("/reset-password", response_model=GenericMessageResponse)
-def reset_password(
+async def reset_password(
     payload: ResetPasswordRequest,
     request: Request,
     db: Session = Depends(get_db),
+    redis_client: redis_lib.Redis = Depends(get_redis),
 ) -> dict:
+    # Rate limit: 3 attempts per 30 minutes per IP
+    await check_rate_limit(
+        redis_client,
+        request,
+        max_attempts=settings.password_reset_rate_limit_attempts,
+        window_minutes=settings.password_reset_rate_limit_window_minutes,
+    )
     return service.reset_password(
         db, payload.token, payload.new_password,
         _client_ip(request), _user_agent(request),
@@ -239,6 +285,14 @@ async def register_restaurant(
     db: Session = Depends(get_db),
     redis_client: redis_lib.Redis = Depends(get_redis),
 ) -> RegisterRestaurantResponse:
+    # Rate limit: 3 attempts per 30 minutes per IP
+    await check_rate_limit(
+        redis_client,
+        request,
+        max_attempts=settings.registration_rate_limit_attempts,
+        window_minutes=settings.registration_rate_limit_window_minutes,
+    )
+    
     final_correlation_id = correlation_id or str(uuid.uuid4())
 
     payload = RegisterRestaurantRequest(

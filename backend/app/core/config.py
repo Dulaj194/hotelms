@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     # Rate limiting
     login_rate_limit_attempts: int = 5
     login_rate_limit_window_minutes: int = 15
+    registration_rate_limit_attempts: int = 3
+    registration_rate_limit_window_minutes: int = 30
+    password_reset_rate_limit_attempts: int = 3
+    password_reset_rate_limit_window_minutes: int = 30
 
     # File uploads
     upload_dir: str = "uploads"
@@ -173,26 +177,65 @@ class Settings(BaseSettings):
 
         return self
 
+    @model_validator(mode="after")
+    def validate_required_environment_variables(self) -> "Settings":
+        """Fail fast if critical environment variables are missing or using defaults."""
+        # In production, reject weak defaults
+        if self.app_env.lower() == "production":
+            # Check database URL is not using default
+            default_db_urls = {
+                "",
+                "mysql+pymysql://root:@localhost:3306/hotelms",
+                "mysql+pymysql://root:password@localhost/db",
+            }
+            if self.database_url in default_db_urls:
+                raise ValueError(
+                    "In production, DATABASE_URL must be explicitly configured. "
+                    "Using default database URL is not allowed."
+                )
+            
+            # Check Redis URL
+            if self.redis_url in ("", "redis://localhost:6379"):
+                raise ValueError(
+                    "In production, REDIS_URL must be explicitly configured."
+                )
+            
+            # Check frontend URL is not localhost
+            if "localhost" in self.frontend_url or "127.0.0.1" in self.frontend_url:
+                raise ValueError(
+                    "In production, FRONTEND_URL cannot be localhost. "
+                    "Set to your actual production domain."
+                )
+        
+        return self
+
     @property
     def cors_allowed_origins(self) -> list[str]:
-        """Return normalized CORS origins with backward-compatible defaults."""
+        """Return normalized CORS origins.
+        
+        In production: only explicitly configured origins.
+        In development: add localhost and private network for testing.
+        """
         origins: list[str] = []
 
+        # Always allow configured frontend URLs
         if self.frontend_urls.strip():
             origins.extend(
                 item.strip() for item in self.frontend_urls.split(",") if item.strip()
             )
-
         if self.frontend_url.strip():
             origins.append(self.frontend_url.strip())
 
-        # Safe defaults for local development, regardless of FRONTEND_URL value.
-        origins.extend([
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-        ])
+        # Only add dev defaults in development
+        if self.app_env.lower() == "development":
+            origins.extend([
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+            ])
 
-        # Deduplicate while preserving order and normalize trailing slashes.
+        # Deduplicate while preserving order and normalize trailing slashes
         deduped: list[str] = []
         seen: set[str] = set()
         for origin in origins:
@@ -205,16 +248,22 @@ class Settings(BaseSettings):
 
     @property
     def cors_allowed_origin_regex(self) -> str | None:
-        """Allow private-network frontend hosts in development for WiFi testing."""
+        """Allow private-network frontend hosts in development ONLY.
+        
+        Production environment: returns None (no regex matching).
+        Development: returns pattern for private IP ranges.
+        """
+        # STRICT: No regex matching in production - only explicit origins allowed
         if self.app_env.lower() != "development":
             return None
+        
         return (
-            r"^https?://(" 
-            r"localhost|127\.0\.0\.1|" 
+            r"^(https?://)"
+            r"(localhost|127\.0\.0\.1|" 
             r"192\.168\.\d{1,3}\.\d{1,3}|" 
             r"10\.\d{1,3}\.\d{1,3}\.\d{1,3}|" 
-            r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}" 
-            r")(:\d+)?$"
+            r"172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})"
+            r"(:\d+)?$"
         )
 
 

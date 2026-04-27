@@ -14,6 +14,7 @@ from starlette.responses import Response
 
 from app.api.router import router
 from app.core.config import settings
+from app.core.exceptions import HotelMSException
 from app.core.logging import configure_logging, get_logger
 from app.workers.subscription_expiry import run_subscription_expiry_loop
 
@@ -135,9 +136,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allowed_origins,
     allow_origin_regex=settings.cors_allowed_origin_regex,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=True,  # Only safe because allow_origins is explicitly curated
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Explicit methods
+    allow_headers=["Content-Type", "Authorization", "Accept"],  # Explicit headers
+    max_age=3600,  # Cache CORS preflight for 1 hour
 )
 
 
@@ -245,6 +247,47 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail, "error_id": error_id},
+    )
+
+
+@app.exception_handler(HotelMSException)
+async def hotelms_exception_handler(request: Request, exc: HotelMSException):
+    """Convert domain exceptions to HTTP responses."""
+    error_id = id(exc)
+    
+    # Log based on status code severity
+    if exc.status_code >= 500:
+        logger.error(
+            "Domain Error %s [%s] - %s %s - %s",
+            exc.error_code,
+            error_id,
+            request.method,
+            request.url.path,
+            exc.detail,
+            exc_info=exc,
+        )
+    elif exc.status_code >= 400:
+        logger.warning(
+            "Domain Error %s - %s %s - %s",
+            exc.error_code,
+            request.method,
+            request.url.path,
+            exc.detail,
+        )
+    
+    response_data = {
+        "detail": exc.detail,
+        "error_code": exc.error_code,
+        "error_id": error_id,
+    }
+    
+    # Include extra context if provided
+    if exc.extra:
+        response_data["extra"] = exc.extra
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=response_data,
     )
 
 

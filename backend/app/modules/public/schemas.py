@@ -31,7 +31,6 @@ class PublicItemSummaryResponse(BaseModel):
     image_path: str | None
     is_available: bool
     category_id: int
-    subcategory_id: int | None
 
     model_config = {"from_attributes": True}
 
@@ -49,37 +48,16 @@ class PublicItemDetailResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ─── Subcategories ────────────────────────────────────────────────────────────
-
-
-class PublicSubcategoryResponse(BaseModel):
-    """Subcategory with its items grouped together."""
-    id: int
-    name: str
-    description: str | None
-    image_path: str | None
-    sort_order: int
-    items: list[PublicItemSummaryResponse]
-
-    model_config = {"from_attributes": True}
-
-
-
-
-
 # ─── Categories ───────────────────────────────────────────────────────────────
 
 
 class PublicCategoryResponse(BaseModel):
-    """Category with subcategories and items organized hierarchically."""
     id: int
     name: str
     description: str | None
     image_path: str | None
     sort_order: int
     menu_id: int | None
-    subcategories: list[PublicSubcategoryResponse]
-    # Direct items (not in any subcategory)
     items: list[PublicItemSummaryResponse]
 
     model_config = {"from_attributes": True}
