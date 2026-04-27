@@ -17,9 +17,14 @@ _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 
 
-def list_categories(db: Session, restaurant_id: int) -> list[CategoryResponse]:
-    categories = repository.list_by_restaurant(db, restaurant_id)
-    return [CategoryResponse.model_validate(c) for c in categories]
+def list_categories(db: Session, restaurant_id: int, skip: int = 0, limit: int = 50) -> tuple[list[CategoryResponse], int]:
+    """List categories for restaurant with pagination.
+    
+    Returns:
+        Tuple of (categories, total_count)
+    """
+    categories, total = repository.list_by_restaurant(db, restaurant_id, skip=skip, limit=limit)
+    return [CategoryResponse.model_validate(c) for c in categories], total
 
 
 def get_category(db: Session, category_id: int, restaurant_id: int) -> CategoryResponse:

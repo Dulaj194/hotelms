@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.logging import get_logger
 from app.db.session import SessionLocal
-from app.modules.audit_logs import catalog
+from app.modules.audit_logs import catalog, repository
 from app.modules.audit_logs.model import AuditLog, AuditLogExportJob, SuperAdminNotificationState
 from app.modules.audit_logs.schemas import (
     AuditLogActorResponse,
@@ -196,8 +196,9 @@ def create_audit_log_export_job(
     requested_by_user_id: int | None,
     filters: AuditLogExportRequest,
 ) -> AuditLogExportJobResponse:
+    """Create an audit log export job."""
     job_id = uuid.uuid4().hex
-    now = _utcnow()
+    now = datetime.now(UTC)
     job = AuditLogExportJob(
         id=job_id,
         requested_by_user_id=requested_by_user_id,
@@ -205,27 +206,21 @@ def create_audit_log_export_job(
         filters_json=json.dumps(_prepare_export_filters(filters), ensure_ascii=True),
         expires_at=now + timedelta(hours=_AUDIT_EXPORT_TTL_HOURS),
     )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    return _serialize_export_job(job)
+    created_job = repository.create_export_job(db, job)
+    return _serialize_export_job(created_job)
 
 
 def process_audit_log_export_job(job_id: str) -> None:
+    """Process audit log export job in background worker."""
     db = SessionLocal()
     try:
-        job = (
-            db.query(AuditLogExportJob)
-            .filter(AuditLogExportJob.id == job_id)
-            .first()
-        )
+        job = repository.get_export_job_by_id(db, job_id)
         if job is None:
             return
 
         job.status = _EXPORT_JOB_STATUS_PROCESSING
         job.error_message = None
-        db.add(job)
-        db.commit()
+        repository.update_export_job(db, job)
 
         filters = _parse_metadata(job.filters_json)
         file_path = _build_export_file_path(job.id)
@@ -238,23 +233,17 @@ def process_audit_log_export_job(job_id: str) -> None:
         job.status = _EXPORT_JOB_STATUS_COMPLETED
         job.file_path = str(file_path)
         job.row_count = row_count
-        job.completed_at = _utcnow()
-        job.expires_at = _utcnow() + timedelta(hours=_AUDIT_EXPORT_TTL_HOURS)
-        db.add(job)
-        db.commit()
+        job.completed_at = datetime.now(UTC)
+        job.expires_at = datetime.now(UTC) + timedelta(hours=_AUDIT_EXPORT_TTL_HOURS)
+        repository.update_export_job(db, job)
     except Exception as exc:  # pragma: no cover - background task failures are environment-specific
         logger.exception("Audit log export job failed: %s", job_id)
-        failed_job = (
-            db.query(AuditLogExportJob)
-            .filter(AuditLogExportJob.id == job_id)
-            .first()
-        )
+        failed_job = repository.get_export_job_by_id(db, job_id)
         if failed_job is not None:
             failed_job.status = _EXPORT_JOB_STATUS_FAILED
             failed_job.error_message = str(exc)[:2000]
-            failed_job.completed_at = _utcnow()
-            db.add(failed_job)
-            db.commit()
+            failed_job.completed_at = datetime.now(UTC)
+            repository.update_export_job(db, failed_job)
     finally:
         db.close()
 
@@ -264,11 +253,8 @@ def get_audit_log_export_job(
     *,
     job_id: str,
 ) -> AuditLogExportJobResponse:
-    job = (
-        db.query(AuditLogExportJob)
-        .filter(AuditLogExportJob.id == job_id)
-        .first()
-    )
+    """Get audit log export job by ID."""
+    job = repository.get_export_job_by_id(db, job_id)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -524,6 +510,7 @@ def _load_context_maps(
     logs: list[AuditLog],
     notification_state_map: dict[int, SuperAdminNotificationState] | None = None,
 ) -> tuple[dict[int, object], dict[int, object]]:
+    """Load user and restaurant context maps for audit log serialization."""
     from app.modules.restaurants.model import Restaurant
     from app.modules.users.model import User
 
@@ -547,17 +534,11 @@ def _load_context_maps(
 
     user_map = {}
     if user_ids:
-        user_map = {
-            user.id: user
-            for user in db.query(User).filter(User.id.in_(user_ids)).all()
-        }
+        user_map = repository.get_users_by_ids(db, list(user_ids))
 
     restaurant_map = {}
     if restaurant_ids:
-        restaurant_map = {
-            restaurant.id: restaurant
-            for restaurant in db.query(Restaurant).filter(Restaurant.id.in_(restaurant_ids)).all()
-        }
+        restaurant_map = repository.get_restaurants_by_ids(db, list(restaurant_ids))
 
     return user_map, restaurant_map
 
@@ -744,6 +725,7 @@ def _get_notification_target(
     db: Session,
     notification_id: str,
 ) -> tuple[AuditLog, SuperAdminNotificationState]:
+    """Get audit log and its notification state for a notification ID."""
     audit_log_id = _parse_notification_id(notification_id)
     log = (
         db.query(AuditLog)
@@ -759,16 +741,10 @@ def _get_notification_target(
             detail="Notification not found.",
         )
 
-    notification_state = (
-        db.query(SuperAdminNotificationState)
-        .filter(SuperAdminNotificationState.audit_log_id == log.id)
-        .first()
-    )
-    if notification_state is None:
+    notification_state = repository.get_notification_state(db)
+    if notification_state is None or notification_state.audit_log_id != log.id:
         notification_state = SuperAdminNotificationState(audit_log_id=log.id)
-        db.add(notification_state)
-        db.commit()
-        db.refresh(notification_state)
+        notification_state = repository.create_or_update_notification_state(db, notification_state)
 
     return log, notification_state
 

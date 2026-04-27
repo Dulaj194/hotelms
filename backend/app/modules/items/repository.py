@@ -14,13 +14,16 @@ def get_by_id(db: Session, item_id: int, restaurant_id: int) -> Item | None:
     )
 
 
-def list_by_restaurant(db: Session, restaurant_id: int) -> list[Item]:
-    return (
-        db.query(Item)
-        .filter(Item.restaurant_id == restaurant_id)
-        .order_by(Item.name.asc())
-        .all()
-    )
+def list_by_restaurant(db: Session, restaurant_id: int, skip: int = 0, limit: int = 50) -> tuple[list[Item], int]:
+    """List items for restaurant with pagination.
+    
+    Returns:
+        Tuple of (items, total_count)
+    """
+    query = db.query(Item).filter(Item.restaurant_id == restaurant_id)
+    total = query.count()
+    items = query.order_by(Item.name.asc()).offset(skip).limit(limit).all()
+    return items, total
 
 
 def list_by_category(db: Session, category_id: int, restaurant_id: int) -> list[Item]:

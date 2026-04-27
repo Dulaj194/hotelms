@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
+from app.core.pagination import PaginationParams, pagination_depends, create_paginated_response
 from app.modules.access import role_catalog
 from app.modules.items import service
 from app.modules.items.schemas import (
@@ -18,12 +19,15 @@ router = APIRouter()
 _RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 
 
-@router.get("", response_model=list[ItemResponse])
+@router.get("", response_model=dict)
 def list_items(
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+    pagination: PaginationParams = Depends(pagination_depends),
     db: Session = Depends(get_db),
-) -> list[ItemResponse]:
-    return service.list_items(db, current_user.restaurant_id)  # type: ignore[arg-type]
+) -> dict:
+    """List items for restaurant with pagination."""
+    items, total = service.list_items(db, current_user.restaurant_id, skip=pagination.skip, limit=pagination.limit)  # type: ignore[arg-type]
+    return create_paginated_response(items, total, pagination.page, pagination.limit)
 
 
 @router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)

@@ -30,9 +30,14 @@ _MEDIA_SLOT_TO_FIELD = {
 }
 
 
-def list_items(db: Session, restaurant_id: int) -> list[ItemResponse]:
-    items = repository.list_by_restaurant(db, restaurant_id)
-    return [ItemResponse.model_validate(i) for i in items]
+def list_items(db: Session, restaurant_id: int, skip: int = 0, limit: int = 50) -> tuple[list[ItemResponse], int]:
+    """List items for restaurant with pagination.
+    
+    Returns:
+        Tuple of (items, total_count)
+    """
+    items, total = repository.list_by_restaurant(db, restaurant_id, skip=skip, limit=limit)
+    return [ItemResponse.model_validate(i) for i in items], total
 
 
 def get_item(db: Session, item_id: int, restaurant_id: int) -> ItemResponse:

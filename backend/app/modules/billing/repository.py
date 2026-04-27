@@ -392,3 +392,26 @@ def list_workflow_events(
         .all()
     )
     return items, total
+
+
+def get_bills_by_ids(
+    db: Session,
+    bill_ids: list[int],
+) -> dict[int, Bill]:
+    """Get bills by IDs as a dictionary for lookup."""
+    if not bill_ids:
+        return {}
+    bills = db.query(Bill).filter(Bill.id.in_(bill_ids)).all()
+    return {bill.id: bill for bill in bills}
+
+
+def get_users_by_ids(
+    db: Session,
+    user_ids: list[int],
+) -> dict[int, object]:
+    """Get users by IDs as a dictionary for lookup."""
+    if not user_ids:
+        return {}
+    from app.modules.users.model import User
+    users = db.query(User).filter(User.id.in_(user_ids)).all()
+    return {user.id: user for user in users}

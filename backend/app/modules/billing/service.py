@@ -136,10 +136,8 @@ def _build_bill_order_response(order: object) -> BillOrderResponse:
 
 
 def _load_user_map(db: Session, user_ids: set[int]) -> dict[int, User]:
-    if not user_ids:
-        return {}
-    users = db.query(User).filter(User.id.in_(user_ids)).all()
-    return {user.id: user for user in users}
+    """Load users by IDs from database."""
+    return repository.get_users_by_ids(db, list(user_ids))
 
 
 def _parse_event_metadata(event: BillWorkflowEvent) -> dict[str, Any] | None:
@@ -188,12 +186,12 @@ def _serialize_workflow_events(
     db: Session,
     events: list[BillWorkflowEvent],
 ) -> list[BillWorkflowEventResponse]:
+    """Serialize workflow events with bill and user context."""
     if not events:
         return []
 
     bill_ids = {event.bill_id for event in events}
-    bills = db.query(Bill).filter(Bill.id.in_(bill_ids)).all()
-    bills_by_id = {bill.id: bill for bill in bills}
+    bills_by_id = repository.get_bills_by_ids(db, list(bill_ids))
     users_by_id = _load_user_map(
         db,
         {event.user_id for event in events if event.user_id is not None},
