@@ -20,7 +20,6 @@ class ItemCreateRequest(BaseModel):
     blog_link: str | None = None
     is_available: bool = True
     category_id: int
-    subcategory_id: int | None = None
 
 
 class ItemUpdateRequest(BaseModel):
@@ -38,7 +37,6 @@ class ItemUpdateRequest(BaseModel):
     blog_link: str | None = None
     is_available: bool | None = None
     category_id: int | None = None
-    subcategory_id: int | None = None
 
 
 class ItemImageUploadResponse(BaseModel):
@@ -66,7 +64,6 @@ class ItemResponse(BaseModel):
     blog_link: str | None
     is_available: bool
     category_id: int
-    subcategory_id: int | None
     restaurant_id: int
     created_at: datetime
     updated_at: datetime

@@ -53,12 +53,6 @@ def add_item(db: Session, restaurant_id: int, data: ItemCreateRequest) -> ItemRe
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Category not found in your restaurant.",
         )
-    if data.subcategory_id is not None:
-        if not repository.subcategory_belongs_to_restaurant(db, data.subcategory_id, restaurant_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Subcategory not found or does not belong to your restaurant.",
-            )
 
     restaurant = restaurant_repository.get_by_id(db, restaurant_id)
     if restaurant is not None:
@@ -78,13 +72,7 @@ def update_item(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Category not found in your restaurant.",
             )
-    # If changing subcategory, verify it belongs to this restaurant
-    if data.subcategory_id is not None:
-        if not repository.subcategory_belongs_to_restaurant(db, data.subcategory_id, restaurant_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Subcategory not found or does not belong to your restaurant.",
-            )
+
     item = repository.update_by_id(db, item_id, restaurant_id, data)
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found.")

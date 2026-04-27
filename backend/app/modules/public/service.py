@@ -10,11 +10,7 @@ from app.modules.public.schemas import (
     PublicMenuResponse,
     PublicRestaurantInfoResponse,
 )
-from app.modules.public.schemas import (
-    PublicMenuSectionResponse,
-    PublicSubcategoryResponse,
-)
-
+from app.modules.public.schemas import PublicMenuSectionResponse
 
 def _assert_restaurant_active(restaurant_id: int, db: Session) -> PublicRestaurantInfoResponse:
     """Fetch and validate a public-facing restaurant. Raises clean 404 if not found."""
@@ -58,30 +54,10 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
     all_items = repository.list_public_items_by_restaurant(db, restaurant_id)
 
     menus = repository.list_public_menus_by_restaurant(db, restaurant_id)
-    all_subcats = repository.list_public_subcategories_by_restaurant(db, restaurant_id)
-
-    # Index items: by subcategory_id (if set), else by category_id
-    items_by_subcat: dict[int, list[PublicItemSummaryResponse]] = {}
-    items_by_category_direct: dict[int, list[PublicItemSummaryResponse]] = {}
+    items_by_category: dict[int, list[PublicItemSummaryResponse]] = {}
     for item in all_items:
         summary = PublicItemSummaryResponse.model_validate(item)
-        if item.subcategory_id is not None:
-            items_by_subcat.setdefault(item.subcategory_id, []).append(summary)
-        else:
-            items_by_category_direct.setdefault(item.category_id, []).append(summary)
-
-    # Index subcategories by category_id
-    subcats_by_category: dict[int, list[PublicSubcategoryResponse]] = {}
-    for subcat in all_subcats:
-        subcat_response = PublicSubcategoryResponse(
-            id=subcat.id,
-            name=subcat.name,
-            description=subcat.description,
-            image_path=subcat.image_path,
-            sort_order=subcat.sort_order,
-            items=items_by_subcat.get(subcat.id, []),
-        )
-        subcats_by_category.setdefault(subcat.category_id, []).append(subcat_response)
+        items_by_category.setdefault(item.category_id, []).append(summary)
 
     def _build_category(cat) -> PublicCategoryResponse:
         return PublicCategoryResponse(
@@ -91,8 +67,7 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
             image_path=cat.image_path,
             sort_order=cat.sort_order,
             menu_id=cat.menu_id,
-            items=items_by_category_direct.get(cat.id, []),
-            subcategories=subcats_by_category.get(cat.id, []),
+            items=items_by_category.get(cat.id, []),
         )
 
     # Index categories by menu_id
@@ -152,7 +127,6 @@ def get_public_item_detail(
         image_path=item.image_path,
         is_available=item.is_available,
         category_id=item.category_id,
-        subcategory_id=item.subcategory_id,
         category_name=item.category.name if item.category else None,
     )
 

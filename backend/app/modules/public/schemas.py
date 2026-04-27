@@ -31,7 +31,6 @@ class PublicItemSummaryResponse(BaseModel):
     image_path: str | None
     is_available: bool
     category_id: int
-    subcategory_id: int | None
 
     model_config = {"from_attributes": True}
 
@@ -44,24 +43,12 @@ class PublicItemDetailResponse(BaseModel):
     image_path: str | None
     is_available: bool
     category_id: int
-    subcategory_id: int | None
     category_name: str | None
 
     model_config = {"from_attributes": True}
 
 
-# ─── Subcategories ────────────────────────────────────────────────────────────
 
-
-class PublicSubcategoryResponse(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    image_path: str | None
-    sort_order: int
-    items: list[PublicItemSummaryResponse]
-
-    model_config = {"from_attributes": True}
 
 
 # ─── Categories ───────────────────────────────────────────────────────────────
@@ -74,8 +61,7 @@ class PublicCategoryResponse(BaseModel):
     image_path: str | None
     sort_order: int
     menu_id: int | None
-    items: list[PublicItemSummaryResponse]      # items with no subcategory
-    subcategories: list[PublicSubcategoryResponse]
+    items: list[PublicItemSummaryResponse]
 
     model_config = {"from_attributes": True}
 

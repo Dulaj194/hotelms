@@ -4,7 +4,6 @@ from app.modules.categories.model import Category
 from app.modules.items.model import Item
 from app.modules.restaurants.model import Restaurant
 from app.modules.menus.model import Menu
-from app.modules.subcategories.model import Subcategory
 
 
 def get_public_restaurant_info(db: Session, restaurant_id: int) -> Restaurant | None:
@@ -69,13 +68,3 @@ def list_public_menus_by_restaurant(db: Session, restaurant_id: int) -> list[Men
     )
 
 
-def list_public_subcategories_by_restaurant(
-    db: Session, restaurant_id: int
-) -> list[Subcategory]:
-    """Return active subcategories for a restaurant."""
-    return (
-        db.query(Subcategory)
-        .filter(Subcategory.restaurant_id == restaurant_id, Subcategory.is_active.is_(True))
-        .order_by(Subcategory.sort_order.asc(), Subcategory.id.asc())
-        .all()
-    )

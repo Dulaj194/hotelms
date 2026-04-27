@@ -11,6 +11,7 @@ from app.modules.audit_logs.model import (  # noqa: F401
 from app.modules.auth.model import PasswordResetToken  # noqa: F401
 from app.modules.billing.model import Bill, BillWorkflowEvent  # noqa: F401
 from app.modules.categories.model import Category  # noqa: F401
+from app.modules.subcategories.model import Subcategory  # noqa: F401
 from app.modules.dashboard.model import DashboardAlertImpression, DashboardSetupProgress  # noqa: F401
 from app.modules.items.model import Item  # noqa: F401
 from app.modules.menus.model import Menu  # noqa: F401
@@ -30,7 +31,6 @@ from app.modules.restaurants.model import (  # noqa: F401
 from app.modules.housekeeping.model import HousekeepingRequest  # noqa: F401
 from app.modules.settings.model import SettingsRequest  # noqa: F401
 from app.modules.site_content.model import ContactLead, SiteBlogPost, SitePage  # noqa: F401
-from app.modules.subcategories.model import Subcategory  # noqa: F401
 from app.modules.subscriptions.model import RestaurantSubscription, SubscriptionChangeLog  # noqa: F401
 from app.modules.room_sessions.model import RoomSession  # noqa: F401
 from app.modules.rooms.model import Room  # noqa: F401
