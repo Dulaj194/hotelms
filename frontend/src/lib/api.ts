@@ -148,17 +148,6 @@ async function request<T>(
 
   return response.json() as Promise<T>;
 }
-    try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload?.detail) detail = payload.detail;
-    } catch {
-      detail = response.statusText;
-    }
-    throw new ApiError(response.status, detail, method, path);
-  }
-
-  return response.json() as Promise<T>;
-}
 
 export async function refreshAccessToken(): Promise<string | null> {
   if (refreshPromise) {
