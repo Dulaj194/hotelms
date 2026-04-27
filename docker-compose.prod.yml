@@ -13,7 +13,7 @@ services:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 30
     restart: unless-stopped
 
   redis:
