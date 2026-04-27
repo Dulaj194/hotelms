@@ -101,7 +101,49 @@ app.add_middleware(
 )
 
 
-@app.exception_handler(Exception)
+@app.middleware("http")
+async def dependency_failure_middleware(request: Request, call_next):
+    """
+    Catch dependency injection failures (e.g., Redis timeout, DB connection error)
+    and return proper error responses instead of 502.
+    """
+    try:
+        response = await call_next(request)
+        return response
+    except HTTPException as exc:
+        # Re-raise HTTPException - will be handled by exception handler below
+        raise
+    except Exception as exc:
+        error_id = id(exc)
+        # Log the dependency failure
+        logger.error(
+            "Dependency failure [%s] - %s %s - %s: %s",
+            error_id,
+            request.method,
+            request.url.path,
+            exc.__class__.__name__,
+            str(exc),
+            exc_info=exc,
+        )
+        
+        # Return appropriate error based on exception type
+        if "redis" in str(exc).lower():
+            status_code = 503  # Service Unavailable
+            detail = "Redis service temporarily unavailable. Please try again."
+        elif "database" in str(exc).lower() or "connection" in str(exc).lower():
+            status_code = 503
+            detail = "Database service temporarily unavailable. Please try again."
+        else:
+            status_code = 502  # Bad Gateway
+            detail = "Backend service error. Please try again."
+        
+        return JSONResponse(
+            status_code=status_code,
+            content={"detail": detail, "error_id": error_id},
+        )
+
+
+# Serve uploaded files (logos, etc.) at /uploads
 async def global_exception_handler(request: Request, exc: Exception):
     """Log all unhandled exceptions as Internal Server Errors (500)."""
     error_id = id(exc)  # Simple error ID for tracking

@@ -3,14 +3,31 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, get_redis, require_roles
+from app.core.config import settings
+from app.core.logging import get_logger
 from app.modules.access import role_catalog
 from app.modules.health.schemas import HealthResponse
 from app.modules.health.service import get_health_status
 from app.modules.users.model import User
 
+logger = get_logger(__name__)
+
 router = APIRouter()
 
 _SUPER_ADMIN_OR_RESTAURANT_ADMIN_ROLES = role_catalog.SUPER_ADMIN_OR_RESTAURANT_ADMIN_ROLES
+
+
+@router.get("/ready", response_model=dict)
+def ready_check() -> dict:
+    """
+    Lightweight readiness check - no dependencies.
+    Use this from nginx/load balancer for container health.
+    """
+    return {
+        "status": "ready",
+        "service": settings.app_name,
+        "version": "1.0.0",
+    }
 
 
 @router.get("", response_model=HealthResponse)
