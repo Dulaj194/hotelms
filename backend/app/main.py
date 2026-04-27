@@ -1,15 +1,16 @@
+import asyncio
+import time
+import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
-import asyncio
-import traceback
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Callable
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.response import JSONResponse
 from fastapi.staticfiles import StaticFiles
-
+from starlette.responses import Response
 
 from app.api.router import router
 from app.core.config import settings
@@ -91,6 +92,45 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Middleware order matters - add timing first, then error handling
+# Request flows through: Timing → Error Handler → CORS → App Logic
+
+
+@app.middleware("http")
+async def request_timing_middleware(request: Request, call_next: Callable) -> Response:
+    """Log request processing time to identify slow endpoints."""
+    start_time = time.time()
+    request_size = request.headers.get("content-length", "0")
+    
+    try:
+        response = await call_next(request)
+        duration = time.time() - start_time
+        
+        # Log slow requests (>1 second)
+        if duration > 1.0:
+            logger.warning(
+                "Slow request [%.2fs] - %s %s (size: %s)",
+                duration,
+                request.method,
+                request.url.path,
+                request_size,
+            )
+        
+        # Add response timing header
+        response.headers["X-Process-Time"] = str(duration)
+        return response
+    except Exception as exc:
+        duration = time.time() - start_time
+        logger.error(
+            "Request failed [%.2fs] - %s %s - %s",
+            duration,
+            request.method,
+            request.url.path,
+            str(exc),
+        )
+        raise
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allowed_origins,
@@ -102,7 +142,7 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def dependency_failure_middleware(request: Request, call_next):
+async def dependency_failure_middleware(request: Request, call_next: Callable) -> Response:
     """
     Catch dependency injection failures (e.g., Redis timeout, DB connection error)
     and return proper error responses instead of 502.
@@ -144,6 +184,11 @@ async def dependency_failure_middleware(request: Request, call_next):
 
 
 # Serve uploaded files (logos, etc.) at /uploads
+# In production replace with CDN/S3 pre-signed URL flow.
+app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
+
+
+@app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Log all unhandled exceptions as Internal Server Errors (500)."""
     error_id = id(exc)  # Simple error ID for tracking
