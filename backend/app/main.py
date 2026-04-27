@@ -5,6 +5,7 @@ import traceback
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.response import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -119,6 +120,44 @@ async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal Server Error", "error_id": error_id},
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Log HTTP exceptions including Bad Gateway (502) errors."""
+    error_id = id(exc)
+    
+    # Log Bad Gateway (502) with higher severity
+    if exc.status_code == 502:
+        logger.error(
+            "Bad Gateway [%s] - %s %s - Upstream service unreachable",
+            error_id,
+            request.method,
+            request.url.path,
+            exc_info=exc,
+        )
+    elif exc.status_code >= 500:
+        logger.error(
+            "HTTP %d [%s] - %s %s - %s",
+            exc.status_code,
+            error_id,
+            request.method,
+            request.url.path,
+            exc.detail,
+        )
+    else:
+        logger.warning(
+            "HTTP %d - %s %s - %s",
+            exc.status_code,
+            request.method,
+            request.url.path,
+            exc.detail,
+        )
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "error_id": error_id},
     )
 
 
