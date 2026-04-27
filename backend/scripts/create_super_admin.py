@@ -9,6 +9,7 @@ from app.db.session import SessionLocal
 from app.modules.users.model import User, UserRole
 from app.core.security import hash_password
 from app.modules.platform_access.catalog import DEFAULT_PLATFORM_SCOPES
+import app.db.init_models  # Ensure all models are registered
 
 def create_super_admin(email: str, password: str, full_name: str):
     with SessionLocal() as db:
