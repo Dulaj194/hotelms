@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
-from app.core.pagination import PaginationParams, pagination_depends, create_paginated_response
+from app.core.pagination import PaginationParams, create_paginated_response, pagination_depends
 from app.modules.access import role_catalog
 from app.modules.items import service
 from app.modules.items.schemas import (
@@ -23,10 +23,17 @@ _RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 def list_items(
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     pagination: PaginationParams = Depends(pagination_depends),
+    category_id: int | None = Query(None, gt=0),
     db: Session = Depends(get_db),
 ) -> dict:
     """List items for restaurant with pagination."""
-    items, total = service.list_items(db, current_user.restaurant_id, skip=pagination.skip, limit=pagination.limit)  # type: ignore[arg-type]
+    items, total = service.list_items(
+        db,
+        current_user.restaurant_id,  # type: ignore[arg-type]
+        skip=pagination.skip,
+        limit=pagination.limit,
+        category_id=category_id,
+    )
     return create_paginated_response(items, total, pagination.page, pagination.limit)
 
 
@@ -84,9 +91,7 @@ async def upload_item_image(
     """
     if current_user.restaurant_id is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return await service.upload_item_image(
-        db, item_id, current_user.restaurant_id, file
-    )
+    return await service.upload_item_image(db, item_id, current_user.restaurant_id, file)
 
 
 @router.post("/{item_id}/media/{slot}", response_model=ItemMediaUploadResponse)
@@ -99,6 +104,4 @@ async def upload_item_media(
 ) -> ItemMediaUploadResponse:
     if current_user.restaurant_id is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return await service.upload_item_media(
-        db, item_id, current_user.restaurant_id, slot, file
-    )
+    return await service.upload_item_media(db, item_id, current_user.restaurant_id, slot, file)

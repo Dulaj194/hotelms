@@ -2,8 +2,8 @@ from sqlalchemy.orm import Session
 
 from app.modules.categories.model import Category
 from app.modules.items.model import Item
-from app.modules.restaurants.model import Restaurant
 from app.modules.menus.model import Menu
+from app.modules.restaurants.model import Restaurant
 
 
 def get_public_restaurant_info(db: Session, restaurant_id: int) -> Restaurant | None:
@@ -23,12 +23,7 @@ def list_public_categories_by_restaurant(db: Session, restaurant_id: int) -> lis
 
 def list_public_items_by_restaurant(db: Session, restaurant_id: int) -> list[Item]:
     """Return all items for a restaurant (all availability states, for menu tree building)."""
-    return (
-        db.query(Item)
-        .filter(Item.restaurant_id == restaurant_id)
-        .order_by(Item.name.asc())
-        .all()
-    )
+    return db.query(Item).filter(Item.restaurant_id == restaurant_id).order_by(Item.name.asc()).all()
 
 
 def get_public_item_by_id(db: Session, item_id: int, restaurant_id: int) -> Item | None:
@@ -36,16 +31,10 @@ def get_public_item_by_id(db: Session, item_id: int, restaurant_id: int) -> Item
 
     The restaurant_id param prevents cross-tenant data leakage.
     """
-    return (
-        db.query(Item)
-        .filter(Item.id == item_id, Item.restaurant_id == restaurant_id)
-        .first()
-    )
+    return db.query(Item).filter(Item.id == item_id, Item.restaurant_id == restaurant_id).first()
 
 
-def list_public_items_by_category(
-    db: Session, category_id: int, restaurant_id: int
-) -> list[Item]:
+def list_public_items_by_category(db: Session, category_id: int, restaurant_id: int) -> list[Item]:
     """Return items for a specific category, scoped to the restaurant.
 
     category_id alone is not sufficient — restaurant_id enforces tenant boundary.
@@ -66,5 +55,3 @@ def list_public_menus_by_restaurant(db: Session, restaurant_id: int) -> list[Men
         .order_by(Menu.sort_order.asc(), Menu.id.asc())
         .all()
     )
-
-

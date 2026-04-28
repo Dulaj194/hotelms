@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import RoomMenu from "@/pages/public/RoomMenu";
 
-const { publicGet, publicPost, setRoomSession, useRoomCart } = vi.hoisted(() => ({
+const { getRoomToken, publicGet, publicPost, setRoomSession, useRoomCart } = vi.hoisted(() => ({
+  getRoomToken: vi.fn(),
   publicGet: vi.fn(),
   publicPost: vi.fn(),
   setRoomSession: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("@/lib/publicApi", () => ({
 }));
 
 vi.mock("@/hooks/useRoomSession", () => ({
+  getRoomToken,
   setRoomSession,
 }));
 
@@ -27,6 +29,7 @@ vi.mock("@/hooks/useRoomCart", () => ({
 describe("RoomMenu", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getRoomToken.mockReturnValue(null);
     publicPost.mockResolvedValue({
       session_id: "room-session-1",
       room_session_token: "room-token-1",
@@ -53,7 +56,7 @@ describe("RoomMenu", () => {
           description: "Popular dishes",
           image_path: null,
           sort_order: 1,
-          menu_id: null,
+          menu_id: 1,
           items: [
             {
               id: 100,
@@ -63,10 +66,8 @@ describe("RoomMenu", () => {
               image_path: null,
               is_available: true,
               category_id: 10,
-              subcategory_id: null,
             },
           ],
-          subcategories: [],
         },
       ],
     });

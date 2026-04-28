@@ -35,9 +35,7 @@ def add_menu(db: Session, restaurant_id: int, data: MenuCreateRequest) -> MenuRe
     return MenuResponse.model_validate(menu)
 
 
-def update_menu(
-    db: Session, menu_id: int, restaurant_id: int, data: MenuUpdateRequest
-) -> MenuResponse:
+def update_menu(db: Session, menu_id: int, restaurant_id: int, data: MenuUpdateRequest) -> MenuResponse:
     menu = repository.update_by_id(db, menu_id, restaurant_id, data)
     if not menu:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu not found.")
@@ -57,7 +55,7 @@ def delete_menu(db: Session, menu_id: int, restaurant_id: int) -> dict:
     if image_path:
         delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
 
-    return {"message": "Menu deleted.", "menu_id": menu_id}
+    return {"message": "Menu and its categories/items deleted.", "menu_id": menu_id}
 
 
 async def upload_menu_image(

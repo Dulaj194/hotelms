@@ -5,7 +5,7 @@ export interface Category {
   image_path: string | null;
   sort_order: number;
   is_active: boolean;
-  menu_id: number | null;
+  menu_id: number;
   restaurant_id: number;
   created_at: string;
   updated_at: string;

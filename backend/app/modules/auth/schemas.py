@@ -57,7 +57,6 @@ class UserMeResponse(BaseModel):
 class TenantDataCountsResponse(BaseModel):
     menus: int = 0
     categories: int = 0
-    subcategories: int = 0
     items: int = 0
 
 

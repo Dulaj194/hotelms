@@ -17,13 +17,32 @@ _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 
 
-def list_categories(db: Session, restaurant_id: int, skip: int = 0, limit: int = 50) -> tuple[list[CategoryResponse], int]:
+def list_categories(
+    db: Session,
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    menu_id: int | None = None,
+) -> tuple[list[CategoryResponse], int]:
     """List categories for restaurant with pagination.
-    
+
     Returns:
         Tuple of (categories, total_count)
     """
-    categories, total = repository.list_by_restaurant(db, restaurant_id, skip=skip, limit=limit)
+    if menu_id is not None:
+        if not repository.menu_belongs_to_restaurant(db, menu_id, restaurant_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Menu not found or does not belong to your restaurant.",
+            )
+
+    categories, total = repository.list_by_restaurant(
+        db,
+        restaurant_id,
+        skip=skip,
+        limit=limit,
+        menu_id=menu_id,
+    )
     return [CategoryResponse.model_validate(c) for c in categories], total
 
 
@@ -34,22 +53,30 @@ def get_category(db: Session, category_id: int, restaurant_id: int) -> CategoryR
     return CategoryResponse.model_validate(category)
 
 
-def add_category(
-    db: Session, restaurant_id: int, data: CategoryCreateRequest
-) -> CategoryResponse:
-    if data.menu_id is not None:
-        if not repository.menu_belongs_to_restaurant(db, data.menu_id, restaurant_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Menu not found or does not belong to your restaurant.",
-            )
+def add_category(db: Session, restaurant_id: int, data: CategoryCreateRequest) -> CategoryResponse:
+    if not repository.menu_belongs_to_restaurant(db, data.menu_id, restaurant_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Menu not found or does not belong to your restaurant.",
+        )
     category = repository.create(db, restaurant_id, data)
     return CategoryResponse.model_validate(category)
 
 
-def update_category(
-    db: Session, category_id: int, restaurant_id: int, data: CategoryUpdateRequest
-) -> CategoryResponse:
+def update_category(db: Session, category_id: int, restaurant_id: int, data: CategoryUpdateRequest) -> CategoryResponse:
+    payload = data.model_dump(exclude_unset=True)
+    if "menu_id" in payload:
+        if payload["menu_id"] is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Category must belong to a menu.",
+            )
+        if not repository.menu_belongs_to_restaurant(db, payload["menu_id"], restaurant_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Menu not found or does not belong to your restaurant.",
+            )
+
     category = repository.update_by_id(db, category_id, restaurant_id, data)
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found.")

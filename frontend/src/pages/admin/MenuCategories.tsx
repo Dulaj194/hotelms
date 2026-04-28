@@ -9,6 +9,7 @@ import {
 import { useTenantContext } from "@/hooks/useTenantContext";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
+import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
 import type { Category, Menu } from "@/types/menu";
 
 interface FormData {
@@ -64,10 +65,10 @@ export default function MenuCategories() {
     setError(null);
     try {
       const [catsRes, menusRes] = await Promise.all([
-        api.get<Category[]>("/categories"),
+        api.get<Category[] | PaginatedResponse<Category>>("/categories?limit=500"),
         api.get<Menu[]>("/menus"),
       ]);
-      setCategories(catsRes);
+      setCategories(unwrapPaginated(catsRes));
       setMenus(menusRes);
     } catch {
       setError("Failed to load categories.");
@@ -182,6 +183,10 @@ export default function MenuCategories() {
       setFormError("Name is required.");
       return;
     }
+    if (formData.menu_id === "") {
+      setFormError("Select a menu before saving this category.");
+      return;
+    }
 
     setSaving(true);
     setFormError(null);
@@ -190,7 +195,7 @@ export default function MenuCategories() {
       const payload = {
         name: formData.name.trim(),
         description: formData.description.trim() || null,
-        menu_id: formData.menu_id === "" ? null : formData.menu_id,
+        menu_id: formData.menu_id,
         sort_order: formData.sort_order,
         is_active: formData.is_active,
       };
@@ -294,7 +299,8 @@ export default function MenuCategories() {
           </select>
           <button
             onClick={openCreate}
-            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+            disabled={menus.length === 0}
+            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             + Add Category
           </button>
@@ -363,12 +369,12 @@ export default function MenuCategories() {
 
                 <div className="mt-3 flex items-center justify-between text-xs font-medium text-slate-500">
                   <span>Sort: {category.sort_order}</span>
-                  <span>{menus.find((menu) => menu.id === category.menu_id)?.name ?? "Uncategorized"}</span>
+                  <span>{menus.find((menu) => menu.id === category.menu_id)?.name ?? "Menu not found"}</span>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => navigate(`/admin/menu/subcategories?categoryId=${category.id}`)}
+                    onClick={() => navigate(`/admin/menu/items?categoryId=${category.id}`)}
                     className="col-span-2 rounded-lg bg-cyan-500 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-600"
                   >
                     Explore
@@ -469,7 +475,9 @@ export default function MenuCategories() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">Menu (optional)</label>
+                <label className="mb-1 block text-xs font-medium text-gray-700">
+                  Menu <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={formData.menu_id}
                   onChange={(event) =>
@@ -480,13 +488,18 @@ export default function MenuCategories() {
                   }
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
                 >
-                  <option value="">No menu (uncategorized)</option>
+                  <option value="">Select menu</option>
                   {menus.map((menu) => (
                     <option key={menu.id} value={menu.id}>
                       {menu.name}
                     </option>
                   ))}
                 </select>
+                {menus.length === 0 && (
+                  <p className="mt-1 text-[11px] text-red-500">
+                    Create a menu before adding categories.
+                  </p>
+                )}
               </div>
 
               <div>

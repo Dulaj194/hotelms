@@ -458,7 +458,7 @@ export default function Menus() {
             <h2 className="mb-2 text-lg font-semibold text-gray-900">Delete Menu?</h2>
             <p className="mb-5 text-sm text-gray-600">
               <span className="font-medium">{deleteTarget.name}</span> will be permanently deleted.
-              Categories linked to this menu will become uncategorized.
+              Categories and items linked to this menu will also be deleted.
             </p>
             <div className="app-form-actions">
               <button

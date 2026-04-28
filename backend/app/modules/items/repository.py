@@ -7,20 +7,24 @@ from app.modules.items.schemas import ItemCreateRequest, ItemUpdateRequest
 
 def get_by_id(db: Session, item_id: int, restaurant_id: int) -> Item | None:
     """Fetch item scoped to restaurant. Prevents cross-tenant access."""
-    return (
-        db.query(Item)
-        .filter(Item.id == item_id, Item.restaurant_id == restaurant_id)
-        .first()
-    )
+    return db.query(Item).filter(Item.id == item_id, Item.restaurant_id == restaurant_id).first()
 
 
-def list_by_restaurant(db: Session, restaurant_id: int, skip: int = 0, limit: int = 50) -> tuple[list[Item], int]:
+def list_by_restaurant(
+    db: Session,
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    category_id: int | None = None,
+) -> tuple[list[Item], int]:
     """List items for restaurant with pagination.
-    
+
     Returns:
         Tuple of (items, total_count)
     """
     query = db.query(Item).filter(Item.restaurant_id == restaurant_id)
+    if category_id is not None:
+        query = query.filter(Item.category_id == category_id)
     total = query.count()
     items = query.order_by(Item.name.asc()).offset(skip).limit(limit).all()
     return items, total
@@ -35,14 +39,10 @@ def list_by_category(db: Session, category_id: int, restaurant_id: int) -> list[
     )
 
 
-def category_belongs_to_restaurant(
-    db: Session, category_id: int, restaurant_id: int
-) -> bool:
+def category_belongs_to_restaurant(db: Session, category_id: int, restaurant_id: int) -> bool:
     """Verify a category belongs to the given restaurant before linking an item to it."""
     return (
-        db.query(Category)
-        .filter(Category.id == category_id, Category.restaurant_id == restaurant_id)
-        .first()
+        db.query(Category).filter(Category.id == category_id, Category.restaurant_id == restaurant_id).first()
     ) is not None
 
 
@@ -71,9 +71,7 @@ def create(db: Session, restaurant_id: int, data: ItemCreateRequest) -> Item:
     return item
 
 
-def update_by_id(
-    db: Session, item_id: int, restaurant_id: int, data: ItemUpdateRequest
-) -> Item | None:
+def update_by_id(db: Session, item_id: int, restaurant_id: int, data: ItemUpdateRequest) -> Item | None:
     item = get_by_id(db, item_id, restaurant_id)
     if not item:
         return None
@@ -93,9 +91,7 @@ def delete_by_id(db: Session, item_id: int, restaurant_id: int) -> bool:
     return True
 
 
-def update_image_path(
-    db: Session, item_id: int, restaurant_id: int, image_path: str
-) -> Item | None:
+def update_image_path(db: Session, item_id: int, restaurant_id: int, image_path: str) -> Item | None:
     item = get_by_id(db, item_id, restaurant_id)
     if not item:
         return None

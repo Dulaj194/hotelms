@@ -41,7 +41,7 @@ export interface PublicCategoryResponse {
   description: string | null;
   image_path: string | null;
   sort_order: number;
-  menu_id: number | null;
+  menu_id: number;
   items: PublicItemSummaryResponse[];
 }
 

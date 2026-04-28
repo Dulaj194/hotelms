@@ -1,5 +1,6 @@
-from fastapi import HTTPException, status
 import json
+
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.modules.public import repository
@@ -8,9 +9,10 @@ from app.modules.public.schemas import (
     PublicItemDetailResponse,
     PublicItemSummaryResponse,
     PublicMenuResponse,
+    PublicMenuSectionResponse,
     PublicRestaurantInfoResponse,
 )
-from app.modules.public.schemas import PublicMenuSectionResponse
+
 
 def _assert_restaurant_active(restaurant_id: int, db: Session) -> PublicRestaurantInfoResponse:
     """Fetch and validate a public-facing restaurant. Raises clean 404 if not found."""
@@ -40,9 +42,7 @@ def _assert_restaurant_active(restaurant_id: int, db: Session) -> PublicRestaura
     )
 
 
-def get_public_restaurant_info(
-    db: Session, restaurant_id: int
-) -> PublicRestaurantInfoResponse:
+def get_public_restaurant_info(db: Session, restaurant_id: int) -> PublicRestaurantInfoResponse:
     return _assert_restaurant_active(restaurant_id, db)
 
 
@@ -70,15 +70,12 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
             items=items_by_category.get(cat.id, []),
         )
 
-    # Index categories by menu_id
     cats_by_menu: dict[int, list[PublicCategoryResponse]] = {}
-    uncategorized: list[PublicCategoryResponse] = []
     for cat in categories:
+        if cat.menu_id is None:
+            continue
         cat_resp = _build_category(cat)
-        if cat.menu_id is not None:
-            cats_by_menu.setdefault(cat.menu_id, []).append(cat_resp)
-        else:
-            uncategorized.append(cat_resp)
+        cats_by_menu.setdefault(cat.menu_id, []).append(cat_resp)
 
     menu_sections = [
         PublicMenuSectionResponse(
@@ -93,22 +90,18 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
     ]
 
     flat_categories: list[PublicCategoryResponse] = [
-        category
-        for section in menu_sections
-        for category in section.categories
-    ] + uncategorized
+        category for section in menu_sections for category in section.categories
+    ]
 
     return PublicMenuResponse(
         restaurant=restaurant_info,
         menus=menu_sections,
-        uncategorized_categories=uncategorized,
+        uncategorized_categories=[],
         categories=flat_categories,
     )
 
 
-def get_public_item_detail(
-    db: Session, restaurant_id: int, item_id: int
-) -> PublicItemDetailResponse:
+def get_public_item_detail(db: Session, restaurant_id: int, item_id: int) -> PublicItemDetailResponse:
     """Fetch a single item's public detail.
 
     restaurant_id scoping prevents cross-tenant data leakage.
@@ -131,9 +124,7 @@ def get_public_item_detail(
     )
 
 
-def get_public_items_by_category(
-    db: Session, restaurant_id: int, category_id: int
-) -> list[PublicItemSummaryResponse]:
+def get_public_items_by_category(db: Session, restaurant_id: int, category_id: int) -> list[PublicItemSummaryResponse]:
     """Return items for one category within a restaurant."""
     items = repository.list_public_items_by_category(db, category_id, restaurant_id)
     return [PublicItemSummaryResponse.model_validate(i) for i in items]

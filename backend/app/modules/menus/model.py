@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 class Menu(Base):
     __tablename__ = "menus"
+    __table_args__ = (Index("ix_menus_restaurant_sort", "restaurant_id", "sort_order", "id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -30,9 +31,7 @@ class Menu(Base):
         Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -42,6 +41,4 @@ class Menu(Base):
 
     # Relationships
     restaurant: Mapped[Restaurant] = relationship("Restaurant", back_populates="menus")
-    categories: Mapped[list[Category]] = relationship(
-        "Category", back_populates="menu", cascade="all, delete-orphan"
-    )
+    categories: Mapped[list[Category]] = relationship("Category", back_populates="menu", cascade="all, delete-orphan")

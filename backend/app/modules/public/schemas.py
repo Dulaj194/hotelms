@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-
 # ─── Restaurant ───────────────────────────────────────────────────────────────
 
 
@@ -57,7 +56,7 @@ class PublicCategoryResponse(BaseModel):
     description: str | None
     image_path: str | None
     sort_order: int
-    menu_id: int | None
+    menu_id: int
     items: list[PublicItemSummaryResponse]
 
     model_config = {"from_attributes": True}

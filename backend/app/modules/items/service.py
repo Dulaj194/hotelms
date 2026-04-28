@@ -30,13 +30,32 @@ _MEDIA_SLOT_TO_FIELD = {
 }
 
 
-def list_items(db: Session, restaurant_id: int, skip: int = 0, limit: int = 50) -> tuple[list[ItemResponse], int]:
+def list_items(
+    db: Session,
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    category_id: int | None = None,
+) -> tuple[list[ItemResponse], int]:
     """List items for restaurant with pagination.
-    
+
     Returns:
         Tuple of (items, total_count)
     """
-    items, total = repository.list_by_restaurant(db, restaurant_id, skip=skip, limit=limit)
+    if category_id is not None:
+        if not repository.category_belongs_to_restaurant(db, category_id, restaurant_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Category not found in your restaurant.",
+            )
+
+    items, total = repository.list_by_restaurant(
+        db,
+        restaurant_id,
+        skip=skip,
+        limit=limit,
+        category_id=category_id,
+    )
     return [ItemResponse.model_validate(i) for i in items], total
 
 
@@ -66,12 +85,15 @@ def add_item(db: Session, restaurant_id: int, data: ItemCreateRequest) -> ItemRe
     return ItemResponse.model_validate(item)
 
 
-def update_item(
-    db: Session, item_id: int, restaurant_id: int, data: ItemUpdateRequest
-) -> ItemResponse:
-    # If changing category, verify it belongs to this restaurant
-    if data.category_id is not None:
-        if not repository.category_belongs_to_restaurant(db, data.category_id, restaurant_id):
+def update_item(db: Session, item_id: int, restaurant_id: int, data: ItemUpdateRequest) -> ItemResponse:
+    payload = data.model_dump(exclude_unset=True)
+    if "category_id" in payload:
+        if payload["category_id"] is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Item must belong to a category.",
+            )
+        if not repository.category_belongs_to_restaurant(db, payload["category_id"], restaurant_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Category not found in your restaurant.",
@@ -143,9 +165,7 @@ async def upload_item_media(
         )
 
     is_video_slot = slot == "video"
-    allowed_content_types = (
-        _ALLOWED_VIDEO_CONTENT_TYPES if is_video_slot else _ALLOWED_CONTENT_TYPES
-    )
+    allowed_content_types = _ALLOWED_VIDEO_CONTENT_TYPES if is_video_slot else _ALLOWED_CONTENT_TYPES
     ext_map = _VIDEO_EXT_MAP if is_video_slot else _EXT_MAP
 
     if file.content_type not in allowed_content_types:

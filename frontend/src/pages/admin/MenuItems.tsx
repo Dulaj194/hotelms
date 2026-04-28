@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
+import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
 import type { Category, Item } from "@/types/menu";
 import type { RestaurantMeResponse } from "@/types/restaurant";
 
@@ -94,12 +95,12 @@ export default function MenuItems() {
     setError(null);
     try {
       const [itemsRes, catsRes, restaurantRes] = await Promise.all([
-        api.get<Item[]>("/items"),
-        api.get<Category[]>("/categories"),
+        api.get<Item[] | PaginatedResponse<Item>>("/items?limit=500"),
+        api.get<Category[] | PaginatedResponse<Category>>("/categories?limit=500"),
         api.get<RestaurantMeResponse>("/restaurants/me"),
       ]);
-      setItems(itemsRes);
-      setCategories(catsRes);
+      setItems(unwrapPaginated(itemsRes));
+      setCategories(unwrapPaginated(catsRes));
       setRestaurantCurrency((restaurantRes.currency || "LKR").toUpperCase());
     } catch {
       setError("Failed to load data.");
@@ -249,7 +250,6 @@ export default function MenuItems() {
         price: priceNum,
         currency: restaurantCurrency,
         category_id: formData.category_id,
-        subcategory_id: null,
         blog_link: formData.blog_link.trim() || null,
         image_path: removeExistingMedia.primary ? null : undefined,
         image_path_2: removeExistingMedia.additional_1 ? null : undefined,

@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
-from app.core.pagination import PaginationParams, pagination_depends, create_paginated_response
+from app.core.pagination import PaginationParams, create_paginated_response, pagination_depends
 from app.modules.access import role_catalog
 from app.modules.categories import service
 from app.modules.categories.schemas import (
@@ -22,10 +22,17 @@ _RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 def list_categories(
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     pagination: PaginationParams = Depends(pagination_depends),
+    menu_id: int | None = Query(None, gt=0),
     db: Session = Depends(get_db),
 ) -> dict:
     """List categories for restaurant with pagination."""
-    categories, total = service.list_categories(db, current_user.restaurant_id, skip=pagination.skip, limit=pagination.limit)  # type: ignore[arg-type]
+    categories, total = service.list_categories(
+        db,
+        current_user.restaurant_id,  # type: ignore[arg-type]
+        skip=pagination.skip,
+        limit=pagination.limit,
+        menu_id=menu_id,
+    )
     return create_paginated_response(categories, total, pagination.page, pagination.limit)
 
 
@@ -83,6 +90,4 @@ async def upload_category_image(
     """
     if current_user.restaurant_id is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return await service.upload_category_image(
-        db, category_id, current_user.restaurant_id, file
-    )
+    return await service.upload_category_image(db, category_id, current_user.restaurant_id, file)

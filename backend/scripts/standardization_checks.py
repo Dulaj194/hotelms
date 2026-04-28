@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 IGNORED_EXTRA_TABLES = {"alembic_version"}
-DEPRECATED_MODULES = {"subcategories"}  # Modules to exclude from router registration check
+DEPRECATED_MODULES: set[str] = set()
 MAX_CONSTRAINT_DETAIL_ITEMS = 15
 
 
@@ -52,9 +52,7 @@ def check_metadata_naming() -> CheckResult:
             violations.append(f"Table '{table_name}' must be snake_case.")
         for column in table.columns:
             if not SNAKE_CASE_PATTERN.fullmatch(column.name):
-                violations.append(
-                    f"Column '{table_name}.{column.name}' must be snake_case."
-                )
+                violations.append(f"Column '{table_name}.{column.name}' must be snake_case.")
 
     if violations:
         return CheckResult(
@@ -71,11 +69,7 @@ def check_metadata_naming() -> CheckResult:
 
 def _modules_with_router() -> set[str]:
     modules_dir = _backend_root() / "app" / "modules"
-    return {
-        entry.name
-        for entry in modules_dir.iterdir()
-        if entry.is_dir() and (entry / "router.py").exists()
-    }
+    return {entry.name for entry in modules_dir.iterdir() if entry.is_dir() and (entry / "router.py").exists()}
 
 
 def _extract_router_imports_and_usage(
@@ -89,12 +83,7 @@ def _extract_router_imports_and_usage(
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
             parts = node.module.split(".")
-            if (
-                len(parts) == 4
-                and parts[0] == "app"
-                and parts[1] == "modules"
-                and parts[3] == "router"
-            ):
+            if len(parts) == 4 and parts[0] == "app" and parts[1] == "modules" and parts[3] == "router":
                 module_name = parts[2]
                 imported_modules.add(module_name)
                 for alias in node.names:
@@ -123,29 +112,21 @@ def check_router_registration() -> CheckResult:
         )
 
     expected_modules = _modules_with_router() - DEPRECATED_MODULES
-    imported_modules, imported_aliases, included_aliases = _extract_router_imports_and_usage(
-        router_path
-    )
+    imported_modules, imported_aliases, included_aliases = _extract_router_imports_and_usage(router_path)
 
     missing_module_imports = sorted(expected_modules - imported_modules)
     imported_but_not_included = sorted(
-        {
-            module
-            for alias, module in imported_aliases.items()
-            if alias not in included_aliases
-        }
+        {module for alias, module in imported_aliases.items() if alias not in included_aliases}
     )
 
     failures: list[str] = []
     if missing_module_imports:
         failures.append(
-            "Modules with router.py missing import in app/api/router.py: "
-            + ", ".join(missing_module_imports)
+            "Modules with router.py missing import in app/api/router.py: " + ", ".join(missing_module_imports)
         )
     if imported_but_not_included:
         failures.append(
-            "Router modules imported but not included with include_router(...): "
-            + ", ".join(imported_but_not_included)
+            "Router modules imported but not included with include_router(...): " + ", ".join(imported_but_not_included)
         )
 
     if failures:
@@ -157,9 +138,7 @@ def check_router_registration() -> CheckResult:
     return CheckResult(
         name="Module router registration",
         ok=True,
-        details=[
-            f"All {len(expected_modules)} module routers are imported and registered."
-        ],
+        details=[f"All {len(expected_modules)} module routers are imported and registered."],
     )
 
 
@@ -185,9 +164,7 @@ def check_compose_secret_injection(compose_file: Path | None = None) -> CheckRes
     for line_no, line in enumerate(compose_path.read_text(encoding="utf-8").splitlines(), start=1):
         for key, pattern in required_env_patterns.items():
             if line.lstrip().startswith(f"{key}:") and not pattern.search(line):
-                failures.append(
-                    f"{compose_path.name}:{line_no} has hardcoded {key}. Use env interpolation."
-                )
+                failures.append(f"{compose_path.name}:{line_no} has hardcoded {key}. Use env interpolation.")
 
     if failures:
         return CheckResult(
@@ -244,9 +221,7 @@ def check_active_track_clarity(
         missing_services = sorted(expected_services - actual_services)
         extra_services = sorted(actual_services - expected_services)
         if missing_services:
-            failures.append(
-                "docker-compose.yml is missing primary active services: " + ", ".join(missing_services)
-            )
+            failures.append("docker-compose.yml is missing primary active services: " + ", ".join(missing_services))
         if extra_services:
             failures.append(
                 "docker-compose.yml contains non-primary services (drift risk): " + ", ".join(extra_services)
@@ -286,11 +261,7 @@ def check_production_guardrails(
 
         app_env = settings.app_env if app_env is None else app_env
         secret_key = settings.secret_key if secret_key is None else secret_key
-        db_auto_schema_sync = (
-            settings.db_auto_schema_sync
-            if db_auto_schema_sync is None
-            else db_auto_schema_sync
-        )
+        db_auto_schema_sync = settings.db_auto_schema_sync if db_auto_schema_sync is None else db_auto_schema_sync
 
     normalized_env = app_env.lower()
     if normalized_env != "production":
@@ -307,13 +278,9 @@ def check_production_guardrails(
         "change-this-to-a-long-random-string",
     }
     if secret_key in weak_secret_values or len(secret_key) < 32:
-        failures.append(
-            "SECRET_KEY is weak for production. Use at least 32 random characters."
-        )
+        failures.append("SECRET_KEY is weak for production. Use at least 32 random characters.")
     if db_auto_schema_sync:
-        failures.append(
-            "DB_AUTO_SCHEMA_SYNC is true in production. Disable it and run Alembic migrations."
-        )
+        failures.append("DB_AUTO_SCHEMA_SYNC is true in production. Disable it and run Alembic migrations.")
 
     if failures:
         return CheckResult(
@@ -355,9 +322,7 @@ def _expected_foreign_keys(
         for fk_constraint in table.foreign_key_constraints:
             constrained_columns = [column.name for column in fk_constraint.columns]
             referred_columns = [element.column.name for element in fk_constraint.elements]
-            referred_table = (
-                fk_constraint.referred_table.name if fk_constraint.referred_table is not None else ""
-            )
+            referred_table = fk_constraint.referred_table.name if fk_constraint.referred_table is not None else ""
             if not constrained_columns or not referred_columns or not referred_table:
                 continue
             expected.add(

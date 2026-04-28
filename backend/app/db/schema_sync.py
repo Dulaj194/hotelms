@@ -7,16 +7,14 @@ from sqlalchemy.engine import Connection, Engine
 
 
 def _column_exists(conn: Connection, table_name: str, column_name: str) -> bool:
-    query = text(
-        """
+    query = text("""
         SELECT 1
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = :table_name
           AND COLUMN_NAME = :column_name
         LIMIT 1
-        """
-    )
+        """)
     row = conn.execute(
         query,
         {"table_name": table_name, "column_name": column_name},
@@ -25,15 +23,13 @@ def _column_exists(conn: Connection, table_name: str, column_name: str) -> bool:
 
 
 def _table_exists(conn: Connection, table_name: str) -> bool:
-    query = text(
-        """
+    query = text("""
         SELECT 1
         FROM INFORMATION_SCHEMA.TABLES
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = :table_name
         LIMIT 1
-        """
-    )
+        """)
     row = conn.execute(query, {"table_name": table_name}).first()
     return row is not None
 
@@ -46,8 +42,7 @@ def _foreign_key_exists(
     referenced_table: str,
     referenced_column: str,
 ) -> bool:
-    query = text(
-        """
+    query = text("""
         SELECT 1
         FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
         WHERE TABLE_SCHEMA = DATABASE()
@@ -56,8 +51,7 @@ def _foreign_key_exists(
           AND REFERENCED_TABLE_NAME = :referenced_table
           AND REFERENCED_COLUMN_NAME = :referenced_column
         LIMIT 1
-        """
-    )
+        """)
     row = conn.execute(
         query,
         {
@@ -68,6 +62,89 @@ def _foreign_key_exists(
         },
     ).first()
     return row is not None
+
+
+def _get_or_create_default_menu_id(conn: Connection, restaurant_id: int) -> int:
+    existing = conn.execute(
+        text("""
+            SELECT id
+            FROM menus
+            WHERE restaurant_id = :restaurant_id
+            ORDER BY sort_order ASC, id ASC
+            LIMIT 1
+            """),
+        {"restaurant_id": restaurant_id},
+    ).first()
+    if existing:
+        return int(existing[0])
+
+    result = conn.execute(
+        text("""
+            INSERT INTO menus (
+                name, description, sort_order, is_active,
+                restaurant_id, created_at, updated_at
+            )
+            VALUES (
+                'Main Menu',
+                'Created automatically during development schema compatibility sync.',
+                0,
+                TRUE,
+                :restaurant_id,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            )
+            """),
+        {"restaurant_id": restaurant_id},
+    )
+    inserted_id = getattr(result, "lastrowid", None)
+    if inserted_id:
+        return int(inserted_id)
+
+    fallback = conn.execute(
+        text("""
+            SELECT id
+            FROM menus
+            WHERE restaurant_id = :restaurant_id
+              AND name = 'Main Menu'
+            ORDER BY id DESC
+            LIMIT 1
+            """),
+        {"restaurant_id": restaurant_id},
+    ).first()
+    if not fallback:
+        raise RuntimeError("Unable to create a default menu for legacy categories.")
+    return int(fallback[0])
+
+
+def _backfill_category_menu_ids(conn: Connection, logger) -> None:
+    if not (_table_exists(conn, "menus") and _table_exists(conn, "categories")):
+        return
+    if not _column_exists(conn, "categories", "menu_id"):
+        return
+
+    restaurant_rows = conn.execute(text("""
+            SELECT DISTINCT restaurant_id
+            FROM categories
+            WHERE menu_id IS NULL
+            """)).all()
+    for row in restaurant_rows:
+        restaurant_id = int(row[0])
+        menu_id = _get_or_create_default_menu_id(conn, restaurant_id)
+        result = conn.execute(
+            text("""
+                UPDATE categories
+                SET menu_id = :menu_id
+                WHERE restaurant_id = :restaurant_id
+                  AND menu_id IS NULL
+                """),
+            {"menu_id": menu_id, "restaurant_id": restaurant_id},
+        )
+        if result.rowcount and result.rowcount > 0:
+            logger.warning(
+                "Applied development schema patch: linked %s legacy category row(s) to menu %s.",
+                result.rowcount,
+                menu_id,
+            )
 
 
 def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
@@ -417,9 +494,7 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             )
 
         if _table_exists(conn, "users") and _column_exists(conn, "users", "role"):
-            conn.execute(
-                text(
-                    """
+            conn.execute(text("""
                     ALTER TABLE users
                     MODIFY COLUMN role ENUM(
                         'owner',
@@ -430,9 +505,7 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                         'accountant',
                         'super_admin'
                     ) NOT NULL
-                    """
-                )
-            )
+                    """))
 
         for column_name, alter_sql in restaurant_column_patches:
             if _column_exists(conn, "restaurants", column_name):
@@ -444,17 +517,13 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             )
 
         if _column_exists(conn, "restaurants", "billing_email") and _column_exists(conn, "restaurants", "email"):
-            result = conn.execute(
-                text(
-                    """
+            result = conn.execute(text("""
                     UPDATE restaurants
                     SET billing_email = email
                     WHERE (billing_email IS NULL OR billing_email = '')
                       AND email IS NOT NULL
                       AND email <> ''
-                    """
-                )
-            )
+                    """))
             if result.rowcount and result.rowcount > 0:
                 logger.warning(
                     "Applied development schema patch: backfilled restaurants.billing_email from restaurants.email for %s row(s).",
@@ -469,6 +538,8 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 "Applied development schema patch: categories.%s was missing and has been added.",
                 column_name,
             )
+
+        _backfill_category_menu_ids(conn, logger)
 
         for column_name, alter_sql in item_column_patches:
             if _column_exists(conn, "items", column_name):
@@ -507,9 +578,7 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             )
 
         if not _table_exists(conn, "subscription_change_logs"):
-            conn.execute(
-                text(
-                    """
+            conn.execute(text("""
                     CREATE TABLE subscription_change_logs (
                         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                         restaurant_id INT NOT NULL,
@@ -541,9 +610,7 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                         CONSTRAINT fk_subscription_change_logs_next_package
                             FOREIGN KEY (next_package_id) REFERENCES packages(id) ON DELETE SET NULL
                     )
-                    """
-                )
-            )
+                    """))
             logger.warning(
                 "Applied development schema patch: subscription_change_logs table was missing and has been created.",
             )
@@ -559,9 +626,7 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 )
 
         if not _table_exists(conn, "super_admin_notification_states"):
-            conn.execute(
-                text(
-                    """
+            conn.execute(text("""
                     CREATE TABLE super_admin_notification_states (
                         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                         audit_log_id INT NOT NULL,
@@ -591,17 +656,13 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                         CONSTRAINT fk_super_admin_notification_states_acknowledged_by
                             FOREIGN KEY (acknowledged_by_user_id) REFERENCES users(id) ON DELETE SET NULL
                     )
-                    """
-                )
-            )
+                    """))
             logger.warning(
                 "Applied development schema patch: super_admin_notification_states table was missing and has been created.",
             )
 
         if not _table_exists(conn, "restaurant_webhook_deliveries"):
-            conn.execute(
-                text(
-                    """
+            conn.execute(text("""
                     CREATE TABLE restaurant_webhook_deliveries (
                         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                         restaurant_id INT NOT NULL,
@@ -630,9 +691,7 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                         CONSTRAINT fk_restaurant_webhook_deliveries_retried_from
                             FOREIGN KEY (retried_from_delivery_id) REFERENCES restaurant_webhook_deliveries(id) ON DELETE SET NULL
                     )
-                    """
-                )
-            )
+                    """))
             logger.warning(
                 "Applied development schema patch: restaurant_webhook_deliveries table was missing and has been created.",
             )

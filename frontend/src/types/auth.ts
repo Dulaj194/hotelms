@@ -33,7 +33,6 @@ export interface UserMeResponse {
 export interface TenantDataCountsResponse {
   menus: number;
   categories: number;
-  subcategories?: number;
   items: number;
 }
 

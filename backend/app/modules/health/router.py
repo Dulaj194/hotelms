@@ -2,8 +2,8 @@ import redis as redis_lib
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, get_redis, require_roles
 from app.core.config import settings
+from app.core.dependencies import get_db, get_redis, require_roles
 from app.core.logging import get_logger
 from app.modules.access import role_catalog
 from app.modules.health.schemas import HealthResponse
@@ -48,12 +48,15 @@ def diagnostic_check(
     Admin diagnostic endpoint for troubleshooting.
     Returns detailed system info + user context + sample query results.
     """
-    from app.modules.menus.repository import list_by_restaurant as list_menus
     from app.modules.categories.repository import list_by_restaurant as list_categories
+    from app.modules.menus.repository import list_by_restaurant as list_menus
     from app.modules.restaurants.repository import get_by_id as get_restaurant
-    
+
     user_restaurant_id = current_user.restaurant_id or -1
-    
+    categories_total = 0
+    if user_restaurant_id > 0:
+        _, categories_total = list_categories(db, user_restaurant_id)
+
     return {
         "status": "ok",
         "user": {
@@ -68,7 +71,7 @@ def diagnostic_check(
         },
         "data_sample": {
             "menus_count": len(list_menus(db, user_restaurant_id)) if user_restaurant_id > 0 else 0,
-            "categories_count": len(list_categories(db, user_restaurant_id)) if user_restaurant_id > 0 else 0,
+            "categories_count": categories_total,
         },
         "backend": {
             "status": "ok",
@@ -76,4 +79,3 @@ def diagnostic_check(
             "redis": "connected",
         },
     }
-
