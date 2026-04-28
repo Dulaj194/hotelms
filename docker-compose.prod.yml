@@ -12,7 +12,7 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 30
     restart: unless-stopped
 
@@ -26,12 +26,14 @@ services:
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
     restart: unless-stopped
 
   backend:
-    image: ${DOCKER_USERNAME}/hotelms-backend:latest
+    build:
+      context: ./backend
+    image: "${DOCKER_USERNAME:-hotelms}/hotelms-backend:latest"
     container_name: hotelms-backend
     ports:
       - "8000:8000"
@@ -48,13 +50,15 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/ready"]
       interval: 10s
-      timeout: 5s
+      timeout: 30s
       retries: 5
       start_period: 30s
     restart: unless-stopped
 
   frontend:
-    image: ${DOCKER_USERNAME}/hotelms-frontend:latest
+    build:
+      context: ./frontend
+    image: "${DOCKER_USERNAME:-hotelms}/hotelms-frontend:latest"
     container_name: hotelms-frontend
     ports:
       - "80:80"

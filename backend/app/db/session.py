@@ -8,8 +8,8 @@ logger = get_logger(__name__)
 
 # Connection pooling configuration for production reliability
 pool_config = {
-    "pool_size": 20,  # Number of connections to keep in the pool
-    "max_overflow": 40,  # Additional connections created when pool is exhausted
+    "pool_size": 50,  # Number of connections to keep in the pool (increased for prod)
+    "max_overflow": 100,  # Additional connections created when pool is exhausted
     "pool_pre_ping": True,  # Test connection before using from pool
     "pool_recycle": 3600,  # Recycle connections every hour (MySQL timeout is usually 8h)
     "pool_timeout": 30,  # Wait up to 30s for connection from pool
