@@ -741,8 +741,8 @@ def _get_notification_target(
             detail="Notification not found.",
         )
 
-    notification_state = repository.get_notification_state(db)
-    if notification_state is None or notification_state.audit_log_id != log.id:
+    notification_state = repository.get_notification_state(db, log.id)
+    if notification_state is None:
         notification_state = SuperAdminNotificationState(audit_log_id=log.id, is_read=False)
         notification_state = repository.create_or_update_notification_state(db, notification_state)
 
