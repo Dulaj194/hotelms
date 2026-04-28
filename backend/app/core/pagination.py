@@ -1,4 +1,5 @@
 """Pagination utilities for consistent pagination across all list endpoints."""
+from enum import Enum
 from typing import Generic, TypeVar, Optional
 
 from fastapi import Query
@@ -105,8 +106,8 @@ def create_paginated_response(
     }
 
 
-class SortOrder(str):
-    """Sort order enum."""
+class SortOrder(str, Enum):
+    """Sort order enum for ascending/descending."""
     ASC = "asc"
     DESC = "desc"
 
