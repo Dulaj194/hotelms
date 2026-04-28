@@ -33,7 +33,6 @@ from app.modules.site_content.router import (
     admin_router as site_content_admin_router,
     router as site_content_router,
 )
-from app.modules.subcategories.router import router as subcategories_router
 from app.modules.subscriptions.router import router as subscriptions_router
 from app.modules.table_sessions.router import router as table_sessions_router
 from app.modules.users.router import router as users_router
@@ -50,7 +49,6 @@ router.include_router(users_router, prefix="/users", tags=["users"])
 router.include_router(restaurants_router, prefix="/restaurants", tags=["restaurants"])
 router.include_router(menus_router, prefix="/menus", tags=["menus"])
 router.include_router(categories_router, prefix="/categories", tags=["categories"])
-router.include_router(subcategories_router, prefix="/subcategories", tags=["subcategories"])
 router.include_router(items_router, prefix="/items", tags=["items"])
 router.include_router(offers_router, prefix="/offers", tags=["offers"])
 router.include_router(reference_data_router, prefix="/reference-data", tags=["reference-data"])

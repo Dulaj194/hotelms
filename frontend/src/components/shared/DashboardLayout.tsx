@@ -9,6 +9,7 @@ import {
   HandPlatter,
   Handshake,
   Home,
+  Layers,
   LayoutGrid,
   Package,
   Menu,
@@ -124,8 +125,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: RESTAURANT_ADMIN_ROLES,
   },
   {
-    path: "/admin/menu/subcategories",
-    label: "Subcategories",
+    path: "/admin/menu/categories",
+    label: "Categories",
     icon: Tags,
     roles: RESTAURANT_ADMIN_ROLES,
   },
@@ -181,7 +182,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     () => [
       { path: "/admin/menu/menus", label: "Add Menu", icon: SquareMenu },
       { path: "/admin/menu/categories", label: "Add Category", icon: ClipboardList },
-      { path: "/admin/menu/subcategories", label: "Add Subcategories", icon: Tags },
+      { path: "/admin/menu/categories", label: "Add Categories", icon: Layers },
       { path: "/admin/menu/items", label: "Add Food Items", icon: HandPlatter },
     ],
     []

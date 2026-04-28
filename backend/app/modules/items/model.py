@@ -32,7 +32,7 @@ class Item(Base):
     blog_link: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     is_available: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # Tenant scope — item belongs to a category, optional subcategory, and a restaurant.
+    # Tenant scope — item belongs to a category and a restaurant.
     # All FKs must come from authenticated context, never from client payload.
     category_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False, index=True

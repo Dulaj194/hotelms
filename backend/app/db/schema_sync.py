@@ -227,10 +227,6 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
 
     item_column_patches: Sequence[tuple[str, str]] = (
         (
-            "subcategory_id",
-            "ALTER TABLE items ADD COLUMN subcategory_id INT NULL",
-        ),
-        (
             "more_details",
             "ALTER TABLE items ADD COLUMN more_details TEXT NULL",
         ),

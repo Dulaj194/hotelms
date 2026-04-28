@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
-import type { Category, Item, Subcategory } from "@/types/menu";
+import type { Category, Item } from "@/types/menu";
 import type { RestaurantMeResponse } from "@/types/restaurant";
 
 type MediaSlot = "primary" | "additional_1" | "additional_2" | "additional_3" | "additional_4" | "video";
@@ -60,20 +60,15 @@ export default function MenuItems() {
 
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [restaurantCurrency, setRestaurantCurrency] = useState("LKR");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const initialCategoryId = searchParams.get("categoryId");
-  const initialSubcategoryId = searchParams.get("subcategoryId");
 
   const [filterCategoryId, setFilterCategoryId] = useState<number | "all">(
     initialCategoryId ? parseInt(initialCategoryId) : "all"
-  );
-  const [filterSubcategoryId, setFilterSubcategoryId] = useState<number | "all">(
-    initialSubcategoryId ? parseInt(initialSubcategoryId) : "all"
   );
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -98,15 +93,13 @@ export default function MenuItems() {
     setLoading(true);
     setError(null);
     try {
-      const [itemsRes, catsRes, subcatsRes, restaurantRes] = await Promise.all([
+      const [itemsRes, catsRes, restaurantRes] = await Promise.all([
         api.get<Item[]>("/items"),
         api.get<Category[]>("/categories"),
-        api.get<Subcategory[]>("/subcategories"),
         api.get<RestaurantMeResponse>("/restaurants/me"),
       ]);
       setItems(itemsRes);
       setCategories(catsRes);
-      setSubcategories(subcatsRes);
       setRestaurantCurrency((restaurantRes.currency || "LKR").toUpperCase());
     } catch {
       setError("Failed to load data.");
@@ -121,44 +114,12 @@ export default function MenuItems() {
 
   const displayedItems =
     filterCategoryId === "all"
-      ? filterSubcategoryId === "all"
-        ? items
-        : items.filter((item) => item.subcategory_id === filterSubcategoryId)
-      : items.filter((item) => {
-          const categoryMatch = item.category_id === filterCategoryId;
-          const subcategoryMatch =
-            filterSubcategoryId === "all" || item.subcategory_id === filterSubcategoryId;
-          return categoryMatch && subcategoryMatch;
-        });
+      ? items
+      : items.filter((item) => item.category_id === filterCategoryId);
 
   function categoryName(categoryId: number): string {
     return categories.find((c) => c.id === categoryId)?.name ?? "—";
   }
-
-  function subcategoryName(subcategoryId: number | null): string {
-    if (!subcategoryId) return "—";
-    return subcategories.find((s) => s.id === subcategoryId)?.name ?? "—";
-  }
-
-  const filterSubcategoryOptions = useMemo(() => {
-    if (filterCategoryId === "all") return subcategories;
-    return subcategories.filter((sub) => sub.category_id === filterCategoryId);
-  }, [filterCategoryId, subcategories]);
-
-  const selectedCategoryName =
-    filterCategoryId === "all"
-      ? "All Categories"
-      : categories.find((category) => category.id === filterCategoryId)?.name ?? "—";
-
-  const selectedSubcategoryName =
-    filterSubcategoryId === "all"
-      ? "All Subcategories"
-      : subcategories.find((sub) => sub.id === filterSubcategoryId)?.name ?? "—";
-
-  const visiblePath =
-    filterSubcategoryId === "all"
-      ? selectedCategoryName
-      : `${selectedCategoryName} / ${selectedSubcategoryName}`;
 
   function resetMediaState() {
     Object.values(mediaPreviewUrls).forEach((url) => {
@@ -409,7 +370,9 @@ export default function MenuItems() {
             + Add Item
           </button>
         </div>
-        <p className="text-sm text-gray-500 mt-2">{visiblePath}</p>
+        <p className="text-sm text-gray-500 mt-2">
+          {filterCategoryId === "all" ? "All Categories" : categories.find((c) => c.id === filterCategoryId)?.name || "—"}
+        </p>
         <p className="text-xs text-gray-400 mt-1">Create a new menu item for this restaurant.</p>
       </div>
 
@@ -428,7 +391,6 @@ export default function MenuItems() {
             onChange={(e) => {
               const value = e.target.value === "all" ? "all" : parseInt(e.target.value);
               setFilterCategoryId(value);
-              setFilterSubcategoryId("all");
             }}
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
           >
@@ -436,21 +398,6 @@ export default function MenuItems() {
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id}>
                 {cat.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={filterSubcategoryId}
-            onChange={(e) =>
-              setFilterSubcategoryId(e.target.value === "all" ? "all" : parseInt(e.target.value))
-            }
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
-          >
-            <option value="all">All Subcategories</option>
-            {filterSubcategoryOptions.map((subcat) => (
-              <option key={subcat.id} value={subcat.id}>
-                {subcat.name}
               </option>
             ))}
           </select>
@@ -488,7 +435,6 @@ export default function MenuItems() {
                 )}
                 <p className="text-xs text-gray-400 mb-3">
                   {categoryName(item.category_id)}
-                  {item.subcategory_id ? ` → ${subcategoryName(item.subcategory_id)}` : ""}
                 </p>
 
                 <div className="flex gap-2">

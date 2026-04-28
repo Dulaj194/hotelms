@@ -34,7 +34,7 @@ const AdminRestaurantProfile = lazy(() => import("@/pages/admin/RestaurantProfil
 const Rooms = lazy(() => import("@/pages/admin/Rooms"));
 const Staff = lazy(() => import("@/pages/admin/Staff"));
 const Steward = lazy(() => import("@/pages/admin/Steward"));
-const Subcategories = lazy(() => import("@/pages/admin/Subcategories"));
+
 const SubscriptionPage = lazy(() => import("@/pages/admin/Subscription"));
 const SubscriptionPaymentCancel = lazy(() => import("@/pages/admin/SubscriptionPaymentCancel"));
 const SubscriptionPaymentSuccess = lazy(() => import("@/pages/admin/SubscriptionPaymentSuccess"));
@@ -363,14 +363,6 @@ function AppRoutes() {
           element={
             <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
               <MenuCategories />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/menu/subcategories"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <Subcategories />
             </ProtectedRoute>
           }
         />

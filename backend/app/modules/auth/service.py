@@ -324,7 +324,6 @@ def get_tenant_context_snapshot(db: Session, current_user) -> TenantContextRespo
     from app.modules.categories.model import Category
     from app.modules.items.model import Item
     from app.modules.menus.model import Menu
-    from app.modules.subcategories.model import Subcategory
 
     restaurant_id = int(current_user.restaurant_id)
     return TenantContextResponse(
@@ -336,7 +335,6 @@ def get_tenant_context_snapshot(db: Session, current_user) -> TenantContextRespo
         counts=TenantDataCountsResponse(
             menus=_count_model_rows(db, Menu, restaurant_id),
             categories=_count_model_rows(db, Category, restaurant_id),
-            subcategories=_count_model_rows(db, Subcategory, restaurant_id),
             items=_count_model_rows(db, Item, restaurant_id),
         ),
     )

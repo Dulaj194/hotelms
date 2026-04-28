@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from app.modules.items.model import Item
     from app.modules.menus.model import Menu
     from app.modules.reference_data.model import Country, CurrencyType
-    from app.modules.subcategories.model import Subcategory
     from app.modules.users.model import User
 
 
@@ -158,10 +157,9 @@ class Restaurant(Base):
         foreign_keys=[registration_reviewed_by_id],
     )
 
-    # One restaurant has menus, categories, subcategories, and items.
+    # One restaurant has menus, categories, and items.
     menus: Mapped[list[Menu]] = relationship("Menu", back_populates="restaurant")
     categories: Mapped[list[Category]] = relationship("Category", back_populates="restaurant")
-    subcategories: Mapped[list[Subcategory]] = relationship("Subcategory", back_populates="restaurant")
     items: Mapped[list[Item]] = relationship("Item", back_populates="restaurant")
 
     country_ref: Mapped[Country | None] = relationship(

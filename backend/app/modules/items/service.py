@@ -50,8 +50,7 @@ def get_item(db: Session, item_id: int, restaurant_id: int) -> ItemResponse:
 def add_item(db: Session, restaurant_id: int, data: ItemCreateRequest) -> ItemResponse:
     """Create item under the current restaurant.
 
-    Validates that the target category and optional subcategory also belong to this
-    restaurant to prevent cross-tenant injection.
+    Validates that the target category also belongs to this restaurant to prevent cross-tenant injection.
     """
     if not repository.category_belongs_to_restaurant(db, data.category_id, restaurant_id):
         raise HTTPException(

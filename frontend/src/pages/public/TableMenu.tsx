@@ -38,7 +38,6 @@ type MenuTile = {
   item: PublicItemSummaryResponse;
   categoryId: number;
   categoryName: string;
-  subcategoryName: string | null;
 };
 
 export default function TableMenu() {
@@ -83,23 +82,11 @@ export default function TableMenu() {
         : visibleCategories.filter((category) => category.id === activeCategoryId);
 
     return categorySource.flatMap((category) => {
-      const categoryItems: MenuTile[] = category.items.map((item) => ({
+      return category.items.map((item) => ({
         item,
         categoryId: category.id,
         categoryName: category.name,
-        subcategoryName: null,
       }));
-
-      const subcategoryItems: MenuTile[] = category.subcategories.flatMap((subcategory) =>
-        subcategory.items.map((item) => ({
-          item,
-          categoryId: category.id,
-          categoryName: category.name,
-          subcategoryName: subcategory.name,
-        })),
-      );
-
-      return [...categoryItems, ...subcategoryItems];
     });
   }, [activeCategoryId, menu, visibleCategories]);
 
@@ -132,8 +119,8 @@ export default function TableMenu() {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return flattenedTiles;
 
-    return flattenedTiles.filter(({ item, categoryName, subcategoryName }) => {
-      return [item.name, item.description ?? "", categoryName, subcategoryName ?? ""].some(
+    return flattenedTiles.filter(({ item, categoryName }) => {
+      return [item.name, item.description ?? "", categoryName].some(
         (value) => value.toLowerCase().includes(query),
       );
     });
@@ -381,12 +368,12 @@ export default function TableMenu() {
     );
   }
 
-  const renderItemCard = ({ item, categoryName, subcategoryName }: MenuTile) => {
+  const renderItemCard = ({ item, categoryName }: MenuTile) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
     const imageUrl = toAssetUrl(item.image_path);
-    const metaLabel = subcategoryName || categoryName;
+    const metaLabel = categoryName;
 
     return (
       <div
