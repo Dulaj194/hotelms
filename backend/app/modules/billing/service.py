@@ -137,7 +137,7 @@ def _build_bill_order_response(order: object) -> BillOrderResponse:
 
 def _load_user_map(db: Session, user_ids: set[int]) -> dict[int, User]:
     """Load users by IDs from database."""
-    return repository.get_users_by_ids(db, list(user_ids))
+    return billing_repo.get_users_by_ids(db, list(user_ids))
 
 
 def _parse_event_metadata(event: BillWorkflowEvent) -> dict[str, Any] | None:

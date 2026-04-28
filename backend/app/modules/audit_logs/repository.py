@@ -93,7 +93,9 @@ def create_or_update_notification_state(
     
     if existing:
         # Update existing record
-        existing.is_read = notification_state.is_read
+        # Guard: is_read is NOT NULL in the DB; fall back to False if the
+        # in-memory object has not yet had its Python-side default applied.
+        existing.is_read = notification_state.is_read if notification_state.is_read is not None else False
         existing.assigned_user_id = notification_state.assigned_user_id
         db.flush()
         db.refresh(existing)
