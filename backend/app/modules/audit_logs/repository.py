@@ -74,18 +74,49 @@ def get_restaurants_by_ids(db: Session, restaurant_ids: list[int]) -> dict[int, 
     return {restaurant.id: restaurant for restaurant in restaurants}
 
 
-def get_notification_state(db: Session) -> SuperAdminNotificationState | None:
-    """Get super admin notification state."""
-    return db.query(SuperAdminNotificationState).first()
+def get_notification_state(db: Session, audit_log_id: int) -> SuperAdminNotificationState | None:
+    """Get super admin notification state for a specific audit log."""
+    return (
+        db.query(SuperAdminNotificationState)
+        .filter(SuperAdminNotificationState.audit_log_id == audit_log_id)
+        .first()
+    )
 
 
 def create_or_update_notification_state(
     db: Session,
     notification_state: SuperAdminNotificationState,
 ) -> SuperAdminNotificationState:
-    """Create or update notification state."""
-    db.merge(notification_state)
-    db.commit()
+    """Create or update notification state (idempotent upsert)."""
+    # Check if record exists by audit_log_id
+    existing = (
+        db.query(SuperAdminNotificationState)
+        .filter(SuperAdminNotificationState.audit_log_id == notification_state.audit_log_id)
+        .one_or_none()
+    )
+    
+    if existing:
+        # Update existing record
+        # Guard: is_read is NOT NULL in the DB; fall back to False if the
+        # in-memory object has not yet had its Python-side default applied.
+        existing.is_read = notification_state.is_read if notification_state.is_read is not None else False
+        existing.read_at = notification_state.read_at
+        existing.read_by_user_id = notification_state.read_by_user_id
+        existing.assigned_user_id = notification_state.assigned_user_id
+        existing.assigned_at = notification_state.assigned_at
+        existing.acknowledged_at = notification_state.acknowledged_at
+        existing.acknowledged_by_user_id = notification_state.acknowledged_by_user_id
+        existing.snoozed_until = notification_state.snoozed_until
+        existing.archived_at = notification_state.archived_at
+        existing.archived_by_user_id = notification_state.archived_by_user_id
+        db.flush()
+        db.refresh(existing)
+        return existing
+    
+    # Create new record
+    db.add(notification_state)
+    db.flush()
+    db.refresh(notification_state)
     return notification_state
 
 
