@@ -191,7 +191,7 @@ def _serialize_workflow_events(
         return []
 
     bill_ids = {event.bill_id for event in events}
-    bills_by_id = repository.get_bills_by_ids(db, list(bill_ids))
+    bills_by_id = billing_repo.get_bills_by_ids(db, list(bill_ids))
     users_by_id = _load_user_map(
         db,
         {event.user_id for event in events if event.user_id is not None},

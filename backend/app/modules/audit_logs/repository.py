@@ -83,9 +83,26 @@ def create_or_update_notification_state(
     db: Session,
     notification_state: SuperAdminNotificationState,
 ) -> SuperAdminNotificationState:
-    """Create or update notification state."""
-    db.merge(notification_state)
-    db.commit()
+    """Create or update notification state (idempotent upsert)."""
+    # Check if record exists by audit_log_id
+    existing = (
+        db.query(SuperAdminNotificationState)
+        .filter(SuperAdminNotificationState.audit_log_id == notification_state.audit_log_id)
+        .one_or_none()
+    )
+    
+    if existing:
+        # Update existing record
+        existing.is_read = notification_state.is_read
+        existing.assigned_user_id = notification_state.assigned_user_id
+        db.flush()
+        db.refresh(existing)
+        return existing
+    
+    # Create new record
+    db.add(notification_state)
+    db.flush()
+    db.refresh(notification_state)
     return notification_state
 
 

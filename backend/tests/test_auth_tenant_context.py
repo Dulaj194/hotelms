@@ -23,7 +23,6 @@ class AuthTenantContextTests(unittest.TestCase):
         self.assertIsNone(snapshot.restaurant_id)
         self.assertEqual(snapshot.counts.menus, 0)
         self.assertEqual(snapshot.counts.categories, 0)
-        self.assertEqual(snapshot.counts.subcategories, 0)
         self.assertEqual(snapshot.counts.items, 0)
         self.assertIsNotNone(snapshot.note)
 
@@ -37,7 +36,7 @@ class AuthTenantContextTests(unittest.TestCase):
 
         with (
             patch("app.modules.auth.service._get_restaurant_name", return_value="Milano"),
-            patch("app.modules.auth.service._count_model_rows", side_effect=[6, 5, 4, 23]),
+            patch("app.modules.auth.service._count_model_rows", side_effect=[6, 5, 23]),
         ):
             snapshot = service.get_tenant_context_snapshot(SimpleNamespace(), user)
 
@@ -46,7 +45,6 @@ class AuthTenantContextTests(unittest.TestCase):
         self.assertEqual(snapshot.restaurant_name, "Milano")
         self.assertEqual(snapshot.counts.menus, 6)
         self.assertEqual(snapshot.counts.categories, 5)
-        self.assertEqual(snapshot.counts.subcategories, 4)
         self.assertEqual(snapshot.counts.items, 23)
         self.assertIsNone(snapshot.note)
 

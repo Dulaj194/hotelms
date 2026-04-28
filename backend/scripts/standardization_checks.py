@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 IGNORED_EXTRA_TABLES = {"alembic_version"}
+DEPRECATED_MODULES = {"subcategories"}  # Modules to exclude from router registration check
 MAX_CONSTRAINT_DETAIL_ITEMS = 15
 
 
@@ -121,7 +122,7 @@ def check_router_registration() -> CheckResult:
             details=[f"Missing API router file: {router_path}"],
         )
 
-    expected_modules = _modules_with_router()
+    expected_modules = _modules_with_router() - DEPRECATED_MODULES
     imported_modules, imported_aliases, included_aliases = _extract_router_imports_and_usage(
         router_path
     )
