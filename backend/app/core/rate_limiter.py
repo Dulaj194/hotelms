@@ -4,7 +4,7 @@ from fastapi import HTTPException, Request, status
 
 
 async def check_rate_limit(
-    redis_client: redis.Redis,
+    redis_client: redis.Redis | None,
     request: Request,
     max_attempts: int,
     window_minutes: int,
@@ -12,14 +12,20 @@ async def check_rate_limit(
     """Check if request is within rate limit.
     
     Args:
-        redis_client: Redis connection
+        redis_client: Redis connection, or None if unavailable
         request: FastAPI request
         max_attempts: Maximum attempts allowed
         window_minutes: Time window in minutes
         
     Raises:
         HTTPException: If rate limit exceeded (429)
+        
+    Note: If redis_client is None, rate limiting is skipped (fails open)
     """
+    if redis_client is None:
+        # Redis unavailable - skip rate limiting to allow requests through
+        return
+    
     if not request.client:
         return
     

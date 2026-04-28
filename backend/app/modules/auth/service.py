@@ -90,7 +90,11 @@ def _normalize_login_email(email: str) -> str:
 
 # ─── Rate limiting ────────────────────────────────────────────────────────────
 
-def _check_rate_limit(redis_client: redis_lib.Redis, ip: str) -> None:
+def _check_rate_limit(redis_client: redis_lib.Redis | None, ip: str) -> None:
+    if redis_client is None:
+        # Redis unavailable - skip rate limiting
+        return
+    
     try:
         count = redis_client.get(_rate_limit_key(ip))
         if count and int(count) >= settings.login_rate_limit_attempts:
@@ -107,7 +111,11 @@ def _check_rate_limit(redis_client: redis_lib.Redis, ip: str) -> None:
         logger.warning("Rate limit check skipped — Redis unavailable")
 
 
-def _increment_rate_limit(redis_client: redis_lib.Redis, ip: str) -> None:
+def _increment_rate_limit(redis_client: redis_lib.Redis | None, ip: str) -> None:
+    if redis_client is None:
+        # Redis unavailable - skip rate limiting
+        return
+    
     try:
         key = _rate_limit_key(ip)
         pipe = redis_client.pipeline()
@@ -617,7 +625,7 @@ async def register_restaurant_idempotent(
 
 def login(
     db: Session,
-    redis_client: redis_lib.Redis,
+    redis_client: redis_lib.Redis | None,
     response: Response,
     email: str,
     password: str,

@@ -41,7 +41,7 @@ def _handle_login_request(
     request: Request,
     response: Response,
     db: Session,
-    redis_client: redis_lib.Redis,
+    redis_client: redis_lib.Redis | None,
     refresh_token: str | None,
     login_fn: Callable[..., TokenResponse],
 ) -> TokenResponse:
@@ -63,7 +63,7 @@ async def login(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
-    redis_client: redis_lib.Redis = Depends(get_redis),
+    redis_client: redis_lib.Redis | None = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
     # Rate limit: 5 attempts per 15 minutes per IP
@@ -90,7 +90,7 @@ async def login_restaurant_admin(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
-    redis_client: redis_lib.Redis = Depends(get_redis),
+    redis_client: redis_lib.Redis | None = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
     # Rate limit: 5 attempts per 15 minutes per IP
@@ -117,7 +117,7 @@ async def login_staff(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
-    redis_client: redis_lib.Redis = Depends(get_redis),
+    redis_client: redis_lib.Redis | None = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
     # Rate limit: 5 attempts per 15 minutes per IP
@@ -144,7 +144,7 @@ async def login_super_admin(
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
-    redis_client: redis_lib.Redis = Depends(get_redis),
+    redis_client: redis_lib.Redis | None = Depends(get_redis),
     refresh_token: str | None = Cookie(default=None),
 ) -> TokenResponse:
     # Rate limit: 5 attempts per 15 minutes per IP

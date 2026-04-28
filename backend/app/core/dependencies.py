@@ -30,8 +30,12 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def get_redis() -> redis_lib.Redis:
-    """Return the shared Redis client instance."""
+def get_redis() -> redis_lib.Redis | None:
+    """Return the shared Redis client instance, or None if unavailable.
+    
+    For critical operations like authentication, Redis failures should not block requests.
+    Rate limiting and other features will degrade gracefully when Redis is unavailable.
+    """
     return get_redis_client()
 
 

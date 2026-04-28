@@ -17,19 +17,19 @@ def get_redis_client() -> redis_lib.Redis:
     - Connection pooling
     - Circuit breaker pattern for cascading failures
     - Health validation
+    
+    Note: For critical operations (auth), use get_redis_client_optional() instead.
     """
     global _redis_client, _redis_circuit_breaker_failures
     
-    # Circuit breaker: if too many failures, fail fast
+    # Circuit breaker: if too many failures, return None instead of raising
+    # This allows critical operations like auth to proceed without Redis
     if _redis_circuit_breaker_failures >= _redis_circuit_breaker_threshold:
-        logger.error(
-            "Redis circuit breaker open - %d consecutive failures",
+        logger.warning(
+            "Redis circuit breaker OPEN - %d consecutive failures. Redis unavailable.",
             _redis_circuit_breaker_failures,
         )
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Redis service degraded. Please try again shortly.",
-        )
+        return None
     
     if _redis_client is None:
         try:
@@ -57,26 +57,21 @@ def get_redis_client() -> redis_lib.Redis:
             
         except redis_lib.ConnectionError as exc:
             _redis_circuit_breaker_failures += 1
-            logger.error(
+            logger.warning(
                 "Redis connection failed (failures: %d/%d): %s",
                 _redis_circuit_breaker_failures,
                 _redis_circuit_breaker_threshold,
                 str(exc),
-                exc_info=exc,
             )
             _redis_client = None
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Redis service unavailable. Please try again.",
-            )
+            return None
         except redis_lib.TimeoutError as exc:
             _redis_circuit_breaker_failures += 1
-            logger.error(
+            logger.warning(
                 "Redis connection timeout (failures: %d/%d): %s",
                 _redis_circuit_breaker_failures,
                 _redis_circuit_breaker_threshold,
                 str(exc),
-                exc_info=exc,
             )
             _redis_client = None
             raise HTTPException(
@@ -98,10 +93,7 @@ def get_redis_client() -> redis_lib.Redis:
             exc_info=exc,
         )
         _redis_client = None
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Redis service unavailable. Please try again.",
-        )
+        return None
     
     return _redis_client
 
