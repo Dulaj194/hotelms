@@ -312,8 +312,8 @@ export default function RoomMenu() {
   } = usePublicMenuBrowser(menu);
 
   const menuSwipeHandlers = useSwipeNavigation<HTMLDivElement>({
-    onSwipeLeft: selectPreviousCategory,
-    onSwipeRight: selectNextCategory,
+    onSwipeLeft: selectNextCategory,
+    onSwipeRight: selectPreviousCategory,
   });
 
   // 1. Start (or reuse) a room session

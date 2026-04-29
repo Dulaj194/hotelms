@@ -77,8 +77,8 @@ export default function TableMenu() {
   } = usePublicMenuBrowser(menu);
 
   const menuSwipeHandlers = useSwipeNavigation<HTMLDivElement>({
-    onSwipeLeft: selectPreviousCategory,
-    onSwipeRight: selectNextCategory,
+    onSwipeLeft: selectNextCategory,
+    onSwipeRight: selectPreviousCategory,
   });
 
   const flattenedTiles = useMemo<MenuTile[]>(() => {

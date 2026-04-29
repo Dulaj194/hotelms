@@ -211,18 +211,18 @@ describe("RoomMenu", () => {
     swipeRight(1);
 
     await waitFor(() => {
+      expect(within(menuContent).getByText("Chocolate Cake")).toBeTruthy();
+      expect(within(menuContent).getByText("Seafood Fried Rice")).toBeTruthy();
+    });
+
+    swipeLeft(2);
+
+    await waitFor(() => {
       expect(within(menuContent).getByText("Seafood Fried Rice")).toBeTruthy();
       expect(within(menuContent).queryByText("Chocolate Cake")).toBeNull();
     });
 
-    swipeRight(2);
-
-    await waitFor(() => {
-      expect(within(menuContent).getByText("Chocolate Cake")).toBeTruthy();
-      expect(within(menuContent).queryByText("Seafood Fried Rice")).toBeNull();
-    });
-
-    swipeRight(3);
+    swipeLeft(3);
 
     await waitFor(() => {
       expect(within(menuContent).getByText("Chocolate Cake")).toBeTruthy();
@@ -232,11 +232,18 @@ describe("RoomMenu", () => {
     swipeLeft(4);
 
     await waitFor(() => {
+      expect(within(menuContent).getByText("Chocolate Cake")).toBeTruthy();
+      expect(within(menuContent).queryByText("Seafood Fried Rice")).toBeNull();
+    });
+
+    swipeRight(5);
+
+    await waitFor(() => {
       expect(within(menuContent).getByText("Seafood Fried Rice")).toBeTruthy();
       expect(within(menuContent).queryByText("Chocolate Cake")).toBeNull();
     });
 
-    swipeLeft(5);
+    swipeRight(6);
 
     await waitFor(() => {
       expect(within(menuContent).getByText("Chocolate Cake")).toBeTruthy();
