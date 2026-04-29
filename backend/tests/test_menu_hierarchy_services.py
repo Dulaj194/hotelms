@@ -18,7 +18,9 @@ from app.modules.categories.model import Category
 from app.modules.categories.schemas import CategoryCreateRequest
 from app.modules.items import service as item_service
 from app.modules.items.schemas import ItemCreateRequest
+from app.modules.menus import service as menu_service
 from app.modules.menus.model import Menu
+from app.modules.menus.schemas import MenuCreateRequest
 from app.modules.restaurants.model import Restaurant
 
 
@@ -82,6 +84,21 @@ class MenuHierarchyServiceTests(unittest.TestCase):
                     CategoryCreateRequest(name="Breakfast", menu_id=menu_two.id),
                 )
             self.assertEqual(ctx.exception.status_code, 400)
+        finally:
+            db.close()
+
+    def test_menu_is_created_under_authenticated_restaurant(self) -> None:
+        db, restaurant_one, _, _, _, _, _ = self._seed()
+        try:
+            menu = menu_service.add_menu(
+                db,
+                restaurant_one.id,
+                MenuCreateRequest(name="Dinner Menu", sort_order=3, is_active=True),
+            )
+            self.assertEqual(menu.name, "Dinner Menu")
+            self.assertEqual(menu.restaurant_id, restaurant_one.id)
+            self.assertEqual(menu.sort_order, 3)
+            self.assertTrue(menu.is_active)
         finally:
             db.close()
 

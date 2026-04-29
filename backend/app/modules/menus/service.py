@@ -2,6 +2,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -31,12 +32,32 @@ def get_menu(db: Session, menu_id: int, restaurant_id: int) -> MenuResponse:
 
 
 def add_menu(db: Session, restaurant_id: int, data: MenuCreateRequest) -> MenuResponse:
-    menu = repository.create(db, restaurant_id, data)
+    try:
+        menu = repository.create(db, restaurant_id, data)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Menu could not be saved because the restaurant context is invalid.",
+        )
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Menu could not be saved. Please try again.",
+        )
     return MenuResponse.model_validate(menu)
 
 
 def update_menu(db: Session, menu_id: int, restaurant_id: int, data: MenuUpdateRequest) -> MenuResponse:
-    menu = repository.update_by_id(db, menu_id, restaurant_id, data)
+    try:
+        menu = repository.update_by_id(db, menu_id, restaurant_id, data)
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Menu could not be updated. Please try again.",
+        )
     if not menu:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu not found.")
     return MenuResponse.model_validate(menu)
@@ -90,8 +111,17 @@ async def upload_menu_image(
     (upload_path / filename).write_bytes(content)
 
     image_path = f"/uploads/menus/{filename}"
-    menu = repository.update_image_path(db, menu_id, restaurant_id, image_path)
+    try:
+        menu = repository.update_image_path(db, menu_id, restaurant_id, image_path)
+    except SQLAlchemyError:
+        db.rollback()
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Menu image could not be saved. Please try again.",
+        )
     if not menu:
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu not found.")
 
     return MenuImageUploadResponse(image_path=image_path)

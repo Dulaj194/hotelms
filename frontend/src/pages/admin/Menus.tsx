@@ -7,7 +7,7 @@ import {
   TenantScopeEmptyState,
 } from "@/components/shared/TenantScopeNotice";
 import { useTenantContext } from "@/hooks/useTenantContext";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
 import type { Menu } from "@/types/menu";
 
@@ -24,6 +24,12 @@ const EMPTY_FORM: FormData = {
   sort_order: 0,
   is_active: true,
 };
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) return error.detail || fallback;
+  if (error instanceof Error) return error.message || fallback;
+  return fallback;
+}
 
 export default function Menus() {
   const navigate = useNavigate();
@@ -54,10 +60,7 @@ export default function Menus() {
       const response = await api.get<Menu[]>("/menus");
       setMenus(response);
     } catch (err: unknown) {
-      const errMsg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? "Failed to load menus.";
-      setError(errMsg);
+      setError(getErrorMessage(err, "Failed to load menus."));
     } finally {
       setLoading(false);
     }
@@ -104,6 +107,7 @@ export default function Menus() {
 
     setSaving(true);
     setFormError(null);
+    setSuccessMessage(null);
 
     try {
       const payload = {
@@ -130,11 +134,11 @@ export default function Menus() {
 
       closeModal();
       await loadMenus();
+      setSuccessMessage(
+        editingMenu ? "Menu updated successfully." : "Menu created successfully."
+      );
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? "Failed to save menu.";
-      setFormError(msg);
+      setFormError(getErrorMessage(err, "Failed to save menu."));
     } finally {
       setSaving(false);
     }
@@ -180,10 +184,7 @@ export default function Menus() {
       await loadMenus();
       setSuccessMessage(`Menu \"${targetName}\" deleted successfully.`);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? "Failed to delete menu.";
-      setError(msg);
+      setError(getErrorMessage(err, "Failed to delete menu."));
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
@@ -206,7 +207,9 @@ export default function Menus() {
       fd.append("file", file);
       await api.post(`/menus/${uploadTarget.id}/image`, fd);
       await loadMenus();
-    } catch {
+      setSuccessMessage("Menu image updated successfully.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to upload menu image."));
       await loadMenus();
     } finally {
       setUploading(false);
