@@ -1,10 +1,9 @@
-import uuid
-from pathlib import Path
-
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.file_storage import delete_uploaded_file, save_upload_file
 from app.modules.categories import repository
 from app.modules.categories.schemas import (
     CategoryCreateRequest,
@@ -107,23 +106,25 @@ async def upload_category_image(
             detail=f"Invalid file type '{file.content_type}'. Allowed: jpg, png, webp.",
         )
 
-    content = await file.read()
-    max_bytes = settings.max_upload_size_mb * 1024 * 1024
-    if len(content) > max_bytes:
+    image_path = await save_upload_file(
+        file=file,
+        upload_root=settings.upload_dir,
+        subdir="categories",
+        allowed_content_types=_ALLOWED_CONTENT_TYPES,
+        ext_map=_EXT_MAP,
+        max_size_mb=settings.max_upload_size_mb,
+    )
+    try:
+        category = repository.update_image_path(db, category_id, restaurant_id, image_path)
+    except SQLAlchemyError:
+        db.rollback()
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds the {settings.max_upload_size_mb} MB size limit.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Category image could not be saved. Please try again.",
         )
-
-    ext = _EXT_MAP[file.content_type]  # type: ignore[index]
-    filename = f"{uuid.uuid4().hex}{ext}"
-    upload_path = Path(settings.upload_dir) / "categories"
-    upload_path.mkdir(parents=True, exist_ok=True)
-    (upload_path / filename).write_bytes(content)
-
-    image_path = f"/uploads/categories/{filename}"
-    category = repository.update_image_path(db, category_id, restaurant_id, image_path)
     if not category:
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found.")
 
     return CategoryImageUploadResponse(image_path=image_path)

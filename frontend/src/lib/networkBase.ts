@@ -6,6 +6,22 @@ function normalizeBase(url: string): string {
 
 export const API_BASE_URL = normalizeBase(env.VITE_API_URL || "/api/v1");
 
+function getBackendOrigin(): string {
+  if (env.VITE_BACKEND_URL) return normalizeBase(env.VITE_BACKEND_URL);
+
+  if (typeof window === "undefined") return "http://localhost:8000";
+
+  if (API_BASE_URL.startsWith("/")) {
+    return window.location.origin;
+  }
+
+  try {
+    return new URL(API_BASE_URL).origin;
+  } catch {
+    return window.location.origin;
+  }
+}
+
 function getWsBaseUrl(): string {
   if (env.VITE_WS_URL) return normalizeBase(env.VITE_WS_URL);
   
@@ -27,5 +43,5 @@ export const WS_BASE_URL = normalizeBase(getWsBaseUrl());
 
 export const RESOLVED_API_BASE_URL = API_BASE_URL;
 export const RESOLVED_WS_BASE_URL = WS_BASE_URL;
-export const RESOLVED_BACKEND_ORIGIN = typeof window !== "undefined" ? window.location.origin : "http://localhost:8000";
+export const RESOLVED_BACKEND_ORIGIN = getBackendOrigin();
 

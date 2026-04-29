@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import AssetImage from "@/components/shared/AssetImage";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import {
   TenantContextBadge,
@@ -8,7 +9,6 @@ import {
 } from "@/components/shared/TenantScopeNotice";
 import { useTenantContext } from "@/hooks/useTenantContext";
 import { api } from "@/lib/api";
-import { toAssetUrl } from "@/lib/assets";
 import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
 import type { Category, Menu } from "@/types/menu";
 
@@ -334,17 +334,11 @@ export default function MenuCategories() {
               className="flex h-full min-h-[410px] flex-col rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md"
             >
               <div className="aspect-[16/10] w-full overflow-hidden rounded-lg bg-slate-100">
-                {category.image_path ? (
-                  <img
-                    src={toAssetUrl(category.image_path)}
-                    alt={category.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm font-medium text-slate-500">
-                    No image available
-                  </div>
-                )}
+                <AssetImage
+                  path={category.image_path}
+                  alt={category.name}
+                  className="h-full w-full object-cover"
+                />
               </div>
 
               <div className="mt-3 flex flex-1 flex-col">

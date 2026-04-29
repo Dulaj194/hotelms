@@ -1,10 +1,9 @@
-import uuid
-from pathlib import Path
-
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.file_storage import delete_uploaded_file, save_upload_file
 from app.modules.items import repository
 from app.modules.items.schemas import (
     ItemCreateRequest,
@@ -129,23 +128,25 @@ async def upload_item_image(
             detail=f"Invalid file type '{file.content_type}'. Allowed: jpg, png, webp.",
         )
 
-    content = await file.read()
-    max_bytes = settings.max_upload_size_mb * 1024 * 1024
-    if len(content) > max_bytes:
+    image_path = await save_upload_file(
+        file=file,
+        upload_root=settings.upload_dir,
+        subdir="items",
+        allowed_content_types=_ALLOWED_CONTENT_TYPES,
+        ext_map=_EXT_MAP,
+        max_size_mb=settings.max_upload_size_mb,
+    )
+    try:
+        item = repository.update_image_path(db, item_id, restaurant_id, image_path)
+    except SQLAlchemyError:
+        db.rollback()
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds the {settings.max_upload_size_mb} MB size limit.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Item image could not be saved. Please try again.",
         )
-
-    ext = _EXT_MAP[file.content_type]  # type: ignore[index]
-    filename = f"{uuid.uuid4().hex}{ext}"
-    upload_path = Path(settings.upload_dir) / "items"
-    upload_path.mkdir(parents=True, exist_ok=True)
-    (upload_path / filename).write_bytes(content)
-
-    image_path = f"/uploads/items/{filename}"
-    item = repository.update_image_path(db, item_id, restaurant_id, image_path)
     if not item:
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found.")
 
     return ItemImageUploadResponse(image_path=image_path)
@@ -175,26 +176,28 @@ async def upload_item_media(
             detail=f"Invalid file type '{file.content_type}'. Allowed: {expected}.",
         )
 
-    content = await file.read()
     max_mb = 25 if is_video_slot else settings.max_upload_size_mb
-    max_bytes = max_mb * 1024 * 1024
-    if len(content) > max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds the {max_mb} MB size limit.",
-        )
-
-    ext = ext_map[file.content_type]  # type: ignore[index]
-    filename = f"{uuid.uuid4().hex}{ext}"
     folder = "videos" if is_video_slot else "items"
-    upload_path = Path(settings.upload_dir) / folder
-    upload_path.mkdir(parents=True, exist_ok=True)
-    (upload_path / filename).write_bytes(content)
-
-    media_path = f"/uploads/{folder}/{filename}"
+    media_path = await save_upload_file(
+        file=file,
+        upload_root=settings.upload_dir,
+        subdir=folder,
+        allowed_content_types=allowed_content_types,
+        ext_map=ext_map,
+        max_size_mb=max_mb,
+    )
     field_name = _MEDIA_SLOT_TO_FIELD[slot]
-    item = repository.update_media_path(db, item_id, restaurant_id, field_name, media_path)
+    try:
+        item = repository.update_media_path(db, item_id, restaurant_id, field_name, media_path)
+    except SQLAlchemyError:
+        db.rollback()
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=media_path)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Item media could not be saved. Please try again.",
+        )
     if not item:
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=media_path)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found.")
 
     return ItemMediaUploadResponse(slot=slot, path=media_path)

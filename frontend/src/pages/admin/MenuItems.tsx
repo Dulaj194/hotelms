@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import AssetImage from "@/components/shared/AssetImage";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
@@ -416,11 +417,11 @@ export default function MenuItems() {
           {displayedItems.map((item) => (
             <div key={item.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
-                {item.image_path ? (
-                  <img src={toAssetUrl(item.image_path)} alt={item.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-3xl">🍴</span>
-                )}
+                <AssetImage
+                  path={item.image_path}
+                  alt={item.name}
+                  className="h-full w-full object-cover"
+                />
               </div>
 
               <div className="p-4">

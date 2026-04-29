@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import AssetImage from "@/components/shared/AssetImage";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import {
   TenantContextBadge,
@@ -8,7 +9,6 @@ import {
 } from "@/components/shared/TenantScopeNotice";
 import { useTenantContext } from "@/hooks/useTenantContext";
 import { ApiError, api } from "@/lib/api";
-import { toAssetUrl } from "@/lib/assets";
 import type { Menu } from "@/types/menu";
 
 interface FormData {
@@ -276,17 +276,11 @@ export default function Menus() {
                   className="flex h-full min-h-[410px] w-full flex-col rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md"
                 >
                   <div className="aspect-[16/10] w-full overflow-hidden rounded-lg bg-slate-100">
-                    {menu.image_path ? (
-                      <img
-                        src={toAssetUrl(menu.image_path)}
-                        alt={menu.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-sm font-medium text-slate-500">
-                        No image available
-                      </div>
-                    )}
+                    <AssetImage
+                      path={menu.image_path}
+                      alt={menu.name}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
 
                   <div className="mt-3 flex flex-1 flex-col">

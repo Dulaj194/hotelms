@@ -42,6 +42,8 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    volumes:
+      - backend_uploads:/app/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -71,3 +73,4 @@ services:
 volumes:
   mysql_data:
   redis_data:
+  backend_uploads:

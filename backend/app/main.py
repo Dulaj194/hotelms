@@ -23,7 +23,11 @@ logger = get_logger(__name__)
 
 # Ensure upload directory exists at startup (required before StaticFiles mount)
 Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+(Path(settings.upload_dir) / "categories").mkdir(parents=True, exist_ok=True)
 (Path(settings.upload_dir) / "logos").mkdir(parents=True, exist_ok=True)
+(Path(settings.upload_dir) / "items").mkdir(parents=True, exist_ok=True)
+(Path(settings.upload_dir) / "menus").mkdir(parents=True, exist_ok=True)
+(Path(settings.upload_dir) / "offers").mkdir(parents=True, exist_ok=True)
 (Path(settings.upload_dir) / "qrcodes").mkdir(parents=True, exist_ok=True)
 (Path(settings.upload_dir) / "videos").mkdir(parents=True, exist_ok=True)
 
@@ -35,7 +39,11 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
 
     # Ensure upload directories exist
     upload_root = Path(settings.upload_dir)
+    (upload_root / "categories").mkdir(parents=True, exist_ok=True)
     (upload_root / "logos").mkdir(parents=True, exist_ok=True)
+    (upload_root / "items").mkdir(parents=True, exist_ok=True)
+    (upload_root / "menus").mkdir(parents=True, exist_ok=True)
+    (upload_root / "offers").mkdir(parents=True, exist_ok=True)
     (upload_root / "qrcodes").mkdir(parents=True, exist_ok=True)
     (upload_root / "videos").mkdir(parents=True, exist_ok=True)
     logger.info("Upload directories ready at %s", upload_root.resolve())

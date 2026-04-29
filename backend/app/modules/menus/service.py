@@ -1,12 +1,9 @@
-import uuid
-from pathlib import Path
-
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.file_storage import delete_uploaded_file
+from app.core.file_storage import delete_uploaded_file, save_upload_file
 from app.modules.menus import repository
 from app.modules.menus.schemas import (
     MenuCreateRequest,
@@ -96,21 +93,14 @@ async def upload_menu_image(
             detail=f"Invalid file type '{file.content_type}'. Allowed: jpg, png, webp.",
         )
 
-    content = await file.read()
-    max_bytes = settings.max_upload_size_mb * 1024 * 1024
-    if len(content) > max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds the {settings.max_upload_size_mb} MB size limit.",
-        )
-
-    ext = _EXT_MAP[file.content_type]  # type: ignore[index]
-    filename = f"{uuid.uuid4().hex}{ext}"
-    upload_path = Path(settings.upload_dir) / "menus"
-    upload_path.mkdir(parents=True, exist_ok=True)
-    (upload_path / filename).write_bytes(content)
-
-    image_path = f"/uploads/menus/{filename}"
+    image_path = await save_upload_file(
+        file=file,
+        upload_root=settings.upload_dir,
+        subdir="menus",
+        allowed_content_types=_ALLOWED_CONTENT_TYPES,
+        ext_map=_EXT_MAP,
+        max_size_mb=settings.max_upload_size_mb,
+    )
     try:
         menu = repository.update_image_path(db, menu_id, restaurant_id, image_path)
     except SQLAlchemyError:

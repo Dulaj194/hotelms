@@ -19,6 +19,7 @@ import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { getRoomToken } from "@/hooks/useRoomSession";
 import { useRoomCart } from "@/hooks/useRoomCart";
 import { fetchRoomSessionJson, restoreRoomSession } from "@/features/public/roomSession";
+import { toAssetUrl } from "@/lib/assets";
 import { publicGet } from "@/lib/publicApi";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
 import type { RoomOrderDetailResponse } from "@/types/roomSession";
@@ -447,7 +448,7 @@ export default function RoomMenu() {
       >
         {item.image_path && (
           <img
-            src={item.image_path}
+            src={toAssetUrl(item.image_path)}
             alt={item.name}
             className="w-full h-36 object-cover"
           />
