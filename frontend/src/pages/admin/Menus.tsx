@@ -275,7 +275,7 @@ export default function Menus() {
                   key={menu.id}
                   className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
                 >
-                  <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100">
+                  <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100">
                     <AssetImage
                       path={menu.image_path}
                       alt={menu.name}
@@ -299,7 +299,7 @@ export default function Menus() {
                       </span>
                     </div>
 
-                    <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">
+                    <p className="mt-1 line-clamp-1 text-sm leading-5 text-slate-600">
                       {menu.description?.trim() || "No description added yet."}
                     </p>
 
@@ -308,7 +308,7 @@ export default function Menus() {
                       <span>Menu #{menu.id}</span>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="mt-2 grid grid-cols-2 gap-2">
                       <button
                         onClick={() => navigate(`/admin/menu/categories?menuId=${menu.id}`)}
                         className="col-span-2 min-h-10 rounded-md bg-cyan-500 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-cyan-600 sm:min-h-0"
@@ -330,7 +330,7 @@ export default function Menus() {
                       <button
                         onClick={() => openUpload(menu)}
                         disabled={uploading && uploadTarget?.id === menu.id}
-                        className="col-span-2 min-h-10 rounded-md border border-slate-200 bg-slate-50 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 sm:min-h-0"
+                        className="col-span-2 min-h-9 rounded-md border border-slate-200 bg-slate-50 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 sm:min-h-0"
                       >
                         {uploading && uploadTarget?.id === menu.id
                           ? "Uploading image..."

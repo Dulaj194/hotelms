@@ -66,7 +66,7 @@ export default function OfferImagePicker({
           <img
             src={imagePreviewUrl || toAssetUrl(existingImagePath) || ""}
             alt="Offer preview"
-            className="aspect-[4/3] w-full object-cover"
+            className="aspect-[16/9] w-full object-cover"
           />
         </div>
       )}

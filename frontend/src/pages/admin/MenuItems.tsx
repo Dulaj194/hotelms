@@ -419,7 +419,7 @@ export default function MenuItems() {
               key={item.id}
               className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
             >
-              <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100">
+              <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100">
                 <AssetImage
                   path={item.image_path}
                   alt={item.name}
@@ -437,7 +437,7 @@ export default function MenuItems() {
                   </span>
                 </div>
                 {item.description && (
-                  <p className="mb-1 line-clamp-2 text-sm leading-5 text-slate-600">
+                  <p className="mb-1 line-clamp-1 text-sm leading-5 text-slate-600">
                     {item.description}
                   </p>
                 )}
