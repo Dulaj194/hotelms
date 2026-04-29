@@ -586,7 +586,7 @@ export default function TableMenu() {
         {...menuSwipeHandlers}
       >
         <section>
-          <div className="relative overflow-hidden rounded-2xl bg-slate-950 px-4 py-3 text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)] sm:px-5">
+          <div className="relative min-h-[11rem] overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
             {featuredBannerUrls.length > 0 && (
               <img
                 src={featuredBannerUrls[activeBannerIndex]}
@@ -595,21 +595,26 @@ export default function TableMenu() {
               />
             )}
             <div className="absolute inset-0 bg-slate-950/65" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.24),_transparent_34%)]" />
-            <div className="relative z-10 flex items-center justify-between gap-3">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.1)_0%,rgba(15,23,42,0.55)_100%)]" />
+            <div className="relative z-10 flex h-full min-h-[calc(11rem-2.5rem)] flex-col justify-between gap-5 sm:min-h-[calc(13rem-3rem)] lg:min-h-[calc(15rem-3rem)]">
               <div className="min-w-0">
-                <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">
-                  <Sparkles className="h-3 w-3" />
+                <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-white/80">
+                  <Sparkles className="h-3.5 w-3.5" />
                   Featured picks
                 </p>
-                <h2 className="mt-1 truncate text-base font-black leading-tight tracking-tight sm:text-lg">
+                <h2 className="mt-4 max-w-xl text-2xl font-black leading-tight tracking-tight sm:text-3xl">
                   Order faster from your table.
                 </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">
+                  Choose favorites, update quantities, and place your order without leaving the menu.
+                </p>
               </div>
 
-              <span className="hidden shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/75 sm:inline-flex">
-                Fast add
-              </span>
+              <div className="flex flex-wrap gap-2 text-xs font-semibold text-white/80">
+                <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add</span>
+                <span className="rounded-full bg-white/10 px-3 py-1.5">Table session</span>
+                <span className="rounded-full bg-white/10 px-3 py-1.5">Live cart</span>
+              </div>
             </div>
           </div>
         </section>
