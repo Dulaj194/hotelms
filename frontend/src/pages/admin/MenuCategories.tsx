@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera } from "lucide-react";
+import { Camera, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import AssetImage from "@/components/shared/AssetImage";
@@ -303,7 +303,8 @@ export default function MenuCategories() {
             disabled={menus.length === 0}
             className="w-full rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:py-2"
           >
-            + Add Category
+            <Plus className="mr-2 inline h-4 w-4" />
+            Add Category
           </button>
         </div>
       </div>
@@ -359,7 +360,7 @@ export default function MenuCategories() {
                     openUpload(category);
                   }}
                   disabled={uploading && uploadTarget?.id === category.id}
-                  className="absolute bottom-2 left-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="absolute bottom-2 right-2 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-slate-950/85 text-white shadow-lg backdrop-blur transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   <Camera className="h-4 w-4" />
                 </button>
@@ -385,8 +386,7 @@ export default function MenuCategories() {
                   {category.description?.trim() || "No description added yet."}
                 </p>
 
-                <div className="mt-2 flex items-center justify-between gap-3 text-xs font-medium text-slate-500">
-                  {category.sort_order > 0 ? <span>Sort: {category.sort_order}</span> : <span />}
+                <div className="mt-2 flex items-center justify-end gap-3 text-xs font-medium text-slate-500">
                   <span className="line-clamp-1 text-right">
                     {menus.find((menu) => menu.id === category.menu_id)?.name ?? "Menu not found"}
                   </span>
@@ -398,8 +398,9 @@ export default function MenuCategories() {
                       event.stopPropagation();
                       openEdit(category);
                     }}
-                    className="min-h-10 rounded-md bg-amber-400 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500 sm:min-h-0"
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:min-h-0"
                   >
+                    <Pencil className="h-4 w-4" />
                     Edit
                   </button>
                   <button
@@ -407,8 +408,9 @@ export default function MenuCategories() {
                       event.stopPropagation();
                       setDeleteTarget(category);
                     }}
-                    className="min-h-10 rounded-md bg-rose-600 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700 sm:min-h-0"
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 sm:min-h-0"
                   >
+                    <Trash2 className="h-4 w-4" />
                     Delete
                   </button>
                 </div>
@@ -450,12 +452,25 @@ export default function MenuCategories() {
 
       {modalOpen && (
         <div className="app-modal-shell">
-          <div className="app-modal-panel max-w-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              {editingCategory ? "Edit Category" : "Add Category"}
-            </h2>
+          <div className="app-modal-panel max-w-lg">
+            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {editingCategory ? "Edit Category" : "Add Category"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">Group items under the correct menu with a clean guest-facing image.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">
                   Name <span className="text-red-500">*</span>
@@ -466,7 +481,7 @@ export default function MenuCategories() {
                   onChange={(event) =>
                     setFormData((current) => ({ ...current, name: event.target.value }))
                   }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   placeholder="e.g., Appetizers"
                 />
               </div>
@@ -480,7 +495,7 @@ export default function MenuCategories() {
                   }
                   rows={2}
                   maxLength={500}
-                  className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   placeholder="Optional description"
                 />
               </div>
@@ -497,7 +512,7 @@ export default function MenuCategories() {
                       menu_id: event.target.value ? parseInt(event.target.value, 10) : "",
                     }))
                   }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                 >
                   <option value="">Select menu</option>
                   {menus.map((menu) => (
@@ -519,7 +534,7 @@ export default function MenuCategories() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handleModalImageChange}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100"
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
                   Max file size 5MB (JPG, PNG, WebP)
@@ -539,7 +554,7 @@ export default function MenuCategories() {
                       sort_order: parseInt(event.target.value, 10) || 0,
                     }))
                   }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                 />
               </div>
 
@@ -564,15 +579,17 @@ export default function MenuCategories() {
             <div className="app-form-actions mt-5">
               <button
                 onClick={closeModal}
-                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
               >
+                <X className="h-4 w-4" />
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
               >
+                <Save className="h-4 w-4" />
                 {saving ? "Saving..." : editingCategory ? "Update" : "Create"}
               </button>
             </div>
@@ -591,15 +608,16 @@ export default function MenuCategories() {
             <div className="app-form-actions">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
                 disabled={deleting}
-                className="w-full rounded-lg bg-red-600 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
               >
+                <Trash2 className="h-4 w-4" />
                 {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera } from "lucide-react";
+import { Camera, CheckCircle2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import AssetImage from "@/components/shared/AssetImage";
@@ -369,7 +369,8 @@ export default function MenuItems() {
             onClick={openCreate}
             className="w-full rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600 sm:w-auto sm:py-2"
           >
-            + Add Item
+            <Plus className="mr-2 inline h-4 w-4" />
+            Add Item
           </button>
         </div>
         <p className="text-sm text-gray-500 mt-2">
@@ -394,7 +395,7 @@ export default function MenuItems() {
               const value = e.target.value === "all" ? "all" : parseInt(e.target.value);
               setFilterCategoryId(value);
             }}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 sm:w-auto"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm sm:w-auto"
           >
             <option value="all">All Categories</option>
             {categories.map((cat) => (
@@ -432,7 +433,7 @@ export default function MenuItems() {
                   title="Change image"
                   onClick={() => openUpload(item)}
                   disabled={uploading && uploadTarget?.id === item.id}
-                  className="absolute bottom-2 left-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="absolute bottom-2 right-2 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-slate-950/85 text-white shadow-lg backdrop-blur transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   <Camera className="h-4 w-4" />
                 </button>
@@ -459,25 +460,28 @@ export default function MenuItems() {
                 <div className="mt-auto grid grid-cols-3 gap-2">
                   <button
                     onClick={() => handleToggleAvailable(item)}
-                    className={`min-h-10 rounded-md border py-1.5 text-xs font-medium transition-colors sm:min-h-0 ${
+                    className={`inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors sm:min-h-0 ${
                       item.is_available
-                        ? "border-green-200 text-green-600 hover:bg-green-50"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                         : "border-slate-200 text-slate-400 hover:bg-slate-50"
                     }`}
                   >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
                     {item.is_available ? "On" : "Off"}
                   </button>
                   <button
                     onClick={() => openEdit(item)}
-                    className="min-h-10 rounded-md bg-amber-400 py-1.5 text-xs font-semibold text-amber-950 transition-colors hover:bg-amber-500 sm:min-h-0"
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:min-h-0"
                   >
+                    <Pencil className="h-3.5 w-3.5" />
                     Edit
                   </button>
                   <button
                     onClick={() => setDeleteTarget(item)}
-                    className="min-h-10 rounded-md bg-rose-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700 sm:min-h-0"
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 sm:min-h-0"
                   >
-                    Del
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
                   </button>
                 </div>
               </div>
@@ -489,12 +493,30 @@ export default function MenuItems() {
       {modalOpen && (
         <div className="app-modal-shell">
           <div className="app-modal-panel max-w-4xl">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {editingItem ? "Edit Food Item" : "Add Food Item"}
-            </h2>
+            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {editingItem ? "Edit Food Item" : "Add Food Item"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Complete the essentials first, then add rich media only where it helps the item sell.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalOpen(false);
+                  resetMediaState();
+                }}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
             <div className="space-y-4 pr-1">
-              <section className="rounded-lg border border-gray-100 p-4 space-y-3">
+              <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">Basic Information</h3>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -504,7 +526,7 @@ export default function MenuItems() {
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData((f) => ({ ...f, name: e.target.value.slice(0, 150) }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                     placeholder="e.g., Chicken Kottu"
                   />
                 </div>
@@ -514,7 +536,7 @@ export default function MenuItems() {
                     value={formData.description}
                     onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value.slice(0, 350) }))}
                     rows={3}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                     placeholder="Short summary shown in menu cards"
                   />
                   <p className="mt-1 text-[11px] text-gray-400">Maximum 350 characters</p>
@@ -525,14 +547,14 @@ export default function MenuItems() {
                     value={formData.more_details}
                     onChange={(e) => setFormData((f) => ({ ...f, more_details: e.target.value.slice(0, 1000) }))}
                     rows={4}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                     placeholder="Ingredients, serving notes, allergens, chef note..."
                   />
                   <p className="mt-1 text-[11px] text-gray-400">Maximum 1000 characters</p>
                 </div>
               </section>
 
-              <section className="rounded-lg border border-gray-100 p-4 space-y-3">
+              <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">Category & Pricing</h3>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -546,7 +568,7 @@ export default function MenuItems() {
                         category_id: e.target.value === "" ? "" : parseInt(e.target.value),
                       }))
                     }
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   >
                     <option value="">Select category</option>
                     {categories.map((cat) => (
@@ -576,7 +598,7 @@ export default function MenuItems() {
                       step={0.01}
                       value={formData.price}
                       onChange={(e) => setFormData((f) => ({ ...f, price: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                       placeholder="0.00"
                     />
                   </div>
@@ -586,7 +608,7 @@ export default function MenuItems() {
                       type="text"
                       value={restaurantCurrency}
                       readOnly
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600 shadow-sm"
                     />
                     <p className="mt-1 text-[11px] text-gray-400">This currency comes from Restaurant Settings.</p>
                   </div>
@@ -605,7 +627,7 @@ export default function MenuItems() {
                 </div>
               </section>
 
-              <section className="rounded-lg border border-gray-100 p-4 space-y-3">
+              <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">Media & Content</h3>
                 <p className="text-[11px] text-gray-400">You can upload up to 5 images. Primary image is used as the main menu thumbnail.</p>
 
@@ -622,7 +644,7 @@ export default function MenuItems() {
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
                         onChange={(e) => handleMediaFileChange(primary.slot, e)}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100"
                       />
                       <p className="text-[11px] text-gray-400">Optional (JPG, JPEG, PNG, WEBP — Max 5MB)</p>
                       {(preview || existingPath) && (
@@ -630,7 +652,7 @@ export default function MenuItems() {
                           <img
                             src={preview || toAssetUrl(existingPath || "")}
                             alt={primary.label}
-                            className="w-16 h-16 rounded border object-cover"
+                            className="h-16 w-16 rounded-md border border-slate-200 object-cover"
                           />
                           <button
                             type="button"
@@ -640,7 +662,7 @@ export default function MenuItems() {
                                 setRemoveExistingMedia((prev) => ({ ...prev, [primary.slot]: true }));
                               }
                             }}
-                            className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50"
+                            className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
                           >
                             Remove
                           </button>
@@ -662,7 +684,7 @@ export default function MenuItems() {
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
                           onChange={(e) => handleMediaFileChange(slot, e)}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                          className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100"
                         />
                         <p className="text-[11px] text-gray-400">Optional (JPG, JPEG, PNG, WEBP — Max 5MB)</p>
                         {(preview || existingPath) && (
@@ -670,7 +692,7 @@ export default function MenuItems() {
                             <img
                               src={preview || toAssetUrl(existingPath || "")}
                               alt={label}
-                              className="w-16 h-16 rounded border object-cover"
+                              className="h-16 w-16 rounded-md border border-slate-200 object-cover"
                             />
                             <button
                               type="button"
@@ -680,7 +702,7 @@ export default function MenuItems() {
                                   setRemoveExistingMedia((prev) => ({ ...prev, [slot]: true }));
                                 }
                               }}
-                              className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50"
+                              className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
                             >
                               Remove
                             </button>
@@ -697,7 +719,7 @@ export default function MenuItems() {
                     type="file"
                     accept="video/mp4,video/webm,video/quicktime"
                     onChange={(e) => handleMediaFileChange("video", e)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100"
                   />
                   <p className="text-[11px] text-gray-400">Optional (MP4, WEBM, MOV — Max 25MB)</p>
                   {mediaPreviewUrls.video && (
@@ -715,7 +737,7 @@ export default function MenuItems() {
                           setRemoveExistingMedia((prev) => ({ ...prev, video: true }));
                         }
                       }}
-                      className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 mt-1"
+                      className="mt-1 rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
                     >
                       Remove
                     </button>
@@ -728,7 +750,7 @@ export default function MenuItems() {
                     type="url"
                     value={formData.blog_link}
                     onChange={(e) => setFormData((f) => ({ ...f, blog_link: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                     placeholder="https://example.com/recipe-story"
                   />
                   <p className="text-[11px] text-gray-400 mt-1">Optional. Must be a valid URL.</p>
@@ -744,15 +766,17 @@ export default function MenuItems() {
                   setModalOpen(false);
                   resetMediaState();
                 }}
-                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
               >
+                <X className="h-4 w-4" />
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || categories.length === 0 || formData.category_id === ""}
-                className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
               >
+                <Save className="h-4 w-4" />
                 {saving ? "Saving..." : editingItem ? "Update Item" : "Add Item"}
               </button>
             </div>
@@ -770,15 +794,16 @@ export default function MenuItems() {
             <div className="app-form-actions">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
                 disabled={deleting}
-                className="w-full rounded-lg bg-red-600 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
               >
+                <Trash2 className="h-4 w-4" />
                 {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
