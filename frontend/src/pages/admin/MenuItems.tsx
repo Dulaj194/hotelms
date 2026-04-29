@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
 import AssetImage from "@/components/shared/AssetImage";
@@ -413,18 +414,28 @@ export default function MenuItems() {
       )}
 
       {!loading && displayedItems.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {displayedItems.map((item) => (
             <article
               key={item.id}
               className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
             >
-              <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100">
+              <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
                 <AssetImage
                   path={item.image_path}
                   alt={item.name}
                   className="h-full w-full object-cover"
                 />
+                <button
+                  type="button"
+                  aria-label={`Change image for ${item.name}`}
+                  title="Change image"
+                  onClick={() => openUpload(item)}
+                  disabled={uploading && uploadTarget?.id === item.id}
+                  className="absolute bottom-2 left-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
               </div>
 
               <div className="flex flex-1 flex-col p-3">
@@ -445,14 +456,7 @@ export default function MenuItems() {
                   {categoryName(item.category_id)}
                 </p>
 
-                <div className="mt-auto grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <button
-                    onClick={() => openUpload(item)}
-                    disabled={uploading && uploadTarget?.id === item.id}
-                    className="min-h-10 rounded-md border border-slate-200 bg-slate-50 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-70 sm:min-h-0"
-                  >
-                    {uploading && uploadTarget?.id === item.id ? "..." : "Image"}
-                  </button>
+                <div className="mt-auto grid grid-cols-3 gap-2">
                   <button
                     onClick={() => handleToggleAvailable(item)}
                     className={`min-h-10 rounded-md border py-1.5 text-xs font-medium transition-colors sm:min-h-0 ${

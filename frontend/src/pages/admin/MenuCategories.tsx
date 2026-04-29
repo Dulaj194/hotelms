@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import AssetImage from "@/components/shared/AssetImage";
@@ -327,18 +328,41 @@ export default function MenuCategories() {
       )}
 
       {!loading && visibleCategories.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {paginatedCategories.map((category) => (
             <article
               key={category.id}
-              className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(`/admin/menu/items?categoryId=${category.id}`)}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  navigate(`/admin/menu/items?categoryId=${category.id}`);
+                }
+              }}
+              className="flex h-full cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
             >
-              <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100">
+              <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
                 <AssetImage
                   path={category.image_path}
                   alt={category.name}
                   className="h-full w-full object-cover"
                 />
+                <button
+                  type="button"
+                  aria-label={`Change image for ${category.name}`}
+                  title="Change image"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openUpload(category);
+                  }}
+                  disabled={uploading && uploadTarget?.id === category.id}
+                  className="absolute bottom-2 left-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/80 bg-white/95 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
               </div>
 
               <div className="flex flex-1 flex-col p-3">
@@ -362,7 +386,7 @@ export default function MenuCategories() {
                 </p>
 
                 <div className="mt-2 flex items-center justify-between gap-3 text-xs font-medium text-slate-500">
-                  <span>Sort: {category.sort_order}</span>
+                  {category.sort_order > 0 ? <span>Sort: {category.sort_order}</span> : <span />}
                   <span className="line-clamp-1 text-right">
                     {menus.find((menu) => menu.id === category.menu_id)?.name ?? "Menu not found"}
                   </span>
@@ -370,31 +394,22 @@ export default function MenuCategories() {
 
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => navigate(`/admin/menu/items?categoryId=${category.id}`)}
-                    className="col-span-2 min-h-10 rounded-md bg-cyan-500 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-cyan-600 sm:min-h-0"
-                  >
-                    Explore
-                  </button>
-                  <button
-                    onClick={() => openEdit(category)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openEdit(category);
+                    }}
                     className="min-h-10 rounded-md bg-amber-400 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500 sm:min-h-0"
                   >
                     Edit
                   </button>
                   <button
-                    onClick={() => setDeleteTarget(category)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setDeleteTarget(category);
+                    }}
                     className="min-h-10 rounded-md bg-rose-600 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700 sm:min-h-0"
                   >
                     Delete
-                  </button>
-                  <button
-                    onClick={() => openUpload(category)}
-                    disabled={uploading && uploadTarget?.id === category.id}
-                    className="col-span-2 min-h-9 rounded-md border border-slate-200 bg-slate-50 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 sm:min-h-0"
-                  >
-                    {uploading && uploadTarget?.id === category.id
-                      ? "Uploading image..."
-                      : "Change image"}
                   </button>
                 </div>
               </div>
