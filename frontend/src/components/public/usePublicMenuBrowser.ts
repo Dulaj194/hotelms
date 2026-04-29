@@ -21,32 +21,29 @@ export function usePublicMenuBrowser(menu: PublicMenuResponse | null): PublicMen
     return menu?.categories ?? [];
   }, [menu]);
 
-  const effectiveActiveCategoryId = useMemo(() => {
-    return activeCategoryId ?? visibleCategories[0]?.id ?? null;
-  }, [activeCategoryId, visibleCategories]);
-
   const selectedCategory = useMemo(() => {
-    if (effectiveActiveCategoryId === null) return null;
-    return (
-      visibleCategories.find((category) => category.id === effectiveActiveCategoryId) ??
-      null
-    );
-  }, [effectiveActiveCategoryId, visibleCategories]);
+    if (activeCategoryId === null) return null;
+    return visibleCategories.find((category) => category.id === activeCategoryId) ?? null;
+  }, [activeCategoryId, visibleCategories]);
 
   const selectCategoryByOffset = useCallback(
     (offset: number) => {
-      if (visibleCategories.length === 0) return;
-
-      const currentIndex = visibleCategories.findIndex(
-        (category) => category.id === effectiveActiveCategoryId
+      const categoryIds = visibleCategories.map((category) => category.id);
+      const navigationIds = [null, ...categoryIds];
+      const currentIndex = navigationIds.findIndex(
+        (categoryId) => categoryId === activeCategoryId
       );
       const safeCurrentIndex = currentIndex >= 0 ? currentIndex : 0;
-      const nextIndex =
-        (safeCurrentIndex + offset + visibleCategories.length) % visibleCategories.length;
+      const nextIndex = Math.min(
+        Math.max(safeCurrentIndex + offset, 0),
+        navigationIds.length - 1
+      );
 
-      setActiveCategoryId(visibleCategories[nextIndex].id);
+      if (nextIndex === safeCurrentIndex) return;
+
+      setActiveCategoryId(navigationIds[nextIndex]);
     },
-    [effectiveActiveCategoryId, visibleCategories]
+    [activeCategoryId, visibleCategories]
   );
 
   const selectNextCategory = useCallback(() => {
@@ -58,21 +55,21 @@ export function usePublicMenuBrowser(menu: PublicMenuResponse | null): PublicMen
   }, [selectCategoryByOffset]);
 
   useEffect(() => {
-    if (!menu || visibleCategories.length === 0) {
+    if (!menu) {
       setActiveCategoryId(null);
       return;
     }
 
     if (
-      activeCategoryId === null ||
+      activeCategoryId !== null &&
       !visibleCategories.some((category) => category.id === activeCategoryId)
     ) {
-      setActiveCategoryId(visibleCategories[0].id);
+      setActiveCategoryId(null);
     }
   }, [activeCategoryId, menu, visibleCategories]);
 
   return {
-    activeCategoryId: effectiveActiveCategoryId,
+    activeCategoryId,
     setActiveCategoryId,
     selectNextCategory,
     selectPreviousCategory,

@@ -35,8 +35,6 @@ export function useSwipeNavigation<T extends HTMLElement>({
   }, []);
 
   const onPointerDown = useCallback<PointerEventHandler<T>>((event) => {
-    if (event.pointerType === "mouse") return;
-
     startRef.current = {
       pointerId: event.pointerId,
       x: event.clientX,
@@ -55,8 +53,10 @@ export function useSwipeNavigation<T extends HTMLElement>({
       const start = startRef.current;
       if (!start || start.pointerId !== event.pointerId) return;
 
-      const deltaX = latestRef.current.x - start.x;
-      const deltaY = latestRef.current.y - start.y;
+      const endX = event.clientX || latestRef.current.x;
+      const endY = event.clientY || latestRef.current.y;
+      const deltaX = endX - start.x;
+      const deltaY = endY - start.y;
       const absX = Math.abs(deltaX);
       const absY = Math.abs(deltaY);
 

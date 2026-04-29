@@ -438,7 +438,8 @@ export default function RoomMenu() {
     );
   }
 
-  const renderedCategories = selectedCategory ? [selectedCategory] : [];
+  const renderedCategories =
+    activeCategoryId === null ? visibleCategories : selectedCategory ? [selectedCategory] : [];
 
   const renderItemCard = (item: PublicItemSummaryResponse) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);

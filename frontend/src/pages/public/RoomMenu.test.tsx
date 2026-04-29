@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -172,7 +172,7 @@ describe("RoomMenu", () => {
     expect(await screen.findByText("Room order route")).toBeTruthy();
   });
 
-  it("switches room menu categories with horizontal swipes", async () => {
+  it("switches room menu categories with bounded horizontal swipes", async () => {
     render(
       <MemoryRouter initialEntries={["/menu/5/room/101?k=room-secret"]}>
         <Routes>
@@ -183,50 +183,64 @@ describe("RoomMenu", () => {
 
     const menuContent = await screen.findByRole("main");
     expect(within(menuContent).getByText("Seafood Fried Rice")).toBeTruthy();
-    expect(within(menuContent).queryByText("Chocolate Cake")).toBeNull();
+    expect(within(menuContent).getByText("Chocolate Cake")).toBeTruthy();
 
-    fireEvent.pointerDown(menuContent, {
-      pointerId: 1,
-      pointerType: "touch",
-      clientX: 40,
-      clientY: 260,
-    });
-    fireEvent.pointerMove(menuContent, {
-      pointerId: 1,
-      pointerType: "touch",
-      clientX: 130,
-      clientY: 264,
-    });
-    fireEvent.pointerUp(menuContent, {
-      pointerId: 1,
-      pointerType: "touch",
-      clientX: 130,
-      clientY: 264,
-    });
+    const firePointer = (type: string, pointerId: number, clientX: number) => {
+      const event = new MouseEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        clientX,
+        clientY: 260,
+      });
+      Object.defineProperty(event, "pointerId", { value: pointerId });
+      fireEvent(menuContent, event);
+    };
 
-    expect(await within(menuContent).findByText("Chocolate Cake")).toBeTruthy();
-    expect(within(menuContent).queryByText("Seafood Fried Rice")).toBeNull();
+    const swipeRight = (pointerId: number) => {
+      firePointer("pointerdown", pointerId, 40);
+      firePointer("pointermove", pointerId, 130);
+      firePointer("pointerup", pointerId, 130);
+    };
 
-    fireEvent.pointerDown(menuContent, {
-      pointerId: 2,
-      pointerType: "touch",
-      clientX: 130,
-      clientY: 260,
-    });
-    fireEvent.pointerMove(menuContent, {
-      pointerId: 2,
-      pointerType: "touch",
-      clientX: 40,
-      clientY: 264,
-    });
-    fireEvent.pointerUp(menuContent, {
-      pointerId: 2,
-      pointerType: "touch",
-      clientX: 40,
-      clientY: 264,
+    const swipeLeft = (pointerId: number) => {
+      firePointer("pointerdown", pointerId, 130);
+      firePointer("pointermove", pointerId, 40);
+      firePointer("pointerup", pointerId, 40);
+    };
+
+    swipeRight(1);
+
+    await waitFor(() => {
+      expect(within(menuContent).getByText("Seafood Fried Rice")).toBeTruthy();
+      expect(within(menuContent).queryByText("Chocolate Cake")).toBeNull();
     });
 
-    expect(await within(menuContent).findByText("Seafood Fried Rice")).toBeTruthy();
-    expect(within(menuContent).queryByText("Chocolate Cake")).toBeNull();
+    swipeRight(2);
+
+    await waitFor(() => {
+      expect(within(menuContent).getByText("Chocolate Cake")).toBeTruthy();
+      expect(within(menuContent).queryByText("Seafood Fried Rice")).toBeNull();
+    });
+
+    swipeRight(3);
+
+    await waitFor(() => {
+      expect(within(menuContent).getByText("Chocolate Cake")).toBeTruthy();
+      expect(within(menuContent).queryByText("Seafood Fried Rice")).toBeNull();
+    });
+
+    swipeLeft(4);
+
+    await waitFor(() => {
+      expect(within(menuContent).getByText("Seafood Fried Rice")).toBeTruthy();
+      expect(within(menuContent).queryByText("Chocolate Cake")).toBeNull();
+    });
+
+    swipeLeft(5);
+
+    await waitFor(() => {
+      expect(within(menuContent).getByText("Chocolate Cake")).toBeTruthy();
+      expect(within(menuContent).getByText("Seafood Fried Rice")).toBeTruthy();
+    });
   });
 });
