@@ -389,7 +389,7 @@ export default function TableMenu() {
     return (
       <div
         key={item.id}
-        className={`group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(15,23,42,0.1)] ${
+        className={`group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)] ${
           !item.is_available ? "opacity-55" : ""
         }`}
       >
@@ -397,10 +397,10 @@ export default function TableMenu() {
           <img
             src={imageUrl}
             alt={item.name}
-            className="h-36 w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="h-28 w-full object-cover transition duration-300 group-hover:scale-[1.03] sm:h-36"
           />
         ) : (
-          <div className="flex h-36 w-full items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300">
+          <div className="flex h-28 w-full items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300 sm:h-36">
             <UtensilsCrossed className="h-10 w-10" />
           </div>
         )}
@@ -491,12 +491,15 @@ export default function TableMenu() {
 
             <div className="min-w-0">
               <p className="truncate text-base font-black leading-tight text-slate-900">
-                {guestName ?? "Guest"}
+                {menu.restaurant.name}
               </p>
-              {displayTableNumber && (
-                <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
-                  Table {displayTableNumber}
-                </p>
+              {(guestName || displayTableNumber) && (
+                <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-500">
+                  {guestName && <span className="min-w-0 truncate">{guestName}</span>}
+                  {displayTableNumber && (
+                    <span className="shrink-0 text-slate-400">Table {displayTableNumber}</span>
+                  )}
+                </div>
               )}
             </div>
           </div>
