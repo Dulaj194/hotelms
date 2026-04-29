@@ -376,6 +376,9 @@ export default function TableMenu() {
     );
   }
 
+  const displayTableNumber =
+    tableNumber && /^\d+$/.test(tableNumber) ? tableNumber.padStart(2, "0") : tableNumber;
+
   const renderItemCard = ({ item, categoryName }: MenuTile) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
@@ -472,28 +475,29 @@ export default function TableMenu() {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
       <header id="menu-top" className="sticky top-0 z-30 border-b border-white/60 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-5 lg:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url ? (
               <img
                 src={toAssetUrl(menu.restaurant.logo_url)}
                 alt={menu.restaurant.name}
-                className="h-11 w-11 rounded-2xl object-cover ring-1 ring-slate-200"
+                className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200"
               />
             ) : (
-              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-900 text-white">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-900 text-white">
                 <Store className="h-5 w-5" />
               </div>
             )}
 
             <div className="min-w-0">
-              <p className="truncate text-base font-black leading-tight text-slate-900 sm:text-lg">
-                {menu.restaurant.name}
+              <p className="truncate text-base font-black leading-tight text-slate-900">
+                {guestName ?? "Guest"}
               </p>
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-500">
-                {tableNumber && <span className="rounded-full bg-slate-100 px-2.5 py-1">Table {tableNumber}</span>}
-                {guestName && <span className="rounded-full bg-orange-50 px-2.5 py-1 text-orange-700">Guest: {guestName}</span>}
-              </div>
+              {displayTableNumber && (
+                <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                  Table {displayTableNumber}
+                </p>
+              )}
             </div>
           </div>
 
@@ -514,7 +518,7 @@ export default function TableMenu() {
 
             <button
               onClick={() => setCartOpen(true)}
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800"
+              className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800"
               aria-label="Open cart"
             >
               <ShoppingCart className="h-5 w-5" />
@@ -527,7 +531,7 @@ export default function TableMenu() {
 
             <button
               onClick={() => setProfileDrawerOpen(true)}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-900 transition hover:bg-slate-200"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-900 transition hover:bg-slate-200"
               aria-label="Open profile menu"
             >
               <UserRound className="h-5 w-5" />
@@ -535,7 +539,7 @@ export default function TableMenu() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-6xl px-4 pb-4 sm:px-5 lg:px-6">
+        <div className={`mx-auto max-w-6xl px-4 sm:px-5 lg:px-6 ${searchPanelOpen ? "pb-2" : "pb-0"}`}>
           <div
             className={`overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ${
               searchPanelOpen ? "max-h-24 opacity-100" : "max-h-0 border-transparent opacity-0"
@@ -564,7 +568,7 @@ export default function TableMenu() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-6xl px-4 pb-3 sm:px-5 lg:px-6">
+        <div className="mx-auto max-w-6xl px-4 pb-2 sm:px-5 lg:px-6">
           <MenuBrowserRail
             visibleCategories={visibleCategories}
             activeCategoryId={activeCategoryId}
@@ -575,11 +579,11 @@ export default function TableMenu() {
 
       <main
         id="menu-content"
-        className="mx-auto flex w-full max-w-6xl touch-pan-y flex-1 flex-col gap-6 px-4 py-4 pb-28 sm:px-5 lg:px-6"
+        className="mx-auto flex w-full max-w-6xl touch-pan-y flex-1 flex-col gap-3 px-4 py-3 pb-28 sm:px-5 lg:px-6"
         {...menuSwipeHandlers}
       >
         <section>
-          <div className="relative overflow-hidden rounded-[1.5rem] bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:px-6 sm:py-6">
+          <div className="relative overflow-hidden rounded-2xl bg-slate-950 px-4 py-3 text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)] sm:px-5">
             {featuredBannerUrls.length > 0 && (
               <img
                 src={featuredBannerUrls[activeBannerIndex]}
@@ -588,49 +592,33 @@ export default function TableMenu() {
               />
             )}
             <div className="absolute inset-0 bg-slate-950/65" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_34%),radial-gradient(circle_at_bottom_left,_rgba(255,255,255,0.12),_transparent_30%)]" />
-            <div className="relative z-10 flex h-full flex-col justify-between gap-4">
-              <div>
-                <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
-                  <Sparkles className="h-3.5 w-3.5" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.24),_transparent_34%)]" />
+            <div className="relative z-10 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/70">
+                  <Sparkles className="h-3 w-3" />
                   Featured picks
                 </p>
-                <h2 className="mt-3 text-2xl font-black leading-tight tracking-tight sm:text-3xl">
+                <h2 className="mt-1 truncate text-base font-black leading-tight tracking-tight sm:text-lg">
                   Order faster from your table.
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">
-                  Browse menu items, update quantities, and checkout with a clean one-page flow.
-                </p>
               </div>
 
-              <div className="flex flex-wrap gap-2 text-xs font-semibold text-white/80">
-                <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add-to-cart</span>
-                <span className="rounded-full bg-white/10 px-3 py-1.5">Search-first layout</span>
-                <span className="rounded-full bg-white/10 px-3 py-1.5">
-                  {featuredBannerUrls.length > 1 ? "Auto rotates every 1 min" : "Table aware session"}
-                </span>
-              </div>
+              <span className="hidden shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/75 sm:inline-flex">
+                Fast add
+              </span>
             </div>
           </div>
-            <button
-              type="button"
-              onClick={handleFocusSearch}
-              className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-            >
-              <Sparkles className="h-4 w-4" />
-              Open search
-            </button>
         </section>
 
-        <section id="menu-list" className="space-y-4">
-          <div className="flex items-end justify-between gap-3">
+        <section id="menu-list" className="space-y-3">
+          <div className="flex items-end justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-orange-500">Our menu</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+              <h2 className="text-xl font-black tracking-tight text-slate-900">
                 {searchQuery ? "Search results" : selectedCategory?.name ?? "All items"}
               </h2>
               {selectedCategory?.description && !searchQuery && (
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
                   {selectedCategory.description}
                 </p>
               )}
@@ -653,7 +641,7 @@ export default function TableMenu() {
               No items match the current filter.
             </div>
           ) : (
-            <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
               {visibleTiles.map(renderItemCard)}
             </div>
           )}
