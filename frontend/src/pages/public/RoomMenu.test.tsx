@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -66,6 +66,25 @@ describe("RoomMenu", () => {
               image_path: null,
               is_available: true,
               category_id: 10,
+            },
+          ],
+        },
+        {
+          id: 11,
+          name: "Desserts",
+          description: "Sweet finishes",
+          image_path: null,
+          sort_order: 2,
+          menu_id: 1,
+          items: [
+            {
+              id: 101,
+              name: "Chocolate Cake",
+              description: "Layered cake",
+              price: 8,
+              image_path: null,
+              is_available: true,
+              category_id: 11,
             },
           ],
         },
@@ -151,5 +170,63 @@ describe("RoomMenu", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Track Order" }));
     expect(await screen.findByText("Room order route")).toBeTruthy();
+  });
+
+  it("switches room menu categories with horizontal swipes", async () => {
+    render(
+      <MemoryRouter initialEntries={["/menu/5/room/101?k=room-secret"]}>
+        <Routes>
+          <Route path="/menu/:restaurantId/room/:roomNumber" element={<RoomMenu />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const menuContent = await screen.findByRole("main");
+    expect(within(menuContent).getByText("Seafood Fried Rice")).toBeTruthy();
+    expect(within(menuContent).queryByText("Chocolate Cake")).toBeNull();
+
+    fireEvent.pointerDown(menuContent, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 40,
+      clientY: 260,
+    });
+    fireEvent.pointerMove(menuContent, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 130,
+      clientY: 264,
+    });
+    fireEvent.pointerUp(menuContent, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 130,
+      clientY: 264,
+    });
+
+    expect(await within(menuContent).findByText("Chocolate Cake")).toBeTruthy();
+    expect(within(menuContent).queryByText("Seafood Fried Rice")).toBeNull();
+
+    fireEvent.pointerDown(menuContent, {
+      pointerId: 2,
+      pointerType: "touch",
+      clientX: 130,
+      clientY: 260,
+    });
+    fireEvent.pointerMove(menuContent, {
+      pointerId: 2,
+      pointerType: "touch",
+      clientX: 40,
+      clientY: 264,
+    });
+    fireEvent.pointerUp(menuContent, {
+      pointerId: 2,
+      pointerType: "touch",
+      clientX: 40,
+      clientY: 264,
+    });
+
+    expect(await within(menuContent).findByText("Seafood Fried Rice")).toBeTruthy();
+    expect(within(menuContent).queryByText("Chocolate Cake")).toBeNull();
   });
 });

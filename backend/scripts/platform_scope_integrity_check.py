@@ -116,7 +116,7 @@ def main() -> int:
             "Never use hardcoded credentials. Example: "
             "export DATABASE_URL='mysql+pymysql://user:pass@localhost/db'"
         )
-    )
+    
 
     engine = create_engine(database_url, pool_pre_ping=True, future=True)
     session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)

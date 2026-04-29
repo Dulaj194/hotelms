@@ -23,8 +23,9 @@ export default function MenuBrowserRail({
   };
 
   useEffect(() => {
-    const key = activeCategoryId === null ? "all" : `category-${activeCategoryId}`;
-    scrollIntoViewIfAvailable(categoryRefs.current.get(key));
+    if (activeCategoryId === null) return;
+
+    scrollIntoViewIfAvailable(categoryRefs.current.get(`category-${activeCategoryId}`));
   }, [activeCategoryId, visibleCategories.length]);
 
   if (visibleCategories.length === 0) {
@@ -42,87 +43,51 @@ export default function MenuBrowserRail({
         </span>
       </div>
 
-      <div className="scrollbar-hide flex gap-3 overflow-x-auto pb-1 snap-x snap-mandatory">
-        <button
-          key="all"
-          ref={(node) => {
-            categoryRefs.current.set("all", node);
-          }}
-          type="button"
-          onClick={() => onSelectCategory(null)}
-          aria-pressed={activeCategoryId === null}
-          className={`group flex min-w-[5.75rem] snap-center flex-col items-center justify-center gap-2 rounded-[1.5rem] border px-3 py-3 text-center transition duration-200 ${
-            activeCategoryId === null
-              ? "border-orange-300 bg-orange-50 shadow-[0_10px_25px_rgba(249,115,22,0.12)]"
-              : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_10px_25px_rgba(15,23,42,0.06)]"
-          }`}
-        >
-          <div
-            className={`grid h-14 w-14 place-items-center overflow-hidden rounded-full ring-1 transition ${
-              activeCategoryId === null ? "ring-orange-200" : "ring-slate-100"
-            }`}
-          >
-            <div className="grid h-full w-full place-items-center bg-slate-100 text-slate-700 font-bold text-base">
-              All
-            </div>
-          </div>
-          <span
-            className={`line-clamp-2 text-xs font-semibold leading-4 ${
-              activeCategoryId === null ? "text-orange-700" : "text-slate-700"
-            }`}
-          >
-            All
-          </span>
-        </button>
+      <div className="scrollbar-hide flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1">
+        {visibleCategories.map((category) => {
+          const isActive = activeCategoryId === category.id;
+          const imageUrl = toAssetUrl(category.image_path);
+          const categoryKey = `category-${category.id}`;
 
-          {visibleCategories.map((category) => {
-            const isActive = activeCategoryId === category.id;
-            const imageUrl = toAssetUrl(category.image_path);
-            const categoryKey = `category-${category.id}`;
-
-            return (
-              <button
-                key={category.id}
-                ref={(node) => {
-                  categoryRefs.current.set(categoryKey, node);
-                }}
-                type="button"
-                onClick={() => onSelectCategory(category.id)}
-                aria-pressed={isActive}
-                className={`group flex min-w-[5.75rem] snap-center flex-col items-center gap-2 rounded-[1.5rem] border px-3 py-3 text-center transition duration-200 ${
-                  isActive
-                    ? "border-orange-300 bg-orange-50 shadow-[0_10px_25px_rgba(249,115,22,0.12)]"
-                    : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_10px_25px_rgba(15,23,42,0.06)]"
+          return (
+            <button
+              key={category.id}
+              ref={(node) => {
+                categoryRefs.current.set(categoryKey, node);
+              }}
+              type="button"
+              onClick={() => onSelectCategory(category.id)}
+              aria-pressed={isActive}
+              className={`group inline-flex h-12 max-w-[11.5rem] shrink-0 snap-center items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-4 text-left transition duration-200 ${
+                isActive
+                  ? "border-orange-300 bg-orange-50 text-orange-700 shadow-[0_10px_24px_rgba(249,115,22,0.14)]"
+                  : "border-slate-200 bg-white text-slate-700 shadow-[0_8px_20px_rgba(15,23,42,0.04)] hover:border-orange-200 hover:bg-orange-50/50 hover:text-orange-700"
+              }`}
+            >
+              <span
+                className={`grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full ring-1 transition ${
+                  isActive ? "ring-orange-200" : "ring-slate-100"
                 }`}
               >
-                <div
-                  className={`grid h-14 w-14 place-items-center overflow-hidden rounded-full ring-1 transition ${
-                    isActive ? "ring-orange-200" : "ring-slate-100"
-                  }`}
-                >
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt={category.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="grid h-full w-full place-items-center bg-gradient-to-br from-orange-50 via-white to-amber-100 text-orange-400">
-                      <UtensilsCrossed className="h-6 w-6" />
-                    </div>
-                  )}
-                </div>
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={category.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="grid h-full w-full place-items-center bg-gradient-to-br from-orange-50 via-white to-amber-100 text-orange-400">
+                    <UtensilsCrossed className="h-4 w-4" />
+                  </span>
+                )}
+              </span>
 
-                <span
-                  className={`line-clamp-2 text-xs font-semibold leading-4 ${
-                    isActive ? "text-orange-700" : "text-slate-700"
-                  }`}
-                >
-                  {category.name}
-                </span>
-              </button>
-            );
-          })}
+              <span className="min-w-0 truncate text-sm font-semibold leading-5">
+                {category.name}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

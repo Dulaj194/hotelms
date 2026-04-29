@@ -16,6 +16,7 @@ import { ChevronRight } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
+import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { getRoomToken } from "@/hooks/useRoomSession";
 import { useRoomCart } from "@/hooks/useRoomCart";
 import { fetchRoomSessionJson, restoreRoomSession } from "@/features/public/roomSession";
@@ -304,9 +305,16 @@ export default function RoomMenu() {
   const {
     activeCategoryId,
     setActiveCategoryId,
+    selectNextCategory,
+    selectPreviousCategory,
     visibleCategories,
     selectedCategory,
   } = usePublicMenuBrowser(menu);
+
+  const menuSwipeHandlers = useSwipeNavigation<HTMLDivElement>({
+    onSwipeLeft: selectPreviousCategory,
+    onSwipeRight: selectNextCategory,
+  });
 
   // 1. Start (or reuse) a room session
   useEffect(() => {
@@ -430,8 +438,7 @@ export default function RoomMenu() {
     );
   }
 
-  const renderedCategories =
-    activeCategoryId === null ? visibleCategories : selectedCategory ? [selectedCategory] : [];
+  const renderedCategories = selectedCategory ? [selectedCategory] : [];
 
   const renderItemCard = (item: PublicItemSummaryResponse) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
@@ -595,7 +602,10 @@ export default function RoomMenu() {
       </header>
 
       {/* Item grid */}
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-4 space-y-6">
+      <main
+        className="flex-1 max-w-2xl w-full touch-pan-y mx-auto px-4 py-4 space-y-6"
+        {...menuSwipeHandlers}
+      >
         {renderedCategories.length === 0 ? (
           <p className="text-center text-gray-400 py-12">No categories available.</p>
         ) : (

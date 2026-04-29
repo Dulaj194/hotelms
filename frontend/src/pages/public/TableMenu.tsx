@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import CartDrawer from "@/components/shared/CartDrawer";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
+import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { useCart } from "@/hooks/useCart";
 import {
@@ -69,9 +70,16 @@ export default function TableMenu() {
   const {
     activeCategoryId,
     setActiveCategoryId,
+    selectNextCategory,
+    selectPreviousCategory,
     visibleCategories,
     selectedCategory,
   } = usePublicMenuBrowser(menu);
+
+  const menuSwipeHandlers = useSwipeNavigation<HTMLDivElement>({
+    onSwipeLeft: selectPreviousCategory,
+    onSwipeRight: selectNextCategory,
+  });
 
   const flattenedTiles = useMemo<MenuTile[]>(() => {
     if (!menu) return [];
@@ -565,7 +573,11 @@ export default function TableMenu() {
         </div>
       </header>
 
-      <main id="menu-content" className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-4 pb-28 sm:px-5 lg:px-6">
+      <main
+        id="menu-content"
+        className="mx-auto flex w-full max-w-6xl touch-pan-y flex-1 flex-col gap-6 px-4 py-4 pb-28 sm:px-5 lg:px-6"
+        {...menuSwipeHandlers}
+      >
         <section>
           <div className="relative overflow-hidden rounded-[1.5rem] bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:px-6 sm:py-6">
             {featuredBannerUrls.length > 0 && (
