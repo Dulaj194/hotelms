@@ -77,14 +77,14 @@ export default function OfferCard({
           <button
             type="button"
             onClick={onEdit}
-            className="rounded-md bg-amber-400 px-3 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500"
+            className="min-h-10 rounded-md bg-amber-400 px-3 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500 sm:min-h-0"
           >
             Edit
           </button>
           <button
             type="button"
             onClick={onDelete}
-            className="rounded-md bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+            className="min-h-10 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700 sm:min-h-0"
           >
             Delete
           </button>

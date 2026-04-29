@@ -268,15 +268,15 @@ export default function MenuCategories() {
 
   return (
     <DashboardLayout>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Menu Categories</h1>
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Menu Categories</h1>
           <p className="mt-1 text-sm text-slate-500">
             Standard view: paginated category cards with the same menu-card style.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
           <span className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
             Total: {sortedVisibleCategories.length}
           </span>
@@ -288,7 +288,7 @@ export default function MenuCategories() {
                 event.target.value === "all" ? "all" : parseInt(event.target.value, 10)
               )
             }
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 sm:w-auto"
           >
             <option value="all">All Menus</option>
             {menus.map((menu) => (
@@ -300,7 +300,7 @@ export default function MenuCategories() {
           <button
             onClick={openCreate}
             disabled={menus.length === 0}
-            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:py-2"
           >
             + Add Category
           </button>
@@ -327,7 +327,7 @@ export default function MenuCategories() {
       )}
 
       {!loading && visibleCategories.length > 0 && (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {paginatedCategories.map((category) => (
             <article
               key={category.id}
@@ -371,26 +371,26 @@ export default function MenuCategories() {
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <button
                     onClick={() => navigate(`/admin/menu/items?categoryId=${category.id}`)}
-                    className="col-span-2 rounded-md bg-cyan-500 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-cyan-600"
+                    className="col-span-2 min-h-10 rounded-md bg-cyan-500 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-cyan-600 sm:min-h-0"
                   >
                     Explore
                   </button>
                   <button
                     onClick={() => openEdit(category)}
-                    className="rounded-md bg-amber-400 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500"
+                    className="min-h-10 rounded-md bg-amber-400 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500 sm:min-h-0"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => setDeleteTarget(category)}
-                    className="rounded-md bg-rose-600 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+                    className="min-h-10 rounded-md bg-rose-600 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-rose-700 sm:min-h-0"
                   >
                     Delete
                   </button>
                   <button
                     onClick={() => openUpload(category)}
                     disabled={uploading && uploadTarget?.id === category.id}
-                    className="col-span-2 rounded-md border border-slate-200 bg-slate-50 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="col-span-2 min-h-10 rounded-md border border-slate-200 bg-slate-50 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 sm:min-h-0"
                   >
                     {uploading && uploadTarget?.id === category.id
                       ? "Uploading image..."
@@ -404,12 +404,12 @@ export default function MenuCategories() {
       )}
 
       {!loading && sortedVisibleCategories.length > CARDS_PER_PAGE && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <div className="mt-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <p className="text-sm text-slate-600">
             Showing {startIndex + 1}-{Math.min(endIndex, sortedVisibleCategories.length)} of{" "}
             {sortedVisibleCategories.length} categories
           </p>
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:flex">
             <button
               type="button"
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}

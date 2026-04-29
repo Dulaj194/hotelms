@@ -361,12 +361,12 @@ export default function MenuItems() {
 
   return (
     <DashboardLayout>
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Menu Items</h1>
+      <div className="mb-5 sm:mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Menu Items</h1>
           <button
             onClick={openCreate}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors"
+            className="w-full rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600 sm:w-auto sm:py-2"
           >
             + Add Item
           </button>
@@ -386,14 +386,14 @@ export default function MenuItems() {
       />
 
       {!loading && categories.length > 0 && (
-        <div className="flex gap-2 flex-wrap mb-5">
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <select
             value={filterCategoryId}
             onChange={(e) => {
               const value = e.target.value === "all" ? "all" : parseInt(e.target.value);
               setFilterCategoryId(value);
             }}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 sm:w-auto"
           >
             <option value="all">All Categories</option>
             {categories.map((cat) => (
@@ -413,7 +413,7 @@ export default function MenuItems() {
       )}
 
       {!loading && displayedItems.length > 0 && (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {displayedItems.map((item) => (
             <article
               key={item.id}
@@ -445,17 +445,17 @@ export default function MenuItems() {
                   {categoryName(item.category_id)}
                 </p>
 
-                <div className="mt-auto grid grid-cols-4 gap-2">
+                <div className="mt-auto grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <button
                     onClick={() => openUpload(item)}
                     disabled={uploading && uploadTarget?.id === item.id}
-                    className="rounded-md border border-slate-200 bg-slate-50 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-70"
+                    className="min-h-10 rounded-md border border-slate-200 bg-slate-50 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-70 sm:min-h-0"
                   >
                     {uploading && uploadTarget?.id === item.id ? "..." : "Image"}
                   </button>
                   <button
                     onClick={() => handleToggleAvailable(item)}
-                    className={`rounded-md border py-1.5 text-xs font-medium transition-colors ${
+                    className={`min-h-10 rounded-md border py-1.5 text-xs font-medium transition-colors sm:min-h-0 ${
                       item.is_available
                         ? "border-green-200 text-green-600 hover:bg-green-50"
                         : "border-slate-200 text-slate-400 hover:bg-slate-50"
@@ -465,13 +465,13 @@ export default function MenuItems() {
                   </button>
                   <button
                     onClick={() => openEdit(item)}
-                    className="rounded-md bg-amber-400 py-1.5 text-xs font-semibold text-amber-950 transition-colors hover:bg-amber-500"
+                    className="min-h-10 rounded-md bg-amber-400 py-1.5 text-xs font-semibold text-amber-950 transition-colors hover:bg-amber-500 sm:min-h-0"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => setDeleteTarget(item)}
-                    className="rounded-md bg-rose-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700"
+                    className="min-h-10 rounded-md bg-rose-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700 sm:min-h-0"
                   >
                     Del
                   </button>
@@ -489,7 +489,7 @@ export default function MenuItems() {
               {editingItem ? "Edit Food Item" : "Add Food Item"}
             </h2>
 
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="space-y-4 pr-1">
               <section className="rounded-lg border border-gray-100 p-4 space-y-3">
                 <h3 className="text-sm font-semibold text-gray-900">Basic Information</h3>
                 <div>
@@ -561,7 +561,7 @@ export default function MenuItems() {
                     </p>
                   )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Price <span className="text-red-500">*</span>
@@ -646,7 +646,7 @@ export default function MenuItems() {
                   );
                 })()}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   {IMAGE_SLOTS.slice(1).map(({ slot, label }) => {
                     const preview = mediaPreviewUrls[slot];
                     const existingPath = !removeExistingMedia[slot] ? existingMediaPath(slot) : null;
