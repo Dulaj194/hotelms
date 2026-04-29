@@ -413,10 +413,13 @@ export default function MenuItems() {
       )}
 
       {!loading && displayedItems.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {displayedItems.map((item) => (
-            <div key={item.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="h-32 bg-gray-100 flex items-center justify-center overflow-hidden">
+            <article
+              key={item.id}
+              className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+            >
+              <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100">
                 <AssetImage
                   path={item.image_path}
                   alt={item.name}
@@ -424,53 +427,57 @@ export default function MenuItems() {
                 />
               </div>
 
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <p className="font-semibold text-gray-900 leading-tight">{item.name}</p>
+              <div className="flex flex-1 flex-col p-3">
+                <div className="mb-1 flex items-start justify-between gap-2">
+                  <h2 className="line-clamp-1 text-lg font-semibold leading-tight text-slate-900">
+                    {item.name}
+                  </h2>
                   <span className="shrink-0 text-sm font-bold text-orange-500">
                     {item.currency} {Number(item.price).toFixed(2)}
                   </span>
                 </div>
                 {item.description && (
-                  <p className="text-xs text-gray-500 line-clamp-2 mb-1">{item.description}</p>
+                  <p className="mb-1 line-clamp-2 text-sm leading-5 text-slate-600">
+                    {item.description}
+                  </p>
                 )}
-                <p className="text-xs text-gray-400 mb-3">
+                <p className="mb-3 line-clamp-1 text-xs font-medium text-slate-500">
                   {categoryName(item.category_id)}
                 </p>
 
-                <div className="flex gap-2">
+                <div className="mt-auto grid grid-cols-4 gap-2">
                   <button
                     onClick={() => openUpload(item)}
                     disabled={uploading && uploadTarget?.id === item.id}
-                    className="flex-1 text-xs py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                    className="rounded-md border border-slate-200 bg-slate-50 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-70"
                   >
-                    {uploading && uploadTarget?.id === item.id ? "..." : "📷"}
+                    {uploading && uploadTarget?.id === item.id ? "..." : "Image"}
                   </button>
                   <button
                     onClick={() => handleToggleAvailable(item)}
-                    className={`flex-1 text-xs py-1.5 border rounded-lg transition-colors ${
+                    className={`rounded-md border py-1.5 text-xs font-medium transition-colors ${
                       item.is_available
                         ? "border-green-200 text-green-600 hover:bg-green-50"
-                        : "border-gray-200 text-gray-400 hover:bg-gray-50"
+                        : "border-slate-200 text-slate-400 hover:bg-slate-50"
                     }`}
                   >
-                    {item.is_available ? "Available" : "Unavailable"}
+                    {item.is_available ? "On" : "Off"}
                   </button>
                   <button
                     onClick={() => openEdit(item)}
-                    className="flex-1 text-xs py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                    className="rounded-md bg-amber-400 py-1.5 text-xs font-semibold text-amber-950 transition-colors hover:bg-amber-500"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => setDeleteTarget(item)}
-                    className="flex-1 text-xs py-1.5 border border-red-100 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                    className="rounded-md bg-rose-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-rose-700"
                   >
                     Del
                   </button>
                 </div>
               </div>
-            </div>
+            </article>
           ))}
         </div>
       )}
