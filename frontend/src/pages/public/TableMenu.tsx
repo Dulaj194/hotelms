@@ -5,6 +5,7 @@ import {
   ChevronRight,
   LogOut,
   Menu,
+  MessageCircle,
   Search,
   ShoppingCart,
   Sparkles,
@@ -14,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
+import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import {
@@ -24,7 +26,6 @@ import {
 } from "@/hooks/useGuestSession";
 import { useLocalTableCart } from "@/hooks/useLocalMenuCart";
 import { publicGet } from "@/lib/publicApi";
-import { toAssetUrl } from "@/lib/assets";
 import type {
   PublicItemSummaryResponse,
   PublicMenuResponse,
@@ -131,16 +132,14 @@ export default function TableMenu() {
     });
   }, [activeCategoryId, menu, visibleCategories]);
 
-  const featuredBannerUrls = useMemo(() => {
+  const featuredBannerPaths = useMemo(() => {
     const urls = menu?.restaurant.public_menu_banner_urls ?? [];
-    return urls
-      .map((url) => toAssetUrl(url) ?? "")
-      .filter((url) => url.length > 0);
+    return urls.filter((url) => url.trim().length > 0);
   }, [menu?.restaurant.public_menu_banner_urls]);
 
   useEffect(() => {
     setActiveBannerIndex(0);
-  }, [featuredBannerUrls.length]);
+  }, [featuredBannerPaths.length]);
 
   useEffect(() => {
     const topRevealOffset = 16;
@@ -189,18 +188,18 @@ export default function TableMenu() {
   }, [categoryRailAutoHideEnabled]);
 
   useEffect(() => {
-    if (featuredBannerUrls.length <= 1) {
+    if (featuredBannerPaths.length <= 1) {
       return;
     }
 
     const timerId = window.setInterval(() => {
-      setActiveBannerIndex((current) => (current + 1) % featuredBannerUrls.length);
+      setActiveBannerIndex((current) => (current + 1) % featuredBannerPaths.length);
     }, 60_000);
 
     return () => {
       window.clearInterval(timerId);
     };
-  }, [featuredBannerUrls.length]);
+  }, [featuredBannerPaths.length]);
 
   const visibleTiles = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -271,7 +270,7 @@ export default function TableMenu() {
     };
   }, [
     activeCategoryId,
-    featuredBannerUrls.length,
+    featuredBannerPaths.length,
     searchPanelOpen,
     searchQuery,
     visibleCategories.length,
@@ -379,6 +378,17 @@ export default function TableMenu() {
     window.location.replace("/");
   }, []);
 
+  const handleContactStaff = useCallback(() => {
+    const phoneNumber = menu?.restaurant.phone?.trim();
+    const callablePhone = phoneNumber?.replace(/[^\d+]/g, "");
+    if (callablePhone) {
+      window.location.href = `tel:${callablePhone}`;
+      return;
+    }
+
+    setProfileDrawerOpen(true);
+  }, [menu?.restaurant.phone]);
+
   if (pageError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -413,17 +423,15 @@ export default function TableMenu() {
                     Enter your name once and continue to menu, cart, and order tracking.
                   </p>
                 </div>
-                {menu?.restaurant.logo_url ? (
-                  <img
-                    src={toAssetUrl(menu.restaurant.logo_url)}
-                    alt={menu.restaurant.name}
-                    className="h-14 w-14 shrink-0 rounded-2xl bg-white/15 object-cover ring-4 ring-white/20"
-                  />
-                ) : (
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/15 ring-4 ring-white/20">
+                <SafeMenuAsset
+                  path={menu?.restaurant.logo_url}
+                  alt={menu.restaurant.name}
+                  className="h-14 w-14 shrink-0 rounded-2xl bg-white/15 object-cover ring-4 ring-white/20"
+                  fallbackClassName="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/15 ring-4 ring-white/20"
+                  fallback={
                     <Store className="h-6 w-6" />
-                  </div>
-                )}
+                  }
+                />
               </div>
 
               <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
@@ -477,7 +485,6 @@ export default function TableMenu() {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
-    const imageUrl = toAssetUrl(item.image_path);
     const metaLabel = categoryName;
 
     return (
@@ -487,19 +494,15 @@ export default function TableMenu() {
           !item.is_available ? "opacity-55" : ""
         }`}
       >
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={item.name}
-            loading="lazy"
-            decoding="async"
-            className="block aspect-[4/3] w-full max-w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-          />
-        ) : (
-          <div className="flex aspect-[4/3] w-full max-w-full shrink-0 items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300">
+        <SafeMenuAsset
+          path={item.image_path}
+          alt={item.name}
+          className="block aspect-[4/3] w-full max-w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+          fallbackClassName="flex aspect-[4/3] w-full max-w-full shrink-0 items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300"
+          fallback={
             <UtensilsCrossed className="h-9 w-9" />
-          </div>
-        )}
+          }
+        />
           <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
             <div className="flex min-w-0 items-start justify-between gap-2">
               <p className="min-w-0 break-words text-sm font-bold leading-tight text-slate-900 line-clamp-2">
@@ -573,21 +576,18 @@ export default function TableMenu() {
       <header id="menu-top" className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b border-white/60 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            {menu.restaurant.logo_url ? (
-              <img
-                src={toAssetUrl(menu.restaurant.logo_url)}
-                alt={menu.restaurant.name}
-                decoding="async"
-                className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200"
-              />
-            ) : (
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-900 text-white">
+            <SafeMenuAsset
+              path={menu.restaurant.logo_url}
+              alt={menu.restaurant.name}
+              className="h-11 w-11 rounded-2xl object-cover ring-1 ring-slate-200"
+              fallbackClassName="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-900 text-white"
+              fallback={
                 <Store className="h-5 w-5" />
-              </div>
-            )}
+              }
+            />
 
             <div className="min-w-0">
-              <p className="truncate text-base font-black leading-tight text-slate-900">
+              <p className="truncate text-lg font-black leading-tight text-slate-900">
                 {menu.restaurant.name}
               </p>
               {(guestName || displayTableNumber) && (
@@ -664,32 +664,34 @@ export default function TableMenu() {
         {...menuSwipeHandlers}
       >
         <section className="box-border w-full max-w-full min-w-0">
-          <div className="relative box-border min-h-[8.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-4 py-4 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
-            {featuredBannerUrls.length > 0 && (
-              <img
-                src={featuredBannerUrls[activeBannerIndex]}
+          <div className="relative box-border min-h-[12.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13.5rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
+            {featuredBannerPaths.length > 0 && (
+              <SafeMenuAsset
+                path={featuredBannerPaths[activeBannerIndex]}
                 alt="Featured menu banner"
-                decoding="async"
+                loading="eager"
                 className="absolute inset-0 h-full w-full object-cover"
+                fallbackClassName="absolute inset-0 bg-slate-950"
+                fallback={null}
               />
             )}
             <div className="absolute inset-0 bg-slate-950/65" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.1)_0%,rgba(15,23,42,0.55)_100%)]" />
-            <div className="relative z-10 flex h-full min-h-[calc(8.75rem-2rem)] flex-col justify-between gap-3 sm:min-h-[calc(13rem-3rem)] sm:gap-5 lg:min-h-[calc(15rem-3rem)]">
+            <div className="relative z-10 flex h-full min-h-[calc(12.75rem-2.5rem)] flex-col justify-between gap-4 sm:min-h-[calc(13.5rem-3rem)] sm:gap-5 lg:min-h-[calc(15rem-3rem)]">
               <div className="min-w-0">
                 <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 sm:text-xs">
                   <Sparkles className="h-3.5 w-3.5" />
                   Featured picks
                 </p>
-                <h2 className="mt-3 max-w-full break-words text-xl font-black leading-tight tracking-tight sm:mt-4 sm:max-w-xl sm:text-3xl">
+                <h2 className="mt-4 max-w-full break-words text-[1.65rem] font-black leading-tight tracking-tight sm:max-w-xl sm:text-3xl">
                   Order faster from your table.
                 </h2>
-                <p className="mt-1.5 max-w-full break-words text-xs leading-5 text-white/80 sm:mt-2 sm:max-w-2xl sm:text-sm sm:leading-6">
+                <p className="mt-2 max-w-full break-words text-sm leading-6 text-white/80 sm:max-w-2xl">
                   Choose favorites, update quantities, and place your order without leaving the menu.
                 </p>
               </div>
 
-              <div className="hidden flex-wrap gap-2 text-xs font-semibold text-white/80 sm:flex">
+              <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-white/80 sm:text-xs">
                 <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add</span>
                 <span className="rounded-full bg-white/10 px-3 py-1.5">Table session</span>
                 <span className="rounded-full bg-white/10 px-3 py-1.5">Live cart</span>
@@ -728,7 +730,7 @@ export default function TableMenu() {
               No items match the current filter.
             </div>
           ) : (
-            <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid w-full max-w-full min-w-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
               {visibleTiles.map(renderItemCard)}
             </div>
           )}
@@ -774,11 +776,12 @@ export default function TableMenu() {
 
           <button
             type="button"
-            onClick={() => setProfileDrawerOpen(true)}
+            onClick={handleContactStaff}
             className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
+            aria-label="Contact staff"
           >
-            <UserRound className="h-5 w-5" />
-            <span className="max-w-full truncate">Profile</span>
+            <MessageCircle className="h-5 w-5" />
+            <span className="max-w-full truncate">Chat</span>
           </button>
         </div>
       </div>

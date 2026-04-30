@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { UtensilsCrossed } from "lucide-react";
 
-import { toAssetUrl } from "@/lib/assets";
+import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import type { PublicCategoryResponse } from "@/types/publicMenu";
 
 type MenuBrowserRailProps = {
@@ -56,7 +56,6 @@ export default function MenuBrowserRail({
       <div className="scrollbar-hide box-border flex w-full max-w-full min-w-0 flex-1 snap-x touch-pan-x gap-2 overflow-x-auto overscroll-x-contain scroll-smooth min-[360px]:gap-2.5">
         {visibleCategories.map((category) => {
           const isActive = activeCategoryId === category.id;
-          const imageUrl = toAssetUrl(category.image_path);
           const categoryKey = `category-${category.id}`;
 
           return (
@@ -79,19 +78,15 @@ export default function MenuBrowserRail({
                   isActive ? "ring-orange-200" : "ring-slate-100"
                 }`}
               >
-                {imageUrl ? (
-                  <img
-                    src={imageUrl}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="grid h-full w-full place-items-center bg-gradient-to-br from-orange-50 via-white to-amber-100 text-orange-400">
+                <SafeMenuAsset
+                  path={category.image_path}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  fallbackClassName="grid h-full w-full place-items-center bg-gradient-to-br from-orange-50 via-white to-amber-100 text-orange-400"
+                  fallback={
                     <UtensilsCrossed className="h-4 w-4" />
-                  </span>
-                )}
+                  }
+                />
               </span>
 
               <span className="min-w-0 truncate text-sm font-semibold leading-5">
