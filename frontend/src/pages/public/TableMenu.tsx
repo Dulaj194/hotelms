@@ -107,16 +107,16 @@ export default function TableMenu() {
 
   if (pageError) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-red-600 text-center max-w-sm">{pageError}</p>
+      <div className="box-border flex min-h-screen w-full max-w-full items-center justify-center overflow-x-hidden p-6">
+        <p className="max-w-sm text-center text-red-600">{pageError}</p>
       </div>
     );
   }
 
   if (!menu) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-400 animate-pulse">Loading menu...</p>
+      <div className="box-border flex min-h-screen w-full max-w-full items-center justify-center overflow-x-hidden">
+        <p className="animate-pulse text-gray-400">Loading menu...</p>
       </div>
     );
   }
@@ -137,7 +137,7 @@ export default function TableMenu() {
     return (
       <div
         key={item.id}
-        className={`bg-white rounded-xl border overflow-hidden flex flex-col ${
+        className={`box-border flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-xl border bg-white ${
           !item.is_available ? "opacity-60" : ""
         }`}
       >
@@ -145,45 +145,47 @@ export default function TableMenu() {
           <img
             src={item.image_path}
             alt={item.name}
-            className="w-full h-36 object-cover"
+            className="h-36 w-full max-w-full object-cover"
           />
         )}
-        <div className="p-3 flex flex-col gap-2 flex-1">
-          <div className="flex-1">
-            <p className="font-semibold text-sm">{item.name}</p>
+        <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="min-w-0 break-words text-sm font-bold leading-tight line-clamp-2">
+              {item.name}
+            </p>
             {item.description && (
-              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+              <p className="mt-0.5 min-w-0 break-words text-xs text-gray-500 line-clamp-2">
                 {item.description}
               </p>
             )}
           </div>
 
-          <div className="flex items-center justify-between mt-1">
-            <span className="font-bold text-sm text-orange-600">
+          <div className="mt-1 flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <span className="min-w-0 text-sm font-bold text-orange-600">
               ${item.price.toFixed(2)}
             </span>
 
             {!item.is_available ? (
               <span className="text-xs text-gray-400">Unavailable</span>
             ) : qtyInCart > 0 ? (
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <button
                   onClick={() =>
                     qtyInCart > 1
                       ? updateItem(item.id, qtyInCart - 1)
                       : removeItem(item.id)
                   }
-                  className="w-7 h-7 flex items-center justify-center rounded-full border hover:bg-gray-100 transition-colors text-sm font-bold"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm font-bold transition-colors hover:bg-gray-100"
                   aria-label="Decrease"
                 >
                   -
                 </button>
-                <span className="text-sm font-semibold w-5 text-center">
+                <span className="w-5 text-center text-sm font-semibold">
                   {qtyInCart}
                 </span>
                 <button
                   onClick={() => updateItem(item.id, qtyInCart + 1)}
-                  className="w-7 h-7 flex items-center justify-center rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors text-sm font-bold"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white transition-colors hover:bg-orange-600"
                   aria-label="Increase"
                 >
                   +
@@ -193,7 +195,7 @@ export default function TableMenu() {
               <button
                 disabled={isAdding || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white rounded-full text-xs font-semibold hover:bg-orange-600 transition-colors disabled:opacity-50"
+                className="box-border inline-flex min-h-10 w-full max-w-full items-center justify-center gap-1 rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50 min-[360px]:w-auto"
               >
                 {isAdding ? "Adding..." : "+ Add"}
               </button>
@@ -205,20 +207,20 @@ export default function TableMenu() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="box-border flex min-h-screen w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
-        <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-30 w-full max-w-full border-b bg-white shadow-sm">
+        <div className="mx-auto flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
               <img
                 src={menu.restaurant.logo_url}
                 alt={menu.restaurant.name}
-                className="h-9 w-9 rounded-full object-cover"
+                className="h-9 w-9 shrink-0 rounded-full object-cover"
               />
             )}
-            <div>
-              <p className="font-semibold text-sm leading-tight">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold leading-tight">
                 {menu.restaurant.name}
               </p>
               {tableNumber && (
@@ -230,7 +232,7 @@ export default function TableMenu() {
           {/* Cart button */}
           <button
             onClick={() => setCartOpen(true)}
-            className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+            className="relative shrink-0 rounded-full p-2 transition-colors hover:bg-gray-100"
             aria-label="Open cart"
           >
             <svg
@@ -257,12 +259,12 @@ export default function TableMenu() {
 
         {/* Category tabs */}
         {menu.categories.length > 1 && (
-          <div className="max-w-2xl mx-auto flex gap-1 overflow-x-auto px-4 pb-2 scrollbar-hide">
+          <div className="scrollbar-hide mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 gap-1 overflow-x-auto px-4 pb-2">
             {menu.categories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategoryId(cat.id)}
-                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                className={`max-w-[9rem] shrink-0 truncate rounded-full px-4 py-1.5 text-sm font-medium transition-colors min-[390px]:max-w-[11.5rem] ${
                   activeCategoryId === cat.id
                     ? "bg-orange-500 text-white"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
@@ -276,11 +278,11 @@ export default function TableMenu() {
       </header>
 
       {/* Item grid */}
-      <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-4 space-y-6">
+      <main className="mx-auto w-full max-w-[min(72rem,100%)] min-w-0 flex-1 space-y-6 px-4 py-4">
         {activeCategory && (
-          <section>
+          <section className="min-w-0">
             {activeCategory.description && (
-              <p className="text-sm text-gray-500 mb-4">
+              <p className="mb-4 min-w-0 break-words text-sm text-gray-500">
                 {activeCategory.description}
               </p>
             )}
@@ -292,29 +294,29 @@ export default function TableMenu() {
             ) : (
               <div className="space-y-6">
                 {hasDirectItems && (
-                  <div>
+                  <div className="min-w-0">
                     {visibleSubcategories.length > 0 && (
-                      <h2 className="text-sm font-semibold text-gray-700 mb-3">
+                      <h2 className="mb-3 min-w-0 break-words text-sm font-semibold text-gray-700">
                         Other items
                       </h2>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {activeCategory.items.map(renderItemCard)}
                     </div>
                   </div>
                 )}
 
                 {visibleSubcategories.map((subcategory) => (
-                  <div key={subcategory.id}>
-                    <h2 className="text-sm font-semibold text-gray-800">
+                  <div key={subcategory.id} className="min-w-0">
+                    <h2 className="min-w-0 break-words text-sm font-semibold text-gray-800">
                       {subcategory.name}
                     </h2>
                     {subcategory.description && (
-                      <p className="text-xs text-gray-500 mt-1 mb-3">
+                      <p className="mb-3 mt-1 min-w-0 break-words text-xs text-gray-500">
                         {subcategory.description}
                       </p>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {subcategory.items.map(renderItemCard)}
                     </div>
                   </div>
@@ -327,15 +329,15 @@ export default function TableMenu() {
 
       {/* Cart FAB for mobile */}
       {(cart?.item_count ?? 0) > 0 && !cartOpen && (
-        <div className="fixed bottom-4 left-0 right-0 px-4 z-30">
+        <div className="fixed bottom-4 left-0 right-0 z-30 box-border w-full max-w-full px-4">
           <button
             onClick={() => setCartOpen(true)}
-            className="w-full max-w-2xl mx-auto flex items-center justify-between bg-orange-500 text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-orange-600 transition-colors"
+            className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 rounded-2xl bg-orange-500 px-5 py-3 text-white shadow-lg transition-colors hover:bg-orange-600"
           >
-            <span className="font-semibold">
+            <span className="min-w-0 truncate font-semibold">
               {cart!.item_count} item{cart!.item_count !== 1 ? "s" : ""} in cart
             </span>
-            <span className="font-bold">${cart!.total.toFixed(2)}</span>
+            <span className="shrink-0 font-bold">${cart!.total.toFixed(2)}</span>
           </button>
         </div>
       )}
