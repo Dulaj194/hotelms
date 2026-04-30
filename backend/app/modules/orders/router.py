@@ -13,7 +13,7 @@ Route groups:
   PATCH  /orders/{order_id}/status — staff: update order status + publish event
 """
 import redis as redis_lib
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import (
@@ -21,6 +21,7 @@ from app.core.dependencies import (
     get_current_restaurant_id,
     get_db,
     get_redis,
+    resolve_guest_session_token,
     require_module_access,
     require_roles,
 )
@@ -49,16 +50,25 @@ _STAFF_ROLES = role_catalog.QR_MENU_STAFF_ROLES
 @router.post("", response_model=PlaceOrderResponse, status_code=201)
 def place_order(
     payload: PlaceOrderRequest,
-    session: TableSession = Depends(get_current_guest_session),
+    x_guest_session: str | None = Header(default=None, alias="X-Guest-Session"),
+    x_table_key: str | None = Header(default=None, alias="X-Table-Key"),
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
 ) -> PlaceOrderResponse:
-    """Place an order from the guest's current cart.
+    """Place a table order at checkout.
 
-    Requires X-Guest-Session header. restaurant_id comes from the validated
-    session — not from the request body.
+    Accepts either an existing X-Guest-Session token or the original X-Table-Key
+    QR credential. restaurant_id and table context are validated server-side.
     """
-    return service.place_order(db, r, session, payload)
+    if x_guest_session:
+        session = resolve_guest_session_token(x_guest_session, db)
+        return service.place_order(db, r, session, payload)
+    if x_table_key:
+        return service.place_order_from_qr_key(db, r, x_table_key, payload)
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Missing table checkout credential.",
+    )
 
 
 @router.get("/my", response_model=ActiveOrderListResponse)

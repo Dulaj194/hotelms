@@ -11,6 +11,17 @@ from app.modules.payments.schemas import PaymentResponse
 
 # ── Request ───────────────────────────────────────────────────────────────────
 
+class PlaceOrderItemRequest(BaseModel):
+    """Client cart line submitted at checkout.
+
+    Name/price from the browser are intentionally not accepted; the service
+    reloads item names and prices from the restaurant-scoped DB rows.
+    """
+
+    item_id: int = Field(..., gt=0)
+    quantity: int = Field(..., ge=1, le=99)
+
+
 class PlaceOrderRequest(BaseModel):
     """Minimal body for guest order placement.
 
@@ -22,6 +33,7 @@ class PlaceOrderRequest(BaseModel):
     customer_name: str | None = Field(default=None, max_length=255)
     customer_phone: str | None = Field(default=None, max_length=50)
     promo_code: str | None = Field(default=None, min_length=1, max_length=100)
+    items: list[PlaceOrderItemRequest] = Field(default_factory=list)
 
 
 class UpdateOrderStatusRequest(BaseModel):
@@ -92,6 +104,7 @@ class OrderDetailResponse(OrderHeaderResponse):
 class PlaceOrderResponse(BaseModel):
     order: OrderDetailResponse
     message: str = "Order placed successfully."
+    guest_token: str | None = None
 
 
 class PendingOrderListResponse(BaseModel):

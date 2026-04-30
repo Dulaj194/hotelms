@@ -356,17 +356,8 @@ def require_room_module_access(module_key: str):
 from fastapi import Header  # noqa: E402 — local import to avoid circular at module load
 
 
-def get_current_guest_session(
-    x_guest_session: str = Header(..., alias="X-Guest-Session"),
-    db: Session = Depends(get_db),
-):
-    """Dependency that validates the X-Guest-Session token and returns the TableSession.
-
-    Used by all cart endpoints. Validates:
-    1. Token signature and expiry (jose).
-    2. Token type is 'guest_session' (not a staff token).
-    3. Session exists in DB and is active/not-expired.
-    """
+def resolve_guest_session_token(x_guest_session: str, db: Session):
+    """Validate a raw X-Guest-Session token and return the TableSession."""
     from app.core.security import decode_guest_session_token
     from app.modules.table_sessions.repository import get_active_session_by_session_id
 
@@ -389,7 +380,6 @@ def get_current_guest_session(
     if session is None:
         raise credentials_exception
 
-    # Defense in depth: token context must match persisted session context.
     try:
         token_restaurant_id = int(payload.get("restaurant_id"))
     except (TypeError, ValueError):
@@ -405,22 +395,14 @@ def get_current_guest_session(
     return session
 
 
-def get_current_room_session(
-    x_room_session: str = Header(..., alias="X-Room-Session"),
-    db: Session = Depends(get_db),
-):
-    """Dependency that validates the X-Room-Session token and returns the RoomSession.
-
-    Used by all room cart and room order endpoints. Validates:
-    1. Token signature and expiry (jose).
-    2. Token type is 'room_session' (not a staff or table token).
-    3. Session exists in DB and is active/not-expired.
-
-    SECURITY: Plain room_number alone never authorizes room operations.
-    Only a valid signed room session token grants access.
-    """
+def resolve_room_session_token(x_room_session: str, db: Session):
+    """Validate a raw X-Room-Session token and return the RoomSession."""
     from app.core.security import decode_room_session_token
-    from app.modules.room_sessions.repository import get_active_room_session_by_session_id
+    from app.modules.room_sessions.repository import (
+        deactivate_room_session,
+        get_active_room_session_by_session_id,
+        touch_room_session_activity,
+    )
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -441,22 +423,32 @@ def get_current_room_session(
     if session is None:
         raise credentials_exception
 
+    try:
+        token_restaurant_id = int(payload.get("restaurant_id"))
+        token_room_id = int(payload.get("room_id"))
+    except (TypeError, ValueError):
+        raise credentials_exception
+    token_room_number = str(payload.get("room_number", "")).strip()
+
+    if (
+        token_restaurant_id != session.restaurant_id
+        or token_room_id != session.room_id
+        or token_room_number != session.room_number_snapshot
+    ):
+        raise credentials_exception
+
     idle_timeout_minutes = max(settings.room_session_idle_timeout_minutes, 1)
     last_activity_at = session.last_activity_at
     if last_activity_at.tzinfo is None:
         last_activity_at = last_activity_at.replace(tzinfo=UTC)
 
     if last_activity_at + timedelta(minutes=idle_timeout_minutes) <= datetime.now(UTC):
-        from app.modules.room_sessions.repository import deactivate_room_session
-
         deactivate_room_session(
             db,
             session_id=session.session_id,
             restaurant_id=session.restaurant_id,
         )
         raise credentials_exception
-
-    from app.modules.room_sessions.repository import touch_room_session_activity
 
     touch_room_session_activity(
         db,
@@ -465,3 +457,34 @@ def get_current_room_session(
     )
 
     return session
+
+
+def get_current_guest_session(
+    x_guest_session: str = Header(..., alias="X-Guest-Session"),
+    db: Session = Depends(get_db),
+):
+    """Dependency that validates the X-Guest-Session token and returns the TableSession.
+
+    Used by all cart endpoints. Validates:
+    1. Token signature and expiry (jose).
+    2. Token type is 'guest_session' (not a staff token).
+    3. Session exists in DB and is active/not-expired.
+    """
+    return resolve_guest_session_token(x_guest_session, db)
+
+
+def get_current_room_session(
+    x_room_session: str = Header(..., alias="X-Room-Session"),
+    db: Session = Depends(get_db),
+):
+    """Dependency that validates the X-Room-Session token and returns the RoomSession.
+
+    Used by all room cart and room order endpoints. Validates:
+    1. Token signature and expiry (jose).
+    2. Token type is 'room_session' (not a staff or table token).
+    3. Session exists in DB and is active/not-expired.
+
+    SECURITY: Plain room_number alone never authorizes room operations.
+    Only a valid signed room session token grants access.
+    """
+    return resolve_room_session_token(x_room_session, db)

@@ -52,6 +52,7 @@ const BlogArticle = lazy(() => import("@/pages/public/BlogArticle"));
 const Contact = lazy(() => import("@/pages/public/Contact"));
 const Landing = lazy(() => import("@/pages/public/Landing"));
 const Pricing = lazy(() => import("@/pages/public/Pricing"));
+const QRResolve = lazy(() => import("@/pages/public/QRResolve"));
 const GuestOrdersList = lazy(() => import("@/pages/public/GuestOrdersList"));
 const RoomMenu = lazy(() => import("@/pages/public/RoomMenu"));
 const RoomOrdersList = lazy(() => import("@/pages/public/RoomOrdersList"));
@@ -118,6 +119,8 @@ function AppRoutes() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
+        <Route path="/qr/:tableKey" element={<QRResolve mode="table" />} />
+        <Route path="/room/:roomKey" element={<QRResolve mode="room" />} />
         <Route path="/menu/:restaurantId/table/:tableNumber" element={<TableMenu />} />
         <Route
           path="/menu/:restaurantId/table/:tableNumber/cart"

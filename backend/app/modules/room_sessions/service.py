@@ -361,9 +361,16 @@ def place_room_order(
     - Cart is cleared only after a successful DB commit.
     - order_source="room" distinguishes this order from table orders.
     """
-    raw_cart = cart_repo.get_cart_raw(
-        r, session.session_id, session.restaurant_id, prefix=_ROOM_CART_PREFIX
-    )
+    cart_from_payload = bool(payload.items)
+    if cart_from_payload:
+        quantities: dict[int, int] = {}
+        for line in payload.items:
+            quantities[line.item_id] = quantities.get(line.item_id, 0) + line.quantity
+        raw_cart = {str(item_id): str(quantity) for item_id, quantity in quantities.items()}
+    else:
+        raw_cart = cart_repo.get_cart_raw(
+            r, session.session_id, session.restaurant_id, prefix=_ROOM_CART_PREFIX
+        )
     if not raw_cart:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -448,9 +455,10 @@ def place_room_order(
         raise
 
     # Clear room cart only after successful commit
-    cart_repo.clear_cart(
-        r, session.session_id, session.restaurant_id, prefix=_ROOM_CART_PREFIX
-    )
+    if not cart_from_payload:
+        cart_repo.clear_cart(
+            r, session.session_id, session.restaurant_id, prefix=_ROOM_CART_PREFIX
+        )
 
     # Reload with relationships for response
     placed = order_repo.get_order_by_id_and_session(
@@ -492,6 +500,76 @@ def place_room_order(
     )
 
     return PlaceRoomOrderResponse(order=_build_room_order_detail(placed))
+
+
+def place_room_order_from_qr_key(
+    db: Session,
+    r: redis_lib.Redis | None,
+    qr_access_key: str,
+    payload: PlaceRoomOrderRequest,
+) -> PlaceRoomOrderResponse:
+    """Place a room order directly from a QR key and client-side cart payload."""
+    if not payload.items:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cart is empty. Add items before placing an order.",
+        )
+
+    try:
+        qr_payload = decode_room_qr_access_token(qr_access_key)
+        restaurant_id = int(qr_payload.get("restaurant_id", -1))
+        room_number = str(qr_payload.get("room_number", "")).strip()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired room QR credential. Please scan the room QR again.",
+        )
+
+    restaurant = get_restaurant(db, restaurant_id)
+    if restaurant is None or not restaurant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant is not currently available.",
+        )
+
+    room = get_room_by_number_and_restaurant(db, room_number, restaurant_id)
+    if room is None or not room.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room is not currently available.",
+        )
+
+    repository.cleanup_stale_room_sessions(
+        db,
+        idle_timeout_minutes=settings.room_session_idle_timeout_minutes,
+    )
+    repository.deactivate_active_sessions_for_room(
+        db,
+        restaurant_id=restaurant_id,
+        room_id=room.id,
+    )
+
+    session_id = uuid.uuid4().hex
+    expire_minutes = settings.guest_session_expire_minutes
+    expires_at = datetime.now(UTC) + timedelta(minutes=expire_minutes)
+    session = repository.create_room_session(
+        db,
+        session_id=session_id,
+        restaurant_id=restaurant_id,
+        room_id=room.id,
+        room_number_snapshot=room.room_number,
+        expires_at=expires_at,
+    )
+    token = create_room_session_token(
+        session_id=session_id,
+        restaurant_id=restaurant_id,
+        room_id=room.id,
+        room_number=room.room_number,
+        expire_minutes=expire_minutes,
+    )
+    response = place_room_order(db, r, session, payload)
+    response.room_session_token = token
+    return response
 
 
 def list_room_orders_for_guest(

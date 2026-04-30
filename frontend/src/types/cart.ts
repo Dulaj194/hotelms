@@ -28,6 +28,11 @@ export interface AddCartItemRequest {
   quantity: number;
 }
 
+export interface PlaceOrderItemRequest {
+  item_id: number;
+  quantity: number;
+}
+
 export interface UpdateCartItemRequest {
   quantity: number;
 }

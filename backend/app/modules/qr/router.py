@@ -11,6 +11,7 @@ from app.modules.qr.schemas import (
     BulkQRRequest,
     QRCodeDeleteResponse,
     QRCodeListResponse,
+    QRCodeResolveResponse,
     QRCodeResponse,
     QRRebuildResponse,
     RoomBulkQRRequest,
@@ -48,6 +49,24 @@ def _request_frontend_base_url(request: Request) -> str | None:
     if parsed.scheme in {"http", "https"} and parsed.netloc:
         return f"{parsed.scheme}://{parsed.netloc}"
     return None
+
+
+@router.get("/resolve/{table_key}", response_model=QRCodeResolveResponse)
+def resolve_table_qr(
+    table_key: str,
+    db: Session = Depends(get_db),
+) -> QRCodeResolveResponse:
+    """Resolve a public table QR key before loading the customer menu."""
+    return service.resolve_table_qr_key(db, table_key)
+
+
+@router.get("/room/resolve/{room_key}", response_model=QRCodeResolveResponse)
+def resolve_room_qr(
+    room_key: str,
+    db: Session = Depends(get_db),
+) -> QRCodeResolveResponse:
+    """Resolve a public room QR key before loading the customer menu."""
+    return service.resolve_room_qr_key(db, room_key)
 
 
 @router.get("/table/{table_number}", response_model=QRCodeResponse)

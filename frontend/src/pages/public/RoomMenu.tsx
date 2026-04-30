@@ -4,11 +4,11 @@
  * Route: /menu/:restaurantId/room/:roomNumber
  *
  * Flow:
- * 1. On mount: start or reuse a room session (POST /room-sessions/start).
+ * 1. On mount: restore QR context from URL/sessionStorage.
  * 2. Fetch the public menu (same menu endpoint as table flow).
  * 3. Guest browses categories and items.
- * 4. Guest adds items to room cart (X-Room-Session header).
- * 5. Guest reviews cart and places room order.
+ * 4. Guest adds items to the client-side room cart.
+ * 5. Guest places the order with X-Room-Key or X-Room-Session.
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useState } from "react";
@@ -17,9 +17,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
-import { getRoomToken } from "@/hooks/useRoomSession";
-import { useRoomCart } from "@/hooks/useRoomCart";
-import { fetchRoomSessionJson, restoreRoomSession } from "@/features/public/roomSession";
+import { useLocalRoomCart } from "@/hooks/useLocalMenuCart";
 import { toAssetUrl } from "@/lib/assets";
 import { publicGet } from "@/lib/publicApi";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
@@ -289,6 +287,8 @@ export default function RoomMenu() {
     roomNumber: string;
   }>();
   const qrAccessKey = searchParams.get("k")?.trim() ?? "";
+  const restaurantIdNumber = restaurantId ? Number(restaurantId) : Number.NaN;
+  const restaurantContextId = Number.isNaN(restaurantIdNumber) ? null : restaurantIdNumber;
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -297,8 +297,14 @@ export default function RoomMenu() {
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [placedOrder, setPlacedOrder] = useState<RoomOrderDetailResponse | null>(null);
 
-  const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing, refetch } =
-    useRoomCart();
+  const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing } =
+    useLocalRoomCart({
+      restaurantId: restaurantContextId,
+      roomId: null,
+      roomNumber: roomNumber ?? null,
+      qrAccessKey,
+      menu,
+    });
 
   const {
     activeCategoryId,
@@ -314,53 +320,14 @@ export default function RoomMenu() {
     onSwipeRight: selectPreviousCategory,
   });
 
-  // 1. Start (or reuse) a room session
+  // 1. Preserve QR context locally. Cart mutations stay client-side until checkout.
   useEffect(() => {
     if (!restaurantId || !roomNumber) return;
-
-    const startFreshRoomSession = async () => {
-      const restored = await restoreRoomSession({
-        restaurantId,
-        roomNumber,
-        qrAccessKey,
-      });
-
-      if (restored) {
-        setSessionReady(true);
-        return;
-      }
-
-      setPageError(
-        qrAccessKey
-          ? "Could not start a room session. Please scan the QR code again."
-          : "Invalid room QR link. Please scan the room QR code again.",
-      );
-    };
-
-    const canReuseExistingSession = async (): Promise<boolean> => {
-      if (!getRoomToken()) return false;
-
-      try {
-        await fetchRoomSessionJson("/room-cart");
-        return true;
-      } catch {
-        return false;
-      }
-    };
-
-    const init = async () => {
-      if (getRoomToken()) {
-        const reusable = await canReuseExistingSession();
-        if (reusable) {
-          setSessionReady(true);
-          return;
-        }
-      }
-
-      await startFreshRoomSession();
-    };
-
-    void init();
+    if (!qrAccessKey) {
+      setPageError("Invalid room QR link. Please scan the room QR code again.");
+      return;
+    }
+    setSessionReady(true);
   }, [restaurantId, roomNumber, qrAccessKey]);
 
   // 2. Fetch public menu
@@ -380,11 +347,6 @@ export default function RoomMenu() {
 
     void fetchMenu();
   }, [restaurantId]);
-
-  // 3. Refetch cart once session is ready
-  useEffect(() => {
-    if (sessionReady) void refetch();
-  }, [sessionReady, refetch]);
 
   const handleAddToCart = useCallback(
     async (itemId: number) => {

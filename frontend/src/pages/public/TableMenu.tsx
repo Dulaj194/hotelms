@@ -16,15 +16,13 @@ import {
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
-import { useCart } from "@/hooks/useCart";
 import {
   clearGuestSession,
   getGuestDisplayName,
   getGuestQrAccessKey,
-  hasGuestSessionForContext,
   setGuestQrAccessKey,
 } from "@/hooks/useGuestSession";
-import { fetchGuestSessionJson, restoreTableGuestSession } from "@/features/public/tableSession";
+import { useLocalTableCart } from "@/hooks/useLocalMenuCart";
 import { publicGet } from "@/lib/publicApi";
 import { toAssetUrl } from "@/lib/assets";
 import type {
@@ -68,6 +66,8 @@ export default function TableMenu() {
     tableNumber: string;
   }>();
   const qrAccessKey = searchParams.get("k")?.trim() ?? "";
+  const restaurantIdNumber = restaurantId ? Number(restaurantId) : Number.NaN;
+  const restaurantContextId = Number.isNaN(restaurantIdNumber) ? null : restaurantIdNumber;
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -88,7 +88,17 @@ export default function TableMenu() {
   const lastMenuScrollYRef = useRef(0);
   const menuScrollFrameRef = useRef<number | null>(null);
 
-  const { cart, addItem, updateItem, removeItem, refetch } = useCart();
+  const { cart, addItem, updateItem, removeItem } = useLocalTableCart({
+    restaurantId: restaurantContextId,
+    tableNumber: tableNumber ?? null,
+    qrAccessKey: qrAccessKey || (
+      restaurantContextId && tableNumber
+        ? getGuestQrAccessKey(restaurantContextId, tableNumber) ?? ""
+        : ""
+    ),
+    menu,
+    customerName: guestName,
+  });
 
   const {
     activeCategoryId,
@@ -279,7 +289,7 @@ export default function TableMenu() {
     }
   }, [restaurantId, tableNumber]);
 
-  // 1. Start a guest session only after customer name is available.
+  // 1. Preserve QR context locally. Cart mutations stay client-side until checkout.
   useEffect(() => {
     if (!restaurantId || !tableNumber || !guestName) return;
     const parsedRestaurantId = Number(restaurantId);
@@ -292,53 +302,12 @@ export default function TableMenu() {
       setGuestQrAccessKey(parsedRestaurantId, tableNumber, qrAccessKey);
     }
 
-    const restoredQrAccessKey = getGuestQrAccessKey(parsedRestaurantId, tableNumber);
-    const effectiveQrAccessKey = qrAccessKey || restoredQrAccessKey || "";
+    if (!qrAccessKey && !getGuestQrAccessKey(parsedRestaurantId, tableNumber)) {
+      setPageError("Invalid table QR link. Please scan the table QR code again.");
+      return;
+    }
 
-    const startFreshSession = async () => {
-      const restored = await restoreTableGuestSession({
-        restaurantId,
-        tableNumber,
-        qrAccessKey: effectiveQrAccessKey,
-        guestName,
-      });
-
-      if (restored) {
-        setSessionReady(true);
-        return;
-      }
-
-      setPageError(
-        effectiveQrAccessKey
-          ? "Could not start a guest session. Please scan the QR code again."
-          : "Invalid table QR link. Please scan the table QR code again.",
-      );
-    };
-
-    const canReuseExistingSession = async (): Promise<boolean> => {
-      try {
-        await fetchGuestSessionJson("/cart");
-        return true;
-      } catch {
-        return false;
-      }
-    };
-
-    // Reuse an existing same-table guest session to keep cart/orders continuity.
-    // Starting a new session would hide previous orders because guest endpoints are session-scoped.
-    const init = async () => {
-      if (hasGuestSessionForContext(parsedRestaurantId, tableNumber)) {
-        const reusable = await canReuseExistingSession();
-        if (reusable) {
-          setSessionReady(true);
-          return;
-        }
-      }
-
-      await startFreshSession();
-    };
-
-    void init();
+    setSessionReady(true);
   }, [restaurantId, tableNumber, qrAccessKey, guestName]);
 
   // 2. Fetch public menu
@@ -358,11 +327,6 @@ export default function TableMenu() {
 
     void fetchMenu();
   }, [restaurantId]);
-
-  // 3. Refetch cart once session is ready
-  useEffect(() => {
-    if (sessionReady) void refetch();
-  }, [sessionReady, refetch]);
 
   const handleAddToCart = useCallback(
     async (itemId: number) => {

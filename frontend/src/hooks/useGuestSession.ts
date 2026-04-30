@@ -33,6 +33,23 @@ export function setGuestSession(response: TableSessionStartResponse): void {
   sessionStorage.setItem(GUEST_PROFILE_KEY, JSON.stringify(profile));
 }
 
+export function setGuestSessionTokenForContext(params: {
+  guestToken: string;
+  restaurantId: number;
+  tableNumber: string;
+  customerName: string;
+}): void {
+  sessionStorage.setItem(GUEST_SESSION_KEY, params.guestToken);
+  sessionStorage.setItem(
+    GUEST_PROFILE_KEY,
+    JSON.stringify({
+      restaurant_id: params.restaurantId,
+      table_number: params.tableNumber,
+      customer_name: params.customerName,
+    } satisfies GuestProfile),
+  );
+}
+
 /** Clears the guest session from storage. */
 export function clearGuestSession(): void {
   sessionStorage.removeItem(GUEST_SESSION_KEY);

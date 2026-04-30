@@ -4,7 +4,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.modules.orders.schemas import OrderItemResponse as RoomOrderItemResponse  # re-export alias
+from app.modules.orders.schemas import (
+    OrderItemResponse as RoomOrderItemResponse,
+    PlaceOrderItemRequest,
+)
 
 
 # ── Room session ──────────────────────────────────────────────────────────────
@@ -104,6 +107,7 @@ class PlaceRoomOrderRequest(BaseModel):
     notes: str | None = Field(default=None, max_length=500)
     customer_name: str | None = Field(default=None, max_length=255)
     customer_phone: str | None = Field(default=None, max_length=50)
+    items: list[PlaceOrderItemRequest] = Field(default_factory=list)
 
 
 class RoomOrderDetailResponse(BaseModel):
@@ -136,6 +140,7 @@ class RoomOrderDetailResponse(BaseModel):
 class PlaceRoomOrderResponse(BaseModel):
     order: RoomOrderDetailResponse
     message: str = "Room order placed successfully."
+    room_session_token: str | None = None
 
 
 class RoomOrderListResponse(BaseModel):

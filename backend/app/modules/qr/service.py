@@ -1,7 +1,7 @@
 import hashlib
 import socket
 from pathlib import Path
-from urllib.parse import quote, urlencode, urlparse
+from urllib.parse import quote, urlparse
 
 import qrcode
 import qrcode.image.pil
@@ -9,14 +9,21 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.security import create_room_qr_access_token, create_table_qr_access_token
+from app.core.security import (
+    create_room_qr_access_token,
+    create_table_qr_access_token,
+    decode_room_qr_access_token,
+    decode_table_qr_access_token,
+)
 from app.modules.qr import repository
 from app.modules.qr.schemas import (
     BulkQRCodeResponse,
     QRCodeDeleteResponse,
     QRCodeListResponse,
+    QRCodeResolveResponse,
     QRCodeResponse,
 )
+from app.modules.restaurants.repository import get_by_id as get_restaurant
 from app.modules.rooms.repository import get_room_by_number_and_restaurant
 
 _QR_DIR = Path(settings.upload_dir) / "qrcodes"
@@ -140,7 +147,9 @@ def _build_frontend_url(
     safe_target = quote(target_number, safe="")
     qr_access_key = _build_qr_access_key(restaurant_id, qr_type, target_number)
     if qr_access_key:
-        return f"{base}/menu/{restaurant_id}/{qr_type}/{safe_target}?{urlencode({'k': qr_access_key})}"
+        if qr_type == "room":
+            return f"{base}/room/{quote(qr_access_key, safe='')}"
+        return f"{base}/qr/{quote(qr_access_key, safe='')}"
     # /menu/{restaurant_id}/{type}/{number}
     return f"{base}/menu/{restaurant_id}/{qr_type}/{safe_target}"
 
@@ -327,6 +336,72 @@ def generate_qr(
         frontend_url=frontend_url,
     )
     return _to_response(qr_record, restaurant_id)
+
+
+def resolve_table_qr_key(db: Session, table_key: str) -> QRCodeResolveResponse:
+    """Resolve a signed table QR key into public customer context."""
+    try:
+        payload = decode_table_qr_access_token(table_key)
+        restaurant_id = int(payload.get("restaurant_id", -1))
+        table_number = _normalize_target_number(
+            str(payload.get("table_number", "")),
+            "table",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired table QR code. Please scan again.",
+        )
+
+    restaurant = get_restaurant(db, restaurant_id)
+    if restaurant is None or not restaurant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant is not currently available.",
+        )
+
+    return QRCodeResolveResponse(
+        qr_type="table",
+        restaurant_id=restaurant_id,
+        table_number=table_number,
+    )
+
+
+def resolve_room_qr_key(db: Session, room_key: str) -> QRCodeResolveResponse:
+    """Resolve a signed room QR key into public customer context."""
+    try:
+        payload = decode_room_qr_access_token(room_key)
+        restaurant_id = int(payload.get("restaurant_id", -1))
+        room_number = _normalize_target_number(
+            str(payload.get("room_number", "")),
+            "room",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired room QR code. Please scan again.",
+        )
+
+    restaurant = get_restaurant(db, restaurant_id)
+    if restaurant is None or not restaurant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant is not currently available.",
+        )
+
+    room = get_room_by_number_and_restaurant(db, room_number, restaurant_id)
+    if room is None or not room.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room is not currently available.",
+        )
+
+    return QRCodeResolveResponse(
+        qr_type="room",
+        restaurant_id=restaurant_id,
+        room_number=room.room_number,
+        room_id=room.id,
+    )
 
 
 def generate_bulk_table_qr(

@@ -39,6 +39,14 @@ class QRCodeDeleteResponse(BaseModel):
     message: str
 
 
+class QRCodeResolveResponse(BaseModel):
+    qr_type: str
+    restaurant_id: int
+    table_number: str | None = None
+    room_number: str | None = None
+    room_id: int | None = None
+
+
 class QRRebuildResponse(BaseModel):
     message: str
     refreshed_count: int

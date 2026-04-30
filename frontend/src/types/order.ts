@@ -15,6 +15,10 @@ export interface PlaceOrderRequest {
   customer_name?: string;
   customer_phone?: string;
   promo_code?: string;
+  items?: Array<{
+    item_id: number;
+    quantity: number;
+  }>;
 }
 
 export interface UpdateOrderStatusRequest {
@@ -87,6 +91,7 @@ export interface OrderDetailResponse extends OrderHeaderResponse {
 export interface PlaceOrderResponse {
   order: OrderDetailResponse;
   message: string;
+  guest_token?: string | null;
 }
 
 export interface PendingOrderListResponse {

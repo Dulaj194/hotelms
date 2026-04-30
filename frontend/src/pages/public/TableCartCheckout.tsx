@@ -14,17 +14,15 @@ import {
   UtensilsCrossed,
 } from "lucide-react";
 
-import { fetchGuestSessionJson, restoreTableGuestSession } from "@/features/public/tableSession";
 import {
   getGuestDisplayName,
   getGuestQrAccessKey,
-  hasGuestSessionForContext,
   setGuestQrAccessKey,
 } from "@/hooks/useGuestSession";
-import { useCart } from "@/hooks/useCart";
+import { useLocalTableCart } from "@/hooks/useLocalMenuCart";
 import { toAssetUrl } from "@/lib/assets";
 import { publicGet } from "@/lib/publicApi";
-import type { CartCouponValidateResponse, CartItemResponse } from "@/types/cart";
+import type { CartItemResponse } from "@/types/cart";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
 
 type MenuItemWithCategory = PublicItemSummaryResponse & {
@@ -67,9 +65,8 @@ export default function TableCartCheckout() {
     tableNumber: string;
   }>();
   const qrAccessKey = searchParams.get("k")?.trim() ?? "";
-
-  const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing, refetch } =
-    useCart();
+  const restaurantIdNumber = restaurantId ? Number(restaurantId) : Number.NaN;
+  const restaurantContextId = Number.isNaN(restaurantIdNumber) ? null : restaurantIdNumber;
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -82,6 +79,25 @@ export default function TableCartCheckout() {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
+
+  const customerName =
+    restaurantContextId && tableNumber
+      ? getGuestDisplayName(restaurantContextId, tableNumber)
+      : null;
+  const effectiveQrAccessKey =
+    qrAccessKey || (
+      restaurantContextId && tableNumber
+        ? getGuestQrAccessKey(restaurantContextId, tableNumber) ?? ""
+        : ""
+    );
+  const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing } =
+    useLocalTableCart({
+      restaurantId: restaurantContextId,
+      tableNumber: tableNumber ?? null,
+      qrAccessKey: effectiveQrAccessKey,
+      menu,
+      customerName,
+    });
 
   const menuItems = useMemo(() => buildMenuItems(menu), [menu]);
   const itemById = useMemo(() => {
@@ -126,39 +142,12 @@ export default function TableCartCheckout() {
       setGuestQrAccessKey(parsedRestaurantId, tableNumber, qrAccessKey);
     }
 
-    let cancelled = false;
+    if (!qrAccessKey && !getGuestQrAccessKey(parsedRestaurantId, tableNumber)) {
+      setPageError("Could not load your cart. Please go back to the menu and scan again.");
+      return;
+    }
 
-    const init = async () => {
-      if (hasGuestSessionForContext(parsedRestaurantId, tableNumber)) {
-        try {
-          await fetchGuestSessionJson("/cart");
-          if (!cancelled) setSessionReady(true);
-          return;
-        } catch {
-          // Fall through and try to restore from the stored QR credential.
-        }
-      }
-
-      const restored = await restoreTableGuestSession({
-        restaurantId,
-        tableNumber,
-        qrAccessKey: qrAccessKey || getGuestQrAccessKey(parsedRestaurantId, tableNumber) || "",
-        guestName: getGuestDisplayName(parsedRestaurantId, tableNumber),
-      });
-
-      if (cancelled) return;
-      if (restored) {
-        setSessionReady(true);
-      } else {
-        setPageError("Could not load your cart. Please go back to the menu and start again.");
-      }
-    };
-
-    void init();
-
-    return () => {
-      cancelled = true;
-    };
+    setSessionReady(true);
   }, [qrAccessKey, restaurantId, tableNumber]);
 
   useEffect(() => {
@@ -177,10 +166,6 @@ export default function TableCartCheckout() {
 
     void loadMenu();
   }, [restaurantId]);
-
-  useEffect(() => {
-    if (sessionReady) void refetch();
-  }, [refetch, sessionReady]);
 
   useEffect(() => {
     if (itemCount === 0) {
@@ -211,33 +196,9 @@ export default function TableCartCheckout() {
 
     setApplyingCoupon(true);
     setCouponError(null);
-    try {
-      const result = await fetchGuestSessionJson<CartCouponValidateResponse>(
-        "/cart/coupon/validate",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code }),
-        },
-      );
-
-      if (!result.valid || !result.code || result.discount_percent === null) {
-        setAppliedCoupon(null);
-        setCouponError(result.message);
-        return;
-      }
-
-      setAppliedCoupon({
-        code: result.code,
-        discountPercent: result.discount_percent,
-      });
-      setCouponInput(result.code);
-    } catch (err) {
-      setAppliedCoupon(null);
-      setCouponError(err instanceof Error ? err.message : "Could not apply coupon.");
-    } finally {
-      setApplyingCoupon(false);
-    }
+    setAppliedCoupon({ code, discountPercent: 0 });
+    setCouponInput(code);
+    setApplyingCoupon(false);
   }, [couponInput]);
 
   const handleAddRecommendation = useCallback(
@@ -529,7 +490,9 @@ export default function TableCartCheckout() {
               <h2 className="text-sm font-black text-slate-900">Apply coupon</h2>
               {appliedCoupon && (
                 <p className="text-xs font-semibold text-emerald-700">
-                  {appliedCoupon.code} gives {appliedCoupon.discountPercent}% off
+                  {appliedCoupon.discountPercent > 0
+                    ? `${appliedCoupon.code} gives ${appliedCoupon.discountPercent}% off`
+                    : `${appliedCoupon.code} will be validated at checkout`}
                 </p>
               )}
             </div>

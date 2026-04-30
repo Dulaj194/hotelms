@@ -61,6 +61,10 @@ export interface PlaceRoomOrderRequest {
   notes?: string;
   customer_name?: string;
   customer_phone?: string;
+  items?: Array<{
+    item_id: number;
+    quantity: number;
+  }>;
 }
 
 export interface RoomOrderItemResponse {
@@ -99,9 +103,11 @@ export interface RoomOrderDetailResponse {
 export interface PlaceRoomOrderResponse {
   order: RoomOrderDetailResponse;
   message: string;
+  room_session_token?: string | null;
 }
 
 // ─── Local storage key ────────────────────────────────────────────────────────
 
 /** Key used to persist the room session token in sessionStorage. */
 export const ROOM_SESSION_KEY = "hotelms_room_session";
+export const ROOM_SESSION_PROFILE_KEY = "hotelms_room_session_profile";
