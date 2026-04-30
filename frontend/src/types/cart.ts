@@ -32,6 +32,20 @@ export interface UpdateCartItemRequest {
   quantity: number;
 }
 
+export interface CartCouponValidateRequest {
+  code: string;
+}
+
+export interface CartCouponValidateResponse {
+  valid: boolean;
+  message: string;
+  code: string | null;
+  discount_percent: number | null;
+  discount_amount: number;
+  subtotal: number;
+  total: number;
+}
+
 export interface GenericMessageResponse {
   message: string;
 }

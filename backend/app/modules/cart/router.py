@@ -6,6 +6,8 @@ from app.core.dependencies import get_current_guest_session, get_db, get_redis
 from app.modules.cart import service
 from app.modules.cart.schemas import (
     AddCartItemRequest,
+    CartCouponValidateRequest,
+    CartCouponValidateResponse,
     CartResponse,
     CartSummaryResponse,
     GenericMessageResponse,
@@ -37,6 +39,17 @@ def get_cart_summary(
 ) -> CartSummaryResponse:
     """Lightweight cart summary for badge/header display."""
     return service.get_cart_summary(db, r, session)
+
+
+@router.post("/coupon/validate", response_model=CartCouponValidateResponse)
+def validate_cart_coupon(
+    payload: CartCouponValidateRequest,
+    session: TableSession = Depends(get_current_guest_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+) -> CartCouponValidateResponse:
+    """Validate a guest coupon against the current table cart."""
+    return service.validate_coupon(db, r, session, payload)
 
 
 @router.post("/items", response_model=CartResponse)

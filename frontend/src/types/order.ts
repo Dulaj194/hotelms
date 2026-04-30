@@ -14,6 +14,7 @@ export interface PlaceOrderRequest {
   notes?: string;
   customer_name?: string;
   customer_phone?: string;
+  promo_code?: string;
 }
 
 export interface UpdateOrderStatusRequest {

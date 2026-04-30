@@ -37,6 +37,10 @@ from app.modules.orders.schemas import (
 )
 from app.modules.payments import repository as payment_repo
 from app.modules.payments.schemas import PaymentResponse
+from app.modules.promo_codes import repository as promo_repo
+from app.modules.promo_codes.model import PromoCodeUsage
+from app.modules.promo_codes.schemas import PromoCodeValidateRequest
+from app.modules.promo_codes.service import validate_promo_for_restaurant
 from app.modules.realtime import service as realtime_service
 from app.modules.table_sessions.model import TableSession
 
@@ -174,6 +178,39 @@ def _build_kitchen_order_card(order) -> KitchenOrderCard:
 
 # ── Place order ───────────────────────────────────────────────────────────────
 
+def _stage_promo_usage_increment(
+    db: Session,
+    *,
+    restaurant_id: int,
+    code: str,
+) -> None:
+    """Increment promo usage as part of the order transaction."""
+    promo = promo_repo.get_promo_code_by_code(db, code)
+    if promo is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Promo code could not be applied.",
+        )
+
+    usage = promo_repo.get_promo_usage(
+        db,
+        restaurant_id=restaurant_id,
+        promo_code_id=promo.id,
+    )
+    if usage is None:
+        usage = PromoCodeUsage(
+            restaurant_id=restaurant_id,
+            promo_code_id=promo.id,
+            used_count=0,
+        )
+        db.add(usage)
+        db.flush()
+
+    usage.used_count += 1
+    usage.last_used_at = datetime.now(UTC)
+    promo.used_count += 1
+
+
 def place_order(
     db: Session,
     r: redis_lib.Redis,
@@ -233,6 +270,22 @@ def place_order(
 
     tax_amount = 0.0
     discount_amount = 0.0
+    applied_promo_code: str | None = None
+    promo_code = (payload.promo_code or "").strip()
+    if promo_code:
+        validation = validate_promo_for_restaurant(
+            db,
+            restaurant_id=session.restaurant_id,
+            payload=PromoCodeValidateRequest(code=promo_code),
+        )
+        if not validation.valid or validation.discount_percent is None or not validation.code:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=validation.message,
+            )
+        applied_promo_code = validation.code
+        discount_amount = round(subtotal * float(validation.discount_percent) / 100, 2)
+
     total_amount = subtotal + tax_amount - discount_amount
 
     # 3. Persist order atomically
@@ -264,6 +317,13 @@ def place_order(
             restaurant_id=session.restaurant_id,
             amount=total_amount,
         )
+
+        if applied_promo_code:
+            _stage_promo_usage_increment(
+                db,
+                restaurant_id=session.restaurant_id,
+                code=applied_promo_code,
+            )
 
         db.commit()
     except Exception:

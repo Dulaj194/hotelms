@@ -13,7 +13,6 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
-import CartDrawer from "@/components/shared/CartDrawer";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
@@ -78,7 +77,6 @@ export default function TableMenu() {
   const [guestName, setGuestName] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -90,8 +88,7 @@ export default function TableMenu() {
   const lastMenuScrollYRef = useRef(0);
   const menuScrollFrameRef = useRef<number | null>(null);
 
-  const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, refetch } =
-    useCart();
+  const { cart, addItem, updateItem, removeItem, refetch } = useCart();
 
   const {
     activeCategoryId,
@@ -379,19 +376,11 @@ export default function TableMenu() {
     [addItem]
   );
 
-  const handlePlaceOrder = useCallback(async (): Promise<number> => {
-    const result = await placeOrder({});
-    const orderId = result.order.id;
-    setCartOpen(false);
-    const basePath = `/menu/${restaurantId}/table/${tableNumber}/order/${orderId}`;
-    const nextPath = qrAccessKey ? `${basePath}?k=${encodeURIComponent(qrAccessKey)}` : basePath;
-    navigate(nextPath);
-    return orderId;
-  }, [placeOrder, navigate, restaurantId, tableNumber, qrAccessKey]);
-
   const handleOpenCart = useCallback(() => {
-    setCartOpen(true);
-  }, []);
+    if (!restaurantId || !tableNumber) return;
+    const basePath = `/menu/${restaurantId}/table/${tableNumber}/cart`;
+    navigate(qrAccessKey ? `${basePath}?k=${encodeURIComponent(qrAccessKey)}` : basePath);
+  }, [navigate, qrAccessKey, restaurantId, tableNumber]);
 
   const handleNameSubmit = useCallback(() => {
     const trimmed = guestNameInput.trim();
@@ -829,17 +818,6 @@ export default function TableMenu() {
           </button>
         </div>
       </div>
-
-      {/* Cart drawer */}
-      <CartDrawer
-        open={cartOpen}
-        onClose={() => setCartOpen(false)}
-        cart={cart}
-        onUpdateItem={updateItem}
-        onRemoveItem={removeItem}
-        onClearCart={clearCart}
-        onPlaceOrder={handlePlaceOrder}
-      />
 
       {/* Profile drawer */}
       {profileDrawerOpen && (

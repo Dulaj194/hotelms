@@ -57,6 +57,7 @@ const RoomMenu = lazy(() => import("@/pages/public/RoomMenu"));
 const RoomOrdersList = lazy(() => import("@/pages/public/RoomOrdersList"));
 const RoomOrderStatus = lazy(() => import("@/pages/public/RoomOrderStatus"));
 const TableMenu = lazy(() => import("@/pages/public/TableMenu"));
+const TableCartCheckout = lazy(() => import("@/pages/public/TableCartCheckout"));
 const TableOrderStatus = lazy(() => import("@/pages/public/TableOrderStatus"));
 const ServiceRequest = lazy(() => import("@/pages/room/ServiceRequest"));
 const SuperAdminOverview = lazy(() => import("@/pages/super-admin/Overview"));
@@ -118,6 +119,10 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route path="/menu/:restaurantId/table/:tableNumber" element={<TableMenu />} />
+        <Route
+          path="/menu/:restaurantId/table/:tableNumber/cart"
+          element={<TableCartCheckout />}
+        />
         <Route
           path="/menu/:restaurantId/table/:tableNumber/order/:orderId"
           element={<TableOrderStatus />}
