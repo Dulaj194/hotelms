@@ -44,7 +44,7 @@ export default function MenuBrowserRail({
         type="button"
         onClick={() => onSelectCategory(null)}
         aria-pressed={activeCategoryId === null}
-        className={`sticky left-0 z-10 inline-flex h-11 shrink-0 snap-start items-center rounded-full border px-5 text-left text-sm font-semibold transition duration-200 ${
+        className={`inline-flex h-11 shrink-0 snap-start items-center rounded-full border px-5 text-left text-sm font-semibold transition duration-200 ${
           activeCategoryId === null
             ? "border-orange-300 bg-orange-50 text-orange-700 shadow-[0_8px_18px_rgba(249,115,22,0.14)]"
             : "border-slate-200 bg-white text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.05)] hover:border-orange-200 hover:bg-orange-50/50 hover:text-orange-700"

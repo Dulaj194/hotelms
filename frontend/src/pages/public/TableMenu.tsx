@@ -85,6 +85,8 @@ export default function TableMenu() {
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [categoryRailVisible, setCategoryRailVisible] = useState(true);
+  const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
+  const categoryRailShellRef = useRef<HTMLDivElement>(null);
   const lastMenuScrollYRef = useRef(0);
   const menuScrollFrameRef = useRef<number | null>(null);
 
@@ -139,6 +141,11 @@ export default function TableMenu() {
 
     lastMenuScrollYRef.current = window.scrollY;
 
+    if (!categoryRailAutoHideEnabled) {
+      setCategoryRailVisible(true);
+      return;
+    }
+
     const updateCategoryRailVisibility = () => {
       const currentScrollY = window.scrollY;
       const lastScrollY = lastMenuScrollYRef.current;
@@ -172,7 +179,7 @@ export default function TableMenu() {
         window.cancelAnimationFrame(menuScrollFrameRef.current);
       }
     };
-  }, []);
+  }, [categoryRailAutoHideEnabled]);
 
   useEffect(() => {
     if (featuredBannerUrls.length <= 1) {
@@ -198,6 +205,71 @@ export default function TableMenu() {
       );
     });
   }, [flattenedTiles, searchQuery]);
+
+  useEffect(() => {
+    const scrollableContentBuffer = 24;
+    let frameId: number | null = null;
+
+    const updateCategoryRailMode = () => {
+      const menuContent = document.getElementById("menu-content");
+      const header = document.getElementById("menu-top");
+      const railHeight = categoryRailShellRef.current?.offsetHeight ?? 0;
+      const headerHeightWithoutRail = Math.max(0, (header?.offsetHeight ?? 0) - railHeight);
+      const menuContentHeight = menuContent?.scrollHeight ?? document.documentElement.scrollHeight;
+      const menuContentStyle = menuContent ? window.getComputedStyle(menuContent) : null;
+      const menuBottomPadding = menuContentStyle
+        ? Number.parseFloat(menuContentStyle.paddingBottom || "0")
+        : 0;
+      const usableContentHeight =
+        headerHeightWithoutRail + Math.max(0, menuContentHeight - menuBottomPadding);
+      const canAutoHide = usableContentHeight > window.innerHeight + scrollableContentBuffer;
+
+      setCategoryRailAutoHideEnabled(canAutoHide);
+      if (!canAutoHide) {
+        setCategoryRailVisible(true);
+      }
+
+      frameId = null;
+    };
+
+    const scheduleCategoryRailModeUpdate = () => {
+      if (frameId !== null) return;
+      frameId = window.requestAnimationFrame(updateCategoryRailMode);
+    };
+
+    scheduleCategoryRailModeUpdate();
+    window.addEventListener("resize", scheduleCategoryRailModeUpdate);
+    window.addEventListener("orientationchange", scheduleCategoryRailModeUpdate);
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(scheduleCategoryRailModeUpdate)
+        : null;
+
+    const menuContent = document.getElementById("menu-content");
+    if (resizeObserver) {
+      resizeObserver.observe(document.body);
+      if (menuContent) {
+        resizeObserver.observe(menuContent);
+      }
+    }
+
+    return () => {
+      window.removeEventListener("resize", scheduleCategoryRailModeUpdate);
+      window.removeEventListener("orientationchange", scheduleCategoryRailModeUpdate);
+      resizeObserver?.disconnect();
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, [
+    activeCategoryId,
+    featuredBannerUrls.length,
+    searchPanelOpen,
+    searchQuery,
+    visibleCategories.length,
+    visibleTiles.length,
+  ]);
 
   useEffect(() => {
     if (!restaurantId || !tableNumber) return;
@@ -617,6 +689,7 @@ export default function TableMenu() {
         </div>
 
         <div
+          ref={categoryRailShellRef}
           className={`mx-auto max-w-6xl overflow-hidden px-4 transition-[max-height,padding-bottom,opacity,transform] duration-300 ease-out sm:px-5 lg:px-6 ${
             categoryRailVisible
               ? "max-h-20 translate-y-0 pb-2 opacity-100"
