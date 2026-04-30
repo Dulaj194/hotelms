@@ -33,7 +33,7 @@ export default function MenuBrowserRail({
 
   return (
     <div
-      className="flex min-w-0 items-center gap-2.5 overflow-hidden pb-1"
+      className="box-border flex w-full max-w-full min-w-0 items-center gap-2 overflow-hidden pb-1 min-[360px]:gap-2.5"
       aria-label="Menu categories"
     >
       <button
@@ -44,7 +44,7 @@ export default function MenuBrowserRail({
         type="button"
         onClick={() => onSelectCategory(null)}
         aria-pressed={activeCategoryId === null}
-        className={`inline-flex h-11 shrink-0 items-center rounded-full border px-5 text-left text-sm font-semibold transition duration-200 ${
+        className={`box-border inline-flex h-11 max-w-[5.5rem] shrink-0 items-center rounded-full border px-4 text-left text-sm font-semibold transition duration-200 min-[360px]:px-5 ${
           activeCategoryId === null
             ? "border-orange-300 bg-orange-50 text-orange-700 shadow-[0_8px_18px_rgba(249,115,22,0.14)]"
             : "border-slate-200 bg-white text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.05)] hover:border-orange-200 hover:bg-orange-50/50 hover:text-orange-700"
@@ -53,7 +53,7 @@ export default function MenuBrowserRail({
         All
       </button>
 
-      <div className="scrollbar-hide flex min-w-0 flex-1 snap-x touch-pan-x gap-2.5 overflow-x-auto overscroll-x-contain scroll-smooth">
+      <div className="scrollbar-hide box-border flex w-full max-w-full min-w-0 flex-1 snap-x touch-pan-x gap-2 overflow-x-auto overscroll-x-contain scroll-smooth min-[360px]:gap-2.5">
         {visibleCategories.map((category) => {
           const isActive = activeCategoryId === category.id;
           const imageUrl = toAssetUrl(category.image_path);
@@ -68,7 +68,7 @@ export default function MenuBrowserRail({
               type="button"
               onClick={() => onSelectCategory(category.id)}
               aria-pressed={isActive}
-              className={`group inline-flex h-11 max-w-[11.5rem] shrink-0 snap-start items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-4 text-left transition duration-200 ${
+              className={`group box-border inline-flex h-11 max-w-[9rem] shrink-0 snap-start items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-left transition duration-200 min-[390px]:max-w-[11.5rem] min-[390px]:pr-4 ${
                 isActive
                   ? "border-orange-300 bg-orange-50 text-orange-700 shadow-[0_8px_18px_rgba(249,115,22,0.14)]"
                   : "border-slate-200 bg-white text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.04)] hover:border-orange-200 hover:bg-orange-50/50 hover:text-orange-700"

@@ -78,7 +78,7 @@ function RoomCartDrawer({
       )}
 
       <div
-        className={`fixed top-0 right-0 z-50 flex h-full w-full max-w-sm flex-col bg-white shadow-xl
+        className={`fixed top-0 right-0 z-50 box-border flex h-full w-full max-w-[min(24rem,100%)] flex-col bg-white shadow-xl
           transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}
         role="dialog"
         aria-modal="true"
@@ -448,7 +448,7 @@ export default function RoomMenu() {
     return (
       <div
         key={item.id}
-        className={`bg-white rounded-xl border overflow-hidden flex flex-col ${
+        className={`box-border flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-xl border bg-white ${
           !item.is_available ? "opacity-60" : ""
         }`}
       >
@@ -458,36 +458,36 @@ export default function RoomMenu() {
             alt={item.name}
             loading="lazy"
             decoding="async"
-            className="aspect-[4/3] w-full object-cover"
+            className="block aspect-[4/3] w-full max-w-full object-cover"
           />
         )}
-        <div className="flex flex-1 flex-col gap-2.5 p-3">
-          <div className="flex items-start justify-between gap-2">
-            <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
+        <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <p className="min-w-0 break-words text-sm font-semibold leading-tight line-clamp-2">{item.name}</p>
             {metaLabel && (
-              <span className="max-w-[40%] truncate text-right text-[11px] text-gray-400">
+              <span className="min-w-0 max-w-[45%] truncate text-right text-[11px] text-gray-400">
                 {metaLabel}
               </span>
             )}
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="font-bold text-sm text-orange-600">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <span className="min-w-0 text-sm font-bold text-orange-600">
               ${item.price.toFixed(2)}
             </span>
             {item.is_available ? (
-              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
+              <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
                 Available
               </span>
             ) : (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
+              <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
                 Sold out
               </span>
             )}
           </div>
 
           {qtyInCart > 0 ? (
-            <div className="flex min-h-10 items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
+            <div className="box-border flex min-h-10 w-full max-w-full items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
               <button
                 onClick={() =>
                   qtyInCart > 1
@@ -512,7 +512,7 @@ export default function RoomMenu() {
             <button
               disabled={isAdding || !sessionReady}
               onClick={() => handleAddToCart(item.id)}
-              className="flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+              className="box-border flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
             >
               {isAdding ? "Adding..." : "Add to Cart"}
               {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
@@ -524,10 +524,10 @@ export default function RoomMenu() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="box-border flex min-h-screen w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
-        <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-3">
+      <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b bg-white shadow-sm">
+        <div className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
               <img
@@ -594,7 +594,7 @@ export default function RoomMenu() {
         </div>
 
         {/* Category tabs */}
-        <div className="max-w-2xl mx-auto px-4 pb-2">
+        <div className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 px-4 pb-2">
           <MenuBrowserRail
             visibleCategories={visibleCategories}
             activeCategoryId={activeCategoryId}
@@ -605,14 +605,14 @@ export default function RoomMenu() {
 
       {/* Item grid */}
       <main
-        className="flex-1 max-w-2xl w-full touch-pan-y mx-auto px-4 py-4 space-y-6"
+        className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 flex-1 touch-pan-y space-y-6 overflow-x-hidden px-4 py-4"
         {...menuSwipeHandlers}
       >
         {renderedCategories.length === 0 ? (
           <p className="text-center text-gray-400 py-12">No categories available.</p>
         ) : (
           renderedCategories.map((category) => (
-            <section key={category.id}>
+            <section key={category.id} className="box-border w-full max-w-full min-w-0">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h2>
               {category.description && (
                 <p className="text-sm text-gray-500 mb-4">{category.description}</p>
@@ -621,7 +621,7 @@ export default function RoomMenu() {
               {category.items.length === 0 ? (
                 <p className="text-center text-gray-400 py-10">No items in this category.</p>
               ) : (
-                <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
+                <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
                   {category.items.map(renderItemCard)}
                 </div>
               )}
@@ -632,10 +632,10 @@ export default function RoomMenu() {
 
       {/* Cart FAB for mobile */}
       {(cart?.item_count ?? 0) > 0 && !cartOpen && !placedOrder && (
-        <div className="fixed bottom-4 left-0 right-0 px-4 z-30">
+        <div className="fixed bottom-4 left-0 right-0 z-30 box-border w-full max-w-full px-3 min-[360px]:px-4">
           <button
             onClick={() => setCartOpen(true)}
-            className="w-full max-w-2xl mx-auto flex items-center justify-between bg-orange-500
+            className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] items-center justify-between bg-orange-500
                        text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-orange-600 transition-colors"
           >
             <span className="font-semibold">

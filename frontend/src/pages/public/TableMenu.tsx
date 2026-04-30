@@ -48,10 +48,10 @@ function FloatingCartButton({ itemCount, onOpenCart }: FloatingCartButtonProps) 
     <button
       type="button"
       onClick={onOpenCart}
-      className="relative -mt-7 mx-auto grid h-16 w-16 place-items-center rounded-full bg-orange-500 text-white shadow-[0_20px_40px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
+      className="relative -mt-6 mx-auto grid h-14 w-14 place-items-center rounded-full bg-orange-500 text-white shadow-[0_20px_40px_rgba(249,115,22,0.35)] transition hover:bg-orange-600 min-[360px]:-mt-7 min-[360px]:h-16 min-[360px]:w-16"
       aria-label={itemCount > 0 ? `Open cart, ${itemCount} items` : "Open cart"}
     >
-      <ShoppingCart className="h-7 w-7" />
+      <ShoppingCart className="h-6 w-6 min-[360px]:h-7 min-[360px]:w-7" />
       {itemCount > 0 && (
         <span className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-slate-900 px-1.5 text-[11px] font-bold text-white ring-2 ring-white">
           {itemCount}
@@ -519,7 +519,7 @@ export default function TableMenu() {
     return (
       <div
         key={item.id}
-        className={`group overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)] ${
+        className={`group box-border flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)] ${
           !item.is_available ? "opacity-55" : ""
         }`}
       >
@@ -529,42 +529,42 @@ export default function TableMenu() {
             alt={item.name}
             loading="lazy"
             decoding="async"
-            className="aspect-[4/3] w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="block aspect-[4/3] w-full max-w-full object-cover transition duration-300 group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="flex aspect-[4/3] w-full items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300">
+          <div className="flex aspect-[4/3] w-full max-w-full shrink-0 items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300">
             <UtensilsCrossed className="h-9 w-9" />
           </div>
         )}
-          <div className="flex flex-1 flex-col gap-2.5 p-3">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-sm font-bold text-slate-900 leading-tight line-clamp-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
+            <div className="flex min-w-0 items-start justify-between gap-2">
+              <p className="min-w-0 break-words text-sm font-bold leading-tight text-slate-900 line-clamp-2">
                 {item.name}
               </p>
               {metaLabel && (
-                <span className="max-w-[40%] truncate text-right text-[11px] text-slate-400">
+                <span className="min-w-0 max-w-[45%] truncate text-right text-[11px] text-slate-400">
                   {metaLabel}
                 </span>
               )}
             </div>
 
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-black text-orange-600">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+              <span className="min-w-0 text-sm font-black text-orange-600">
                 ${item.price.toFixed(2)}
               </span>
               {item.is_available ? (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
+                <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
                   Available
                 </span>
               ) : (
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
                   Sold out
                 </span>
               )}
             </div>
 
             {qtyInCart > 0 ? (
-              <div className="flex min-h-10 items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
+              <div className="box-border flex min-h-10 w-full max-w-full items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
                 <button
                   onClick={() =>
                     qtyInCart > 1
@@ -591,7 +591,7 @@ export default function TableMenu() {
               <button
                 disabled={isAdding || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="box-border inline-flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isAdding ? "Adding..." : "Add to Cart"}
                 {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
@@ -605,9 +605,9 @@ export default function TableMenu() {
   const cartItemCount = cart?.item_count ?? 0;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
-      <header id="menu-top" className="sticky top-0 z-30 border-b border-white/60 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
+    <div className="box-border min-h-screen w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
+      <header id="menu-top" className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b border-white/60 bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url ? (
               <img
@@ -648,7 +648,7 @@ export default function TableMenu() {
           </div>
         </div>
 
-        <div className={`mx-auto max-w-6xl px-4 sm:px-5 lg:px-6 ${searchPanelOpen ? "pb-2" : "pb-0"}`}>
+        <div className={`mx-auto box-border w-full max-w-[min(72rem,100%)] min-w-0 px-4 sm:px-5 lg:px-6 ${searchPanelOpen ? "pb-2" : "pb-0"}`}>
           <div
             className={`overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ${
               searchPanelOpen ? "max-h-24 opacity-100" : "max-h-0 border-transparent opacity-0"
@@ -679,7 +679,7 @@ export default function TableMenu() {
 
         <div
           ref={categoryRailShellRef}
-          className={`mx-auto max-w-6xl overflow-hidden px-4 transition-[max-height,padding-bottom,opacity,transform] duration-300 ease-out sm:px-5 lg:px-6 ${
+          className={`mx-auto box-border w-full max-w-[min(72rem,100%)] min-w-0 overflow-hidden px-4 transition-[max-height,padding-bottom,opacity,transform] duration-300 ease-out sm:px-5 lg:px-6 ${
             categoryRailVisible
               ? "max-h-20 translate-y-0 pb-2 opacity-100"
               : "max-h-0 -translate-y-2 pb-0 opacity-0 pointer-events-none"
@@ -696,11 +696,11 @@ export default function TableMenu() {
 
       <main
         id="menu-content"
-        className="mx-auto flex w-full max-w-6xl touch-pan-y flex-1 flex-col gap-3 px-4 py-3 pb-28 sm:px-5 lg:px-6"
+        className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 touch-pan-y flex-1 flex-col gap-3 overflow-x-hidden px-4 py-3 pb-28 sm:px-5 lg:px-6"
         {...menuSwipeHandlers}
       >
-        <section>
-          <div className="relative min-h-[8.75rem] overflow-hidden rounded-2xl bg-slate-950 px-4 py-4 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
+        <section className="box-border w-full max-w-full min-w-0">
+          <div className="relative box-border min-h-[8.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-4 py-4 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
             {featuredBannerUrls.length > 0 && (
               <img
                 src={featuredBannerUrls[activeBannerIndex]}
@@ -717,10 +717,10 @@ export default function TableMenu() {
                   <Sparkles className="h-3.5 w-3.5" />
                   Featured picks
                 </p>
-                <h2 className="mt-3 max-w-xl text-xl font-black leading-tight tracking-tight sm:mt-4 sm:text-3xl">
+                <h2 className="mt-3 max-w-full break-words text-xl font-black leading-tight tracking-tight sm:mt-4 sm:max-w-xl sm:text-3xl">
                   Order faster from your table.
                 </h2>
-                <p className="mt-1.5 max-w-2xl text-xs leading-5 text-white/80 sm:mt-2 sm:text-sm sm:leading-6">
+                <p className="mt-1.5 max-w-full break-words text-xs leading-5 text-white/80 sm:mt-2 sm:max-w-2xl sm:text-sm sm:leading-6">
                   Choose favorites, update quantities, and place your order without leaving the menu.
                 </p>
               </div>
@@ -734,9 +734,9 @@ export default function TableMenu() {
           </div>
         </section>
 
-        <section id="menu-list" className="space-y-3">
-          <div className="flex items-end justify-between gap-2">
-            <div>
+        <section id="menu-list" className="box-border w-full max-w-full min-w-0 space-y-3">
+          <div className="flex min-w-0 items-end justify-between gap-2">
+            <div className="min-w-0">
               <h2 className="text-xl font-black tracking-tight text-slate-900">
                 {searchQuery ? "Search results" : selectedCategory?.name ?? "All items"}
               </h2>
@@ -764,31 +764,31 @@ export default function TableMenu() {
               No items match the current filter.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {visibleTiles.map(renderItemCard)}
             </div>
           )}
         </section>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/70 bg-white/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-        <div className="mx-auto grid max-w-6xl grid-cols-5 items-end gap-2">
+      <div className="fixed inset-x-0 bottom-0 z-30 box-border w-full max-w-full overflow-hidden border-t border-white/70 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
+        <div className="mx-auto grid w-full max-w-[min(72rem,100%)] min-w-0 grid-cols-5 items-end gap-1 min-[360px]:gap-2">
           <button
             type="button"
             onClick={() => handleScrollTo("menu-list")}
-            className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Menu className="h-5 w-5" />
-            Menu
+            <span className="max-w-full truncate">Menu</span>
           </button>
 
           <button
             type="button"
             onClick={handleFocusSearch}
-            className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Search className="h-5 w-5" />
-            Search
+            <span className="max-w-full truncate">Search</span>
           </button>
 
           <FloatingCartButton itemCount={cartItemCount} onOpenCart={handleOpenCart} />
@@ -802,19 +802,19 @@ export default function TableMenu() {
                 : `/orders/my/${restaurantId}/${tableNumber}`;
               navigate(target);
             }}
-            className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Bell className="h-5 w-5" />
-            Orders
+            <span className="max-w-full truncate">Orders</span>
           </button>
 
           <button
             type="button"
             onClick={() => setProfileDrawerOpen(true)}
-            className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <UserRound className="h-5 w-5" />
-            Profile
+            <span className="max-w-full truncate">Profile</span>
           </button>
         </div>
       </div>
@@ -829,7 +829,7 @@ export default function TableMenu() {
           />
 
           {/* Drawer Panel */}
-          <div className="absolute bottom-0 right-0 top-0 flex w-full max-w-sm flex-col bg-white shadow-2xl transition-all duration-300 animate-in slide-in-from-right-40">
+          <div className="absolute bottom-0 right-0 top-0 box-border flex w-full max-w-[min(24rem,100%)] flex-col bg-white shadow-2xl transition-all duration-300 animate-in slide-in-from-right-40">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <h2 className="text-lg font-bold text-slate-900">Profile</h2>
