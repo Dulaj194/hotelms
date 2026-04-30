@@ -85,6 +85,9 @@ export default function TableMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const [categoryRailVisible, setCategoryRailVisible] = useState(true);
+  const lastMenuScrollYRef = useRef(0);
+  const menuScrollFrameRef = useRef<number | null>(null);
 
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, refetch } =
     useCart();
@@ -130,6 +133,47 @@ export default function TableMenu() {
   useEffect(() => {
     setActiveBannerIndex(0);
   }, [featuredBannerUrls.length]);
+
+  useEffect(() => {
+    const topRevealOffset = 16;
+    const scrollDeltaThreshold = 8;
+
+    lastMenuScrollYRef.current = window.scrollY;
+
+    const updateCategoryRailVisibility = () => {
+      const currentScrollY = window.scrollY;
+      const lastScrollY = lastMenuScrollYRef.current;
+      const scrollDelta = currentScrollY - lastScrollY;
+
+      if (currentScrollY <= topRevealOffset) {
+        setCategoryRailVisible(true);
+        lastMenuScrollYRef.current = currentScrollY;
+        menuScrollFrameRef.current = null;
+        return;
+      }
+
+      if (Math.abs(scrollDelta) >= scrollDeltaThreshold) {
+        setCategoryRailVisible(scrollDelta < 0);
+        lastMenuScrollYRef.current = currentScrollY;
+      }
+
+      menuScrollFrameRef.current = null;
+    };
+
+    const handleWindowScroll = () => {
+      if (menuScrollFrameRef.current !== null) return;
+      menuScrollFrameRef.current = window.requestAnimationFrame(updateCategoryRailVisibility);
+    };
+
+    window.addEventListener("scroll", handleWindowScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleWindowScroll);
+      if (menuScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(menuScrollFrameRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (featuredBannerUrls.length <= 1) {
@@ -570,7 +614,14 @@ export default function TableMenu() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-6xl px-4 pb-2 sm:px-5 lg:px-6">
+        <div
+          className={`mx-auto max-w-6xl overflow-hidden px-4 transition-[max-height,padding-bottom,opacity,transform] duration-300 ease-out sm:px-5 lg:px-6 ${
+            categoryRailVisible
+              ? "max-h-20 translate-y-0 pb-2 opacity-100"
+              : "max-h-0 -translate-y-2 pb-0 opacity-0 pointer-events-none"
+          }`}
+          aria-hidden={!categoryRailVisible}
+        >
           <MenuBrowserRail
             visibleCategories={visibleCategories}
             activeCategoryId={activeCategoryId}
