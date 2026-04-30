@@ -16,6 +16,8 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   steward: "Steward",
   housekeeper: "Housekeeper",
+  cashier: "Cashier",
+  accountant: "Accountant",
   super_admin: "Super Admin",
 };
 
@@ -24,6 +26,7 @@ const LANE_DESCRIPTIONS: Record<string, string> = {
   orders: "Review live QR and room-service orders with the current SLA priority.",
   housekeeping: "Continue room readiness and housekeeping task execution.",
   reports: "Review performance, sales, and daily operational summaries.",
+  billing: "Handle settlements, payment capture, and billing reconciliation.",
   settings: "Maintain restaurant profile, branding, and setup details.",
 };
 
@@ -89,6 +92,31 @@ function getRecommendedLane(
   );
 }
 
+function getWizardStepFromOverview(
+  overview: AdminDashboardOverviewResponse,
+  focusBlocking = false,
+): number {
+  const totalSteps = Math.max(overview.setup_wizard.total_steps, overview.setup_requirements.length, 1);
+  const persistedStep = Number.isFinite(overview.setup_wizard.current_step)
+    ? overview.setup_wizard.current_step
+    : 1;
+  const clampedPersistedStep = Math.min(Math.max(persistedStep, 1), totalSteps);
+  const firstPendingStep = getFirstPendingStep(overview.setup_requirements);
+  const firstBlockingStep = getFirstPendingStep(overview.setup_requirements, "blocking");
+
+  if (focusBlocking && overview.setup_wizard.has_blocking_missing) {
+    return firstBlockingStep;
+  }
+
+  const hasPendingRequirements = overview.setup_requirements.some((item) => !item.completed);
+  const currentRequirement = overview.setup_requirements[clampedPersistedStep - 1];
+  if (hasPendingRequirements && currentRequirement?.completed) {
+    return firstPendingStep;
+  }
+
+  return clampedPersistedStep;
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = getUser();
@@ -103,6 +131,13 @@ export default function Dashboard() {
   const [wizardError, setWizardError] = useState<string | null>(null);
   const [dismissingAlertKey, setDismissingAlertKey] = useState<string | null>(null);
 
+  function markVisibleAlertsShown(data: AdminDashboardOverviewResponse) {
+    const visibleAlerts = data.alerts.filter((alert) => alert.should_show);
+    for (const alert of visibleAlerts) {
+      void api.post(`/dashboard/alerts/${encodeURIComponent(alert.key)}/shown`, {});
+    }
+  }
+
   useEffect(() => {
     let active = true;
 
@@ -116,23 +151,13 @@ export default function Dashboard() {
           return;
         }
 
-        const totalSteps = Math.max(data.setup_wizard.total_steps, data.setup_requirements.length, 1);
-        const persistedStep = Number.isFinite(data.setup_wizard.current_step)
-          ? data.setup_wizard.current_step
-          : 1;
-        const clampedPersistedStep = Math.min(Math.max(persistedStep, 1), totalSteps);
-        const firstPendingStep = getFirstPendingStep(data.setup_requirements);
+        const normalizedStep = getWizardStepFromOverview(data);
         const firstBlockingStep = getFirstPendingStep(data.setup_requirements, "blocking");
-        const hasPersistedProgress = clampedPersistedStep > 1;
 
         setOverview(data);
-        setWizardStep(hasPersistedProgress ? clampedPersistedStep : firstPendingStep);
+        setWizardStep(normalizedStep);
         setWizardOpen(data.setup_wizard.has_blocking_missing && firstBlockingStep > 0);
-
-        const visibleAlerts = data.alerts.filter((alert) => alert.should_show);
-        for (const alert of visibleAlerts) {
-          void api.post(`/dashboard/alerts/${encodeURIComponent(alert.key)}/shown`, {});
-        }
+        markVisibleAlertsShown(data);
       } catch (error) {
         if (!active) {
           return;
@@ -197,8 +222,8 @@ export default function Dashboard() {
     }
   }
 
-  async function saveWizardProgress(nextStep: number): Promise<boolean> {
-    if (!overview) return false;
+  async function saveWizardProgress(nextStep: number): Promise<AdminDashboardOverviewResponse | null> {
+    if (!overview) return null;
 
     setWizardSaving(true);
     setWizardError(null);
@@ -212,22 +237,14 @@ export default function Dashboard() {
         completed_keys: completedKeys,
       });
 
-      setWizardStep(nextStep);
-      setOverview((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          setup_wizard: {
-            ...prev.setup_wizard,
-            current_step: nextStep,
-            completed_keys: completedKeys,
-          },
-        };
-      });
-      return true;
+      const refreshedOverview = await api.get<AdminDashboardOverviewResponse>("/dashboard/admin-overview");
+      setOverview(refreshedOverview);
+      setWizardStep(getWizardStepFromOverview(refreshedOverview));
+      markVisibleAlertsShown(refreshedOverview);
+      return refreshedOverview;
     } catch (error) {
       setWizardError(getErrorMessage(error, "Failed to save setup progress."));
-      return false;
+      return null;
     } finally {
       setWizardSaving(false);
     }
@@ -245,9 +262,7 @@ export default function Dashboard() {
       return;
     }
 
-    const nextStep = focusBlocking
-      ? getFirstPendingStep(overview.setup_requirements, "blocking")
-      : getFirstPendingStep(overview.setup_requirements);
+    const nextStep = getWizardStepFromOverview(overview, focusBlocking);
 
     setWizardStep(nextStep);
     setWizardError(null);
@@ -258,13 +273,12 @@ export default function Dashboard() {
     if (!overview) return;
 
     if (wizardStep >= wizardTotalSteps) {
-      const saved = await saveWizardProgress(wizardTotalSteps);
-      if (!saved) return;
+      const refreshedOverview = await saveWizardProgress(wizardTotalSteps);
+      if (!refreshedOverview) return;
 
-      const firstPendingStep = getFirstPendingStep(overview.setup_requirements);
-      const hasPendingRequirements = overview.setup_requirements.some((item) => !item.completed);
+      const hasPendingRequirements = refreshedOverview.setup_requirements.some((item) => !item.completed);
       if (hasPendingRequirements) {
-        setWizardStep(firstPendingStep);
+        setWizardStep(getWizardStepFromOverview(refreshedOverview));
         return;
       }
 
@@ -272,7 +286,11 @@ export default function Dashboard() {
       return;
     }
 
-    await saveWizardProgress(Math.min(wizardTotalSteps, wizardStep + 1));
+    const refreshedOverview = await saveWizardProgress(Math.min(wizardTotalSteps, wizardStep + 1));
+    if (!refreshedOverview) {
+      return;
+    }
+    setWizardStep(getWizardStepFromOverview(refreshedOverview));
   }
 
   return (

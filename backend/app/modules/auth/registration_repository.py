@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.modules.restaurants.model import Restaurant
+from app.modules.restaurants.model import RegistrationStatus, Restaurant
 from app.modules.users.model import User, UserRole
 
 
@@ -27,6 +27,8 @@ def create_restaurant(
         opening_time=opening_time,
         closing_time=closing_time,
         logo_url=logo_url,
+        is_active=False,
+        registration_status=RegistrationStatus.PENDING,
     )
     db.add(restaurant)
     db.flush()
@@ -47,7 +49,7 @@ def create_linked_admin(
         password_hash=password_hash,
         role=UserRole.owner,
         restaurant_id=restaurant_id,
-        is_active=True,
+        is_active=False,
         must_change_password=False,
     )
     db.add(admin_user)

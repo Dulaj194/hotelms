@@ -1,0 +1,38 @@
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # Pyflakes
+    "I",     # isort (import sorting)
+    "B",     # flake8-bugbear
+    "S",     # flake8-bandit security warnings
+    "C",     # flake8-comprehensions
+]
+ignore = [
+    "E501",  # Line too long (black handles this)
+    "S101",  # Use of assert (fine for tests)
+    "S104",  # Possible binding to all interfaces
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]     # Allow assertions in tests
+
+[tool.black]
+line-length = 120
+target-version = ['py313']
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false  # Too strict for rapid development
+disallow_incomplete_defs = false
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true

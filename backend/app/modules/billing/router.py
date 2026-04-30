@@ -1,31 +1,47 @@
-"""Billing router — all billing HTTP endpoints.
+"""Billing router for table settlements, room folios, and review dashboards."""
+from __future__ import annotations
 
-Endpoints (prefix /api/v1/billing):
-  GET  /session/{session_id}/summary   — Bill summary for a table session
-  POST /session/{session_id}/settle    — Settle / close the session
-  GET  /session/{session_id}/payments  — Payment records for the session
-  GET  /session/{session_id}/status    — Quick billing status snapshot
+from datetime import date
 
-All endpoints require authenticated staff with role: owner | admin | steward.
-The restaurant_id is derived from the JWT token, never from the client request.
-"""
-from fastapi import APIRouter, Depends
+import redis as redis_lib
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_restaurant_id, require_privilege, require_roles
-from app.core.dependencies import get_db
+from app.core.dependencies import (
+    get_current_restaurant_id,
+    get_db,
+    get_redis,
+    require_module_access,
+    require_roles,
+)
+from app.modules.access import role_catalog
 from app.modules.billing import service as billing_service
+from app.modules.billing.model import BillContextType, BillHandoffStatus, BillReviewStatus
 from app.modules.billing.schemas import (
+    BillDetailResponse,
+    BillListResponse,
+    BillRecordResponse,
+    BillingQueueSummaryResponse,
+    BillingReconciliationResponse,
     BillSummaryResponse,
+    ReverseBillRequest,
+    BillWorkflowActionRequest,
+    BillWorkflowEventListResponse,
     SessionBillingStatusResponse,
     SessionPaymentHistoryResponse,
-    SettleSessionRequest,
+    SettleSessionSplitRequest,
     SettleSessionResponse,
 )
 
 router = APIRouter()
 
-_STAFF_ROLES = ["owner", "admin", "steward"]
+_STAFF_ROLES = role_catalog.BILLING_STAFF_ROLES
+_ROOM_HANDOFF_TO_CASHIER_ROLES = role_catalog.BILLING_ROOM_HANDOFF_TO_CASHIER_ROLES
+_ROOM_HANDOFF_TO_ACCOUNTANT_ROLES = role_catalog.BILLING_ROOM_HANDOFF_TO_ACCOUNTANT_ROLES
+_CASHIER_REVIEW_ROLES = role_catalog.BILLING_CASHIER_REVIEW_ROLES
+_ACCOUNTANT_REVIEW_ROLES = role_catalog.BILLING_ACCOUNTANT_REVIEW_ROLES
+_ROOM_HANDOFF_COMPLETE_ROLES = role_catalog.BILLING_ROOM_HANDOFF_COMPLETE_ROLES
+_ROOM_REOPEN_ROLES = role_catalog.BILLING_ROOM_REOPEN_ROLES
 
 
 @router.get(
@@ -37,8 +53,8 @@ def get_bill_summary(
     session_id: str,
     db: Session = Depends(get_db),
     restaurant_id: int = Depends(get_current_restaurant_id),
-    _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
 ):
     return billing_service.get_bill_summary(db, session_id, restaurant_id)
 
@@ -46,18 +62,27 @@ def get_bill_summary(
 @router.post(
     "/session/{session_id}/settle",
     response_model=SettleSessionResponse,
-    status_code=200,
-    summary="Settle (close and pay) a table session",
+    summary="Settle a table session",
 )
 def settle_session(
     session_id: str,
-    payload: SettleSessionRequest,
+    payload: SettleSessionSplitRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
     restaurant_id: int = Depends(get_current_restaurant_id),
-    _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
 ):
-    return billing_service.settle_session(db, session_id, restaurant_id, payload)
+    return billing_service.settle_session(
+        db,
+        session_id,
+        restaurant_id,
+        payload,
+        current_user=current_user,
+        r=r,
+        idempotency_key=idempotency_key,
+    )
 
 
 @router.get(
@@ -69,8 +94,8 @@ def list_session_payments(
     session_id: str,
     db: Session = Depends(get_db),
     restaurant_id: int = Depends(get_current_restaurant_id),
-    _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
 ):
     return billing_service.list_session_payments(db, session_id, restaurant_id)
 
@@ -84,8 +109,437 @@ def get_session_billing_status(
     session_id: str,
     db: Session = Depends(get_db),
     restaurant_id: int = Depends(get_current_restaurant_id),
-    _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
 ):
     return billing_service.get_session_billing_status(db, session_id, restaurant_id)
 
+
+@router.get(
+    "/room/{lookup}/summary",
+    response_model=BillSummaryResponse,
+    summary="Get folio summary for a room session or room number",
+)
+def get_room_bill_summary(
+    lookup: str,
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.get_room_bill_summary(db, lookup, restaurant_id)
+
+
+@router.post(
+    "/room/{lookup}/settle",
+    response_model=SettleSessionResponse,
+    summary="Settle a room folio",
+)
+def settle_room_session(
+    lookup: str,
+    payload: SettleSessionSplitRequest,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.settle_room_session(
+        db,
+        lookup,
+        restaurant_id,
+        payload,
+        current_user=current_user,
+        r=r,
+        idempotency_key=idempotency_key,
+    )
+
+
+@router.get(
+    "/room/{lookup}/payments",
+    response_model=SessionPaymentHistoryResponse,
+    summary="List payment records for a room folio",
+)
+def list_room_session_payments(
+    lookup: str,
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.list_room_session_payments(db, lookup, restaurant_id)
+
+
+@router.get(
+    "/room/{lookup}/status",
+    response_model=SessionBillingStatusResponse,
+    summary="Get quick billing status for a room folio",
+)
+def get_room_billing_status(
+    lookup: str,
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.get_room_billing_status(db, lookup, restaurant_id)
+
+
+@router.get(
+    "/queue-summary",
+    response_model=BillingQueueSummaryResponse,
+    summary="Get room-folio queue totals for billing dashboards",
+)
+def get_billing_queue_summary(
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.get_billing_queue_summary(
+        db,
+        restaurant_id=restaurant_id,
+    )
+
+
+@router.get(
+    "/events",
+    response_model=BillWorkflowEventListResponse,
+    summary="List billing workflow events",
+)
+def list_bill_workflow_events(
+    bill_id: int | None = Query(default=None),
+    action_type: str | None = Query(default=None),
+    created_from: date | None = Query(default=None),
+    created_to: date | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=250),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.list_bill_workflow_events(
+        db,
+        restaurant_id=restaurant_id,
+        bill_id=bill_id,
+        action_type=action_type,
+        created_from=created_from,
+        created_to=created_to,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get(
+    "/reconciliation/daily",
+    response_model=BillingReconciliationResponse,
+    summary="Get end-of-day billing reconciliation snapshot",
+)
+def get_daily_reconciliation(
+    business_date: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.get_daily_reconciliation(
+        db,
+        restaurant_id=restaurant_id,
+        business_date=business_date,
+    )
+
+
+@router.get(
+    "/folios",
+    response_model=BillListResponse,
+    summary="List bills or room folios",
+)
+def list_folios(
+    context_type: BillContextType | None = Query(default=None),
+    handoff_status: BillHandoffStatus | None = Query(default=None),
+    cashier_status: BillReviewStatus | None = Query(default=None),
+    accountant_status: BillReviewStatus | None = Query(default=None),
+    search: str | None = Query(default=None),
+    settled_from: date | None = Query(default=None),
+    settled_to: date | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=250),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.list_folios(
+        db,
+        restaurant_id=restaurant_id,
+        context_type=context_type,
+        handoff_status=handoff_status,
+        cashier_status=cashier_status,
+        accountant_status=accountant_status,
+        search=search,
+        settled_from=settled_from,
+        settled_to=settled_to,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get(
+    "/folios/{bill_id}",
+    response_model=BillDetailResponse,
+    summary="Get a detailed folio with payment and audit history",
+)
+def get_folio_detail(
+    bill_id: int,
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.get_folio_detail(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/print",
+    response_model=BillRecordResponse,
+    summary="Record a bill print action for audit history",
+)
+def record_bill_print(
+    bill_id: int,
+    payload: BillWorkflowActionRequest | None = None,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.record_bill_print(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        current_user=current_user,
+        note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/send-to-cashier",
+    response_model=BillRecordResponse,
+    summary="Send a settled room folio to cashier",
+)
+def send_room_folio_to_cashier(
+    bill_id: int,
+    payload: BillWorkflowActionRequest | None = None,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_ROOM_HANDOFF_TO_CASHIER_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.send_room_folio_to_cashier(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        current_user=current_user,
+        note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/cashier/accept",
+    response_model=BillRecordResponse,
+    summary="Accept a room folio in the cashier queue",
+)
+def accept_cashier_folio(
+    bill_id: int,
+    payload: BillWorkflowActionRequest | None = None,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_CASHIER_REVIEW_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.accept_cashier_folio(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        current_user=current_user,
+        note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/cashier/reject",
+    response_model=BillRecordResponse,
+    summary="Reject a room folio back to the billing workspace",
+)
+def reject_cashier_folio(
+    bill_id: int,
+    payload: BillWorkflowActionRequest | None = None,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_CASHIER_REVIEW_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.reject_cashier_folio(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        current_user=current_user,
+        note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/send-to-accountant",
+    response_model=BillRecordResponse,
+    summary="Send a settled room folio from cashier to accountant",
+)
+def send_room_folio_to_accountant(
+    bill_id: int,
+    payload: BillWorkflowActionRequest | None = None,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_ROOM_HANDOFF_TO_ACCOUNTANT_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.send_room_folio_to_accountant(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        current_user=current_user,
+        note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/accountant/accept",
+    response_model=BillRecordResponse,
+    summary="Accept a room folio in the accountant queue",
+)
+def accept_accountant_folio(
+    bill_id: int,
+    payload: BillWorkflowActionRequest | None = None,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_ACCOUNTANT_REVIEW_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.accept_accountant_folio(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        current_user=current_user,
+        note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/accountant/reject",
+    response_model=BillRecordResponse,
+    summary="Reject a room folio back to the cashier queue",
+)
+def reject_accountant_folio(
+    bill_id: int,
+    payload: BillWorkflowActionRequest | None = None,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_ACCOUNTANT_REVIEW_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.reject_accountant_folio(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        current_user=current_user,
+        note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/complete",
+    response_model=BillRecordResponse,
+    summary="Mark a room folio handoff as completed",
+)
+def complete_room_folio_handoff(
+    bill_id: int,
+    payload: BillWorkflowActionRequest | None = None,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_ROOM_HANDOFF_COMPLETE_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.complete_room_folio_handoff(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        current_user=current_user,
+        note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/reopen",
+    response_model=BillRecordResponse,
+    summary="Reopen a completed room folio back to fresh queue",
+)
+def reopen_room_folio(
+    bill_id: int,
+    payload: BillWorkflowActionRequest | None = None,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_ROOM_REOPEN_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.reopen_room_folio(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        current_user=current_user,
+        note=payload.note if payload else None,
+        r=r,
+    )
+
+
+@router.post(
+    "/folios/{bill_id}/reverse",
+    response_model=BillRecordResponse,
+    summary="Reverse/void/refund a bill and reopen operational context",
+)
+def reverse_bill(
+    bill_id: int,
+    payload: ReverseBillRequest,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("billing")),
+):
+    return billing_service.reverse_bill(
+        db,
+        bill_id=bill_id,
+        restaurant_id=restaurant_id,
+        payload=payload,
+        current_user=current_user,
+        r=r,
+    )

@@ -15,7 +15,13 @@ describe("auth and module access guards", () => {
   });
 
   it("resolves role redirect for normalized super admin", () => {
-    expect(getRoleRedirect("s_admin")).toBe("/super-admin/restaurants");
+    expect(getRoleRedirect("s_admin")).toBe("/super-admin");
+    expect(getRoleRedirect("super_admin", ["billing_admin"])).toBe("/super-admin/packages");
+  });
+
+  it("routes billing-focused roles to the billing workspace", () => {
+    expect(getRoleRedirect("cashier")).toBe("/admin/billing/cashier");
+    expect(getRoleRedirect("accountant")).toBe("/admin/billing/accountant");
   });
 
   it("checks role access using normalized role values", () => {
@@ -30,20 +36,47 @@ describe("auth and module access guards", () => {
 
   it("requires both role and privilege for module access", () => {
     expect(
-      canAccessModuleItem("admin", ["QR_MENU"], ["owner", "admin"], "QR_MENU"),
+      canAccessModuleItem(
+        "admin",
+        ["QR_MENU"],
+        { reports: true },
+        ["owner", "admin"],
+        "QR_MENU",
+        "reports",
+      ),
     ).toBe(true);
     expect(
-      canAccessModuleItem("steward", ["QR_MENU"], ["owner", "admin"], "QR_MENU"),
+      canAccessModuleItem(
+        "steward",
+        ["QR_MENU"],
+        { reports: true },
+        ["owner", "admin"],
+        "QR_MENU",
+        "reports",
+      ),
     ).toBe(false);
     expect(
-      canAccessModuleItem("admin", ["HOUSEKEEPING"], ["owner", "admin"], "QR_MENU"),
+      canAccessModuleItem(
+        "admin",
+        ["HOUSEKEEPING"],
+        { reports: false },
+        ["owner", "admin"],
+        "QR_MENU",
+        "reports",
+      ),
     ).toBe(false);
   });
 
   it("applies dedicated housekeeping and qr module helpers", () => {
-    expect(canAccessHousekeepingTasks("housekeeper", ["HOUSEKEEPING"])).toBe(true);
-    expect(canAccessHousekeepingTasks("steward", ["HOUSEKEEPING"])).toBe(false);
-    expect(canAccessQrMenuStaffModule("steward", ["QR_MENU"])).toBe(true);
-    expect(canAccessQrMenuStaffModule("housekeeper", ["QR_MENU"])).toBe(false);
+    expect(
+      canAccessHousekeepingTasks("housekeeper", ["HOUSEKEEPING"], { housekeeping: true }),
+    ).toBe(true);
+    expect(
+      canAccessHousekeepingTasks("steward", ["HOUSEKEEPING"], { housekeeping: true }),
+    ).toBe(false);
+    expect(
+      canAccessQrMenuStaffModule("steward", ["QR_MENU"], { steward_ops: true }),
+    ).toBe(true);
+    expect(canAccessQrMenuStaffModule("housekeeper", ["QR_MENU"], { kds: true })).toBe(false);
   });
 });

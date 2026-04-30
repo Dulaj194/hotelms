@@ -1,8 +1,21 @@
 import { normalizeRole } from "@/lib/auth";
+import type { ModuleAccessSnapshot } from "@/types/access";
 
+export const RESTAURANT_ADMIN_ROLES = ["owner", "admin"] as const;
+export const SUPER_ADMIN_ONLY_ROLES = ["super_admin"] as const;
 export const HOUSEKEEPING_TASK_ROLES = ["owner", "admin", "housekeeper"] as const;
 export const HOUSEKEEPING_SUPERVISOR_ROLES = ["owner", "admin"] as const;
 export const QR_MENU_STAFF_ROLES = ["owner", "admin", "steward"] as const;
+export const BILLING_STAFF_ROLES = [
+  "owner",
+  "admin",
+  "steward",
+  "cashier",
+  "accountant",
+] as const;
+export const BILLING_CASHIER_REVIEW_ROLES = ["owner", "admin", "cashier"] as const;
+export const BILLING_ACCOUNTANT_REVIEW_ROLES = ["owner", "admin", "accountant"] as const;
+export const HOUSEKEEPING_ROOM_ROLES = ["owner", "admin", "housekeeper"] as const;
 
 export function hasRoleAccess(
   role: string | null | undefined,
@@ -17,27 +30,54 @@ export function hasPrivilegeCode(privileges: string[], code: string): boolean {
   return privileges.some((item) => item.toUpperCase() === normalizedCode);
 }
 
+export function hasModuleAccess(
+  moduleAccess: Partial<ModuleAccessSnapshot> | Record<string, boolean>,
+  key: string,
+): boolean {
+  return Boolean(moduleAccess[key as keyof ModuleAccessSnapshot]);
+}
+
 export function canAccessModuleItem(
   role: string | null | undefined,
   privileges: string[],
+  moduleAccess: Partial<ModuleAccessSnapshot> | Record<string, boolean>,
   allowedRoles?: readonly string[] | null,
   privilegeCode?: string,
+  moduleKey?: string,
 ): boolean {
   const roleOk = !allowedRoles || hasRoleAccess(role, allowedRoles);
   const privilegeOk = !privilegeCode || hasPrivilegeCode(privileges, privilegeCode);
-  return roleOk && privilegeOk;
+  const moduleOk = !moduleKey || hasModuleAccess(moduleAccess, moduleKey);
+  return roleOk && privilegeOk && moduleOk;
 }
 
 export function canAccessHousekeepingTasks(
   role: string | null | undefined,
   privileges: string[],
+  moduleAccess: Partial<ModuleAccessSnapshot> | Record<string, boolean>,
 ): boolean {
-  return canAccessModuleItem(role, privileges, HOUSEKEEPING_TASK_ROLES, "HOUSEKEEPING");
+  return canAccessModuleItem(
+    role,
+    privileges,
+    moduleAccess,
+    HOUSEKEEPING_TASK_ROLES,
+    "HOUSEKEEPING",
+    "housekeeping",
+  );
 }
 
 export function canAccessQrMenuStaffModule(
   role: string | null | undefined,
   privileges: string[],
+  moduleAccess: Partial<ModuleAccessSnapshot> | Record<string, boolean>,
 ): boolean {
-  return canAccessModuleItem(role, privileges, QR_MENU_STAFF_ROLES, "QR_MENU");
+  const normalizedRole = normalizeRole(role);
+  return canAccessModuleItem(
+    normalizedRole,
+    privileges,
+    moduleAccess,
+    QR_MENU_STAFF_ROLES,
+    "QR_MENU",
+    normalizedRole === "steward" ? "steward_ops" : "kds",
+  );
 }

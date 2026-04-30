@@ -1,3 +1,6 @@
+import type { FeatureFlagSnapshot, ModuleAccessSnapshot } from "@/types/access";
+import type { UserRole } from "@/types/user";
+
 export interface LoginRequest {
   email: string;
   password: string;
@@ -13,23 +16,30 @@ export interface UserMeResponse {
   id: number;
   full_name: string;
   email: string;
-  role: string;
+  role: UserRole;
   restaurant_id: number | null;
   is_active: boolean;
   must_change_password: boolean;
+  package_id: number | null;
+  package_name: string | null;
+  package_code: string | null;
+  subscription_status: string | null;
+  privileges: string[];
+  super_admin_scopes: string[];
+  feature_flags: FeatureFlagSnapshot;
+  module_access: ModuleAccessSnapshot;
 }
 
 export interface TenantDataCountsResponse {
   menus: number;
   categories: number;
-  subcategories: number;
   items: number;
 }
 
 export interface TenantContextResponse {
   user_id: number;
   email: string;
-  role: string;
+  role: UserRole;
   restaurant_id: number | null;
   restaurant_name: string | null;
   counts: TenantDataCountsResponse;

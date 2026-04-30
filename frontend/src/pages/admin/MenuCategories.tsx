@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import AssetImage from "@/components/shared/AssetImage";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import {
   TenantContextBadge,
@@ -8,7 +10,7 @@ import {
 } from "@/components/shared/TenantScopeNotice";
 import { useTenantContext } from "@/hooks/useTenantContext";
 import { api } from "@/lib/api";
-import { toAssetUrl } from "@/lib/assets";
+import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
 import type { Category, Menu } from "@/types/menu";
 
 interface FormData {
@@ -64,10 +66,10 @@ export default function MenuCategories() {
     setError(null);
     try {
       const [catsRes, menusRes] = await Promise.all([
-        api.get<Category[]>("/categories"),
+        api.get<Category[] | PaginatedResponse<Category>>("/categories?limit=500"),
         api.get<Menu[]>("/menus"),
       ]);
-      setCategories(catsRes);
+      setCategories(unwrapPaginated(catsRes));
       setMenus(menusRes);
     } catch {
       setError("Failed to load categories.");
@@ -182,6 +184,10 @@ export default function MenuCategories() {
       setFormError("Name is required.");
       return;
     }
+    if (formData.menu_id === "") {
+      setFormError("Select a menu before saving this category.");
+      return;
+    }
 
     setSaving(true);
     setFormError(null);
@@ -190,7 +196,7 @@ export default function MenuCategories() {
       const payload = {
         name: formData.name.trim(),
         description: formData.description.trim() || null,
-        menu_id: formData.menu_id === "" ? null : formData.menu_id,
+        menu_id: formData.menu_id,
         sort_order: formData.sort_order,
         is_active: formData.is_active,
       };
@@ -263,15 +269,15 @@ export default function MenuCategories() {
 
   return (
     <DashboardLayout>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Menu Categories</h1>
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Menu Categories</h1>
           <p className="mt-1 text-sm text-slate-500">
             Standard view: paginated category cards with the same menu-card style.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
           <span className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
             Total: {sortedVisibleCategories.length}
           </span>
@@ -283,7 +289,7 @@ export default function MenuCategories() {
                 event.target.value === "all" ? "all" : parseInt(event.target.value, 10)
               )
             }
-            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 sm:w-auto"
           >
             <option value="all">All Menus</option>
             {menus.map((menu) => (
@@ -294,9 +300,11 @@ export default function MenuCategories() {
           </select>
           <button
             onClick={openCreate}
-            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+            disabled={menus.length === 0}
+            className="w-full rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:py-2"
           >
-            + Add Category
+            <Plus className="mr-2 inline h-4 w-4" />
+            Add Category
           </button>
         </div>
       </div>
@@ -321,29 +329,46 @@ export default function MenuCategories() {
       )}
 
       {!loading && visibleCategories.length > 0 && (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {paginatedCategories.map((category) => (
             <article
               key={category.id}
-              className="flex h-full min-h-[410px] flex-col rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md"
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate(`/admin/menu/items?categoryId=${category.id}`)}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  navigate(`/admin/menu/items?categoryId=${category.id}`);
+                }
+              }}
+              className="flex h-full cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
             >
-              <div className="aspect-[16/10] w-full overflow-hidden rounded-lg bg-slate-100">
-                {category.image_path ? (
-                  <img
-                    src={toAssetUrl(category.image_path)}
-                    alt={category.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm font-medium text-slate-500">
-                    No image available
-                  </div>
-                )}
+              <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
+                <AssetImage
+                  path={category.image_path}
+                  alt={category.name}
+                  className="h-full w-full object-cover"
+                />
+                <button
+                  type="button"
+                  aria-label={`Change image for ${category.name}`}
+                  title="Change image"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openUpload(category);
+                  }}
+                  disabled={uploading && uploadTarget?.id === category.id}
+                  className="absolute bottom-2 right-2 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-slate-950/85 text-white shadow-lg backdrop-blur transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
               </div>
 
-              <div className="mt-3 flex flex-1 flex-col">
+              <div className="flex flex-1 flex-col p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="line-clamp-1 text-2xl font-semibold leading-tight text-slate-900">
+                  <h2 className="line-clamp-1 text-lg font-semibold leading-tight text-slate-900">
                     {category.name}
                   </h2>
                   <span
@@ -357,42 +382,36 @@ export default function MenuCategories() {
                   </span>
                 </div>
 
-                <p className="mt-2 min-h-[38px] text-sm text-slate-600 line-clamp-2">
+                <p className="mt-1 line-clamp-1 text-sm leading-5 text-slate-600">
                   {category.description?.trim() || "No description added yet."}
                 </p>
 
-                <div className="mt-3 flex items-center justify-between text-xs font-medium text-slate-500">
-                  <span>Sort: {category.sort_order}</span>
-                  <span>{menus.find((menu) => menu.id === category.menu_id)?.name ?? "Uncategorized"}</span>
+                <div className="mt-2 flex items-center justify-end gap-3 text-xs font-medium text-slate-500">
+                  <span className="line-clamp-1 text-right">
+                    {menus.find((menu) => menu.id === category.menu_id)?.name ?? "Menu not found"}
+                  </span>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-2 grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => navigate(`/admin/menu/subcategories?categoryId=${category.id}`)}
-                    className="col-span-2 rounded-lg bg-cyan-500 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-600"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openEdit(category);
+                    }}
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:min-h-0"
                   >
-                    Explore
-                  </button>
-                  <button
-                    onClick={() => openEdit(category)}
-                    className="rounded-lg bg-amber-400 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500"
-                  >
+                    <Pencil className="h-4 w-4" />
                     Edit
                   </button>
                   <button
-                    onClick={() => setDeleteTarget(category)}
-                    className="rounded-lg bg-rose-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setDeleteTarget(category);
+                    }}
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 sm:min-h-0"
                   >
+                    <Trash2 className="h-4 w-4" />
                     Delete
-                  </button>
-                  <button
-                    onClick={() => openUpload(category)}
-                    disabled={uploading && uploadTarget?.id === category.id}
-                    className="col-span-2 rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {uploading && uploadTarget?.id === category.id
-                      ? "Uploading image..."
-                      : "Change image"}
                   </button>
                 </div>
               </div>
@@ -402,12 +421,12 @@ export default function MenuCategories() {
       )}
 
       {!loading && sortedVisibleCategories.length > CARDS_PER_PAGE && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <div className="mt-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <p className="text-sm text-slate-600">
             Showing {startIndex + 1}-{Math.min(endIndex, sortedVisibleCategories.length)} of{" "}
             {sortedVisibleCategories.length} categories
           </p>
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:flex">
             <button
               type="button"
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
@@ -433,12 +452,25 @@ export default function MenuCategories() {
 
       {modalOpen && (
         <div className="app-modal-shell">
-          <div className="app-modal-panel max-w-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              {editingCategory ? "Edit Category" : "Add Category"}
-            </h2>
+          <div className="app-modal-panel max-w-lg">
+            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {editingCategory ? "Edit Category" : "Add Category"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">Group items under the correct menu with a clean guest-facing image.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">
                   Name <span className="text-red-500">*</span>
@@ -449,7 +481,7 @@ export default function MenuCategories() {
                   onChange={(event) =>
                     setFormData((current) => ({ ...current, name: event.target.value }))
                   }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   placeholder="e.g., Appetizers"
                 />
               </div>
@@ -463,13 +495,15 @@ export default function MenuCategories() {
                   }
                   rows={2}
                   maxLength={500}
-                  className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   placeholder="Optional description"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">Menu (optional)</label>
+                <label className="mb-1 block text-xs font-medium text-gray-700">
+                  Menu <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={formData.menu_id}
                   onChange={(event) =>
@@ -478,15 +512,20 @@ export default function MenuCategories() {
                       menu_id: event.target.value ? parseInt(event.target.value, 10) : "",
                     }))
                   }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                 >
-                  <option value="">No menu (uncategorized)</option>
+                  <option value="">Select menu</option>
                   {menus.map((menu) => (
                     <option key={menu.id} value={menu.id}>
                       {menu.name}
                     </option>
                   ))}
                 </select>
+                {menus.length === 0 && (
+                  <p className="mt-1 text-[11px] text-red-500">
+                    Create a menu before adding categories.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -495,7 +534,7 @@ export default function MenuCategories() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handleModalImageChange}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100"
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
                   Max file size 5MB (JPG, PNG, WebP)
@@ -515,7 +554,7 @@ export default function MenuCategories() {
                       sort_order: parseInt(event.target.value, 10) || 0,
                     }))
                   }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                 />
               </div>
 
@@ -540,15 +579,17 @@ export default function MenuCategories() {
             <div className="app-form-actions mt-5">
               <button
                 onClick={closeModal}
-                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
               >
+                <X className="h-4 w-4" />
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
               >
+                <Save className="h-4 w-4" />
                 {saving ? "Saving..." : editingCategory ? "Update" : "Create"}
               </button>
             </div>
@@ -567,15 +608,16 @@ export default function MenuCategories() {
             <div className="app-form-actions">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
                 disabled={deleting}
-                className="w-full rounded-lg bg-red-600 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
               >
+                <Trash2 className="h-4 w-4" />
                 {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>

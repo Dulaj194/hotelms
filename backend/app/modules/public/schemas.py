@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
-
+from pydantic import BaseModel, Field
 
 # ─── Restaurant ───────────────────────────────────────────────────────────────
 
@@ -14,6 +13,7 @@ class PublicRestaurantInfoResponse(BaseModel):
     phone: str | None
     address: str | None
     logo_url: str | None
+    public_menu_banner_urls: list[str] = Field(default_factory=list)
     is_active: bool
 
     model_config = {"from_attributes": True}
@@ -30,7 +30,6 @@ class PublicItemSummaryResponse(BaseModel):
     image_path: str | None
     is_available: bool
     category_id: int
-    subcategory_id: int | None
 
     model_config = {"from_attributes": True}
 
@@ -43,22 +42,7 @@ class PublicItemDetailResponse(BaseModel):
     image_path: str | None
     is_available: bool
     category_id: int
-    subcategory_id: int | None
     category_name: str | None
-
-    model_config = {"from_attributes": True}
-
-
-# ─── Subcategories ────────────────────────────────────────────────────────────
-
-
-class PublicSubcategoryResponse(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    image_path: str | None
-    sort_order: int
-    items: list[PublicItemSummaryResponse]
 
     model_config = {"from_attributes": True}
 
@@ -72,9 +56,8 @@ class PublicCategoryResponse(BaseModel):
     description: str | None
     image_path: str | None
     sort_order: int
-    menu_id: int | None
-    items: list[PublicItemSummaryResponse]      # items with no subcategory
-    subcategories: list[PublicSubcategoryResponse]
+    menu_id: int
+    items: list[PublicItemSummaryResponse]
 
     model_config = {"from_attributes": True}
 

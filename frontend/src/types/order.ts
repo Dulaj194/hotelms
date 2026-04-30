@@ -8,12 +8,17 @@ export type OrderStatus =
   | "paid"
   | "rejected";
 
-export type PaymentStatus = "pending" | "paid" | "failed";
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded" | "voided" | "reversed";
 
 export interface PlaceOrderRequest {
   notes?: string;
   customer_name?: string;
   customer_phone?: string;
+  promo_code?: string;
+  items?: Array<{
+    item_id: number;
+    quantity: number;
+  }>;
 }
 
 export interface UpdateOrderStatusRequest {
@@ -24,10 +29,19 @@ export interface OrderItemResponse {
   id: number;
   item_id: number;
   item_name_snapshot: string;
+  item_image_snapshot: string | null;
   unit_price_snapshot: number;
   quantity: number;
   line_total: number;
   notes: string | null;
+}
+
+export interface OrderItemPreviewResponse {
+  item_name_snapshot: string;
+  item_image_snapshot: string | null;
+  unit_price_snapshot: number;
+  quantity: number;
+  line_total: number;
 }
 
 export interface PaymentResponse {
@@ -64,6 +78,8 @@ export interface OrderHeaderResponse {
   order_source: string;
   room_id: number | null;
   room_number: string | null;
+  primary_item_name: string | null;
+  item_previews: OrderItemPreviewResponse[];
 }
 
 export interface OrderDetailResponse extends OrderHeaderResponse {
@@ -75,6 +91,7 @@ export interface OrderDetailResponse extends OrderHeaderResponse {
 export interface PlaceOrderResponse {
   order: OrderDetailResponse;
   message: string;
+  guest_token?: string | null;
 }
 
 export interface PendingOrderListResponse {

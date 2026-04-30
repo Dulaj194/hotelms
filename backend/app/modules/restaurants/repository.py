@@ -1,7 +1,10 @@
+from datetime import datetime
+
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from app.modules.restaurants.model import Restaurant
-from app.modules.restaurants.schemas import RestaurantUpdateRequest
+from app.modules.restaurants.model import RegistrationStatus, Restaurant
+from app.modules.users.model import User, UserRole
 
 # ─── Tenant-safe access ───────────────────────────────────────────────────────
 #
@@ -22,14 +25,13 @@ def get_by_id(db: Session, restaurant_id: int) -> Restaurant | None:
 def update_profile(
     db: Session,
     restaurant_id: int,
-    payload: RestaurantUpdateRequest,
+    update_data: dict,
 ) -> Restaurant | None:
     """Update allowed profile fields. Only fields in the payload are changed."""
     restaurant = get_by_id(db, restaurant_id)
     if not restaurant:
         return None
 
-    update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(restaurant, field, value)
 
@@ -70,6 +72,132 @@ def list_all_for_super_admin(db: Session) -> list[Restaurant]:
     return db.query(Restaurant).order_by(Restaurant.id.desc()).all()
 
 
+def list_by_registration_status(
+    db: Session,
+    registration_status: RegistrationStatus,
+    *,
+    limit: int = 100,
+    cursor_created_at: datetime | None = None,
+    cursor_id: int | None = None,
+    sort_order: str = "newest",
+) -> list[Restaurant]:
+    query = db.query(Restaurant).filter(Restaurant.registration_status == registration_status)
+
+    if cursor_created_at is not None and cursor_id is not None:
+        if sort_order == "oldest":
+            query = query.filter(
+                or_(
+                    Restaurant.created_at > cursor_created_at,
+                    and_(Restaurant.created_at == cursor_created_at, Restaurant.id > cursor_id),
+                )
+            )
+        else:
+            query = query.filter(
+                or_(
+                    Restaurant.created_at < cursor_created_at,
+                    and_(Restaurant.created_at == cursor_created_at, Restaurant.id < cursor_id),
+                )
+            )
+
+    if sort_order == "oldest":
+        query = query.order_by(Restaurant.created_at.asc(), Restaurant.id.asc())
+    else:
+        query = query.order_by(Restaurant.created_at.desc(), Restaurant.id.desc())
+
+    return query.limit(limit).all()
+
+
+def count_by_registration_status(
+    db: Session,
+    registration_status: RegistrationStatus,
+) -> int:
+    return (
+        db.query(Restaurant)
+        .filter(Restaurant.registration_status == registration_status)
+        .count()
+    )
+
+
+def list_reviewed_registrations(
+    db: Session,
+    *,
+    registration_status: RegistrationStatus | None = None,
+    limit: int = 100,
+    cursor_reviewed_at: datetime | None = None,
+    cursor_id: int | None = None,
+    sort_order: str = "newest",
+) -> list[Restaurant]:
+    query = db.query(Restaurant).filter(
+        Restaurant.registration_status.in_(
+            [RegistrationStatus.APPROVED, RegistrationStatus.REJECTED]
+        )
+    )
+    if registration_status is not None:
+        query = query.filter(Restaurant.registration_status == registration_status)
+
+    if cursor_reviewed_at is not None and cursor_id is not None:
+        if sort_order == "oldest":
+            query = query.filter(
+                or_(
+                    Restaurant.registration_reviewed_at > cursor_reviewed_at,
+                    and_(
+                        Restaurant.registration_reviewed_at == cursor_reviewed_at,
+                        Restaurant.id > cursor_id,
+                    ),
+                )
+            )
+        else:
+            query = query.filter(
+                or_(
+                    Restaurant.registration_reviewed_at < cursor_reviewed_at,
+                    and_(
+                        Restaurant.registration_reviewed_at == cursor_reviewed_at,
+                        Restaurant.id < cursor_id,
+                    ),
+                )
+            )
+
+    if sort_order == "oldest":
+        query = query.order_by(
+            Restaurant.registration_reviewed_at.asc(),
+            Restaurant.id.asc(),
+        )
+    else:
+        query = query.order_by(
+            Restaurant.registration_reviewed_at.desc(),
+            Restaurant.id.desc(),
+        )
+
+    return query.limit(limit).all()
+
+
+def count_reviewed_registrations(
+    db: Session,
+    *,
+    registration_status: RegistrationStatus | None = None,
+) -> int:
+    query = db.query(Restaurant).filter(
+        Restaurant.registration_status.in_(
+            [RegistrationStatus.APPROVED, RegistrationStatus.REJECTED]
+        )
+    )
+    if registration_status is not None:
+        query = query.filter(Restaurant.registration_status == registration_status)
+    return query.count()
+
+
+def get_owner_user(db: Session, restaurant_id: int) -> User | None:
+    return (
+        db.query(User)
+        .filter(
+            User.restaurant_id == restaurant_id,
+            User.role == UserRole.owner,
+        )
+        .order_by(User.created_at.asc(), User.id.asc())
+        .first()
+    )
+
+
 def create_restaurant(
     db: Session,
     name: str,
@@ -81,7 +209,7 @@ def create_restaurant(
     country: str | None,
     currency: str | None,
     billing_email: str | None,
-    tax_id: str | None,
+    public_menu_banner_urls_json: str | None,
     opening_time: str | None,
     closing_time: str | None,
 ) -> Restaurant:
@@ -96,7 +224,7 @@ def create_restaurant(
         country=country,
         currency=currency,
         billing_email=billing_email,
-        tax_id=tax_id,
+        public_menu_banner_urls_json=public_menu_banner_urls_json,
         opening_time=opening_time,
         closing_time=closing_time,
     )
@@ -122,6 +250,17 @@ def update_for_super_admin(
     db.commit()
     db.refresh(restaurant)
     return restaurant
+
+
+def get_by_active_api_key_hash(db: Session, api_key_hash: str) -> Restaurant | None:
+    return (
+        db.query(Restaurant)
+        .filter(
+            Restaurant.integration_api_key_hash == api_key_hash,
+            Restaurant.integration_api_key_active.is_(True),
+        )
+        .first()
+    )
 
 
 def delete_for_super_admin(db: Session, restaurant_id: int) -> bool:

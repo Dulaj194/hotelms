@@ -18,6 +18,8 @@ from sqlalchemy.orm import Session
 from app.modules.cart import repository as cart_repo
 from app.modules.cart.schemas import (
     AddCartItemRequest,
+    CartCouponValidateRequest,
+    CartCouponValidateResponse,
     CartItemResponse,
     CartResponse,
     CartSummaryResponse,
@@ -25,6 +27,8 @@ from app.modules.cart.schemas import (
     UpdateCartItemRequest,
 )
 from app.modules.items.repository import get_by_id as get_item
+from app.modules.promo_codes.schemas import PromoCodeValidateRequest
+from app.modules.promo_codes.service import validate_promo_for_restaurant
 from app.modules.table_sessions.model import TableSession
 
 
@@ -91,6 +95,48 @@ def get_cart_summary(
 ) -> CartSummaryResponse:
     cart = _build_cart_response(db, r, session)
     return CartSummaryResponse(item_count=cart.item_count, total=cart.total)
+
+
+def validate_coupon(
+    db: Session,
+    r: redis_lib.Redis,
+    session: TableSession,
+    data: CartCouponValidateRequest,
+) -> CartCouponValidateResponse:
+    """Validate a coupon for the current guest cart and return live totals."""
+    cart = _build_cart_response(db, r, session)
+    if cart.item_count <= 0:
+        return CartCouponValidateResponse(
+            valid=False,
+            message="Add items before applying a coupon.",
+            subtotal=cart.total,
+            total=cart.total,
+        )
+
+    validation = validate_promo_for_restaurant(
+        db,
+        restaurant_id=session.restaurant_id,
+        payload=PromoCodeValidateRequest(code=data.code),
+    )
+    if not validation.valid or validation.discount_percent is None:
+        return CartCouponValidateResponse(
+            valid=False,
+            message=validation.message,
+            code=validation.code,
+            subtotal=cart.total,
+            total=cart.total,
+        )
+
+    discount_amount = round(cart.total * float(validation.discount_percent) / 100, 2)
+    return CartCouponValidateResponse(
+        valid=True,
+        message=validation.message,
+        code=validation.code,
+        discount_percent=float(validation.discount_percent),
+        discount_amount=discount_amount,
+        subtotal=cart.total,
+        total=round(max(cart.total - discount_amount, 0), 2),
+    )
 
 
 def add_item(

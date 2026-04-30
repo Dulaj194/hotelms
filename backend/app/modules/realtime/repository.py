@@ -17,6 +17,16 @@ def get_order_channel(restaurant_id: int) -> str:
     return f"orders:{restaurant_id}"
 
 
+def get_super_admin_channel() -> str:
+    """Return the Redis pub/sub channel for platform-level super admin events."""
+    return "platform:super_admin"
+
+
+def get_billing_channel(restaurant_id: int) -> str:
+    """Return the Redis pub/sub channel for a restaurant's billing workflow."""
+    return f"billing:{restaurant_id}"
+
+
 def _json_default(obj: object) -> str:
     if isinstance(obj, datetime):
         return obj.isoformat()
@@ -31,5 +41,14 @@ def publish_event(r: redis_lib.Redis, restaurant_id: int, event: dict) -> None:
     via its own async Redis client.
     """
     channel = get_order_channel(restaurant_id)
+    payload = json.dumps(event, default=_json_default)
+    r.publish(channel, payload)
+
+
+def publish_global_event(
+    r: redis_lib.Redis,
+    channel: str,
+    event: dict,
+) -> None:
     payload = json.dumps(event, default=_json_default)
     r.publish(channel, payload)

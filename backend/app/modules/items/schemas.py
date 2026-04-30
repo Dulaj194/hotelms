@@ -9,7 +9,7 @@ class ItemCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
     more_details: str | None = None
-    price: float = Field(..., ge=0)
+    price: float = Field(..., gt=0)
     currency: str | None = None
     image_path: str | None = None
     image_path_2: str | None = None
@@ -20,14 +20,13 @@ class ItemCreateRequest(BaseModel):
     blog_link: str | None = None
     is_available: bool = True
     category_id: int
-    subcategory_id: int | None = None
 
 
 class ItemUpdateRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
     more_details: str | None = None
-    price: float | None = Field(None, ge=0)
+    price: float | None = Field(None, gt=0)
     currency: str | None = None
     image_path: str | None = None
     image_path_2: str | None = None
@@ -38,7 +37,6 @@ class ItemUpdateRequest(BaseModel):
     blog_link: str | None = None
     is_available: bool | None = None
     category_id: int | None = None
-    subcategory_id: int | None = None
 
 
 class ItemImageUploadResponse(BaseModel):
@@ -66,7 +64,6 @@ class ItemResponse(BaseModel):
     blog_link: str | None
     is_available: bool
     category_id: int
-    subcategory_id: int | None
     restaurant_id: int
     created_at: datetime
     updated_at: datetime

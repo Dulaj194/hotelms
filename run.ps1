@@ -38,10 +38,17 @@ if (-not $dockerOk) {
 
 Write-Step "Preparing .env files (if missing)"
 Ensure-EnvFile ".env" @"
-MYSQL_DATABASE=hotelms
-MYSQL_ROOT_PASSWORD=hotelms123
-DATABASE_URL=mysql+pymysql://root:hotelms123@mysql:3306/hotelms
-REDIS_URL=redis://redis:6379
+# Database configuration
+MYSQL_DATABASE=${env:MYSQL_DATABASE:-hotelms}
+# WARNING: Use strong password in production! Never commit credentials to Git.
+MYSQL_ROOT_PASSWORD=${env:MYSQL_ROOT_PASSWORD:-generate-a-random-password-here}
+DATABASE_URL=${env:DATABASE_URL:-mysql+pymysql://root:change-password@mysql:3306/hotelms}
+REDIS_URL=${env:REDIS_URL:-redis://redis:6379}
+
+# IMPORTANT: For production deployment, set these environment variables:
+# - export MYSQL_ROOT_PASSWORD='your-secure-password'
+# - export DATABASE_URL='mysql+pymysql://root:password@host:3306/hotelms'
+# - export REDIS_URL='redis://host:6379'
 "@
 
 Ensure-EnvFile "backend/.env" @"
@@ -59,6 +66,12 @@ REFRESH_TOKEN_EXPIRE_DAYS=7
 RESET_TOKEN_EXPIRE_MINUTES=30
 LOGIN_RATE_LIMIT_ATTEMPTS=5
 LOGIN_RATE_LIMIT_WINDOW_MINUTES=15
+SMS_ENABLED=false
+SMS_PROVIDER=twilio
+SMS_DEFAULT_COUNTRY_CODE=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
 "@
 
 Ensure-EnvFile "frontend/.env" @"

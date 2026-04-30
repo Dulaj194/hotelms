@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
+from app.modules.platform_access import catalog as platform_access_catalog
 from app.modules.users.model import User, UserRole
 from app.modules.users.schemas import StaffCreateRequest, StaffUpdateRequest, UserCreate
 
@@ -57,6 +58,32 @@ def list_by_restaurant(
     return query.order_by(User.created_at.desc()).all()
 
 
+def list_platform_users(
+    db: Session,
+    *,
+    is_active: bool | None = None,
+) -> list[User]:
+    query = db.query(User).filter(
+        User.role == UserRole.super_admin,
+        User.restaurant_id.is_(None),
+    )
+    if is_active is not None:
+        query = query.filter(User.is_active == is_active)
+    return query.order_by(User.created_at.desc(), User.id.desc()).all()
+
+
+def get_platform_user_for_super_admin(db: Session, user_id: int) -> User | None:
+    return (
+        db.query(User)
+        .filter(
+            User.id == user_id,
+            User.role == UserRole.super_admin,
+            User.restaurant_id.is_(None),
+        )
+        .first()
+    )
+
+
 # Write operations
 
 
@@ -68,6 +95,36 @@ def create_user(db: Session, data: UserCreate) -> User:
         role=data.role,
         restaurant_id=data.restaurant_id,
     )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def create_platform_user(
+    db: Session,
+    *,
+    full_name: str,
+    email: str,
+    username: str | None,
+    phone: str | None,
+    password: str,
+    is_active: bool,
+    must_change_password: bool,
+    super_admin_scopes: list[str] | None,
+) -> User:
+    user = User(
+        full_name=full_name,
+        email=email,
+        username=username,
+        phone=phone,
+        password_hash=hash_password(password),
+        role=UserRole.super_admin,
+        restaurant_id=None,
+        is_active=is_active,
+        must_change_password=must_change_password,
+    )
+    user.set_super_admin_scopes(super_admin_scopes)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -136,6 +193,29 @@ def update_by_id(
     return user
 
 
+def update_platform_user(
+    db: Session,
+    user: User,
+    update_data: dict,
+) -> User:
+    if "password" in update_data:
+        update_data["password_hash"] = hash_password(update_data.pop("password"))
+
+    if "super_admin_scopes" in update_data:
+        user.set_super_admin_scopes(
+            platform_access_catalog.normalize_platform_scopes(
+                update_data.pop("super_admin_scopes")
+            )
+        )
+
+    for field, value in update_data.items():
+        setattr(user, field, value)
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def disable_by_id(db: Session, user_id: int, restaurant_id: int) -> User | None:
     """Set is_active=False for a staff member in the given restaurant."""
     user = get_by_id(db, user_id, restaurant_id)
@@ -179,3 +259,52 @@ def count_active_owners(db: Session, restaurant_id: int) -> int:
         )
         .count()
     )
+
+
+def count_active_platform_users(db: Session) -> int:
+    return (
+        db.query(User)
+        .filter(
+            User.role == UserRole.super_admin,
+            User.restaurant_id.is_(None),
+            User.is_active.is_(True),
+        )
+        .count()
+    )
+
+
+def count_active_platform_users_with_scope(db: Session, scope: str) -> int:
+    normalized_scope = scope.strip().lower()
+    users = (
+        db.query(User)
+        .filter(
+            User.role == UserRole.super_admin,
+            User.restaurant_id.is_(None),
+            User.is_active.is_(True),
+        )
+        .all()
+    )
+    return sum(
+        1
+        for user in users
+        if normalized_scope in platform_access_catalog.get_user_platform_scopes(user)
+    )
+
+
+def enable_platform_user(db: Session, user: User) -> User:
+    user.is_active = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def disable_platform_user(db: Session, user: User) -> User:
+    user.is_active = False
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def delete_platform_user(db: Session, user: User) -> None:
+    db.delete(user)
+    db.commit()

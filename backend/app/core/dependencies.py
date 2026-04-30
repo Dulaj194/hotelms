@@ -13,6 +13,13 @@ from app.db.session import SessionLocal
 
 _bearer = HTTPBearer()
 
+_AUTH_SELF_SERVICE_ALLOWED_PATHS = {
+    "/api/v1/auth/me",
+    "/api/v1/auth/logout",
+    "/api/v1/auth/change-initial-password",
+    "/api/v1/auth/refresh",
+}
+
 
 def get_db() -> Generator[Session, None, None]:
     """Yield a SQLAlchemy database session and ensure it is closed afterward."""
@@ -23,8 +30,12 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def get_redis() -> redis_lib.Redis:
-    """Return the shared Redis client instance."""
+def get_redis() -> redis_lib.Redis | None:
+    """Return the shared Redis client instance, or None if unavailable.
+    
+    For critical operations like authentication, Redis failures should not block requests.
+    Rate limiting and other features will degrade gracefully when Redis is unavailable.
+    """
     return get_redis_client()
 
 
@@ -67,14 +78,38 @@ def get_current_user(
             detail="Account is inactive.",
         )
 
+    request_path = request.url.path if request else None
+
+    if user.restaurant_id is not None:
+        from app.modules.auth.service import _assert_role_feature_access
+        from app.modules.restaurants.model import RegistrationStatus, Restaurant
+
+        restaurant = db.query(Restaurant).filter(Restaurant.id == user.restaurant_id).first()
+        if request_path not in _AUTH_SELF_SERVICE_ALLOWED_PATHS:
+            if restaurant is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your restaurant account is unavailable.",
+                )
+            if restaurant.registration_status == RegistrationStatus.PENDING:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your registration is pending super admin approval.",
+                )
+            if restaurant.registration_status == RegistrationStatus.REJECTED:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your registration was rejected. Please contact support.",
+                )
+            if not restaurant.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your restaurant account is inactive.",
+                )
+            _assert_role_feature_access(user, restaurant)
+
     if user.must_change_password:
-        allowed_paths = {
-            "/api/v1/auth/me",
-            "/api/v1/auth/logout",
-            "/api/v1/auth/change-initial-password",
-            "/api/v1/auth/refresh",
-        }
-        if request.url.path not in allowed_paths:
+        if request_path not in _AUTH_SELF_SERVICE_ALLOWED_PATHS:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Password change required before accessing this resource.",
@@ -83,11 +118,20 @@ def get_current_user(
     return user
 
 
-def require_roles(*roles: str):
+def require_roles(*roles: object):
     """Dependency factory that enforces role-based access control."""
 
+    normalized_roles = {
+        str(role.value if hasattr(role, "value") else role).strip().lower()
+        for role in roles
+        if role
+    }
+
     def _check(current_user=Depends(get_current_user)):
-        if current_user.role.value not in roles:
+        current_role = str(
+            current_user.role.value if hasattr(current_user.role, "value") else current_user.role
+        ).strip().lower()
+        if current_role not in normalized_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to perform this action.",
@@ -205,6 +249,72 @@ def require_privilege(privilege_code: str):
     return _check
 
 
+def require_platform_scopes(*scopes: str):
+    """Dependency factory that enforces super-admin scope-based access."""
+
+    normalized_scopes = tuple(dict.fromkeys(scope.strip().lower() for scope in scopes if scope))
+
+    def _check(current_user=Depends(get_current_user)):
+        from app.modules.platform_access import catalog as platform_access_catalog
+        from app.modules.users.model import UserRole
+
+        if current_user.role != UserRole.super_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action.",
+            )
+
+        if not platform_access_catalog.user_has_any_platform_scope(
+            current_user,
+            normalized_scopes,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your platform account does not have the required permission scope.",
+            )
+        return current_user
+
+    return _check
+
+
+def require_platform_action(resource: str, action: str):
+    """Dependency factory that enforces platform permission matrix actions."""
+
+    from app.modules.platform_access import matrix as platform_access_matrix
+
+    required_scopes = platform_access_matrix.get_required_scopes_for_action(
+        resource,
+        action,
+    )
+    if required_scopes is None:
+        raise ValueError(
+            f"Unknown platform permission mapping for resource='{resource}' action='{action}'."
+        )
+
+    return require_platform_scopes(*required_scopes)
+
+
+def require_module_access(module_key: str):
+    """Dependency factory to enforce effective module access for tenant routes."""
+
+    def _check(
+        db: Session = Depends(get_db),
+        restaurant_id: int = Depends(get_current_restaurant_id),
+    ):
+        if restaurant_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No restaurant context available for module access check.",
+            )
+
+        from app.modules.subscriptions import service as subscription_service
+
+        subscription_service.assert_module_access(db, restaurant_id, module_key)
+        return True
+
+    return _check
+
+
 def require_room_session_privilege(privilege_code: str):
     """Dependency factory for guest room-session routes that need privilege gates."""
 
@@ -215,6 +325,21 @@ def require_room_session_privilege(privilege_code: str):
         from app.modules.subscriptions import service as subscription_service
 
         subscription_service.assert_privilege(db, session.restaurant_id, privilege_code)
+        return True
+
+    return _check
+
+
+def require_room_module_access(module_key: str):
+    """Dependency factory for guest room-session routes that need module gates."""
+
+    def _check(
+        db: Session = Depends(get_db),
+        session=Depends(get_current_room_session),
+    ):
+        from app.modules.subscriptions import service as subscription_service
+
+        subscription_service.assert_module_access(db, session.restaurant_id, module_key)
         return True
 
     return _check
@@ -231,17 +356,8 @@ def require_room_session_privilege(privilege_code: str):
 from fastapi import Header  # noqa: E402 — local import to avoid circular at module load
 
 
-def get_current_guest_session(
-    x_guest_session: str = Header(..., alias="X-Guest-Session"),
-    db: Session = Depends(get_db),
-):
-    """Dependency that validates the X-Guest-Session token and returns the TableSession.
-
-    Used by all cart endpoints. Validates:
-    1. Token signature and expiry (jose).
-    2. Token type is 'guest_session' (not a staff token).
-    3. Session exists in DB and is active/not-expired.
-    """
+def resolve_guest_session_token(x_guest_session: str, db: Session):
+    """Validate a raw X-Guest-Session token and return the TableSession."""
     from app.core.security import decode_guest_session_token
     from app.modules.table_sessions.repository import get_active_session_by_session_id
 
@@ -264,25 +380,29 @@ def get_current_guest_session(
     if session is None:
         raise credentials_exception
 
+    try:
+        token_restaurant_id = int(payload.get("restaurant_id"))
+    except (TypeError, ValueError):
+        raise credentials_exception
+    token_table_number = str(payload.get("table_number", "")).strip()
+
+    if (
+        token_restaurant_id != session.restaurant_id
+        or token_table_number != session.table_number
+    ):
+        raise credentials_exception
+
     return session
 
 
-def get_current_room_session(
-    x_room_session: str = Header(..., alias="X-Room-Session"),
-    db: Session = Depends(get_db),
-):
-    """Dependency that validates the X-Room-Session token and returns the RoomSession.
-
-    Used by all room cart and room order endpoints. Validates:
-    1. Token signature and expiry (jose).
-    2. Token type is 'room_session' (not a staff or table token).
-    3. Session exists in DB and is active/not-expired.
-
-    SECURITY: Plain room_number alone never authorizes room operations.
-    Only a valid signed room session token grants access.
-    """
+def resolve_room_session_token(x_room_session: str, db: Session):
+    """Validate a raw X-Room-Session token and return the RoomSession."""
     from app.core.security import decode_room_session_token
-    from app.modules.room_sessions.repository import get_active_room_session_by_session_id
+    from app.modules.room_sessions.repository import (
+        deactivate_room_session,
+        get_active_room_session_by_session_id,
+        touch_room_session_activity,
+    )
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -303,22 +423,32 @@ def get_current_room_session(
     if session is None:
         raise credentials_exception
 
+    try:
+        token_restaurant_id = int(payload.get("restaurant_id"))
+        token_room_id = int(payload.get("room_id"))
+    except (TypeError, ValueError):
+        raise credentials_exception
+    token_room_number = str(payload.get("room_number", "")).strip()
+
+    if (
+        token_restaurant_id != session.restaurant_id
+        or token_room_id != session.room_id
+        or token_room_number != session.room_number_snapshot
+    ):
+        raise credentials_exception
+
     idle_timeout_minutes = max(settings.room_session_idle_timeout_minutes, 1)
     last_activity_at = session.last_activity_at
     if last_activity_at.tzinfo is None:
         last_activity_at = last_activity_at.replace(tzinfo=UTC)
 
     if last_activity_at + timedelta(minutes=idle_timeout_minutes) <= datetime.now(UTC):
-        from app.modules.room_sessions.repository import deactivate_room_session
-
         deactivate_room_session(
             db,
             session_id=session.session_id,
             restaurant_id=session.restaurant_id,
         )
         raise credentials_exception
-
-    from app.modules.room_sessions.repository import touch_room_session_activity
 
     touch_room_session_activity(
         db,
@@ -327,3 +457,34 @@ def get_current_room_session(
     )
 
     return session
+
+
+def get_current_guest_session(
+    x_guest_session: str = Header(..., alias="X-Guest-Session"),
+    db: Session = Depends(get_db),
+):
+    """Dependency that validates the X-Guest-Session token and returns the TableSession.
+
+    Used by all cart endpoints. Validates:
+    1. Token signature and expiry (jose).
+    2. Token type is 'guest_session' (not a staff token).
+    3. Session exists in DB and is active/not-expired.
+    """
+    return resolve_guest_session_token(x_guest_session, db)
+
+
+def get_current_room_session(
+    x_room_session: str = Header(..., alias="X-Room-Session"),
+    db: Session = Depends(get_db),
+):
+    """Dependency that validates the X-Room-Session token and returns the RoomSession.
+
+    Used by all room cart and room order endpoints. Validates:
+    1. Token signature and expiry (jose).
+    2. Token type is 'room_session' (not a staff or table token).
+    3. Session exists in DB and is active/not-expired.
+
+    SECURITY: Plain room_number alone never authorizes room operations.
+    Only a valid signed room session token grants access.
+    """
+    return resolve_room_session_token(x_room_session, db)

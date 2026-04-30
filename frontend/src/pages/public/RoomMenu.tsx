@@ -4,26 +4,32 @@
  * Route: /menu/:restaurantId/room/:roomNumber
  *
  * Flow:
- * 1. On mount: start or reuse a room session (POST /room-sessions/start).
+ * 1. On mount: restore QR context from URL/sessionStorage.
  * 2. Fetch the public menu (same menu endpoint as table flow).
  * 3. Guest browses categories and items.
- * 4. Guest adds items to room cart (X-Room-Session header).
- * 5. Guest reviews cart and places room order.
+ * 4. Guest adds items to the client-side room cart.
+ * 5. Guest places the order with X-Room-Key or X-Room-Session.
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
-import { setRoomSession } from "@/hooks/useRoomSession";
-import { useRoomCart } from "@/hooks/useRoomCart";
-import { publicGet, publicPost } from "@/lib/publicApi";
+import { ChevronRight } from "lucide-react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import MenuBrowserRail from "@/components/public/MenuBrowserRail";
+import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
+import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
+import { useLocalRoomCart } from "@/hooks/useLocalMenuCart";
+import { toAssetUrl } from "@/lib/assets";
+import { publicGet } from "@/lib/publicApi";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
-import type { RoomSessionStartResponse, RoomOrderDetailResponse } from "@/types/roomSession";
+import type { RoomOrderDetailResponse } from "@/types/roomSession";
 
 // Sub-component: Cart Drawer (inline, room-specific)
 
 interface RoomCartDrawerProps {
   open: boolean;
   onClose: () => void;
+  onContinueBrowsing: () => void;
+  onTrackOrder: () => void;
   cart: import("@/types/roomSession").RoomCartResponse | null;
   onUpdateItem: (itemId: number, quantity: number) => Promise<void>;
   onRemoveItem: (itemId: number) => Promise<void>;
@@ -36,6 +42,8 @@ interface RoomCartDrawerProps {
 function RoomCartDrawer({
   open,
   onClose,
+  onContinueBrowsing,
+  onTrackOrder,
   cart,
   onUpdateItem,
   onRemoveItem,
@@ -81,7 +89,7 @@ function RoomCartDrawer({
           </h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            className="grid h-10 w-10 place-items-center rounded-full transition-colors hover:bg-gray-100"
             aria-label="Close cart"
           >
             <svg
@@ -131,13 +139,22 @@ function RoomCartDrawer({
             <p className="text-xs text-gray-400 mb-4">
               Total: ${orderPlaced.total_amount.toFixed(2)}
             </p>
-            <button
-              onClick={onClose}
-              className="box-border min-h-10 w-full max-w-full rounded-xl bg-orange-500 py-2 text-sm font-semibold text-white
-                         hover:bg-orange-600 transition-colors"
-            >
-              Continue Browsing
-            </button>
+            <div className="w-full space-y-2">
+              <button
+                onClick={onTrackOrder}
+                className="min-h-11 w-full rounded-xl bg-orange-500 py-2.5 text-sm font-semibold text-white
+                           hover:bg-orange-600 transition-colors"
+              >
+                Track Order
+              </button>
+              <button
+                onClick={onContinueBrowsing}
+                className="min-h-11 w-full rounded-xl border border-orange-200 py-2 text-sm font-semibold text-orange-600
+                           hover:bg-orange-50 transition-colors"
+              >
+                Continue Browsing
+              </button>
+            </div>
           </div>
         )}
 
@@ -180,46 +197,65 @@ function RoomCartDrawer({
                         {item.quantity}
                       </span>
                       <button
-                        onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
-                        className="w-7 h-7 flex items-center justify-center rounded-full border
-                                   hover:bg-gray-100 text-sm font-medium"
-                        aria-label="Increase"
+                        onClick={() => onRemoveItem(item.item_id)}
+                        className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                        aria-label={`Remove ${item.name}`}
                       >
-                        +
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
                       </button>
                     </div>
 
-                    <div className="w-16 shrink-0 text-right text-sm font-semibold">
-                      ${item.line_total.toFixed(2)}
-                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      {/* Quantity controls */}
+                      <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 p-1">
+                        <button
+                          onClick={() =>
+                            item.quantity > 1
+                              ? onUpdateItem(item.item_id, item.quantity - 1)
+                              : onRemoveItem(item.item_id)
+                          }
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors hover:bg-white"
+                          aria-label="Decrease"
+                        >
+                          -
+                        </button>
+                        <span className="w-6 text-center text-sm font-semibold">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+                          aria-label="Increase"
+                        >
+                          +
+                        </button>
+                      </div>
 
-                    <button
-                      onClick={() => onRemoveItem(item.item_id)}
-                      className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                      aria-label={`Remove ${item.name}`}
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                    </button>
+                      {/* Line total */}
+                      <div className="text-xs font-semibold">
+                        ${item.line_total.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
             </div>
 
             {cart && cart.items.length > 0 && (
-              <div className="space-y-3 border-t px-4 py-4">
+              <div className="space-y-3 border-t px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <div className="flex justify-between font-semibold text-base">
                   <span>Total</span>
                   <span>${total.toFixed(2)}</span>
@@ -232,7 +268,7 @@ function RoomCartDrawer({
                 <button
                   onClick={handlePlaceOrder}
                   disabled={placing}
-                  className="box-border min-h-10 w-full max-w-full rounded-xl bg-orange-500 py-3 text-sm font-semibold text-white
+                  className="min-h-12 w-full rounded-xl bg-orange-500 py-3 text-sm font-semibold text-white
                              hover:bg-orange-600 transition-colors disabled:opacity-60"
                 >
                   {placing ? "Placing order..." : `Place Order - $${total.toFixed(2)}`}
@@ -241,7 +277,7 @@ function RoomCartDrawer({
                 <button
                   onClick={onClearCart}
                   disabled={placing}
-                  className="box-border min-h-10 w-full max-w-full rounded-lg border border-red-200 py-2 text-sm text-red-600
+                  className="min-h-11 w-full rounded-lg border border-red-200 py-2 text-sm font-semibold text-red-600
                              hover:bg-red-50 transition-colors disabled:opacity-50"
                 >
                   Clear cart
@@ -259,51 +295,53 @@ function RoomCartDrawer({
 
 export default function RoomMenu() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { restaurantId, roomNumber } = useParams<{
     restaurantId: string;
     roomNumber: string;
   }>();
   const qrAccessKey = searchParams.get("k")?.trim() ?? "";
+  const restaurantIdNumber = restaurantId ? Number(restaurantId) : Number.NaN;
+  const restaurantContextId = Number.isNaN(restaurantIdNumber) ? null : restaurantIdNumber;
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [activeCategoryId, setActiveCategoryId] = useState<number | null>(null);
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [placedOrder, setPlacedOrder] = useState<RoomOrderDetailResponse | null>(null);
 
-  const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing, refetch } =
-    useRoomCart();
+  const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing } =
+    useLocalRoomCart({
+      restaurantId: restaurantContextId,
+      roomId: null,
+      roomNumber: roomNumber ?? null,
+      qrAccessKey,
+      menu,
+    });
 
-  // 1. Start (or reuse) a room session
+  const {
+    activeCategoryId,
+    setActiveCategoryId,
+    selectNextCategory,
+    selectPreviousCategory,
+    visibleCategories,
+    selectedCategory,
+  } = usePublicMenuBrowser(menu);
+
+  const menuSwipeHandlers = useSwipeNavigation<HTMLDivElement>({
+    onSwipeLeft: selectNextCategory,
+    onSwipeRight: selectPreviousCategory,
+  });
+
+  // 1. Preserve QR context locally. Cart mutations stay client-side until checkout.
   useEffect(() => {
     if (!restaurantId || !roomNumber) return;
-
-    const init = async () => {
-      if (!qrAccessKey) {
-        setPageError("Invalid room QR link. Please scan the room QR code again.");
-        return;
-      }
-      try {
-        const session = await publicPost<RoomSessionStartResponse>(
-          "/room-sessions/start",
-          {
-            restaurant_id: Number(restaurantId),
-            room_number: roomNumber,
-            qr_access_key: qrAccessKey,
-          }
-        );
-        setRoomSession(session);
-        setSessionReady(true);
-      } catch {
-        setPageError(
-          "Could not start a room session. Please scan the QR code again."
-        );
-      }
-    };
-
-    void init();
+    if (!qrAccessKey) {
+      setPageError("Invalid room QR link. Please scan the room QR code again.");
+      return;
+    }
+    setSessionReady(true);
   }, [restaurantId, roomNumber, qrAccessKey]);
 
   // 2. Fetch public menu
@@ -316,9 +354,6 @@ export default function RoomMenu() {
           `/public/restaurants/${restaurantId}/menu`
         );
         setMenu(data);
-        if (data.categories.length > 0) {
-          setActiveCategoryId(data.categories[0].id);
-        }
       } catch {
         setPageError("Failed to load the menu. Please try again.");
       }
@@ -326,11 +361,6 @@ export default function RoomMenu() {
 
     void fetchMenu();
   }, [restaurantId]);
-
-  // 3. Refetch cart once session is ready
-  useEffect(() => {
-    if (sessionReady) void refetch();
-  }, [sessionReady, refetch]);
 
   const handleAddToCart = useCallback(
     async (itemId: number) => {
@@ -350,6 +380,20 @@ export default function RoomMenu() {
     setCartOpen(true); // keep drawer open to show confirmation
   }, [placeOrder]);
 
+  const handleTrackOrder = useCallback(() => {
+    if (!restaurantId || !roomNumber || !placedOrder) return;
+    const basePath = `/menu/${restaurantId}/room/${roomNumber}/order/${placedOrder.id}`;
+    const nextPath = qrAccessKey
+      ? `${basePath}?k=${encodeURIComponent(qrAccessKey)}`
+      : basePath;
+    navigate(nextPath);
+  }, [navigate, placedOrder, qrAccessKey, restaurantId, roomNumber]);
+
+  const handleContinueBrowsing = useCallback(() => {
+    setPlacedOrder(null);
+    setCartOpen(false);
+  }, []);
+
   // Render
 
   if (pageError) {
@@ -368,17 +412,14 @@ export default function RoomMenu() {
     );
   }
 
-  const activeCategory =
-    menu.categories.find((c) => c.id === activeCategoryId) ?? menu.categories[0];
-  const visibleSubcategories =
-    activeCategory?.subcategories.filter((subcat) => subcat.items.length > 0) ?? [];
-  const hasDirectItems = (activeCategory?.items.length ?? 0) > 0;
-  const hasAnyItems = hasDirectItems || visibleSubcategories.length > 0;
+  const renderedCategories =
+    activeCategoryId === null ? visibleCategories : selectedCategory ? [selectedCategory] : [];
 
   const renderItemCard = (item: PublicItemSummaryResponse) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
+    const metaLabel = item.description ?? "";
 
     return (
       <div
@@ -389,7 +430,7 @@ export default function RoomMenu() {
       >
         {item.image_path && (
           <img
-            src={item.image_path}
+            src={toAssetUrl(item.image_path)}
             alt={item.name}
             className="h-36 w-full max-w-full object-cover"
           />
@@ -441,17 +482,44 @@ export default function RoomMenu() {
                 </button>
               </div>
             ) : (
-              <button
-                disabled={isAdding || !sessionReady}
-                onClick={() => handleAddToCart(item.id)}
-                className="box-border inline-flex min-h-10 w-full max-w-full items-center justify-center gap-1 bg-orange-500 px-3 py-1.5 text-white
-                           rounded-full text-xs font-semibold hover:bg-orange-600
-                           transition-colors disabled:opacity-50 min-[360px]:w-auto"
-              >
-                {isAdding ? "Adding..." : "+ Add"}
-              </button>
+              <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                Sold out
+              </span>
             )}
           </div>
+
+          {qtyInCart > 0 ? (
+            <div className="box-border flex min-h-10 w-full max-w-full items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
+              <button
+                onClick={() =>
+                  qtyInCart > 1
+                    ? updateItem(item.id, qtyInCart - 1)
+                    : removeItem(item.id)
+                }
+                className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-gray-600 transition-colors hover:bg-white"
+                aria-label="Decrease"
+              >
+                -
+              </button>
+              <span className="text-sm font-semibold w-6 text-center">{qtyInCart}</span>
+              <button
+                onClick={() => updateItem(item.id, qtyInCart + 1)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white transition-colors hover:bg-orange-600"
+                aria-label="Increase"
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <button
+              disabled={isAdding || !sessionReady}
+              onClick={() => handleAddToCart(item.id)}
+              className="box-border flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+            >
+              {isAdding ? "Adding..." : "Add to Cart"}
+              {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -460,14 +528,15 @@ export default function RoomMenu() {
   return (
     <div className="box-border flex min-h-screen w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 w-full max-w-full border-b bg-white shadow-sm">
-        <div className="mx-auto flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 py-3">
+      <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b bg-white shadow-sm">
+        <div className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
               <img
-                src={menu.restaurant.logo_url}
+                src={toAssetUrl(menu.restaurant.logo_url) ?? undefined}
                 alt={menu.restaurant.name}
-                className="h-9 w-9 shrink-0 rounded-full object-cover"
+                decoding="async"
+                className="h-9 w-9 rounded-full object-cover"
               />
             )}
             <div className="min-w-0">
@@ -484,9 +553,13 @@ export default function RoomMenu() {
           <div className="flex shrink-0 items-center gap-2">
             {restaurantId && roomNumber && (
               <Link
-                to={`/menu/${restaurantId}/room/${roomNumber}/service-request`}
-                className="box-border inline-flex max-w-[6.5rem] items-center justify-center gap-1.5 truncate rounded-full border border-orange-200 px-3 py-2 text-xs font-medium text-orange-600
-                           transition-colors hover:bg-orange-50"
+                to={
+                  qrAccessKey
+                    ? `/menu/${restaurantId}/room/${roomNumber}/service-request?k=${encodeURIComponent(qrAccessKey)}`
+                    : `/menu/${restaurantId}/room/${roomNumber}/service-request`
+                }
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-orange-600
+                           border border-orange-200 rounded-full hover:bg-orange-50 transition-colors"
                 aria-label="Service request"
               >
                 Request
@@ -523,82 +596,49 @@ export default function RoomMenu() {
         </div>
 
         {/* Category tabs */}
-        {menu.categories.length > 1 && (
-          <div className="scrollbar-hide mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 gap-1 overflow-x-auto px-4 pb-2">
-            {menu.categories.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategoryId(cat.id)}
-                className={`max-w-[9rem] shrink-0 truncate rounded-full px-4 py-1.5 text-sm font-medium transition-colors min-[390px]:max-w-[11.5rem] ${
-                  activeCategoryId === cat.id
-                    ? "bg-orange-500 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {cat.name}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 px-4 pb-2">
+          <MenuBrowserRail
+            visibleCategories={visibleCategories}
+            activeCategoryId={activeCategoryId}
+            onSelectCategory={setActiveCategoryId}
+          />
+        </div>
       </header>
 
       {/* Item grid */}
-      <main className="mx-auto w-full max-w-[min(72rem,100%)] min-w-0 flex-1 space-y-6 px-4 py-4">
-        {activeCategory && (
-          <section className="min-w-0">
-            {activeCategory.description && (
-              <p className="mb-4 min-w-0 break-words text-sm text-gray-500">
-                {activeCategory.description}
-              </p>
-            )}
+      <main
+        className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 flex-1 touch-pan-y space-y-6 overflow-x-hidden px-4 py-4"
+        {...menuSwipeHandlers}
+      >
+        {renderedCategories.length === 0 ? (
+          <p className="text-center text-gray-400 py-12">No categories available.</p>
+        ) : (
+          renderedCategories.map((category) => (
+            <section key={category.id} className="box-border w-full max-w-full min-w-0">
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h2>
+              {category.description && (
+                <p className="text-sm text-gray-500 mb-4">{category.description}</p>
+              )}
 
-            {!hasAnyItems ? (
-              <p className="text-center text-gray-400 py-12">
-                No items in this category.
-              </p>
-            ) : (
-              <div className="space-y-6">
-                {hasDirectItems && (
-                  <div className="min-w-0">
-                    {visibleSubcategories.length > 0 && (
-                      <h2 className="mb-3 min-w-0 break-words text-sm font-semibold text-gray-700">
-                        Other items
-                      </h2>
-                    )}
-                    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                      {activeCategory.items.map(renderItemCard)}
-                    </div>
-                  </div>
-                )}
-
-                {visibleSubcategories.map((subcategory) => (
-                  <div key={subcategory.id} className="min-w-0">
-                    <h2 className="min-w-0 break-words text-sm font-semibold text-gray-800">
-                      {subcategory.name}
-                    </h2>
-                    {subcategory.description && (
-                      <p className="mb-3 mt-1 min-w-0 break-words text-xs text-gray-500">
-                        {subcategory.description}
-                      </p>
-                    )}
-                    <div className="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                      {subcategory.items.map(renderItemCard)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+              {category.items.length === 0 ? (
+                <p className="text-center text-gray-400 py-10">No items in this category.</p>
+              ) : (
+                <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                  {category.items.map(renderItemCard)}
+                </div>
+              )}
+              </section>
+          ))
         )}
       </main>
 
       {/* Cart FAB for mobile */}
       {(cart?.item_count ?? 0) > 0 && !cartOpen && !placedOrder && (
-        <div className="fixed bottom-4 left-0 right-0 z-30 box-border w-full max-w-full px-4">
+        <div className="fixed bottom-4 left-0 right-0 z-30 box-border w-full max-w-full px-3 min-[360px]:px-4">
           <button
             onClick={() => setCartOpen(true)}
-            className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 rounded-2xl bg-orange-500
-                       px-5 py-3 text-white shadow-lg transition-colors hover:bg-orange-600"
+            className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] items-center justify-between bg-orange-500
+                       text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-orange-600 transition-colors"
           >
             <span className="min-w-0 truncate font-semibold">
               {cart!.item_count} item{cart!.item_count !== 1 ? "s" : ""} in cart
@@ -611,7 +651,9 @@ export default function RoomMenu() {
       {/* Room cart drawer */}
       <RoomCartDrawer
         open={cartOpen}
-        onClose={() => setCartOpen(false)}
+        onClose={handleContinueBrowsing}
+        onContinueBrowsing={handleContinueBrowsing}
+        onTrackOrder={handleTrackOrder}
         cart={cart}
         onUpdateItem={updateItem}
         onRemoveItem={removeItem}

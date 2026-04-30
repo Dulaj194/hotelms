@@ -7,8 +7,20 @@ from fastapi import HTTPException, UploadFile, status
 
 
 def _safe_relative_upload_path(subdir: str, filename: str) -> str:
-    safe_subdir = subdir.strip("/\\")
-    return f"/uploads/{safe_subdir}/{filename}"
+    """Generate safe relative path - prevents path traversal attacks."""
+    # Remove any path separators and parent directory references from subdir
+    safe_subdir = (
+        subdir.strip("/\\").replace("..", "").replace("/", "").replace("\\", "")
+    )
+    if not safe_subdir or safe_subdir in (".", ".."):
+        raise ValueError(f"Invalid subdirectory: {subdir}")
+
+    # Ensure filename is just the filename (no paths)
+    safe_filename = Path(filename).name
+    if not safe_filename or safe_filename in (".", ".."):
+        raise ValueError(f"Invalid filename: {filename}")
+
+    return f"/uploads/{safe_subdir}/{safe_filename}"
 
 
 async def save_upload_file(
@@ -51,15 +63,25 @@ async def save_upload_file(
 
 
 def delete_uploaded_file(*, upload_root: str, public_path: str) -> None:
-    if not public_path.startswith("/uploads/"):
+    """Delete uploaded file with path traversal protection."""
+    if not public_path or not public_path.startswith("/uploads/"):
         return
 
-    relative = public_path.removeprefix("/uploads/")
-    file_path = (Path(upload_root) / relative).resolve()
-    root = Path(upload_root).resolve()
+    try:
+        relative = public_path.removeprefix("/uploads/")
+        # Prevent traversal with ".."
+        if ".." in relative or relative.startswith("/"):
+            return
 
-    if root not in file_path.parents:
-        return
+        file_path = (Path(upload_root) / relative).resolve()
+        root = Path(upload_root).resolve()
 
-    if file_path.exists() and file_path.is_file():
-        file_path.unlink(missing_ok=True)
+        # Verify file is within upload directory
+        if not str(file_path).startswith(str(root)):
+            return
+
+        if file_path.exists() and file_path.is_file():
+            file_path.unlink(missing_ok=True)
+    except (ValueError, OSError):
+        # Silently ignore invalid paths
+        pass

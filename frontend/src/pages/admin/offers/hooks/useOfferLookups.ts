@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
+import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
 import type { Category, Item, Menu } from "@/types/menu";
 
 import { getErrorMessage } from "../utils/offerHelpers";
@@ -24,13 +25,13 @@ export function useOfferLookups(enabled: boolean) {
     try {
       const [menusRes, categoriesRes, itemsRes] = await Promise.all([
         api.get<Menu[]>("/menus"),
-        api.get<Category[]>("/categories"),
-        api.get<Item[]>("/items"),
+        api.get<Category[] | PaginatedResponse<Category>>("/categories?limit=500"),
+        api.get<Item[] | PaginatedResponse<Item>>("/items?limit=500"),
       ]);
 
       setMenus(menusRes);
-      setCategories(categoriesRes);
-      setItems(itemsRes);
+      setCategories(unwrapPaginated(categoriesRes));
+      setItems(unwrapPaginated(itemsRes));
     } catch (error) {
       setError(getErrorMessage(error, "Failed to load lookup data."));
     } finally {

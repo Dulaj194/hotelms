@@ -1,5 +1,10 @@
 export type SettingsRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
+export interface SettingsRequestCreateRequest {
+  requested_changes: Record<string, unknown>;
+  request_reason?: string | null;
+}
+
 export interface SettingsRequestResponse {
   request_id: number;
   restaurant_id: number;
@@ -18,11 +23,32 @@ export interface SettingsRequestResponse {
 export interface SettingsRequestListResponse {
   items: SettingsRequestResponse[];
   total: number;
+  next_cursor: string | null;
+  has_more: boolean;
 }
 
 export interface SettingsRequestReviewRequest {
   status: Extract<SettingsRequestStatus, "APPROVED" | "REJECTED">;
   review_notes?: string | null;
+}
+
+export interface SettingsRequestBulkReviewRequest {
+  request_ids: number[];
+  status: Extract<SettingsRequestStatus, "APPROVED" | "REJECTED">;
+  review_notes?: string | null;
+}
+
+export interface SettingsRequestBulkReviewResultItem {
+  request_id: number;
+  status: "ok" | "error";
+  message: string;
+}
+
+export interface SettingsRequestBulkReviewResponse {
+  total_requested: number;
+  succeeded: number;
+  failed: number;
+  results: SettingsRequestBulkReviewResultItem[];
 }
 
 export interface SettingsRequestReviewResponse {

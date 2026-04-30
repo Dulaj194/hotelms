@@ -28,9 +28,10 @@ from app.modules.auth.repository import (
 )
 from app.modules.auth import registration_repository
 from app.modules.auth.login_scope import (
-    RESTAURANT_ADMIN_LOGIN_ROLES,
-    STAFF_LOGIN_ROLES,
-    SUPER_ADMIN_LOGIN_ROLES,
+    GENERAL_LOGIN_SCOPE,
+    RESTAURANT_ADMIN_LOGIN_SCOPE,
+    STAFF_LOGIN_SCOPE,
+    SUPER_ADMIN_LOGIN_SCOPE,
     is_login_scope_allowed,
 )
 from app.modules.auth.schemas import (
@@ -38,7 +39,13 @@ from app.modules.auth.schemas import (
     TenantContextResponse,
     TenantDataCountsResponse,
     TokenResponse,
+    UserFeatureFlagResponse,
+    UserMeResponse,
+    UserModuleAccessResponse,
 )
+from app.modules.access import catalog as access_catalog
+from app.modules.realtime import service as realtime_service
+from app.modules.restaurants.model import RegistrationStatus
 from app.modules.subscriptions import service as subscription_service
 from app.modules.users.model import UserRole
 from app.modules.users.repository import (
@@ -83,7 +90,11 @@ def _normalize_login_email(email: str) -> str:
 
 # ─── Rate limiting ────────────────────────────────────────────────────────────
 
-def _check_rate_limit(redis_client: redis_lib.Redis, ip: str) -> None:
+def _check_rate_limit(redis_client: redis_lib.Redis | None, ip: str) -> None:
+    if redis_client is None:
+        # Redis unavailable - skip rate limiting
+        return
+    
     try:
         count = redis_client.get(_rate_limit_key(ip))
         if count and int(count) >= settings.login_rate_limit_attempts:
@@ -100,7 +111,11 @@ def _check_rate_limit(redis_client: redis_lib.Redis, ip: str) -> None:
         logger.warning("Rate limit check skipped — Redis unavailable")
 
 
-def _increment_rate_limit(redis_client: redis_lib.Redis, ip: str) -> None:
+def _increment_rate_limit(redis_client: redis_lib.Redis | None, ip: str) -> None:
+    if redis_client is None:
+        # Redis unavailable - skip rate limiting
+        return
+    
     try:
         key = _rate_limit_key(ip)
         pipe = redis_client.pipeline()
@@ -127,7 +142,7 @@ def _set_refresh_cookie(response: Response, token_value: str) -> None:
         httponly=True,
         max_age=settings.refresh_token_expire_days * 86400,
         samesite="lax",
-        secure=settings.app_env == "production",
+        secure=settings.secure_cookies if hasattr(settings, "secure_cookies") else (settings.app_env == "production"),
     )
 
 
@@ -205,6 +220,83 @@ def _get_restaurant_name(db: Session, restaurant_id: int) -> str | None:
     return db.query(Restaurant.name).filter(Restaurant.id == restaurant_id).scalar()
 
 
+def _get_restaurant_for_user(db: Session, restaurant_id: int | None):
+    if restaurant_id is None:
+        return None
+
+    from app.modules.restaurants.model import Restaurant
+
+    return db.query(Restaurant).filter(Restaurant.id == restaurant_id).first()
+
+
+def _empty_feature_flag_snapshot() -> UserFeatureFlagResponse:
+    return UserFeatureFlagResponse()
+
+
+def _empty_module_access_snapshot() -> UserModuleAccessResponse:
+    return UserModuleAccessResponse()
+
+
+def _assert_role_feature_access(user, restaurant) -> None:
+    role_obj = getattr(user, "role", None)
+    role = role_obj.value if hasattr(role_obj, "value") else str(role_obj)
+
+    required_feature_by_role = {
+        "steward": "steward",
+        "housekeeper": "housekeeping",
+        "cashier": "cashier",
+        "accountant": "accountant",
+    }
+    required_feature = required_feature_by_role.get(role)
+    if required_feature is None:
+        return
+
+    feature_flags = access_catalog.build_feature_flag_snapshot(restaurant)
+    if feature_flags.get(required_feature, True):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"The '{required_feature}' workflow is disabled for this restaurant.",
+    )
+
+
+def _ensure_restaurant_login_allowed(
+    db: Session,
+    user,
+    restaurant_id: int | None,
+) -> None:
+    if restaurant_id is None:
+        return
+
+    restaurant = _get_restaurant_for_user(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your restaurant account is unavailable.",
+        )
+
+    if restaurant.registration_status == RegistrationStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your registration is pending super admin approval.",
+        )
+
+    if restaurant.registration_status == RegistrationStatus.REJECTED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your registration was rejected. Please contact support.",
+        )
+
+    if not restaurant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your restaurant account is inactive.",
+        )
+
+    _assert_role_feature_access(user, restaurant)
+
+
 def _count_model_rows(db: Session, model, restaurant_id: int) -> int:
     from sqlalchemy import func
 
@@ -232,7 +324,6 @@ def get_tenant_context_snapshot(db: Session, current_user) -> TenantContextRespo
     from app.modules.categories.model import Category
     from app.modules.items.model import Item
     from app.modules.menus.model import Menu
-    from app.modules.subcategories.model import Subcategory
 
     restaurant_id = int(current_user.restaurant_id)
     return TenantContextResponse(
@@ -244,9 +335,59 @@ def get_tenant_context_snapshot(db: Session, current_user) -> TenantContextRespo
         counts=TenantDataCountsResponse(
             menus=_count_model_rows(db, Menu, restaurant_id),
             categories=_count_model_rows(db, Category, restaurant_id),
-            subcategories=_count_model_rows(db, Subcategory, restaurant_id),
             items=_count_model_rows(db, Item, restaurant_id),
         ),
+    )
+
+
+def get_user_me_snapshot(db: Session, current_user) -> UserMeResponse:
+    package_id: int | None = None
+    package_name: str | None = None
+    package_code: str | None = None
+    subscription_status: str | None = None
+    privileges: list[str] = []
+    feature_flags = _empty_feature_flag_snapshot()
+    module_access = _empty_module_access_snapshot()
+
+    if current_user.restaurant_id is not None:
+        access_summary = subscription_service.get_package_access_summary(
+            db,
+            current_user.restaurant_id,
+        )
+        package_id = access_summary.package_id
+        package_name = access_summary.package_name
+        package_code = access_summary.package_code
+        subscription_status = access_summary.status
+        privileges = [item.code for item in access_summary.privileges]
+        feature_flags = UserFeatureFlagResponse.model_validate(
+            {
+                item.key: item.enabled
+                for item in access_summary.feature_flags
+            }
+        )
+        module_access = UserModuleAccessResponse.model_validate(
+            {
+                item.key: item.is_enabled
+                for item in access_summary.module_access
+            }
+        )
+
+    return UserMeResponse(
+        id=current_user.id,
+        full_name=current_user.full_name,
+        email=current_user.email,
+        role=current_user.role.value,
+        restaurant_id=current_user.restaurant_id,
+        is_active=current_user.is_active,
+        must_change_password=current_user.must_change_password,
+        package_id=package_id,
+        package_name=package_name,
+        package_code=package_code,
+        subscription_status=subscription_status,
+        privileges=privileges,
+        super_admin_scopes=current_user.super_admin_scopes,
+        feature_flags=feature_flags,
+        module_access=module_access,
     )
 
 
@@ -334,21 +475,21 @@ async def register_restaurant(
             restaurant_id=restaurant.id,
         )
 
-        subscription_service.assign_initial_trial_subscription(
-            db,
-            restaurant.id,
-            commit=False,
-        )
-
         db.commit()
-        write_audit_log(
+        audit_log = write_audit_log(
             db,
             event_type="restaurant_registration_success",
             user_id=owner.id,
+            restaurant_id=restaurant.id,
             ip_address=ip,
             user_agent=user_agent,
             metadata={"correlation_id": correlation_id, "restaurant_id": restaurant.id},
         )
+        if audit_log is not None:
+            realtime_service.publish_super_admin_audit_notification(
+                audit_log=audit_log,
+                restaurant_id=restaurant.id,
+            )
         logger.info(
             "event=registration_success correlation_id=%s restaurant_id=%s owner_email=%s",
             correlation_id,
@@ -482,15 +623,16 @@ async def register_restaurant_idempotent(
 
 def login(
     db: Session,
-    redis_client: redis_lib.Redis,
+    redis_client: redis_lib.Redis | None,
     response: Response,
     email: str,
     password: str,
     ip: str,
     user_agent: str,
     existing_refresh_token: str | None = None,
-    allowed_roles: set[UserRole] | None = None,
-    require_restaurant_context: bool = False,
+    allowed_roles: frozenset[UserRole] | set[UserRole] | None = GENERAL_LOGIN_SCOPE.allowed_roles,
+    require_restaurant_context: bool = GENERAL_LOGIN_SCOPE.require_restaurant_context,
+    scope_key: str = GENERAL_LOGIN_SCOPE.scope_key,
 ) -> TokenResponse:
     _check_rate_limit(redis_client, ip)
 
@@ -506,20 +648,7 @@ def login(
             user_id=user.id if user else None,
             ip_address=ip,
             user_agent=user_agent,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=GENERIC_AUTH_ERROR_DETAIL,
-        )
-
-    if not user.is_active:
-        write_audit_log(
-            db,
-            event_type="login_failed",
-            user_id=user.id,
-            ip_address=ip,
-            user_agent=user_agent,
-            metadata={"reason": "inactive_account"},
+            metadata={"reason": "invalid_credentials", "login_scope": scope_key},
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -541,11 +670,28 @@ def login(
             user_agent=user_agent,
             metadata={
                 "reason": "login_scope_mismatch",
+                "login_scope": scope_key,
                 "user_role": user.role.value,
                 "has_restaurant_context": user.restaurant_id is not None,
                 "required_roles": allowed_role_values,
                 "require_restaurant_context": require_restaurant_context,
             },
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=GENERIC_AUTH_ERROR_DETAIL,
+        )
+
+    _ensure_restaurant_login_allowed(db, user, user.restaurant_id)
+
+    if not user.is_active:
+        write_audit_log(
+            db,
+            event_type="login_failed",
+            user_id=user.id,
+            ip_address=ip,
+            user_agent=user_agent,
+            metadata={"reason": "inactive_account", "login_scope": scope_key},
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -578,6 +724,11 @@ def login(
         user_id=user.id,
         ip_address=ip,
         user_agent=user_agent,
+        metadata={
+            "login_scope": scope_key,
+            "user_role": user.role.value,
+            "restaurant_id": user.restaurant_id,
+        },
     )
 
     return TokenResponse(access_token=access_token, must_change_password=user.must_change_password)
@@ -602,8 +753,9 @@ def login_restaurant_admin(
         ip,
         user_agent,
         existing_refresh_token,
-        allowed_roles=RESTAURANT_ADMIN_LOGIN_ROLES,
-        require_restaurant_context=True,
+        allowed_roles=RESTAURANT_ADMIN_LOGIN_SCOPE.allowed_roles,
+        require_restaurant_context=RESTAURANT_ADMIN_LOGIN_SCOPE.require_restaurant_context,
+        scope_key=RESTAURANT_ADMIN_LOGIN_SCOPE.scope_key,
     )
 
 
@@ -626,8 +778,9 @@ def login_staff(
         ip,
         user_agent,
         existing_refresh_token,
-        allowed_roles=STAFF_LOGIN_ROLES,
-        require_restaurant_context=True,
+        allowed_roles=STAFF_LOGIN_SCOPE.allowed_roles,
+        require_restaurant_context=STAFF_LOGIN_SCOPE.require_restaurant_context,
+        scope_key=STAFF_LOGIN_SCOPE.scope_key,
     )
 
 
@@ -650,8 +803,9 @@ def login_super_admin(
         ip,
         user_agent,
         existing_refresh_token,
-        allowed_roles=SUPER_ADMIN_LOGIN_ROLES,
-        require_restaurant_context=False,
+        allowed_roles=SUPER_ADMIN_LOGIN_SCOPE.allowed_roles,
+        require_restaurant_context=SUPER_ADMIN_LOGIN_SCOPE.require_restaurant_context,
+        scope_key=SUPER_ADMIN_LOGIN_SCOPE.scope_key,
     )
 
 
@@ -731,6 +885,8 @@ def refresh(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive.",
         )
+
+    _ensure_restaurant_login_allowed(db, user, user.restaurant_id)
 
     # Rotate: delete old session, create new one
     redis_client.delete(redis_key)

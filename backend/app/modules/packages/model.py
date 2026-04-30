@@ -38,7 +38,10 @@ class Package(Base):
     privileges: Mapped[list[PackagePrivilege]] = relationship(
         "PackagePrivilege", back_populates="package", cascade="all, delete-orphan"
     )
-    subscriptions: Mapped[list[RestaurantSubscription]] = relationship("RestaurantSubscription")
+    subscriptions: Mapped[list[RestaurantSubscription]] = relationship(
+        "RestaurantSubscription",
+        back_populates="package",
+    )
 
 
 class PackagePrivilege(Base):

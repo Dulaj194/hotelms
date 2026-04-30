@@ -18,7 +18,6 @@ from app.modules.categories.model import Category  # noqa: E402
 from app.modules.items.model import Item  # noqa: E402
 from app.modules.menus.model import Menu  # noqa: E402
 from app.modules.restaurants.model import Restaurant  # noqa: E402
-from app.modules.subcategories.model import Subcategory  # noqa: E402
 from app.modules.users.model import User  # noqa: E402
 
 
@@ -37,7 +36,7 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "SQLAlchemy URL override. If omitted, uses DATABASE_URL env var, "
-            "then falls back to mysql+pymysql://root:hotelms123@localhost:3307/hotelms"
+            "Set DATABASE_URL environment variable to use a custom database URL."
         ),
     )
     return parser.parse_args()
@@ -62,35 +61,21 @@ def _audit_orphans_and_cross_tenant(db, restaurant_id: int | None) -> dict[str, 
         .join(Menu, Menu.id == Category.menu_id)
         .filter(Category.menu_id.isnot(None), Category.restaurant_id != Menu.restaurant_id)
     )
-    subcategory_cross_q = (
-        db.query(func.count(Subcategory.id))
-        .join(Category, Category.id == Subcategory.category_id)
-        .filter(Subcategory.restaurant_id != Category.restaurant_id)
-    )
     item_category_cross_q = (
         db.query(func.count(Item.id))
         .join(Category, Category.id == Item.category_id)
         .filter(Item.restaurant_id != Category.restaurant_id)
     )
-    item_subcategory_cross_q = (
-        db.query(func.count(Item.id))
-        .join(Subcategory, Subcategory.id == Item.subcategory_id)
-        .filter(Item.subcategory_id.isnot(None), Item.restaurant_id != Subcategory.restaurant_id)
-    )
 
     if restaurant_id is not None:
         category_menu_cross_q = category_menu_cross_q.filter(Category.restaurant_id == restaurant_id)
-        subcategory_cross_q = subcategory_cross_q.filter(Subcategory.restaurant_id == restaurant_id)
         item_category_cross_q = item_category_cross_q.filter(Item.restaurant_id == restaurant_id)
-        item_subcategory_cross_q = item_subcategory_cross_q.filter(Item.restaurant_id == restaurant_id)
         user_orphans_q = user_orphans_q.filter(User.restaurant_id == restaurant_id)
 
     return {
         "user_restaurant_orphans": int(user_orphans_q.scalar() or 0),
         "categories_linked_to_foreign_menu": int(category_menu_cross_q.scalar() or 0),
-        "subcategories_linked_to_foreign_category": int(subcategory_cross_q.scalar() or 0),
         "items_linked_to_foreign_category": int(item_category_cross_q.scalar() or 0),
-        "items_linked_to_foreign_subcategory": int(item_subcategory_cross_q.scalar() or 0),
     }
 
 
@@ -99,7 +84,13 @@ def main() -> int:
     database_url = (
         args.database_url
         or os.getenv("DATABASE_URL")
-        or "mysql+pymysql://root:hotelms123@localhost:3307/hotelms"
+        or "" # Fail fast if not set
+    )
+    if not database_url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable must be set. "
+            "Never use hardcoded credentials."
+        )
     )
     engine = create_engine(database_url, pool_pre_ping=True, future=True)
     session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)
@@ -118,12 +109,11 @@ def main() -> int:
         counts_users = _group_counts_by_restaurant(db, User, args.restaurant_id)
         counts_menus = _group_counts_by_restaurant(db, Menu, args.restaurant_id)
         counts_categories = _group_counts_by_restaurant(db, Category, args.restaurant_id)
-        counts_subcategories = _group_counts_by_restaurant(db, Subcategory, args.restaurant_id)
         counts_items = _group_counts_by_restaurant(db, Item, args.restaurant_id)
 
         print("Tenant catalog summary")
         print("-" * 100)
-        print(f"{'RID':<6}{'Restaurant':<28}{'Users':>8}{'Menus':>8}{'Cats':>8}{'Subs':>8}{'Items':>10}")
+        print(f"{'RID':<6}{'Restaurant':<28}{'Users':>8}{'Menus':>8}{'Cats':>8}{'Items':>10}")
         print("-" * 100)
         for rid, name in restaurant_rows:
             rid_int = int(rid)
@@ -132,7 +122,6 @@ def main() -> int:
                 f"{counts_users.get(rid_int, 0):>8}"
                 f"{counts_menus.get(rid_int, 0):>8}"
                 f"{counts_categories.get(rid_int, 0):>8}"
-                f"{counts_subcategories.get(rid_int, 0):>8}"
                 f"{counts_items.get(rid_int, 0):>10}"
             )
         print("-" * 100)

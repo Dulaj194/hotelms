@@ -1,5 +1,5 @@
-import unittest
 import sys
+import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -22,6 +22,9 @@ class ModelRegistryTests(unittest.TestCase):
     def test_promo_code_tables_are_registered(self) -> None:
         self.assertIn("promo_codes", Base.metadata.tables.keys())
         self.assertIn("promo_code_usages", Base.metadata.tables.keys())
+
+    def test_subcategory_table_is_not_registered(self) -> None:
+        self.assertNotIn("subcategories", Base.metadata.tables.keys())
 
 
 if __name__ == "__main__":

@@ -87,7 +87,7 @@ def create_order_items(
     """Insert all order line items.
 
     Each dict in `items` must have:
-      item_id, item_name_snapshot, unit_price_snapshot, quantity, line_total
+      item_id, item_name_snapshot, item_image_snapshot, unit_price_snapshot, quantity, line_total
     """
     order_items = []
     for item_data in items:
@@ -96,6 +96,7 @@ def create_order_items(
             restaurant_id=restaurant_id,
             item_id=item_data["item_id"],
             item_name_snapshot=item_data["item_name_snapshot"],
+            item_image_snapshot=item_data.get("item_image_snapshot"),
             unit_price_snapshot=round(item_data["unit_price_snapshot"], 2),
             quantity=item_data["quantity"],
             line_total=round(item_data["line_total"], 2),
@@ -174,6 +175,7 @@ def list_active_orders_by_restaurant(
     active_statuses = {OrderStatus.pending, OrderStatus.confirmed, OrderStatus.processing}
     return (
         db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
         .filter(
             OrderHeader.restaurant_id == restaurant_id,
             OrderHeader.status.in_(active_statuses),
@@ -190,6 +192,7 @@ def list_history_orders_by_restaurant(
     history_statuses = {OrderStatus.completed, OrderStatus.paid, OrderStatus.rejected}
     return (
         db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
         .filter(
             OrderHeader.restaurant_id == restaurant_id,
             OrderHeader.status.in_(history_statuses),
@@ -274,7 +277,7 @@ def list_billable_orders_by_session(
     session_id: str,
     restaurant_id: int,
 ) -> list[OrderHeader]:
-    """Return completed, not-yet-paid orders for a table session.
+    """Return completed, not-yet-paid orders for a session.
 
     'Billable' == status is exactly OrderStatus.completed.
     Orders in paid/rejected/pending/confirmed/processing states are excluded.
@@ -291,6 +294,26 @@ def list_billable_orders_by_session(
         .order_by(OrderHeader.placed_at.asc())
         .all()
     )
+
+
+def list_orders_by_session(
+    db: Session,
+    session_id: str,
+    restaurant_id: int,
+    *,
+    statuses: list[OrderStatus] | None = None,
+) -> list[OrderHeader]:
+    query = (
+        db.query(OrderHeader)
+        .options(joinedload(OrderHeader.items))
+        .filter(
+            OrderHeader.session_id == session_id,
+            OrderHeader.restaurant_id == restaurant_id,
+        )
+    )
+    if statuses:
+        query = query.filter(OrderHeader.status.in_(statuses))
+    return query.order_by(OrderHeader.placed_at.asc()).all()
 
 
 def mark_orders_paid_by_ids(
@@ -317,6 +340,38 @@ def mark_orders_paid_by_ids(
             {
                 OrderHeader.status: OrderStatus.paid,
                 OrderHeader.paid_at: paid_at,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.flush()
+
+
+def mark_orders_completed_by_ids(
+    db: Session,
+    *,
+    order_ids: list[int],
+    restaurant_id: int,
+    completed_at: datetime,
+) -> None:
+    """Bulk-update order statuses back to completed and clear paid_at.
+
+    Used by billing reversal flows (refund/void/reversal) to reopen
+    previously paid orders for reconciliation-safe recovery.
+    """
+    if not order_ids:
+        return
+    (
+        db.query(OrderHeader)
+        .filter(
+            OrderHeader.id.in_(order_ids),
+            OrderHeader.restaurant_id == restaurant_id,
+        )
+        .update(
+            {
+                OrderHeader.status: OrderStatus.completed,
+                OrderHeader.completed_at: completed_at,
+                OrderHeader.paid_at: None,
             },
             synchronize_session=False,
         )

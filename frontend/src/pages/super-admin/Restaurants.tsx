@@ -1,107 +1,275 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import ActionDialog from "@/components/shared/ActionDialog";
-import { api } from "@/lib/api";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
+import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
+import {
+  createRestaurant,
+  createRestaurantUser,
+  deleteRestaurant,
+  deleteRestaurantUser,
+  expireOverdueSubscriptions,
+  generateRestaurantApiKey,
+  generateRestaurantWebhookSecret,
+  getRestaurant,
+  getRestaurantIntegrationOps,
+  getRestaurantPackageAccess,
+  getRestaurantSubscription,
+  getRestaurantSubscriptionHistory,
+  listPackages,
+  listRestaurantsOverview,
+  listRestaurantUsers,
+  refreshRestaurantWebhookHealth,
+  revealRestaurantUserTemporaryPassword,
+  resetRestaurantUserPassword,
+  revokeRestaurantApiKey,
+  revokeRestaurantWebhookSecret,
+  retryRestaurantWebhookDelivery,
+  rotateRestaurantApiKey,
+  rotateRestaurantWebhookSecret,
+  sendRestaurantWebhookTestDelivery,
+  toggleRestaurantUser,
+  updateRestaurant,
+  updateRestaurantIntegration,
+  updateRestaurantSubscription,
+  uploadRestaurantLogo,
+} from "@/features/super-admin/restaurants/api";
+import { CreateRestaurantForm } from "@/features/super-admin/restaurants/components/CreateRestaurantForm";
+import { IntegrationPanel } from "@/features/super-admin/restaurants/components/IntegrationPanel";
+import { RestaurantList } from "@/features/super-admin/restaurants/components/RestaurantList";
+import { RestaurantProfilePanel } from "@/features/super-admin/restaurants/components/RestaurantProfilePanel";
+import { StaffPanel } from "@/features/super-admin/restaurants/components/StaffPanel";
+import { SubscriptionPanel } from "@/features/super-admin/restaurants/components/SubscriptionPanel";
+import type {
+  AddHotelUserFormState,
+  ConfirmActionState,
+  InlineMessage,
+  IntegrationFormState,
+  SubscriptionFormState,
+} from "@/features/super-admin/restaurants/types";
+import { getUser } from "@/lib/auth";
 import type {
   RestaurantAdminUpdateRequest,
-  RestaurantMeResponse,
   RestaurantCreateRequest,
-  RestaurantDeleteResponse,
-  RestaurantLogoUploadResponse,
+  RestaurantFeatureFlags,
+  RestaurantIntegrationOpsResponse,
+  RestaurantMeResponse,
 } from "@/types/restaurant";
 import type {
+  PackageDetailResponse,
+  SubscriptionAccessSummaryResponse,
+  SubscriptionChangeHistoryItemResponse,
   SubscriptionResponse,
-  PackageResponse,
-  PackageListResponse,
 } from "@/types/subscription";
-import type { StaffDetailResponse } from "@/types/user";
+import {
+  STAFF_ROLES,
+  type StaffDetailResponse,
+  type UserRole,
+} from "@/types/user";
 
-type ConfirmActionState = {
-  title: string;
-  description: string;
-  confirmLabel: string;
-  confirmTone?: "primary" | "success" | "warning" | "danger";
-  onConfirm: () => Promise<void>;
-} | null;
+const EMPTY_CREATE_FORM: RestaurantCreateRequest = { name: "" };
+const EMPTY_EDIT_FORM: RestaurantAdminUpdateRequest = {};
+const EMPTY_SUB_FORM: SubscriptionFormState = {
+  status: "",
+  expires_at: "",
+  package_id: "",
+  change_reason: "",
+};
+const EMPTY_INTEGRATION_FORM: IntegrationFormState = {
+  public_ordering_enabled: false,
+  webhook_url: "",
+  webhook_secret_header_name: "",
+};
+const EMPTY_USER_FORM: AddHotelUserFormState = {
+  full_name: "",
+  email: "",
+  password: "",
+  role: "admin",
+};
+
+function getAvailableStaffRoles(
+  featureFlags: RestaurantFeatureFlags | null | undefined,
+): UserRole[] {
+  if (!featureFlags) {
+    return [...STAFF_ROLES];
+  }
+
+  return STAFF_ROLES.filter((role) => {
+    switch (role) {
+      case "steward":
+        return featureFlags.steward;
+      case "housekeeper":
+        return featureFlags.housekeeping;
+      case "cashier":
+        return featureFlags.cashier;
+      case "accountant":
+        return featureFlags.accountant;
+      default:
+        return true;
+    }
+  });
+}
+
+function buildReadOnlySubscriptionMessage(): InlineMessage {
+  return {
+    type: "err",
+    text: "Billing Admin scope is required to change package assignments or subscription status.",
+  };
+}
 
 export default function SuperAdminRestaurants() {
+  const currentUser = getUser();
+  const canManageTenants = hasAnyPlatformScope(currentUser?.super_admin_scopes, ["tenant_admin"]);
+  const canManageBilling = hasAnyPlatformScope(currentUser?.super_admin_scopes, ["billing_admin"]);
+  const canManageSecurity = hasAnyPlatformScope(currentUser?.super_admin_scopes, ["security_admin"]);
+
   const [list, setList] = useState<RestaurantMeResponse[]>([]);
-  const [subscriptionStatusByHotel, setSubscriptionStatusByHotel] = useState<Record<number, string>>({});
+  const [subscriptionStatusByHotel, setSubscriptionStatusByHotel] = useState<
+    Record<number, string>
+  >({});
+  const [packages, setPackages] = useState<PackageDetailResponse[]>([]);
+  const [hotelUsers, setHotelUsers] = useState<StaffDetailResponse[]>([]);
+  const [selected, setSelected] = useState<RestaurantMeResponse | null>(null);
+  const [selectedSub, setSelectedSub] = useState<SubscriptionResponse | null>(null);
+  const [selectedAccess, setSelectedAccess] =
+    useState<SubscriptionAccessSummaryResponse | null>(null);
+  const [selectedSubHistory, setSelectedSubHistory] = useState<
+    SubscriptionChangeHistoryItemResponse[]
+  >([]);
+
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState<RestaurantCreateRequest>({ name: "" });
-  const [creating, setCreating] = useState(false);
-  const [createMsg, setCreateMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-
-  const [selected, setSelected] = useState<RestaurantMeResponse | null>(null);
   const [selectedLoading, setSelectedLoading] = useState(false);
   const [selectedError, setSelectedError] = useState<string | null>(null);
+  const [subLoading, setSubLoading] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<RestaurantCreateRequest>(EMPTY_CREATE_FORM);
+  const [createLogoFile, setCreateLogoFile] = useState<File | null>(null);
+  const [createMsg, setCreateMsg] = useState<InlineMessage>(null);
 
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<RestaurantAdminUpdateRequest>({});
+  const [editForm, setEditForm] = useState<RestaurantAdminUpdateRequest>(EMPTY_EDIT_FORM);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [actionMsg, setActionMsg] = useState<InlineMessage>(null);
 
-  const [actionMsg, setActionMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [editingSub, setEditingSub] = useState(false);
+  const [subForm, setSubForm] = useState<SubscriptionFormState>(EMPTY_SUB_FORM);
+  const [savingSub, setSavingSub] = useState(false);
+  const [subMsg, setSubMsg] = useState<InlineMessage>(null);
+
+  const [integrationForm, setIntegrationForm] = useState<IntegrationFormState>(
+    EMPTY_INTEGRATION_FORM,
+  );
+  const [selectedIntegrationOps, setSelectedIntegrationOps] =
+    useState<RestaurantIntegrationOpsResponse | null>(null);
+  const [integrationOpsLoading, setIntegrationOpsLoading] = useState(false);
+  const [savingIntegration, setSavingIntegration] = useState(false);
+  const [refreshingWebhook, setRefreshingWebhook] = useState(false);
+  const [sendingTestDelivery, setSendingTestDelivery] = useState(false);
+  const [retryingDeliveryId, setRetryingDeliveryId] = useState<number | null>(null);
+  const [integrationMsg, setIntegrationMsg] = useState<InlineMessage>(null);
+  const [apiKeyAction, setApiKeyAction] = useState<"generate" | "rotate" | "revoke" | null>(
+    null,
+  );
+  const [webhookSecretAction, setWebhookSecretAction] = useState<
+    "generate" | "rotate" | "revoke" | null
+  >(null);
+  const [revealedApiKey, setRevealedApiKey] = useState<string | null>(null);
+  const [revealedWebhookSecret, setRevealedWebhookSecret] = useState<string | null>(null);
+
+  const [expiringOverdue, setExpiringOverdue] = useState(false);
+  const [expireMsg, setExpireMsg] = useState<InlineMessage>(null);
+
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [addUserForm, setAddUserForm] = useState<AddHotelUserFormState>(EMPTY_USER_FORM);
+  const [addingUser, setAddingUser] = useState(false);
+  const [addUserMsg, setAddUserMsg] = useState<InlineMessage>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
+  const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
+  const [resettingUserId, setResettingUserId] = useState<number | null>(null);
+
   const [confirmAction, setConfirmAction] = useState<ConfirmActionState>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
-  // ─── Subscription state ────────────────────────────────────────────────────
-  const [selectedSub, setSelectedSub] = useState<SubscriptionResponse | null>(null);
-  const [subLoading, setSubLoading] = useState(false);
-  const [editingSub, setEditingSub] = useState(false);
-  const [subForm, setSubForm] = useState({ status: "", expires_at: "", package_id: "" });
-  const [savingSub, setSavingSub] = useState(false);
-  const [subMsg, setSubMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const [packages, setPackages] = useState<PackageResponse[]>([]);
-
-  // ─── Expiry job state ──────────────────────────────────────────────────────
-  const [expiringOverdue, setExpiringOverdue] = useState(false);
-  const [expireMsg, setExpireMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-
-  // ─── Hotel staff state ─────────────────────────────────────────────────────
-  const [hotelUsers, setHotelUsers] = useState<StaffDetailResponse[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [showAddUser, setShowAddUser] = useState(false);
-  const [addUserForm, setAddUserForm] = useState({
-    full_name: "", email: "", password: "", role: "admin",
-  });
-  const [addingUser, setAddingUser] = useState(false);
-  const [addUserMsg, setAddUserMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
-  const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
-
-  // ─── Create-hotel logo ─────────────────────────────────────────────────────
-  const [createLogoFile, setCreateLogoFile] = useState<File | null>(null);
-  const createLogoRef = useRef<HTMLInputElement>(null);
-
-  // ─── Edit-hotel logo ───────────────────────────────────────────────────────
   const [uploadingEditLogo, setUploadingEditLogo] = useState(false);
-  const [editLogoMsg, setEditLogoMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const editLogoRef = useRef<HTMLInputElement>(null);
+  const [editLogoMsg, setEditLogoMsg] = useState<InlineMessage>(null);
+  const createLogoRef = useRef<HTMLInputElement | null>(null);
+  const editLogoRef = useRef<HTMLInputElement | null>(null);
 
-  async function load() {
+  const availableStaffRoles = useMemo(
+    () => getAvailableStaffRoles(selected?.feature_flags),
+    [selected?.feature_flags],
+  );
+
+  useEffect(() => {
+    void loadPage();
+  }, []);
+
+  useEffect(() => {
+    if (availableStaffRoles.includes(addUserForm.role)) {
+      return;
+    }
+    setAddUserForm((current) => ({
+      ...current,
+      role: availableStaffRoles[0] ?? "admin",
+    }));
+  }, [addUserForm.role, availableStaffRoles]);
+
+  function applySelectedRestaurant(restaurant: RestaurantMeResponse | null) {
+    setSelected(restaurant);
+    setIntegrationForm(
+      restaurant
+        ? {
+            public_ordering_enabled: restaurant.integration.settings.public_ordering_enabled,
+            webhook_url: restaurant.integration.settings.webhook_url ?? "",
+            webhook_secret_header_name:
+              restaurant.integration.settings.webhook_secret_header_name ?? "",
+          }
+        : EMPTY_INTEGRATION_FORM,
+    );
+    setSelectedIntegrationOps(null);
+    setIntegrationMsg(null);
+    setRevealedApiKey(null);
+    setRevealedWebhookSecret(null);
+  }
+
+  async function loadIntegrationOps(restaurantId: number) {
+    if (!canManageSecurity) {
+      setSelectedIntegrationOps(null);
+      return;
+    }
+    setIntegrationOpsLoading(true);
+    try {
+      const ops = await getRestaurantIntegrationOps(restaurantId);
+      setSelectedIntegrationOps(ops);
+    } catch {
+      setSelectedIntegrationOps(null);
+    } finally {
+      setIntegrationOpsLoading(false);
+    }
+  }
+
+  async function loadPage() {
     setLoading(true);
     try {
-      const restaurants = await api.get<RestaurantMeResponse[]>("/restaurants");
-      setList(restaurants);
-      setFetchError(null);
+      const [overview, packageItems] = await Promise.all([
+        listRestaurantsOverview(),
+        canManageBilling ? listPackages() : Promise.resolve<PackageDetailResponse[]>([]),
+      ]);
 
-      const statusEntries = await Promise.all(
-        restaurants.map(async (restaurant) => {
-          try {
-            const sub = await api.get<SubscriptionResponse>(`/subscriptions/admin/${restaurant.id}`);
-            return [restaurant.id, sub.status] as const;
-          } catch {
-            return [restaurant.id, "none"] as const;
-          }
-        }),
+      const statusMap = Object.fromEntries(
+        overview.subscriptions.map((item) => [item.restaurant_id, item.status]),
       );
 
-      setSubscriptionStatusByHotel(Object.fromEntries(statusEntries));
+      setList(overview.items);
+      setPackages(packageItems);
+      setSubscriptionStatusByHotel(statusMap);
+      setFetchError(null);
     } catch {
       setFetchError("Failed to load restaurants.");
     } finally {
@@ -109,75 +277,102 @@ export default function SuperAdminRestaurants() {
     }
   }
 
-  useEffect(() => {
-    void load();
-    api
-      .get<PackageListResponse>("/packages")
-      .then((r) => setPackages(r.items))
-      .catch(() => {});
-  }, []);
-
   async function fetchHotelExtras(restaurantId: number) {
     setSubLoading(true);
-    setUsersLoading(true);
+    setUsersLoading(canManageTenants);
+    setIntegrationOpsLoading(canManageSecurity);
     setSelectedSub(null);
+    setSelectedAccess(null);
+    setSelectedSubHistory([]);
     setHotelUsers([]);
+    setSelectedIntegrationOps(null);
     setSubMsg(null);
     setAddUserMsg(null);
+    setResettingUserId(null);
+    setIntegrationMsg(null);
+    setRevealedApiKey(null);
+    setRevealedWebhookSecret(null);
     setEditingSub(false);
     setShowAddUser(false);
 
-    const [subResult, usersResult] = await Promise.allSettled([
-      api.get<SubscriptionResponse>(`/subscriptions/admin/${restaurantId}`),
-      api.get<StaffDetailResponse[]>(`/restaurants/${restaurantId}/users`),
-    ]);
+    const [subResult, accessResult, integrationOpsResult, usersResult, historyResult] =
+      await Promise.allSettled([
+      getRestaurantSubscription(restaurantId),
+      getRestaurantPackageAccess(restaurantId),
+      canManageSecurity
+        ? getRestaurantIntegrationOps(restaurantId)
+        : Promise.resolve<RestaurantIntegrationOpsResponse | null>(null),
+      canManageTenants
+        ? listRestaurantUsers(restaurantId)
+        : Promise.resolve<StaffDetailResponse[]>([]),
+      getRestaurantSubscriptionHistory(restaurantId),
+      ]);
 
     if (subResult.status === "fulfilled") {
-      const sub = subResult.value;
-      setSelectedSub(sub);
+      const subscription = subResult.value;
+      setSelectedSub(subscription);
       setSubForm({
-        status: sub.status,
-        expires_at: sub.expires_at
-          ? new Date(sub.expires_at).toISOString().slice(0, 10)
+        status: subscription.status,
+        expires_at: subscription.expires_at
+          ? new Date(subscription.expires_at).toISOString().slice(0, 10)
           : "",
-        package_id: sub.package_id?.toString() ?? "",
+        package_id: subscription.package_id?.toString() ?? "",
+        change_reason: "",
       });
+    }
+    if (accessResult.status === "fulfilled") {
+      setSelectedAccess(accessResult.value);
+    }
+    if (integrationOpsResult.status === "fulfilled") {
+      setSelectedIntegrationOps(integrationOpsResult.value);
     }
     if (usersResult.status === "fulfilled") {
       setHotelUsers(usersResult.value);
     }
+    if (historyResult.status === "fulfilled") {
+      setSelectedSubHistory(historyResult.value.items);
+    }
+
     setSubLoading(false);
     setUsersLoading(false);
+    setIntegrationOpsLoading(false);
   }
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canManageTenants) {
+      setCreateMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to register a hotel.",
+      });
+      return;
+    }
+
     setCreating(true);
     setCreateMsg(null);
     try {
-      const created = await api.post<RestaurantMeResponse>("/restaurants", form);
+      const created = await createRestaurant(form);
       if (createLogoFile) {
         try {
-          const fd = new FormData();
-          fd.append("file", createLogoFile);
-          const logoData = await api.post<RestaurantLogoUploadResponse>(
-            `/restaurants/${created.id}/logo`,
-            fd,
-          );
+          const logoData = await uploadRestaurantLogo(created.id, createLogoFile);
           created.logo_url = logoData.logo_url;
-        } catch { /* logo upload failure is non-fatal */ }
+        } catch {
+          // Logo upload failure should not block restaurant creation.
+        }
       }
-      setList((prev) => [created, ...prev]);
-      setSubscriptionStatusByHotel((prev) => ({ ...prev, [created.id]: "trial" }));
+      setList((current) => [created, ...current]);
+      setSubscriptionStatusByHotel((current) => ({ ...current, [created.id]: "trial" }));
       setShowCreate(false);
-      setForm({ name: "" });
+      setForm(EMPTY_CREATE_FORM);
       setCreateLogoFile(null);
-      if (createLogoRef.current) createLogoRef.current.value = "";
+      if (createLogoRef.current) {
+        createLogoRef.current.value = "";
+      }
       setCreateMsg({ type: "ok", text: `Hotel "${created.name}" registered successfully.` });
-    } catch (err) {
+    } catch (error) {
       setCreateMsg({
         type: "err",
-        text: err instanceof Error ? err.message : "Failed to register hotel.",
+        text: error instanceof Error ? error.message : "Failed to register hotel.",
       });
     } finally {
       setCreating(false);
@@ -191,8 +386,8 @@ export default function SuperAdminRestaurants() {
     setEditingId(null);
     setEditLogoMsg(null);
     try {
-      const data = await api.get<RestaurantMeResponse>(`/restaurants/${restaurantId}`);
-      setSelected(data);
+      const restaurant = await getRestaurant(restaurantId);
+      applySelectedRestaurant(restaurant);
       void fetchHotelExtras(restaurantId);
     } catch {
       setSelectedError("Failed to load hotel profile.");
@@ -202,20 +397,30 @@ export default function SuperAdminRestaurants() {
   }
 
   async function handleStartEdit(restaurantId: number) {
+    if (!canManageTenants) {
+      setActionMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to edit hotel profiles.",
+      });
+      return;
+    }
+
     setSelectedLoading(true);
     setSelectedError(null);
     setActionMsg(null);
     setEditLogoMsg(null);
     try {
-      const data = await api.get<RestaurantMeResponse>(`/restaurants/${restaurantId}`);
-      setSelected(data);
+      const restaurant = await getRestaurant(restaurantId);
+      applySelectedRestaurant(restaurant);
       setEditingId(restaurantId);
       setEditForm({
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        address: data.address,
-        is_active: data.is_active,
+        name: restaurant.name,
+        email: restaurant.email,
+        phone: restaurant.phone,
+        address: restaurant.address,
+        public_menu_banner_urls: restaurant.public_menu_banner_urls,
+        feature_flags: restaurant.feature_flags,
+        is_active: restaurant.is_active,
       });
       void fetchHotelExtras(restaurantId);
     } catch {
@@ -227,40 +432,62 @@ export default function SuperAdminRestaurants() {
 
   async function handleEditLogoUpload(file: File) {
     if (!selected) return;
+    if (!canManageTenants) {
+      setEditLogoMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to update hotel branding.",
+      });
+      return;
+    }
+
     setUploadingEditLogo(true);
     setEditLogoMsg(null);
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const data = await api.post<RestaurantLogoUploadResponse>(
-        `/restaurants/${selected.id}/logo`,
-        fd,
+      const data = await uploadRestaurantLogo(selected.id, file);
+      setSelected((current) => (current ? { ...current, logo_url: data.logo_url } : current));
+      setList((current) =>
+        current.map((restaurant) =>
+          restaurant.id === selected.id ? { ...restaurant, logo_url: data.logo_url } : restaurant,
+        ),
       );
-      setSelected((prev) => prev ? { ...prev, logo_url: data.logo_url } : prev);
-      setList((prev) => prev.map((r) => r.id === selected.id ? { ...r, logo_url: data.logo_url } : r));
       setEditLogoMsg({ type: "ok", text: "Logo updated." });
-    } catch (err) {
-      setEditLogoMsg({ type: "err", text: err instanceof Error ? err.message : "Upload failed." });
+    } catch (error) {
+      setEditLogoMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Upload failed.",
+      });
     } finally {
       setUploadingEditLogo(false);
-      if (editLogoRef.current) editLogoRef.current.value = "";
+      if (editLogoRef.current) {
+        editLogoRef.current.value = "";
+      }
     }
   }
 
   async function handleSaveEdit() {
     if (editingId === null) return;
+    if (!canManageTenants) {
+      setActionMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to update hotel profiles.",
+      });
+      return;
+    }
+
     setSaving(true);
     setActionMsg(null);
     try {
-      const updated = await api.patch<RestaurantMeResponse>(`/restaurants/${editingId}`, editForm);
-      setList((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
-      setSelected(updated);
+      const updated = await updateRestaurant(editingId, editForm);
+      const accessSummary = await getRestaurantPackageAccess(editingId);
+      setList((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      applySelectedRestaurant(updated);
+      setSelectedAccess(accessSummary);
       setEditingId(null);
       setActionMsg({ type: "ok", text: `Hotel "${updated.name}" updated.` });
-    } catch (err) {
+    } catch (error) {
       setActionMsg({
         type: "err",
-        text: err instanceof Error ? err.message : "Failed to update hotel.",
+        text: error instanceof Error ? error.message : "Failed to update hotel.",
       });
     } finally {
       setSaving(false);
@@ -269,30 +496,41 @@ export default function SuperAdminRestaurants() {
 
   async function runConfirmedAction() {
     if (!confirmAction) return;
+    const pendingAction = confirmAction;
     setConfirmBusy(true);
     setConfirmError(null);
     try {
-      await confirmAction.onConfirm();
-      setConfirmAction(null);
-    } catch (err) {
-      setConfirmError(err instanceof Error ? err.message : "Action failed.");
+      await pendingAction.onConfirm();
+      setConfirmAction((current) => (current === pendingAction ? null : current));
+    } catch (error) {
+      setConfirmError(error instanceof Error ? error.message : "Action failed.");
     } finally {
       setConfirmBusy(false);
     }
   }
 
   async function deleteRestaurantRecord(restaurantId: number) {
+    if (!canManageTenants) {
+      setActionMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to delete hotels.",
+      });
+      return;
+    }
+
     setDeletingId(restaurantId);
     setActionMsg(null);
     try {
-      const result = await api.delete<RestaurantDeleteResponse>(`/restaurants/${restaurantId}`);
-      setList((prev) => prev.filter((item) => item.id !== restaurantId));
-      setSubscriptionStatusByHotel((prev) => {
-        const next = { ...prev };
+      const result = await deleteRestaurant(restaurantId);
+      setList((current) => current.filter((item) => item.id !== restaurantId));
+      setSubscriptionStatusByHotel((current) => {
+        const next = { ...current };
         delete next[restaurantId];
         return next;
       });
-      if (selected?.id === restaurantId) { setSelected(null); setEditingId(null); }
+      if (selected?.id === restaurantId) {
+        closeSelectedPanel();
+      }
       setActionMsg({ type: "ok", text: result.message });
     } finally {
       setDeletingId(null);
@@ -314,29 +552,52 @@ export default function SuperAdminRestaurants() {
 
   async function handleSaveSub() {
     if (!selected) return;
-    const payload: Record<string, unknown> = {};
+    if (!canManageBilling) {
+      setSubMsg(buildReadOnlySubscriptionMessage());
+      return;
+    }
+
+    const payload: {
+      status?: string;
+      expires_at?: string;
+      package_id?: number;
+      change_reason?: string | null;
+    } = {};
     if (subForm.status) payload.status = subForm.status;
     if (subForm.expires_at) payload.expires_at = new Date(subForm.expires_at).toISOString();
     if (subForm.package_id) payload.package_id = parseInt(subForm.package_id, 10);
+    if (subForm.change_reason.trim()) payload.change_reason = subForm.change_reason.trim();
     if (Object.keys(payload).length === 0) {
       setSubMsg({ type: "err", text: "No changes to save." });
       return;
     }
+
     setSavingSub(true);
     setSubMsg(null);
     try {
-      const updated = await api.patch<SubscriptionResponse>(
-        `/subscriptions/admin/${selected.id}`,
-        payload,
-      );
+      const updated = await updateRestaurantSubscription(selected.id, payload);
+      const [accessSummary, history] = await Promise.all([
+        getRestaurantPackageAccess(selected.id),
+        getRestaurantSubscriptionHistory(selected.id),
+      ]);
       setSelectedSub(updated);
-      setSubscriptionStatusByHotel((prev) => ({ ...prev, [selected.id]: updated.status }));
+      setSelectedAccess(accessSummary);
+      setSelectedSubHistory(history.items);
+      setSubscriptionStatusByHotel((current) => ({ ...current, [selected.id]: updated.status }));
       setEditingSub(false);
+      setSubForm({
+        status: updated.status,
+        expires_at: updated.expires_at
+          ? new Date(updated.expires_at).toISOString().slice(0, 10)
+          : "",
+        package_id: updated.package_id?.toString() ?? "",
+        change_reason: "",
+      });
       setSubMsg({ type: "ok", text: "Subscription updated successfully." });
-    } catch (err) {
+    } catch (error) {
       setSubMsg({
         type: "err",
-        text: err instanceof Error ? err.message : "Failed to update subscription.",
+        text: error instanceof Error ? error.message : "Failed to update subscription.",
       });
     } finally {
       setSavingSub(false);
@@ -344,43 +605,53 @@ export default function SuperAdminRestaurants() {
   }
 
   async function handleExpireOverdue() {
+    if (!canManageBilling) {
+      setExpireMsg(buildReadOnlySubscriptionMessage());
+      return;
+    }
+
     setExpiringOverdue(true);
     setExpireMsg(null);
     try {
-      const result = await api.post<{ message: string; expired_count: number }>(
-        "/subscriptions/admin/expire-overdue",
-        {},
-      );
+      const result = await expireOverdueSubscriptions();
       setExpireMsg({ type: "ok", text: result.message });
-      load();
-    } catch (err) {
+      await loadPage();
+    } catch (error) {
       setExpireMsg({
         type: "err",
-        text: err instanceof Error ? err.message : "Expiry check failed.",
+        text: error instanceof Error ? error.message : "Expiry check failed.",
       });
     } finally {
       setExpiringOverdue(false);
     }
   }
 
-  async function handleAddUser(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleAddUser(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (!selected) return;
+    if (!canManageTenants) {
+      setAddUserMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to manage hotel staff.",
+      });
+      return;
+    }
+
     setAddingUser(true);
     setAddUserMsg(null);
     try {
-      const newUser = await api.post<StaffDetailResponse>(
-        `/restaurants/${selected.id}/users`,
-        { ...addUserForm },
-      );
-      setHotelUsers((prev) => [newUser, ...prev]);
+      const newUser = await createRestaurantUser(selected.id, addUserForm);
+      setHotelUsers((current) => [newUser, ...current]);
       setShowAddUser(false);
-      setAddUserForm({ full_name: "", email: "", password: "", role: "admin" });
+      setAddUserForm({
+        ...EMPTY_USER_FORM,
+        role: availableStaffRoles[0] ?? EMPTY_USER_FORM.role,
+      });
       setAddUserMsg({ type: "ok", text: `"${newUser.full_name}" added successfully.` });
-    } catch (err) {
+    } catch (error) {
       setAddUserMsg({
         type: "err",
-        text: err instanceof Error ? err.message : "Failed to add staff member.",
+        text: error instanceof Error ? error.message : "Failed to add staff member.",
       });
     } finally {
       setAddingUser(false);
@@ -389,11 +660,19 @@ export default function SuperAdminRestaurants() {
 
   async function removeHotelUser(userId: number) {
     if (!selected) return;
+    if (!canManageTenants) {
+      setAddUserMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to manage hotel staff.",
+      });
+      return;
+    }
+
     setDeletingUserId(userId);
     setAddUserMsg(null);
     try {
-      await api.delete(`/restaurants/${selected.id}/users/${userId}`);
-      setHotelUsers((prev) => prev.filter((u) => u.id !== userId));
+      await deleteRestaurantUser(selected.id, userId);
+      setHotelUsers((current) => current.filter((user) => user.id !== userId));
     } finally {
       setDeletingUserId(null);
     }
@@ -413,61 +692,509 @@ export default function SuperAdminRestaurants() {
     });
   }
 
-  async function handleToggleUser(userId: number, isActive: boolean) {
+  async function resetHotelUserPassword(userId: number, userName: string) {
     if (!selected) return;
-    setTogglingUserId(userId);
-    const action = isActive ? "disable" : "enable";
-    try {
-      const result = await api.patch<{ id: number; is_active: boolean; message: string }>(
-        `/restaurants/${selected.id}/users/${userId}/${action}`,
-        {},
-      );
-      setHotelUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, is_active: result.is_active } : u)),
-      );
-    } catch (err) {
+    if (!canManageTenants) {
       setAddUserMsg({
         type: "err",
-        text: err instanceof Error ? err.message : `Failed to ${action} user.`,
+        text: "Tenant Admin scope is required to manage hotel staff.",
+      });
+      return;
+    }
+
+    setResettingUserId(userId);
+    setAddUserMsg(null);
+    try {
+      const restaurantId = selected.id;
+      const result = await resetRestaurantUserPassword(restaurantId, userId);
+
+      if (result.email_sent) {
+        setAddUserMsg({
+          type: "ok",
+          text: `${result.message} Temporary password was sent to the user's email.`,
+        });
+        return;
+      }
+
+      if (result.reveal_token) {
+        const revealToken = result.reveal_token;
+        const expiresAt = result.reveal_expires_at
+          ? new Date(result.reveal_expires_at).toLocaleString()
+          : null;
+        setAddUserMsg({
+          type: "ok",
+          text:
+            `${result.message} Email delivery failed for "${userName}". ` +
+            "Use one-time secure reveal to view the temporary password." +
+            (expiresAt ? ` Token expires at ${expiresAt}.` : ""),
+        });
+        setConfirmError(null);
+        setConfirmAction({
+          title: "Reveal Temporary Password",
+          description:
+            `Email delivery failed for "${userName}". Reveal the temporary password now? ` +
+            "This secret can be viewed only once and should be shared immediately.",
+          confirmLabel: "Reveal Once",
+          confirmTone: "warning",
+          onConfirm: async () => {
+            const reveal = await revealRestaurantUserTemporaryPassword(restaurantId, userId, {
+              reveal_token: revealToken,
+            });
+            setAddUserMsg({
+              type: "ok",
+              text:
+                `${reveal.message} Temporary password for "${userName}": ` +
+                `${reveal.temporary_password}. Share it securely now.`,
+            });
+          },
+        });
+        return;
+      }
+
+      setAddUserMsg({
+        type: "err",
+        text:
+          `${result.message} Email delivery failed and no secure reveal token was issued. ` +
+          "Retry reset and verify notification configuration.",
+      });
+    } catch (error) {
+      setAddUserMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to reset user password.",
+      });
+    } finally {
+      setResettingUserId(null);
+    }
+  }
+
+  function handleResetUserPassword(userId: number, userName: string, role: UserRole) {
+    if (!selected) return;
+    const roleLabel = role === "owner" ? "Owner" : "Admin";
+
+    setConfirmError(null);
+    setConfirmAction({
+      title: "Reset Staff Password",
+      description:
+        `Generate a temporary password for "${userName}" (${roleLabel})? ` +
+        "The user must change it on next login. Delivery is email-first with secure reveal fallback.",
+      confirmLabel: "Generate Temporary Password",
+      confirmTone: "warning",
+      onConfirm: async () => {
+        await resetHotelUserPassword(userId, userName);
+      },
+    });
+  }
+
+  async function handleToggleUser(userId: number, isActive: boolean) {
+    if (!selected) return;
+    if (!canManageTenants) {
+      setAddUserMsg({
+        type: "err",
+        text: "Tenant Admin scope is required to manage hotel staff.",
+      });
+      return;
+    }
+
+    setTogglingUserId(userId);
+    try {
+      const action = isActive ? "disable" : "enable";
+      const result = await toggleRestaurantUser(selected.id, userId, action);
+      setHotelUsers((current) =>
+        current.map((user) =>
+          user.id === userId ? { ...user, is_active: result.is_active } : user,
+        ),
+      );
+    } catch (error) {
+      setAddUserMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to update user status.",
       });
     } finally {
       setTogglingUserId(null);
     }
   }
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+  async function handleSaveIntegration() {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to update integration settings.",
+      });
+      return;
+    }
+
+    setSavingIntegration(true);
+    setIntegrationMsg(null);
+    try {
+      const integration = await updateRestaurantIntegration(selected.id, {
+        public_ordering_enabled: integrationForm.public_ordering_enabled,
+        webhook_url: integrationForm.webhook_url.trim() || null,
+        webhook_secret_header_name: integrationForm.webhook_secret_header_name.trim() || null,
+      });
+      setSelected((current) => (current ? { ...current, integration } : current));
+      setIntegrationForm({
+        public_ordering_enabled: integration.settings.public_ordering_enabled,
+        webhook_url: integration.settings.webhook_url ?? "",
+        webhook_secret_header_name: integration.settings.webhook_secret_header_name ?? "",
+      });
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({ type: "ok", text: "Integration settings updated." });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to update integration settings.",
+      });
+    } finally {
+      setSavingIntegration(false);
+    }
+  }
+
+  async function handleGenerateApiKey(rotate: boolean) {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to manage API keys.",
+      });
+      return;
+    }
+
+    setApiKeyAction(rotate ? "rotate" : "generate");
+    setIntegrationMsg(null);
+    try {
+      const response = rotate
+        ? await rotateRestaurantApiKey(selected.id)
+        : await generateRestaurantApiKey(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                api_key: response.summary,
+              },
+            }
+          : current,
+      );
+      setRevealedApiKey(response.api_key);
+      setIntegrationMsg({ type: "ok", text: response.message });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to provision API key.",
+      });
+    } finally {
+      setApiKeyAction(null);
+    }
+  }
+
+  async function handleRevokeApiKey() {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to manage API keys.",
+      });
+      return;
+    }
+
+    setApiKeyAction("revoke");
+    setIntegrationMsg(null);
+    try {
+      const summary = await revokeRestaurantApiKey(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                api_key: summary,
+              },
+            }
+          : current,
+      );
+      setRevealedApiKey(null);
+      setIntegrationMsg({ type: "ok", text: "API key revoked successfully." });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to revoke API key.",
+      });
+    } finally {
+      setApiKeyAction(null);
+    }
+  }
+
+  async function handleGenerateWebhookSecret(rotate: boolean) {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to manage webhook secrets.",
+      });
+      return;
+    }
+
+    setWebhookSecretAction(rotate ? "rotate" : "generate");
+    setIntegrationMsg(null);
+    try {
+      const response = rotate
+        ? await rotateRestaurantWebhookSecret(selected.id)
+        : await generateRestaurantWebhookSecret(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                webhook_secret: response.summary,
+                settings: {
+                  ...current.integration.settings,
+                  webhook_secret_header_name:
+                    response.summary.header_name ?? current.integration.settings.webhook_secret_header_name,
+                },
+              },
+            }
+          : current,
+      );
+      setIntegrationForm((current) => ({
+        ...current,
+        webhook_secret_header_name: response.summary.header_name ?? current.webhook_secret_header_name,
+      }));
+      setRevealedWebhookSecret(response.secret_value);
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({ type: "ok", text: response.message });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to provision webhook secret.",
+      });
+    } finally {
+      setWebhookSecretAction(null);
+    }
+  }
+
+  async function handleRevokeWebhookSecret() {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to manage webhook secrets.",
+      });
+      return;
+    }
+
+    setWebhookSecretAction("revoke");
+    setIntegrationMsg(null);
+    try {
+      const summary = await revokeRestaurantWebhookSecret(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                webhook_secret: summary,
+              },
+            }
+          : current,
+      );
+      setRevealedWebhookSecret(null);
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({ type: "ok", text: "Webhook secret revoked successfully." });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to revoke webhook secret.",
+      });
+    } finally {
+      setWebhookSecretAction(null);
+    }
+  }
+
+  async function handleRefreshWebhook() {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to refresh webhook health.",
+      });
+      return;
+    }
+
+    setRefreshingWebhook(true);
+    setIntegrationMsg(null);
+    try {
+      const response = await refreshRestaurantWebhookHealth(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                settings: response.settings,
+              },
+            }
+          : current,
+      );
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({ type: "ok", text: response.message });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to refresh webhook health.",
+      });
+    } finally {
+      setRefreshingWebhook(false);
+    }
+  }
+
+  async function handleSendTestDelivery() {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to send test webhook deliveries.",
+      });
+      return;
+    }
+
+    setSendingTestDelivery(true);
+    setIntegrationMsg(null);
+    try {
+      const response = await sendRestaurantWebhookTestDelivery(selected.id);
+      const health = await refreshRestaurantWebhookHealth(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                settings: health.settings,
+              },
+            }
+          : current,
+      );
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({
+        type: response.delivery.delivery_status === "success" ? "ok" : "err",
+        text: response.message,
+      });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to send test webhook delivery.",
+      });
+    } finally {
+      setSendingTestDelivery(false);
+    }
+  }
+
+  async function handleRetryDelivery(deliveryId: number) {
+    if (!selected) return;
+    if (!canManageSecurity) {
+      setIntegrationMsg({
+        type: "err",
+        text: "Security Admin scope is required to retry webhook deliveries.",
+      });
+      return;
+    }
+
+    setRetryingDeliveryId(deliveryId);
+    setIntegrationMsg(null);
+    try {
+      const response = await retryRestaurantWebhookDelivery(selected.id, deliveryId);
+      const health = await refreshRestaurantWebhookHealth(selected.id);
+      setSelected((current) =>
+        current
+          ? {
+              ...current,
+              integration: {
+                ...current.integration,
+                settings: health.settings,
+              },
+            }
+          : current,
+      );
+      await loadIntegrationOps(selected.id);
+      setIntegrationMsg({
+        type: response.delivery.delivery_status === "success" ? "ok" : "err",
+        text: response.message,
+      });
+    } catch (error) {
+      setIntegrationMsg({
+        type: "err",
+        text: error instanceof Error ? error.message : "Failed to retry webhook delivery.",
+      });
+    } finally {
+      setRetryingDeliveryId(null);
+    }
+  }
+
+  function closeSelectedPanel() {
+    applySelectedRestaurant(null);
+    setEditingId(null);
+    setEditLogoMsg(null);
+    setSelectedSub(null);
+    setSelectedAccess(null);
+    setSelectedSubHistory([]);
+    setSelectedIntegrationOps(null);
+    setIntegrationOpsLoading(false);
+    setHotelUsers([]);
+    setSubMsg(null);
+    setAddUserMsg(null);
+    setShowAddUser(false);
+    setAddUserForm(EMPTY_USER_FORM);
+    setResettingUserId(null);
+    setWebhookSecretAction(null);
+    setSendingTestDelivery(false);
+    setRetryingDeliveryId(null);
+  }
 
   return (
     <SuperAdminLayout>
       <div className="space-y-6">
-
-        {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Hotels</h1>
+          <div>
+            <h1 className="text-2xl font-semibold">Hotels</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage tenant profiles, package access, security integrations, and scoped hotel
+              operations from one workspace.
+            </p>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             {expireMsg && (
-              <span className={`text-xs ${expireMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+              <span
+                className={`text-xs ${expireMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}
+              >
                 {expireMsg.text}
               </span>
             )}
-            <button
-              type="button"
-              onClick={handleExpireOverdue}
-              disabled={expiringOverdue}
-              className="rounded-md border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50"
-            >
-              {expiringOverdue ? "Checking…" : "Run Expiry Check"}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setShowCreate(true); setCreateMsg(null); }}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              + Register Hotel
-            </button>
+            {canManageBilling && (
+              <button
+                type="button"
+                onClick={() => void handleExpireOverdue()}
+                disabled={expiringOverdue}
+                className="rounded-md border border-orange-300 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-700 hover:bg-orange-100 disabled:opacity-50"
+              >
+                {expiringOverdue ? "Checking..." : "Run Expiry Check"}
+              </button>
+            )}
+            {canManageTenants && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreate(true);
+                  setCreateMsg(null);
+                }}
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                + Register Hotel
+              </button>
+            )}
           </div>
         </div>
-
         {createMsg && (
           <p className={`text-sm ${createMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
             {createMsg.text}
@@ -479,502 +1206,132 @@ export default function SuperAdminRestaurants() {
           </p>
         )}
 
-        {/* Register hotel form */}
-        {showCreate && (
-          <form onSubmit={handleCreate} className="rounded-lg border bg-white p-5 space-y-3">
-            <h2 className="font-medium text-sm text-gray-500 uppercase tracking-wide">Register New Hotel</h2>
-            <FormField label="Hotel Name *" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} />
-            <FormField label="Email" type="email" value={form.email ?? ""} onChange={(v) => setForm((f) => ({ ...f, email: v || null }))} />
-            <FormField label="Phone" value={form.phone ?? ""} onChange={(v) => setForm((f) => ({ ...f, phone: v || null }))} />
-            <FormField label="Address" value={form.address ?? ""} onChange={(v) => setForm((f) => ({ ...f, address: v || null }))} />
-            <div className="space-y-1">
-              <label className="text-sm font-medium">
-                Logo <span className="text-gray-400 font-normal">(optional · JPG/PNG/WebP · max 5 MB)</span>
-              </label>
-              <input
-                ref={createLogoRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="block w-full text-sm text-gray-500 file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-xs file:font-medium file:bg-gray-50 hover:file:bg-gray-100"
-                onChange={(e) => setCreateLogoFile(e.target.files?.[0] ?? null)}
-              />
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                type="submit"
-                disabled={creating || !form.name.trim()}
-                className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {creating ? "Registering…" : "Register Hotel"}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowCreate(false); setCreateLogoFile(null); }}
-                className="flex-1 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+        {showCreate && canManageTenants && (
+          <CreateRestaurantForm
+            form={form}
+            creating={creating}
+            createLogoRef={createLogoRef}
+            onFormChange={setForm}
+            onLogoChange={setCreateLogoFile}
+            onSubmit={(event) => void handleCreate(event)}
+            onCancel={() => {
+              setShowCreate(false);
+              setCreateLogoFile(null);
+              setForm(EMPTY_CREATE_FORM);
+              if (createLogoRef.current) {
+                createLogoRef.current.value = "";
+              }
+            }}
+          />
         )}
 
-        {/* Hotels table */}
-        {loading ? (
-          <p className="text-gray-400">Loading…</p>
-        ) : fetchError ? (
-          <p className="text-red-600">{fetchError}</p>
-        ) : list.length === 0 ? (
-          <div className="rounded-lg border bg-white p-8 text-center text-gray-400">
-            No hotels registered yet.
-          </div>
-        ) : (
-          <div className="rounded-lg border bg-white overflow-hidden">
-            <div className="space-y-3 p-4 md:hidden">
-              {list.map((r) => (
-                <article key={r.id} className="rounded-lg border border-gray-200 p-4 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-semibold text-gray-900">{r.name}</p>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBooleanStatusBadgeClass(r.is_active)}`}
-                    >
-                      {r.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </div>
-                  <div className="mt-2 space-y-1 text-xs text-gray-600">
-                    <p>Email: {r.email ?? "â€”"}</p>
-                    <p>Phone: {r.phone ?? "â€”"}</p>
-                    <p>
-                      Subscription:{" "}
-                      {formatSubscriptionStatusLabel(subscriptionStatusByHotel[r.id])}
-                    </p>
-                  </div>
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => handleView(r.id)}
-                      className="w-full rounded border px-2.5 py-1.5 text-xs font-medium hover:bg-gray-50 sm:w-auto"
-                    >
-                      View
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleStartEdit(r.id)}
-                      className="w-full rounded border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 sm:w-auto"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(r.id, r.name)}
-                      disabled={deletingId === r.id}
-                      className="w-full rounded border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:w-auto"
-                    >
-                      {deletingId === r.id ? "Deletingâ€¦" : "Delete"}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
+        <RestaurantList
+          loading={loading}
+          fetchError={fetchError}
+          list={list}
+          selectedId={selected?.id ?? null}
+          deletingId={deletingId}
+          canManageTenants={canManageTenants}
+          subscriptionStatusByHotel={subscriptionStatusByHotel}
+          onView={(restaurantId) => void handleView(restaurantId)}
+          onEdit={(restaurantId) => void handleStartEdit(restaurantId)}
+          onDelete={handleDelete}
+        />
 
-            <div className="app-table-scroll hidden md:block">
-              <table className="w-full min-w-[900px] text-sm">
-              <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
-                <tr>
-                  <th className="px-4 py-3 text-left">Hotel Name</th>
-                  <th className="px-4 py-3 text-left">Email</th>
-                  <th className="px-4 py-3 text-left">Phone</th>
-                  <th className="px-4 py-3 text-left">Hotel Status</th>
-                  <th className="px-4 py-3 text-left">Subscription Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {list.map((r) => (
-                  <tr key={r.id} className={`hover:bg-gray-50 ${selected?.id === r.id ? "bg-blue-50" : ""}`}>
-                    <td className="px-4 py-3 font-medium">{r.name}</td>
-                    <td className="px-4 py-3 text-gray-500">{r.email ?? "—"}</td>
-                    <td className="px-4 py-3 text-gray-500">{r.phone ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBooleanStatusBadgeClass(r.is_active)}`}>
-                        {r.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${getSubscriptionStatusBadgeClass(subscriptionStatusByHotel[r.id])}`}
-                      >
-                        {formatSubscriptionStatusLabel(subscriptionStatusByHotel[r.id])}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <button type="button" onClick={() => handleView(r.id)}
-                          className="rounded border px-2.5 py-1 text-xs font-medium hover:bg-gray-50">
-                          View
-                        </button>
-                        <button type="button" onClick={() => handleStartEdit(r.id)}
-                          className="rounded border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50">
-                          Edit
-                        </button>
-                        <button type="button" onClick={() => handleDelete(r.id, r.name)}
-                          disabled={deletingId === r.id}
-                          className="rounded border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">
-                          {deletingId === r.id ? "Deleting…" : "Delete"}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Hotel detail panel */}
         {(selectedLoading || selectedError || selected) && (
           <div className="space-y-4">
+            <RestaurantProfilePanel
+              selected={selected}
+              selectedLoading={selectedLoading}
+              selectedError={selectedError}
+              editingId={editingId}
+              editForm={editForm}
+              saving={saving}
+              actionMsg={actionMsg}
+              uploadingEditLogo={uploadingEditLogo}
+              editLogoMsg={editLogoMsg}
+              editLogoRef={editLogoRef}
+              onClose={closeSelectedPanel}
+              onStartEditChange={setEditForm}
+              onSave={() => void handleSaveEdit()}
+              onCancelEdit={() => {
+                setEditingId(null);
+                setSelectedError(null);
+                setEditLogoMsg(null);
+              }}
+              onLogoUpload={(file) => void handleEditLogoUpload(file)}
+            />
 
-            {/* ── Basic info / edit ── */}
-            <div className="rounded-lg border bg-white p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-medium text-sm text-gray-500 uppercase tracking-wide">
-                  Hotel Profile {selected ? `— ${selected.name}` : ""}
-                </h2>
-                {selected && (
-                  <button type="button"
-                    onClick={() => { setSelected(null); setEditingId(null); setEditLogoMsg(null); }}
-                    className="text-xs text-gray-400 hover:text-gray-600">
-                    ✕ Close
-                  </button>
-                )}
-              </div>
-
-              {selectedLoading ? (
-                <p className="text-sm text-gray-500">Loading…</p>
-              ) : selectedError ? (
-                <p className="text-sm text-red-600">{selectedError}</p>
-              ) : selected ? (
-                editingId === selected.id ? (
-                  <div className="space-y-3">
-                    {/* ── Logo upload in edit mode ── */}
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">Logo</label>
-                      <div className="flex items-center gap-3">
-                        {selected.logo_url && (
-                          <img
-                            src={`${import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"}${selected.logo_url}`}
-                            alt="Current logo"
-                            className="h-14 w-14 rounded-md object-cover border"
-                          />
-                        )}
-                        <label className="cursor-pointer rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-gray-50">
-                          {uploadingEditLogo ? "Uploading…" : selected.logo_url ? "Change Logo" : "Upload Logo"}
-                          <input
-                            ref={editLogoRef}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            className="hidden"
-                            disabled={uploadingEditLogo}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) handleEditLogoUpload(f);
-                            }}
-                          />
-                        </label>
-                      </div>
-                      {editLogoMsg && (
-                        <p className={`text-xs ${editLogoMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
-                          {editLogoMsg.text}
-                        </p>
-                      )}
-                    </div>
-                    <FormField label="Name *" value={editForm.name ?? ""} onChange={(v) => setEditForm((p) => ({ ...p, name: v }))} />
-                    <FormField label="Email" type="email" value={editForm.email ?? ""} onChange={(v) => setEditForm((p) => ({ ...p, email: v || null }))} />
-                    <FormField label="Phone" value={editForm.phone ?? ""} onChange={(v) => setEditForm((p) => ({ ...p, phone: v || null }))} />
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">Address</label>
-                      <textarea className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" rows={3}
-                        value={editForm.address ?? ""}
-                        onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value || null }))} />
-                    </div>
-                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" checked={Boolean(editForm.is_active)}
-                        onChange={(e) => setEditForm((p) => ({ ...p, is_active: e.target.checked }))} />
-                      Active hotel
-                    </label>
-                    {actionMsg && (
-                      <p className={`text-xs ${actionMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>{actionMsg.text}</p>
-                    )}
-                    <div className="flex gap-2 pt-1">
-                      <button type="button" onClick={handleSaveEdit}
-                        disabled={saving || !(editForm.name ?? "").trim()}
-                        className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                        {saving ? "Saving…" : "Save Changes"}
-                      </button>
-                      <button type="button" onClick={() => { setEditingId(null); setSelectedError(null); setEditLogoMsg(null); }}
-                        className="flex-1 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50">
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {selected.logo_url && (
-                      <div>
-                        <p className="text-xs font-medium text-gray-500 mb-1">Logo</p>
-                        <img
-                          src={`${import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"}${selected.logo_url}`}
-                          alt="Hotel logo"
-                          className="h-20 w-20 rounded-md object-cover border"
-                        />
-                      </div>
-                    )}
-                    <dl className="grid grid-cols-2 gap-4">
-                      <InfoItem label="Name" value={selected.name} />
-                      <InfoItem label="Email" value={selected.email} />
-                      <InfoItem label="Phone" value={selected.phone} />
-                      <InfoItem label="Hotel Status" value={selected.is_active ? "Active" : "Inactive"} />
-                      <div className="col-span-2"><InfoItem label="Address" value={selected.address} /></div>
-                      <InfoItem label="Registered" value={new Date(selected.created_at).toLocaleDateString()} />
-                      <InfoItem label="Last Updated" value={new Date(selected.updated_at).toLocaleDateString()} />
-                    </dl>
-                  </div>
-                )
-              ) : null}
-            </div>
-
-            {/* ── Subscription Management ── */}
-            {selected && (
-              <div className="rounded-lg border bg-white p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-medium text-sm text-gray-500 uppercase tracking-wide">Subscription</h2>
-                  {!editingSub && selectedSub && (
-                    <button type="button" onClick={() => setEditingSub(true)}
-                      className="text-xs text-blue-600 hover:underline">
-                      Edit
-                    </button>
-                  )}
-                </div>
-
-                {subMsg && (
-                  <p className={`text-xs ${subMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>{subMsg.text}</p>
-                )}
-
-                {subLoading ? (
-                  <p className="text-sm text-gray-400">Loading subscription…</p>
-                ) : !selectedSub ? (
-                  <p className="text-sm text-gray-400">No subscription found for this hotel.</p>
-                ) : editingSub ? (
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">Subscription Status</label>
-                      <select className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={subForm.status}
-                        onChange={(e) => setSubForm((f) => ({ ...f, status: e.target.value }))}>
-                        <option value="">— Keep current —</option>
-                        <option value="trial">Trial</option>
-                        <option value="active">Active</option>
-                        <option value="expired">Expired</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">Expiry Date</label>
-                      <input type="date"
-                        className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={subForm.expires_at}
-                        onChange={(e) => setSubForm((f) => ({ ...f, expires_at: e.target.value }))} />
-                    </div>
-                    {packages.length > 0 && (
-                      <div className="space-y-1">
-                        <label className="text-sm font-medium">Package</label>
-                        <select className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          value={subForm.package_id}
-                          onChange={(e) => setSubForm((f) => ({ ...f, package_id: e.target.value }))}>
-                          <option value="">— Keep current —</option>
-                          {packages.map((p) => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="flex gap-2 pt-1">
-                      <button type="button" onClick={handleSaveSub} disabled={savingSub}
-                        className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                        {savingSub ? "Saving…" : "Save Subscription"}
-                      </button>
-                      <button type="button" onClick={() => setEditingSub(false)}
-                        className="flex-1 rounded-md border px-4 py-2 text-sm font-medium hover:bg-gray-50">
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <dl className="grid grid-cols-2 gap-3">
-                    <div>
-                      <dt className="text-xs font-medium text-gray-500">Subscription Status</dt>
-                      <dd className="mt-0.5">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                          selectedSub.status === "active"  ? "bg-green-100 text-green-700" :
-                          selectedSub.status === "trial"   ? "bg-blue-100 text-blue-700"  :
-                          selectedSub.status === "expired" ? "bg-red-100 text-red-700"    :
-                          "bg-gray-100 text-gray-600"
-                        }`}>
-                          {selectedSub.status}
-                        </span>
-                      </dd>
-                    </div>
-                    <InfoItem label="Package" value={selectedSub.package_name ?? "—"} />
-                    <InfoItem label="Package Code" value={selectedSub.package_code ?? "—"} />
-                    <InfoItem label="Trial" value={selectedSub.is_trial ? "Yes" : "No"} />
-                    <InfoItem label="Expires" value={selectedSub.expires_at ? new Date(selectedSub.expires_at).toLocaleDateString() : "—"} />
-                    <InfoItem label="Started" value={selectedSub.started_at ? new Date(selectedSub.started_at).toLocaleDateString() : "—"} />
-                  </dl>
-                )}
-              </div>
+            {selected && canManageSecurity && (
+              <IntegrationPanel
+                selected={selected}
+                form={integrationForm}
+                ops={selectedIntegrationOps}
+                opsLoading={integrationOpsLoading}
+                savingIntegration={savingIntegration}
+                refreshingWebhook={refreshingWebhook}
+                sendingTestDelivery={sendingTestDelivery}
+                retryingDeliveryId={retryingDeliveryId}
+                apiKeyAction={apiKeyAction}
+                webhookSecretAction={webhookSecretAction}
+                message={integrationMsg}
+                revealedApiKey={revealedApiKey}
+                revealedWebhookSecret={revealedWebhookSecret}
+                onFormChange={setIntegrationForm}
+                onSave={() => void handleSaveIntegration()}
+                onRefreshWebhook={() => void handleRefreshWebhook()}
+                onGenerateApiKey={() => void handleGenerateApiKey(false)}
+                onRotateApiKey={() => void handleGenerateApiKey(true)}
+                onRevokeApiKey={() => void handleRevokeApiKey()}
+                onGenerateWebhookSecret={() => void handleGenerateWebhookSecret(false)}
+                onRotateWebhookSecret={() => void handleGenerateWebhookSecret(true)}
+                onRevokeWebhookSecret={() => void handleRevokeWebhookSecret()}
+                onSendTestDelivery={() => void handleSendTestDelivery()}
+                onRetryDelivery={(deliveryId) => void handleRetryDelivery(deliveryId)}
+              />
             )}
 
-            {/* ── Staff Management ── */}
             {selected && (
-              <div className="rounded-lg border bg-white p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-medium text-sm text-gray-500 uppercase tracking-wide">Staff</h2>
-                  <button type="button"
-                    onClick={() => { setShowAddUser((v) => !v); setAddUserMsg(null); }}
-                    className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
-                    {showAddUser ? "Cancel" : "+ Add Staff"}
-                  </button>
-                </div>
-
-                {addUserMsg && (
-                  <p className={`text-xs ${addUserMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>{addUserMsg.text}</p>
-                )}
-
-                {showAddUser && (
-                  <form onSubmit={handleAddUser} className="rounded-md bg-gray-50 border p-4 space-y-3">
-                    <h3 className="text-xs font-medium text-gray-500 uppercase">New Staff Member</h3>
-                    <FormField label="Full Name *" value={addUserForm.full_name} onChange={(v) => setAddUserForm((f) => ({ ...f, full_name: v }))} />
-                    <FormField label="Email *" type="email" value={addUserForm.email} onChange={(v) => setAddUserForm((f) => ({ ...f, email: v }))} />
-                    <FormField label="Password *" type="password" value={addUserForm.password} onChange={(v) => setAddUserForm((f) => ({ ...f, password: v }))} />
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">Role *</label>
-                      <select className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={addUserForm.role}
-                        onChange={(e) => setAddUserForm((f) => ({ ...f, role: e.target.value }))}>
-                        <option value="admin">Admin</option>
-                        <option value="owner">Owner</option>
-                        <option value="steward">Steward</option>
-                        <option value="housekeeper">Housekeeper</option>
-                      </select>
-                    </div>
-                    <button type="submit"
-                      disabled={addingUser || !addUserForm.full_name || !addUserForm.email || addUserForm.password.length < 8}
-                      className="w-full rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50">
-                      {addingUser ? "Adding…" : "Add Staff Member"}
-                    </button>
-                  </form>
-                )}
-
-                {usersLoading ? (
-                  <p className="text-sm text-gray-400">Loading staff…</p>
-                ) : hotelUsers.length === 0 ? (
-                  <p className="text-sm text-gray-400">No staff members found.</p>
-                ) : (
-                  <>
-                    <div className="space-y-3 md:hidden">
-                      {hotelUsers.map((u) => (
-                        <article key={u.id} className="rounded-lg border border-gray-200 p-4 text-sm">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-semibold text-gray-900">{u.full_name}</p>
-                            <span
-                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBooleanStatusBadgeClass(u.is_active)}`}
-                            >
-                              {u.is_active ? "Active" : "Inactive"}
-                            </span>
-                          </div>
-                          <div className="mt-2 space-y-1 text-xs text-gray-600">
-                            <p>Email: {u.email}</p>
-                            <p>Role: {u.role}</p>
-                          </div>
-                          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleUser(u.id, u.is_active)}
-                              disabled={togglingUserId === u.id}
-                              className={`w-full rounded border px-2 py-1 text-xs font-medium disabled:opacity-50 sm:w-auto ${
-                                u.is_active
-                                  ? "border-orange-200 text-orange-700 hover:bg-orange-50"
-                                  : "border-green-200 text-green-700 hover:bg-green-50"
-                              }`}
-                            >
-                              {togglingUserId === u.id ? "â€¦" : u.is_active ? "Disable" : "Enable"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteUser(u.id, u.full_name)}
-                              disabled={deletingUserId === u.id}
-                              className="w-full rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 sm:w-auto"
-                            >
-                              {deletingUserId === u.id ? "â€¦" : "Remove"}
-                            </button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-
-                    <div className="app-table-scroll hidden md:block">
-                      <table className="w-full min-w-[760px] text-sm">
-                      <thead className="bg-gray-50 text-gray-500 uppercase text-xs">
-                        <tr>
-                          <th className="px-3 py-2 text-left">Name</th>
-                          <th className="px-3 py-2 text-left">Email</th>
-                          <th className="px-3 py-2 text-left">Role</th>
-                          <th className="px-3 py-2 text-left">Staff Status</th>
-                          <th className="px-3 py-2 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {hotelUsers.map((u) => (
-                          <tr key={u.id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2 font-medium">{u.full_name}</td>
-                            <td className="px-3 py-2 text-gray-500 text-xs">{u.email}</td>
-                            <td className="px-3 py-2">
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium capitalize">{u.role}</span>
-                            </td>
-                            <td className="px-3 py-2">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getBooleanStatusBadgeClass(u.is_active)}`}>
-                                {u.is_active ? "Active" : "Inactive"}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <button type="button" onClick={() => handleToggleUser(u.id, u.is_active)}
-                                  disabled={togglingUserId === u.id}
-                                  className={`rounded border px-2 py-1 text-xs font-medium disabled:opacity-50 ${
-                                    u.is_active
-                                      ? "border-orange-200 text-orange-700 hover:bg-orange-50"
-                                      : "border-green-200 text-green-700 hover:bg-green-50"
-                                  }`}>
-                                  {togglingUserId === u.id ? "…" : u.is_active ? "Disable" : "Enable"}
-                                </button>
-                                <button type="button" onClick={() => handleDeleteUser(u.id, u.full_name)}
-                                  disabled={deletingUserId === u.id}
-                                  className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50">
-                                  {deletingUserId === u.id ? "…" : "Remove"}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      </table>
-                    </div>
-                  </>
-                )}
-              </div>
+              <SubscriptionPanel
+                selectedSub={selectedSub}
+                accessSummary={selectedAccess}
+                historyItems={selectedSubHistory}
+                packages={packages}
+                canManageBilling={canManageBilling}
+                subLoading={subLoading}
+                editingSub={editingSub}
+                savingSub={savingSub}
+                subForm={subForm}
+                subMsg={subMsg}
+                onEditToggle={setEditingSub}
+                onFormChange={setSubForm}
+                onSave={() => void handleSaveSub()}
+              />
             )}
 
+            {selected && canManageTenants && (
+              <StaffPanel
+                hotelUsers={hotelUsers}
+                usersLoading={usersLoading}
+                showAddUser={showAddUser}
+                addUserForm={addUserForm}
+                addingUser={addingUser}
+                addUserMsg={addUserMsg}
+                availableRoles={availableStaffRoles}
+                deletingUserId={deletingUserId}
+                togglingUserId={togglingUserId}
+                resettingUserId={resettingUserId}
+                onToggleAddUser={() => {
+                  setShowAddUser((current) => !current);
+                  setAddUserMsg(null);
+                }}
+                onFormChange={setAddUserForm}
+                onSubmit={(event) => void handleAddUser(event)}
+                onToggleUser={(userId, isActive) => void handleToggleUser(userId, isActive)}
+                onDeleteUser={handleDeleteUser}
+                onResetUserPassword={handleResetUserPassword}
+              />
+            )}
           </div>
         )}
 
@@ -997,61 +1354,4 @@ export default function SuperAdminRestaurants() {
       </div>
     </SuperAdminLayout>
   );
-}
-
-function FormField({
-  label,
-  value,
-  type = "text",
-  onChange,
-}: {
-  label: string;
-  value: string;
-  type?: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <label className="text-sm font-medium">{label}</label>
-      <input
-        type={type}
-        className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </div>
-  );
-}
-
-function InfoItem({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <dt className="text-xs font-medium text-gray-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-gray-900">{value ?? "—"}</dd>
-    </div>
-  );
-}
-
-function getBooleanStatusBadgeClass(isActive: boolean): string {
-  return isActive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700";
-}
-
-function getSubscriptionStatusBadgeClass(status: string | undefined): string {
-  switch (status) {
-    case "active":
-      return "bg-green-100 text-green-700";
-    case "trial":
-      return "bg-blue-100 text-blue-700";
-    case "expired":
-      return "bg-red-100 text-red-700";
-    case "cancelled":
-      return "bg-gray-100 text-gray-600";
-    default:
-      return "bg-amber-100 text-amber-700";
-  }
-}
-
-function formatSubscriptionStatusLabel(status: string | undefined): string {
-  if (!status || status === "none") return "No Subscription";
-  return status.charAt(0).toUpperCase() + status.slice(1);
 }

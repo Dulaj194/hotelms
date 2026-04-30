@@ -6,14 +6,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_restaurant_id, get_db, require_privilege, require_roles
+from app.core.dependencies import get_current_restaurant_id, get_db, require_module_access, require_roles
+from app.modules.access import role_catalog
 from app.modules.reports import service
 from app.modules.reports.schemas import SalesReportHistoryListResponse, SalesReportResponse
 from app.modules.users.model import User
 
 router = APIRouter()
 
-_STAFF_ROLES = ("owner", "admin", "steward")
+_STAFF_ROLES = role_catalog.QR_MENU_STAFF_ROLES
 
 
 @router.get("/sales", response_model=SalesReportResponse)
@@ -25,7 +26,7 @@ def get_sales_report(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("reports")),
 ) -> SalesReportResponse:
     return service.get_sales_report(
         db,
@@ -45,7 +46,7 @@ def get_monthly_sales_report(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("reports")),
 ) -> SalesReportResponse:
     return service.get_monthly_sales_report(
         db,
@@ -65,7 +66,7 @@ def export_sales_report_csv(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("reports")),
 ):
     csv_text = service.export_sales_report_csv(
         db,
@@ -90,7 +91,7 @@ def get_sales_report_history(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("reports")),
 ) -> SalesReportHistoryListResponse:
     normalized_format = output_format.strip().lower() if output_format else None
     if normalized_format not in {None, "json", "csv"}:

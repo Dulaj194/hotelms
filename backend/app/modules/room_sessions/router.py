@@ -5,15 +5,20 @@ Exports:
   cart_router     → mounted at /room-cart        (room cart CRUD)
   orders_router   → mounted at /room-orders      (room order placement + retrieval)
 
-All guest routes are public-facing — they require a signed room session token
-in the X-Room-Session header (handled by get_current_room_session dependency),
-NOT a staff Bearer JWT.
+Guest retrieval/cart routes require a signed room session token in the
+X-Room-Session header. Order placement can also bootstrap from X-Room-Key
+when the checkout payload contains the client-side cart.
 """
 import redis as redis_lib
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_room_session, get_db, get_redis
+from app.core.dependencies import (
+    get_current_room_session,
+    get_db,
+    get_redis,
+    resolve_room_session_token,
+)
 from app.modules.room_sessions import service
 from app.modules.room_sessions.model import RoomSession
 from app.modules.room_sessions.schemas import (
@@ -23,6 +28,7 @@ from app.modules.room_sessions.schemas import (
     PlaceRoomOrderResponse,
     RoomCartResponse,
     RoomOrderDetailResponse,
+    RoomOrderListResponse,
     RoomSessionStartRequest,
     RoomSessionStartResponse,
     UpdateRoomCartItemRequest,
@@ -122,16 +128,37 @@ orders_router = APIRouter()
 @orders_router.post("", response_model=PlaceRoomOrderResponse, status_code=201)
 def place_room_order(
     payload: PlaceRoomOrderRequest,
-    session: RoomSession = Depends(get_current_room_session),
+    x_room_session: str | None = Header(default=None, alias="X-Room-Session"),
+    x_room_key: str | None = Header(default=None, alias="X-Room-Key"),
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
 ) -> PlaceRoomOrderResponse:
-    """Place a room order from the guest's current room cart.
+    """Place a room order at checkout.
 
-    Requires X-Room-Session header. restaurant_id and room context come
-    from the validated session — not from the request body.
+    Accepts either an existing X-Room-Session token or the original X-Room-Key
+    QR credential. restaurant_id and room context are validated server-side.
     """
-    return service.place_room_order(db, r, session, payload)
+    if x_room_session:
+        session = resolve_room_session_token(x_room_session, db)
+        return service.place_room_order(db, r, session, payload)
+    if x_room_key:
+        return service.place_room_order_from_qr_key(db, r, x_room_key, payload)
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Missing room checkout credential.",
+    )
+
+
+@orders_router.get("", response_model=RoomOrderListResponse)
+def list_room_orders(
+    session: RoomSession = Depends(get_current_room_session),
+    db: Session = Depends(get_db),
+) -> RoomOrderListResponse:
+    """Return all room orders for the guest's current session.
+
+    SECURITY: scoped to the guest's room session — cannot access other sessions' orders.
+    """
+    return service.list_room_orders_for_guest(db, session)
 
 
 @orders_router.get("/{order_id}", response_model=RoomOrderDetailResponse)
@@ -145,3 +172,14 @@ def get_room_order(
     SECURITY: scoped to the guest's room session — cannot access other sessions' orders.
     """
     return service.get_room_order_for_guest(db, order_id, session)
+
+
+@orders_router.post("/{order_id}/cancel", response_model=GenericMessageResponse)
+def cancel_room_order(
+    order_id: int,
+    session: RoomSession = Depends(get_current_room_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+) -> GenericMessageResponse:
+    """Cancel a guest room order within the 5-second grace window."""
+    return service.cancel_room_order_for_guest(db, r, order_id, session)

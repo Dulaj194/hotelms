@@ -6,6 +6,7 @@ export interface PublicRestaurantInfoResponse {
   phone: string | null;
   address: string | null;
   logo_url: string | null;
+  public_menu_banner_urls: string[];
   is_active: boolean;
 }
 
@@ -19,7 +20,6 @@ export interface PublicItemSummaryResponse {
   image_path: string | null;
   is_available: boolean;
   category_id: number;
-  subcategory_id: number | null;
 }
 
 export interface PublicItemDetailResponse {
@@ -30,17 +30,7 @@ export interface PublicItemDetailResponse {
   image_path: string | null;
   is_available: boolean;
   category_id: number;
-  subcategory_id: number | null;
   category_name: string | null;
-}
-
-export interface PublicSubcategoryResponse {
-  id: number;
-  name: string;
-  description: string | null;
-  image_path: string | null;
-  sort_order: number;
-  items: PublicItemSummaryResponse[];
 }
 
 // --- Categories --------------------------------------------------------------
@@ -51,9 +41,8 @@ export interface PublicCategoryResponse {
   description: string | null;
   image_path: string | null;
   sort_order: number;
-  menu_id: number | null;
+  menu_id: number;
   items: PublicItemSummaryResponse[];
-  subcategories: PublicSubcategoryResponse[];
 }
 
 export interface PublicMenuSectionResponse {
@@ -82,6 +71,7 @@ export interface QRCodeResponse {
   frontend_url: string;
   qr_image_url: string;
   restaurant_id: number;
+  created_at: string;
 }
 
 export interface BulkQRCodeResponse {
@@ -89,11 +79,17 @@ export interface BulkQRCodeResponse {
   count: number;
 }
 
-export interface RoomQRCodeListResponse {
+export interface QRCodeListResponse {
   qrcodes: QRCodeResponse[];
   total: number;
 }
 
 export interface QRCodeDeleteResponse {
   message: string;
+}
+
+export interface QRRebuildResponse {
+  message: string;
+  refreshed_count: number;
+  total_count: number;
 }

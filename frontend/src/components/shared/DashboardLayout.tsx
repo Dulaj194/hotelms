@@ -16,7 +16,6 @@ import {
   ReceiptText,
   ShieldCheck,
   SquareMenu,
-  Tags,
   Ticket,
   UserCog,
   Users,
@@ -25,9 +24,16 @@ import {
 import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
+import { getBillingHomePath } from "@/features/billing/helpers";
 import {
+  BILLING_STAFF_ROLES,
   canAccessModuleItem,
   canAccessHousekeepingTasks,
+  hasRoleAccess,
+  HOUSEKEEPING_ROOM_ROLES,
+  HOUSEKEEPING_TASK_ROLES,
+  QR_MENU_STAFF_ROLES,
+  RESTAURANT_ADMIN_ROLES,
 } from "@/lib/moduleAccess";
 import {
   clearInAppNavigationHistory,
@@ -38,16 +44,18 @@ interface NavItem {
   path: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  roles: string[] | null;
+  roles: readonly string[] | null;
   privilege?: string;
+  moduleKey?: string;
 }
 
 interface MenuSubItem {
   path: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
-  roles?: string[];
+  roles?: readonly string[];
   privilege?: string;
+  moduleKey?: string;
 }
 
 type SidebarGroupState = {
@@ -93,52 +101,48 @@ const ALL_NAV_ITEMS: NavItem[] = [
     path: "/admin/restaurant-profile",
     label: "Restaurant",
     icon: UtensilsCrossed,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
   {
     path: "/admin/subscription",
     label: "Subscription",
     icon: Package,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
-  { path: "/admin/staff", label: "Staff", icon: Users, roles: ["owner", "admin"] },
+  { path: "/admin/staff", label: "Staff", icon: Users, roles: RESTAURANT_ADMIN_ROLES },
   {
     path: "/admin/menu/menus",
     label: "Menus",
     icon: SquareMenu,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
   {
     path: "/admin/menu/categories",
     label: "Categories",
     icon: ClipboardList,
-    roles: ["owner", "admin"],
-  },
-  {
-    path: "/admin/menu/subcategories",
-    label: "Subcategories",
-    icon: Tags,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
   {
     path: "/admin/menu/items",
     label: "Menu Items",
     icon: HandPlatter,
-    roles: ["owner", "admin"],
+    roles: RESTAURANT_ADMIN_ROLES,
   },
   {
     path: "/admin/reports",
     label: "Reports",
     icon: ReceiptText,
-    roles: ["owner", "admin", "steward"],
+    roles: QR_MENU_STAFF_ROLES,
     privilege: "QR_MENU",
+    moduleKey: "reports",
   },
   {
     path: "/admin/billing",
     label: "Billing",
     icon: Ticket,
-    roles: ["owner", "admin", "steward"],
+    roles: BILLING_STAFF_ROLES,
     privilege: "QR_MENU",
+    moduleKey: "billing",
   },
 ];
 
@@ -151,7 +155,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const user = getUser();
   const role = normalizeRole(user?.role);
-  const { loading: privilegesLoading, hasPrivilege, privileges } = useSubscriptionPrivileges();
+  const {
+    loading: privilegesLoading,
+    hasModuleAccess,
+    privileges,
+    moduleAccess,
+  } = useSubscriptionPrivileges();
   const [groupState, setGroupState] = useState<SidebarGroupState>(() =>
     loadSidebarGroupState()
   );
@@ -165,31 +174,81 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     () => [
       { path: "/admin/menu/menus", label: "Add Menu", icon: SquareMenu },
       { path: "/admin/menu/categories", label: "Add Category", icon: ClipboardList },
-      { path: "/admin/menu/subcategories", label: "Add Subcategories", icon: Tags },
-      { path: "/admin/menu/items", label: "Add Food Items", icon: HandPlatter },
+      { path: "/admin/menu/items", label: "Add Item", icon: HandPlatter },
     ],
     []
   );
 
   const offerSubItems: MenuSubItem[] = useMemo(
     () => [
-      { path: "/admin/offers/new", label: "Add New Offer", icon: ShieldCheck },
-      { path: "/admin/offers", label: "Manage Offers", icon: ClipboardList },
+      { path: "/admin/offers/new", label: "Add New Offer", icon: ShieldCheck, moduleKey: "offers" },
+      { path: "/admin/offers", label: "Manage Offers", icon: ClipboardList, moduleKey: "offers" },
     ],
     []
   );
 
   const kitchenSubItems: MenuSubItem[] = useMemo(
     () => [
-      { path: "/admin/steward", label: "Steward Dashboard", icon: UserCog, privilege: "QR_MENU" },
-      { path: "/admin/kitchen/orders", label: "Orders", icon: ClipboardList, privilege: "QR_MENU" },
-      { path: "/admin/kitchen/old-orders", label: "Old Orders", icon: ReceiptText, privilege: "QR_MENU" },
+      {
+        path: "/admin/steward",
+        label: "Steward Dashboard",
+        icon: UserCog,
+        privilege: "QR_MENU",
+        moduleKey: "steward_ops",
+      },
+      {
+        path: "/admin/kitchen/orders",
+        label: "Orders",
+        icon: ClipboardList,
+        privilege: "QR_MENU",
+        moduleKey: "kds",
+      },
+      {
+        path: "/admin/kitchen/old-orders",
+        label: "Old Orders",
+        icon: ReceiptText,
+        privilege: "QR_MENU",
+        moduleKey: "kds",
+      },
     ],
     []
   );
 
   const qrSubItems: MenuSubItem[] = useMemo(
-    () => [{ path: "/admin/tables", label: "Table QR Codes", icon: LayoutGrid }],
+    () => [
+      {
+        path: "/admin/qr/tables",
+        label: "All Table QR Codes",
+        icon: QrCode,
+        roles: RESTAURANT_ADMIN_ROLES,
+        privilege: "QR_MENU",
+        moduleKey: "qr",
+      },
+      {
+        path: "/admin/qr/tables/generate",
+        label: "Generate Table QR Codes",
+        icon: LayoutGrid,
+        roles: RESTAURANT_ADMIN_ROLES,
+        privilege: "QR_MENU",
+        moduleKey: "qr",
+      },
+      {
+        path: "/admin/qr/rooms",
+        label: "All Room QR Codes",
+        icon: QrCode,
+        roles: RESTAURANT_ADMIN_ROLES,
+        privilege: "QR_MENU",
+        moduleKey: "qr",
+      },
+      {
+        path: "/admin/qr/rooms/generate",
+        label: "Generate Room QR Codes",
+        icon: LayoutGrid,
+        roles: RESTAURANT_ADMIN_ROLES,
+        privilege: "QR_MENU",
+        moduleKey: "qr",
+      },
+    ],
     []
   );
 
@@ -199,26 +258,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         path: "/admin/housekeeping/rooms",
         label: "Rooms",
         icon: BedDouble,
-        roles: ["owner", "admin", "housekeeper"],
+        roles: HOUSEKEEPING_ROOM_ROLES,
+        moduleKey: "housekeeping",
       },
       {
         path: "/admin/housekeeping",
         label: "Messages",
         icon: Handshake,
-        roles: ["owner", "admin", "housekeeper"],
+        roles: HOUSEKEEPING_TASK_ROLES,
         privilege: "HOUSEKEEPING",
-      },
-      {
-        path: "/admin/housekeeping/rooms/qr/all",
-        label: "All Room QR Codes",
-        icon: QrCode,
-        roles: ["owner", "admin"],
-      },
-      {
-        path: "/admin/housekeeping/rooms/qr/generate",
-        label: "Generate Room QR Codes",
-        icon: LayoutGrid,
-        roles: ["owner", "admin"],
+        moduleKey: "housekeeping",
       },
     ],
     []
@@ -232,31 +281,75 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const visibleKitchenSubItems = useMemo(
     () =>
       kitchenSubItems.filter((item) =>
-        canAccessModuleItem(role, privileges, item.roles, item.privilege)
+        canAccessModuleItem(
+          role,
+          privileges,
+          moduleAccess,
+          item.roles,
+          item.privilege,
+          item.moduleKey,
+        )
       ),
-    [kitchenSubItems, privileges, role]
+    [kitchenSubItems, moduleAccess, privileges, role]
+  );
+  const visibleQrSubItems = useMemo(
+    () =>
+      qrSubItems.filter((item) =>
+        canAccessModuleItem(
+          role,
+          privileges,
+          moduleAccess,
+          item.roles,
+          item.privilege,
+          item.moduleKey,
+        )
+      ),
+    [moduleAccess, privileges, qrSubItems, role]
   );
   const visibleHousekeepingSubItems = useMemo(
     () =>
       housekeepingSubItems.filter((item) =>
-        canAccessModuleItem(role, privileges, item.roles, item.privilege)
+        canAccessModuleItem(
+          role,
+          privileges,
+          moduleAccess,
+          item.roles,
+          item.privilege,
+          item.moduleKey,
+        )
       ),
-    [housekeepingSubItems, privileges, role]
+    [housekeepingSubItems, moduleAccess, privileges, role]
   );
-  const isMenuGroupVisible = role === "owner" || role === "admin";
+  const visibleOfferSubItems = useMemo(
+    () =>
+      offerSubItems.filter((item) =>
+        canAccessModuleItem(
+          role,
+          privileges,
+          moduleAccess,
+          item.roles,
+          item.privilege,
+          item.moduleKey,
+        )
+      ),
+    [moduleAccess, offerSubItems, privileges, role]
+  );
+  const isMenuGroupVisible = hasRoleAccess(role, RESTAURANT_ADMIN_ROLES);
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
   const isKitchenGroupVisible = !privilegesLoading && visibleKitchenSubItems.length > 0;
   const isKitchenGroupActive =
     location.pathname.startsWith("/admin/kitchen") || location.pathname === "/admin/steward";
-  const isQrGroupVisible = role === "owner" || role === "admin";
-  const isQrGroupActive = qrPaths.some((path) => location.pathname === path);
-  const isHousekeepingGroupVisible = visibleHousekeepingSubItems.length > 0;
-  const housekeepingTasksEnabled = canAccessHousekeepingTasks(role, privileges);
+  const isQrGroupVisible = !privilegesLoading && visibleQrSubItems.length > 0;
+  const isQrGroupActive =
+    location.pathname === "/admin/qr" ||
+    qrPaths.some((path) => location.pathname === path || location.pathname.startsWith(`${path}/`));
+  const isHousekeepingGroupVisible = !privilegesLoading && visibleHousekeepingSubItems.length > 0;
+  const housekeepingTasksEnabled = canAccessHousekeepingTasks(role, privileges, moduleAccess);
   const isHousekeepingGroupActive = housekeepingPaths.some((path) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
-  const offerPrivilegeEnabled = hasPrivilege("OFFERS");
-  const isOfferGroupVisible = role === "owner" || role === "admin";
+  const offerPrivilegeEnabled = hasModuleAccess("offers");
+  const isOfferGroupVisible = hasRoleAccess(role, RESTAURANT_ADMIN_ROLES);
   const isOfferGroupActive = offerPaths.some((path) =>
     path === "/admin/offers"
       ? location.pathname === "/admin/offers" || location.pathname.startsWith("/admin/offers/")
@@ -270,8 +363,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       !qrPaths.includes(item.path) &&
       !housekeepingPaths.includes(item.path) &&
       !offerPaths.includes(item.path) &&
-      canAccessModuleItem(role, privileges, item.roles, item.privilege)
+      canAccessModuleItem(
+        role,
+        privileges,
+        moduleAccess,
+        item.roles,
+        item.privilege,
+        item.moduleKey,
+      )
   );
+  const billingNavPath = getBillingHomePath(role);
   const toggleGroup = (group: keyof SidebarGroupState) => {
     setGroupState((prev) => ({ ...prev, [group]: !prev[group] }));
   };
@@ -576,7 +677,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               {qrOpen && (
                 <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
-                  {qrSubItems.map((subItem) => {
+                  {visibleQrSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
                     return (
@@ -658,14 +759,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
 
           {navItems.map((item) => {
+            const resolvedPath = item.path === "/admin/billing" ? billingNavPath : item.path;
             const active =
-              location.pathname === item.path ||
-              location.pathname.startsWith(`${item.path}/`);
+              item.path === "/admin/billing"
+                ? location.pathname === "/admin/billing" ||
+                  location.pathname.startsWith("/admin/billing/")
+                : location.pathname === resolvedPath ||
+                  location.pathname.startsWith(`${resolvedPath}/`);
             const Icon = item.icon;
             return (
               <Link
                 key={item.path}
-                to={item.path}
+                to={resolvedPath}
                 onClick={handleSidebarNavigate}
                 className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
                   active
@@ -709,7 +814,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               {offersOpen && (
                 <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
-                  {offerSubItems.map((subItem) => {
+                  {visibleOfferSubItems.map((subItem) => {
                     const subActive =
                       subItem.path === "/admin/offers"
                         ? location.pathname === "/admin/offers" ||
@@ -733,6 +838,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       </Link>
                     );
                   })}
+                  {!privilegesLoading && !offerPrivilegeEnabled && (
+                    <p className="px-3 py-2 text-xs text-gray-400">
+                      Unlock the Offers module from package access to open these tools.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

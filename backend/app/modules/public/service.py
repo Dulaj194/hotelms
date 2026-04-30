@@ -1,3 +1,5 @@
+import json
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -7,11 +9,8 @@ from app.modules.public.schemas import (
     PublicItemDetailResponse,
     PublicItemSummaryResponse,
     PublicMenuResponse,
-    PublicRestaurantInfoResponse,
-)
-from app.modules.public.schemas import (
     PublicMenuSectionResponse,
-    PublicSubcategoryResponse,
+    PublicRestaurantInfoResponse,
 )
 
 
@@ -23,47 +22,42 @@ def _assert_restaurant_active(restaurant_id: int, db: Session) -> PublicRestaura
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
-    return PublicRestaurantInfoResponse.model_validate(restaurant)
+    banner_urls: list[str] = []
+    if restaurant.public_menu_banner_urls_json:
+        try:
+            parsed = json.loads(restaurant.public_menu_banner_urls_json)
+            if isinstance(parsed, list):
+                banner_urls = [str(item).strip() for item in parsed if str(item).strip()]
+        except Exception:
+            banner_urls = []
+
+    return PublicRestaurantInfoResponse(
+        id=restaurant.id,
+        name=restaurant.name,
+        phone=restaurant.phone,
+        address=restaurant.address,
+        logo_url=restaurant.logo_url,
+        public_menu_banner_urls=banner_urls,
+        is_active=restaurant.is_active,
+    )
 
 
-def get_public_restaurant_info(
-    db: Session, restaurant_id: int
-) -> PublicRestaurantInfoResponse:
+def get_public_restaurant_info(db: Session, restaurant_id: int) -> PublicRestaurantInfoResponse:
     return _assert_restaurant_active(restaurant_id, db)
 
 
 def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
-    """Build the full public menu tree: restaurant → menus → categories → subcategories → items."""
+    """Build the full public menu tree: restaurant → menus → categories → items."""
     restaurant_info = _assert_restaurant_active(restaurant_id, db)
 
     categories = repository.list_public_categories_by_restaurant(db, restaurant_id)
     all_items = repository.list_public_items_by_restaurant(db, restaurant_id)
 
     menus = repository.list_public_menus_by_restaurant(db, restaurant_id)
-    all_subcats = repository.list_public_subcategories_by_restaurant(db, restaurant_id)
-
-    # Index items: by subcategory_id (if set), else by category_id
-    items_by_subcat: dict[int, list[PublicItemSummaryResponse]] = {}
-    items_by_category_direct: dict[int, list[PublicItemSummaryResponse]] = {}
+    items_by_category: dict[int, list[PublicItemSummaryResponse]] = {}
     for item in all_items:
         summary = PublicItemSummaryResponse.model_validate(item)
-        if item.subcategory_id is not None:
-            items_by_subcat.setdefault(item.subcategory_id, []).append(summary)
-        else:
-            items_by_category_direct.setdefault(item.category_id, []).append(summary)
-
-    # Index subcategories by category_id
-    subcats_by_category: dict[int, list[PublicSubcategoryResponse]] = {}
-    for subcat in all_subcats:
-        subcat_response = PublicSubcategoryResponse(
-            id=subcat.id,
-            name=subcat.name,
-            description=subcat.description,
-            image_path=subcat.image_path,
-            sort_order=subcat.sort_order,
-            items=items_by_subcat.get(subcat.id, []),
-        )
-        subcats_by_category.setdefault(subcat.category_id, []).append(subcat_response)
+        items_by_category.setdefault(item.category_id, []).append(summary)
 
     def _build_category(cat) -> PublicCategoryResponse:
         return PublicCategoryResponse(
@@ -73,19 +67,15 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
             image_path=cat.image_path,
             sort_order=cat.sort_order,
             menu_id=cat.menu_id,
-            items=items_by_category_direct.get(cat.id, []),
-            subcategories=subcats_by_category.get(cat.id, []),
+            items=items_by_category.get(cat.id, []),
         )
 
-    # Index categories by menu_id
     cats_by_menu: dict[int, list[PublicCategoryResponse]] = {}
-    uncategorized: list[PublicCategoryResponse] = []
     for cat in categories:
+        if cat.menu_id is None:
+            continue
         cat_resp = _build_category(cat)
-        if cat.menu_id is not None:
-            cats_by_menu.setdefault(cat.menu_id, []).append(cat_resp)
-        else:
-            uncategorized.append(cat_resp)
+        cats_by_menu.setdefault(cat.menu_id, []).append(cat_resp)
 
     menu_sections = [
         PublicMenuSectionResponse(
@@ -100,22 +90,18 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
     ]
 
     flat_categories: list[PublicCategoryResponse] = [
-        category
-        for section in menu_sections
-        for category in section.categories
-    ] + uncategorized
+        category for section in menu_sections for category in section.categories
+    ]
 
     return PublicMenuResponse(
         restaurant=restaurant_info,
         menus=menu_sections,
-        uncategorized_categories=uncategorized,
+        uncategorized_categories=[],
         categories=flat_categories,
     )
 
 
-def get_public_item_detail(
-    db: Session, restaurant_id: int, item_id: int
-) -> PublicItemDetailResponse:
+def get_public_item_detail(db: Session, restaurant_id: int, item_id: int) -> PublicItemDetailResponse:
     """Fetch a single item's public detail.
 
     restaurant_id scoping prevents cross-tenant data leakage.
@@ -134,14 +120,11 @@ def get_public_item_detail(
         image_path=item.image_path,
         is_available=item.is_available,
         category_id=item.category_id,
-        subcategory_id=item.subcategory_id,
         category_name=item.category.name if item.category else None,
     )
 
 
-def get_public_items_by_category(
-    db: Session, restaurant_id: int, category_id: int
-) -> list[PublicItemSummaryResponse]:
+def get_public_items_by_category(db: Session, restaurant_id: int, category_id: int) -> list[PublicItemSummaryResponse]:
     """Return items for one category within a restaurant."""
     items = repository.list_public_items_by_category(db, category_id, restaurant_id)
     return [PublicItemSummaryResponse.model_validate(i) for i in items]

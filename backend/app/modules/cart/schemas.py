@@ -23,6 +23,12 @@ class UpdateCartItemRequest(BaseModel):
     quantity: int = Field(..., ge=1, description="Must be at least 1")
 
 
+class CartCouponValidateRequest(BaseModel):
+    """Validate a guest coupon against the current table cart."""
+
+    code: str = Field(..., min_length=1, max_length=100)
+
+
 # ─── Responses ────────────────────────────────────────────────────────────────
 
 
@@ -53,6 +59,16 @@ class CartSummaryResponse(BaseModel):
 
     item_count: int
     total: float
+
+
+class CartCouponValidateResponse(BaseModel):
+    valid: bool
+    message: str
+    code: str | None = None
+    discount_percent: float | None = None
+    discount_amount: float = 0.0
+    subtotal: float = 0.0
+    total: float = 0.0
 
 
 class GenericMessageResponse(BaseModel):

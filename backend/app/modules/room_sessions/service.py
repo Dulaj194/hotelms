@@ -41,6 +41,7 @@ from app.modules.room_sessions.schemas import (
     RoomCartResponse,
     RoomOrderDetailResponse,
     RoomOrderItemResponse,
+    RoomOrderListResponse,
     RoomSessionStartRequest,
     RoomSessionStartResponse,
     UpdateRoomCartItemRequest,
@@ -49,6 +50,7 @@ from app.modules.rooms.repository import get_room_by_number_and_restaurant
 
 # Redis key prefix for room carts — keeps room carts distinct from table carts
 _ROOM_CART_PREFIX = "room_cart"
+GUEST_CANCEL_WINDOW_SECONDS = 5
 
 
 # ── Session start ─────────────────────────────────────────────────────────────
@@ -359,9 +361,16 @@ def place_room_order(
     - Cart is cleared only after a successful DB commit.
     - order_source="room" distinguishes this order from table orders.
     """
-    raw_cart = cart_repo.get_cart_raw(
-        r, session.session_id, session.restaurant_id, prefix=_ROOM_CART_PREFIX
-    )
+    cart_from_payload = bool(payload.items)
+    if cart_from_payload:
+        quantities: dict[int, int] = {}
+        for line in payload.items:
+            quantities[line.item_id] = quantities.get(line.item_id, 0) + line.quantity
+        raw_cart = {str(item_id): str(quantity) for item_id, quantity in quantities.items()}
+    else:
+        raw_cart = cart_repo.get_cart_raw(
+            r, session.session_id, session.restaurant_id, prefix=_ROOM_CART_PREFIX
+        )
     if not raw_cart:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -446,9 +455,10 @@ def place_room_order(
         raise
 
     # Clear room cart only after successful commit
-    cart_repo.clear_cart(
-        r, session.session_id, session.restaurant_id, prefix=_ROOM_CART_PREFIX
-    )
+    if not cart_from_payload:
+        cart_repo.clear_cart(
+            r, session.session_id, session.restaurant_id, prefix=_ROOM_CART_PREFIX
+        )
 
     # Reload with relationships for response
     placed = order_repo.get_order_by_id_and_session(
@@ -492,6 +502,96 @@ def place_room_order(
     return PlaceRoomOrderResponse(order=_build_room_order_detail(placed))
 
 
+def place_room_order_from_qr_key(
+    db: Session,
+    r: redis_lib.Redis | None,
+    qr_access_key: str,
+    payload: PlaceRoomOrderRequest,
+) -> PlaceRoomOrderResponse:
+    """Place a room order directly from a QR key and client-side cart payload."""
+    if not payload.items:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cart is empty. Add items before placing an order.",
+        )
+
+    try:
+        qr_payload = decode_room_qr_access_token(qr_access_key)
+        restaurant_id = int(qr_payload.get("restaurant_id", -1))
+        room_number = str(qr_payload.get("room_number", "")).strip()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired room QR credential. Please scan the room QR again.",
+        )
+
+    restaurant = get_restaurant(db, restaurant_id)
+    if restaurant is None or not restaurant.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant is not currently available.",
+        )
+
+    room = get_room_by_number_and_restaurant(db, room_number, restaurant_id)
+    if room is None or not room.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room is not currently available.",
+        )
+
+    repository.cleanup_stale_room_sessions(
+        db,
+        idle_timeout_minutes=settings.room_session_idle_timeout_minutes,
+    )
+    repository.deactivate_active_sessions_for_room(
+        db,
+        restaurant_id=restaurant_id,
+        room_id=room.id,
+    )
+
+    session_id = uuid.uuid4().hex
+    expire_minutes = settings.guest_session_expire_minutes
+    expires_at = datetime.now(UTC) + timedelta(minutes=expire_minutes)
+    session = repository.create_room_session(
+        db,
+        session_id=session_id,
+        restaurant_id=restaurant_id,
+        room_id=room.id,
+        room_number_snapshot=room.room_number,
+        expires_at=expires_at,
+    )
+    token = create_room_session_token(
+        session_id=session_id,
+        restaurant_id=restaurant_id,
+        room_id=room.id,
+        room_number=room.room_number,
+        expire_minutes=expire_minutes,
+    )
+    response = place_room_order(db, r, session, payload)
+    response.room_session_token = token
+    return response
+
+
+def list_room_orders_for_guest(
+    db: Session,
+    session: RoomSession,
+) -> RoomOrderListResponse:
+    """Return all room orders for the guest's current session.
+
+    Includes all statuses (pending, confirmed, processing, completed, paid, rejected)
+    so the guest can see their complete order history within the current room session.
+    """
+    orders = order_repo.list_orders_by_session(
+        db,
+        session.session_id,
+        session.restaurant_id,
+    )
+    return RoomOrderListResponse(
+        orders=[_build_room_order_detail(o) for o in orders],
+        total=len(orders),
+    )
+
+
 def get_room_order_for_guest(
     db: Session,
     order_id: int,
@@ -511,3 +611,71 @@ def get_room_order_for_guest(
             detail="Order not found.",
         )
     return _build_room_order_detail(order)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def cancel_room_order_for_guest(
+    db: Session,
+    r: redis_lib.Redis,
+    order_id: int,
+    session: RoomSession,
+) -> GenericMessageResponse:
+    """Cancel a guest room order within 5 seconds while status is pending/confirmed.
+
+    Room orders are auto-confirmed at placement, so both pending and confirmed
+    are treated as customer-cancellable during the short grace window.
+    """
+    order = order_repo.get_order_by_id_and_session(
+        db, order_id, session.session_id, session.restaurant_id
+    )
+    if order is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found.",
+        )
+
+    if order.order_source.value != "room":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found.",
+        )
+
+    if order.status not in {OrderStatus.pending, OrderStatus.confirmed}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only pending or confirmed room orders can be cancelled by customer.",
+        )
+
+    elapsed_seconds = (datetime.now(UTC) - _as_utc(order.placed_at)).total_seconds()
+    if elapsed_seconds > GUEST_CANCEL_WINDOW_SECONDS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Cancellation window expired. Orders can be cancelled within 5 seconds only.",
+        )
+
+    updated = order_repo.update_order_status(db, order, OrderStatus.rejected)
+    db.commit()
+    db.refresh(updated)
+
+    try:
+        realtime_service.publish_order_status_updated(
+            r,
+            restaurant_id=session.restaurant_id,
+            order_id=updated.id,
+            order_number=updated.order_number,
+            table_number=updated.table_number,
+            order_source=updated.order_source.value,
+            room_id=updated.room_id,
+            room_number=updated.room_number,
+            status=updated.status.value,
+            updated_at=datetime.now(UTC),
+        )
+    except Exception:
+        pass
+
+    return GenericMessageResponse(message="Room order cancelled successfully.")

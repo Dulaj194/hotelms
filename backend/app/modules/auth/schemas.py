@@ -2,6 +2,8 @@ import re
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.modules.users.model import UserRole
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -14,29 +16,54 @@ class TokenResponse(BaseModel):
     must_change_password: bool = False
 
 
+class UserFeatureFlagResponse(BaseModel):
+    steward: bool = False
+    housekeeping: bool = False
+    kds: bool = False
+    reports: bool = False
+    accountant: bool = False
+    cashier: bool = False
+
+
+class UserModuleAccessResponse(BaseModel):
+    orders: bool = False
+    qr: bool = False
+    kds: bool = False
+    steward_ops: bool = False
+    reports: bool = False
+    billing: bool = False
+    housekeeping: bool = False
+    offers: bool = False
+
+
 class UserMeResponse(BaseModel):
     id: int
     full_name: str
     email: str
-    role: str
+    role: UserRole
     restaurant_id: int | None
     is_active: bool
     must_change_password: bool = False
-
-    model_config = {"from_attributes": True}
+    package_id: int | None = None
+    package_name: str | None = None
+    package_code: str | None = None
+    subscription_status: str | None = None
+    privileges: list[str] = Field(default_factory=list)
+    super_admin_scopes: list[str] = Field(default_factory=list)
+    feature_flags: UserFeatureFlagResponse = Field(default_factory=UserFeatureFlagResponse)
+    module_access: UserModuleAccessResponse = Field(default_factory=UserModuleAccessResponse)
 
 
 class TenantDataCountsResponse(BaseModel):
     menus: int = 0
     categories: int = 0
-    subcategories: int = 0
     items: int = 0
 
 
 class TenantContextResponse(BaseModel):
     user_id: int
     email: EmailStr
-    role: str
+    role: UserRole
     restaurant_id: int | None
     restaurant_name: str | None = None
     counts: TenantDataCountsResponse
@@ -94,7 +121,7 @@ class RegisterRestaurantRequest(BaseModel):
 
 class RegisterRestaurantResponse(BaseModel):
     message: str
-    message_key: str = "registration_success"
+    message_key: str = "registration_pending_approval"
     restaurant_id: int
     owner_email: EmailStr
     correlation_id: str | None = None

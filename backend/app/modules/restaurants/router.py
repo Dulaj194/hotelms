@@ -1,15 +1,45 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db, require_restaurant_user, require_roles
+from app.core.dependencies import (
+    get_db,
+    require_platform_action,
+    require_platform_scopes,
+    require_restaurant_user,
+    require_roles,
+)
+from app.modules.access import role_catalog
+from app.modules.restaurants import integration_service
 from app.modules.restaurants import service
+from app.modules.restaurants.model import RegistrationStatus
 from app.modules.restaurants.schemas import (
+    PendingRestaurantRegistrationCountResponse,
+    PendingRestaurantRegistrationListResponse,
+    RestaurantApiKeyProvisionResponse,
+    RestaurantApiKeySummaryResponse,
     RestaurantAdminUpdateRequest,
     RestaurantCreateRequest,
     RestaurantDeleteResponse,
+    RestaurantIntegrationResponse,
+    RestaurantIntegrationOpsResponse,
+    RestaurantIntegrationUpdateRequest,
     RestaurantLogoUploadResponse,
     RestaurantMeResponse,
+    RestaurantOverviewListResponse,
+    RestaurantRegistrationHistoryListResponse,
+    RestaurantRegistrationBulkReviewRequest,
+    RestaurantRegistrationBulkReviewResponse,
+    RestaurantRegistrationReviewRequest,
+    RestaurantRegistrationReviewResponse,
+    RestaurantStaffPasswordResetRequest,
+    RestaurantStaffPasswordRevealRequest,
+    RestaurantStaffPasswordRevealResponse,
+    RestaurantStaffPasswordResetResponse,
     RestaurantUpdateRequest,
+    RestaurantWebhookDeliveryActionResponse,
+    RestaurantWebhookSecretProvisionResponse,
+    RestaurantWebhookSecretSummaryResponse,
+    RestaurantWebhookHealthRefreshResponse,
 )
 from app.modules.users import service as users_service
 from app.modules.users.model import User
@@ -22,6 +52,8 @@ from app.modules.users.schemas import (
 )
 
 router = APIRouter()
+
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 
 
 @router.get("/me", response_model=RestaurantMeResponse)
@@ -39,7 +71,7 @@ def get_my_restaurant(
 @router.patch("/me", response_model=RestaurantMeResponse)
 def update_my_restaurant(
     payload: RestaurantUpdateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Update current tenant's restaurant profile. Owner/admin only.
@@ -54,12 +86,12 @@ def update_my_restaurant(
 @router.post("/me/logo", response_model=RestaurantLogoUploadResponse)
 async def upload_logo(
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> RestaurantLogoUploadResponse:
     """Upload/replace the restaurant logo. Owner/admin only.
 
-    Multipart/form-data. Allowed: jpg, jpeg, png, webp. Max: 5 MB.
+    Multipart/form-data. Allowed: jpg, jpeg, png, webp, gif. Max: 5 MB.
 
     SECURITY: Original filename never used. UUID path assigned server-side.
     restaurant_id from authenticated user.
@@ -71,27 +103,124 @@ async def upload_logo(
 
 @router.get("", response_model=list[RestaurantMeResponse])
 def list_restaurants(
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(
+        require_platform_scopes(
+            "ops_viewer",
+            "tenant_admin",
+            "billing_admin",
+            "security_admin",
+        )
+    ),
     db: Session = Depends(get_db),
 ) -> list[RestaurantMeResponse]:
     """List all restaurants. Super-admin only."""
     return service.list_all_restaurants(db)
 
 
+@router.get("/overview", response_model=RestaurantOverviewListResponse)
+def list_restaurants_overview(
+    _current_user: User = Depends(
+        require_platform_scopes(
+            "ops_viewer",
+            "tenant_admin",
+            "billing_admin",
+            "security_admin",
+        )
+    ),
+    db: Session = Depends(get_db),
+) -> RestaurantOverviewListResponse:
+    """List restaurants and latest subscription snapshots in one call."""
+    return service.list_restaurants_overview(db)
+
+
+@router.get(
+    "/registrations/pending",
+    response_model=PendingRestaurantRegistrationListResponse,
+)
+def list_pending_registrations(
+    limit: int = Query(default=50, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    sort: str = Query(default="oldest", pattern="^(oldest|newest)$"),
+    _current_user: User = Depends(require_platform_action("registrations", "view")),
+    db: Session = Depends(get_db),
+) -> PendingRestaurantRegistrationListResponse:
+    return service.list_pending_restaurant_registrations(
+        db,
+        limit=limit,
+        cursor=cursor,
+        sort_order=sort,
+    )
+
+
+@router.get(
+    "/registrations/pending/count",
+    response_model=PendingRestaurantRegistrationCountResponse,
+)
+def get_pending_registration_count(
+    _current_user: User = Depends(require_platform_action("registrations", "view")),
+    db: Session = Depends(get_db),
+) -> PendingRestaurantRegistrationCountResponse:
+    return PendingRestaurantRegistrationCountResponse(
+        pending_count=service.get_pending_restaurant_registrations_count(db),
+    )
+
+
+@router.get(
+    "/registrations/history",
+    response_model=RestaurantRegistrationHistoryListResponse,
+)
+def list_registration_history(
+    limit: int = Query(default=50, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    sort: str = Query(default="newest", pattern="^(oldest|newest)$"),
+    status_filter: str | None = None,
+    _current_user: User = Depends(require_platform_action("registrations", "view")),
+    db: Session = Depends(get_db),
+) -> RestaurantRegistrationHistoryListResponse:
+    try:
+        registration_status = (
+            RegistrationStatus(status_filter.upper()) if status_filter else None
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="status_filter must be APPROVED or REJECTED.",
+        ) from exc
+    if registration_status == RegistrationStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="History view only supports APPROVED or REJECTED statuses.",
+        )
+    return service.list_restaurant_registration_history(
+        db,
+        registration_status=registration_status,
+        limit=limit,
+        cursor=cursor,
+        sort_order=sort,
+    )
+
+
 @router.post("", response_model=RestaurantMeResponse, status_code=status.HTTP_201_CREATED)
 def create_restaurant(
     payload: RestaurantCreateRequest,
-    _current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Create a new restaurant tenant. Super-admin only."""
-    return service.create_restaurant(db, payload)
+    return service.create_restaurant(db, payload, current_user_id=current_user.id)
 
 
 @router.get("/{restaurant_id}", response_model=RestaurantMeResponse)
 def get_restaurant_by_id(
     restaurant_id: int,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(
+        require_platform_scopes(
+            "ops_viewer",
+            "tenant_admin",
+            "billing_admin",
+            "security_admin",
+        )
+    ),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Fetch any restaurant by ID. Super-admin only."""
@@ -102,21 +231,246 @@ def get_restaurant_by_id(
 def update_restaurant_by_id(
     restaurant_id: int,
     payload: RestaurantAdminUpdateRequest,
-    _current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantMeResponse:
     """Update any restaurant by ID. Super-admin only."""
-    return service.update_restaurant_for_super_admin(db, restaurant_id, payload)
+    return service.update_restaurant_for_super_admin(
+        db,
+        restaurant_id,
+        payload,
+        current_user_id=current_user.id,
+    )
+
+
+@router.patch("/{restaurant_id}/integration", response_model=RestaurantIntegrationResponse)
+def update_restaurant_integration(
+    restaurant_id: int,
+    payload: RestaurantIntegrationUpdateRequest,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantIntegrationResponse:
+    return service.update_restaurant_integration_settings(
+        db,
+        restaurant_id=restaurant_id,
+        payload=payload,
+        current_user_id=current_user.id,
+    )
+
+
+@router.get(
+    "/{restaurant_id}/integration/ops",
+    response_model=RestaurantIntegrationOpsResponse,
+)
+def get_restaurant_integration_ops(
+    restaurant_id: int,
+    _current_user: User = Depends(require_platform_scopes("security_admin", "ops_viewer")),
+    db: Session = Depends(get_db),
+) -> RestaurantIntegrationOpsResponse:
+    return integration_service.get_restaurant_integration_ops(
+        db,
+        restaurant_id=restaurant_id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/api-key/generate",
+    response_model=RestaurantApiKeyProvisionResponse,
+)
+def generate_restaurant_api_key(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantApiKeyProvisionResponse:
+    return service.provision_restaurant_api_key(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+        rotate=False,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/api-key/rotate",
+    response_model=RestaurantApiKeyProvisionResponse,
+)
+def rotate_restaurant_api_key(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantApiKeyProvisionResponse:
+    return service.provision_restaurant_api_key(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+        rotate=True,
+    )
+
+
+@router.delete(
+    "/{restaurant_id}/integration/api-key",
+    response_model=RestaurantApiKeySummaryResponse,
+)
+def revoke_restaurant_api_key(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantApiKeySummaryResponse:
+    return service.revoke_restaurant_api_key(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/webhook/secret/generate",
+    response_model=RestaurantWebhookSecretProvisionResponse,
+)
+def generate_restaurant_webhook_secret(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookSecretProvisionResponse:
+    return integration_service.provision_restaurant_webhook_secret(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+        rotate=False,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/webhook/secret/rotate",
+    response_model=RestaurantWebhookSecretProvisionResponse,
+)
+def rotate_restaurant_webhook_secret(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookSecretProvisionResponse:
+    return integration_service.provision_restaurant_webhook_secret(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+        rotate=True,
+    )
+
+
+@router.delete(
+    "/{restaurant_id}/integration/webhook/secret",
+    response_model=RestaurantWebhookSecretSummaryResponse,
+)
+def revoke_restaurant_webhook_secret(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookSecretSummaryResponse:
+    return integration_service.revoke_restaurant_webhook_secret(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/webhook/refresh",
+    response_model=RestaurantWebhookHealthRefreshResponse,
+)
+def refresh_restaurant_webhook_health(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookHealthRefreshResponse:
+    return service.refresh_restaurant_webhook_health(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/webhook/deliveries/test",
+    response_model=RestaurantWebhookDeliveryActionResponse,
+)
+def send_restaurant_test_webhook_delivery(
+    restaurant_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookDeliveryActionResponse:
+    return integration_service.send_restaurant_test_webhook_delivery(
+        db,
+        restaurant_id=restaurant_id,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/integration/webhook/deliveries/{delivery_id}/retry",
+    response_model=RestaurantWebhookDeliveryActionResponse,
+)
+def retry_restaurant_webhook_delivery(
+    restaurant_id: int,
+    delivery_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantWebhookDeliveryActionResponse:
+    return integration_service.retry_restaurant_webhook_delivery(
+        db,
+        restaurant_id=restaurant_id,
+        delivery_id=delivery_id,
+        current_user_id=current_user.id,
+    )
 
 
 @router.delete("/{restaurant_id}", response_model=RestaurantDeleteResponse)
 def delete_restaurant_by_id(
     restaurant_id: int,
-    _current_user: User = Depends(require_roles("super_admin")),
+    reason: str | None = Query(default=None, min_length=3, max_length=500),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantDeleteResponse:
     """Delete any restaurant by ID. Super-admin only."""
-    return service.delete_restaurant_for_super_admin(db, restaurant_id)
+    return service.delete_restaurant_for_super_admin(
+        db,
+        restaurant_id,
+        current_user_id=current_user.id,
+        reason=reason,
+    )
+
+
+@router.patch(
+    "/{restaurant_id}/registration/review",
+    response_model=RestaurantRegistrationReviewResponse,
+)
+def review_restaurant_registration(
+    restaurant_id: int,
+    payload: RestaurantRegistrationReviewRequest,
+    current_user: User = Depends(require_platform_action("registrations", "approve")),
+    db: Session = Depends(get_db),
+) -> RestaurantRegistrationReviewResponse:
+    return service.review_restaurant_registration(
+        db,
+        restaurant_id=restaurant_id,
+        reviewer_user_id=current_user.id,
+        payload=payload,
+    )
+
+
+@router.post(
+    "/registrations/bulk-review",
+    response_model=RestaurantRegistrationBulkReviewResponse,
+)
+def bulk_review_restaurant_registrations(
+    payload: RestaurantRegistrationBulkReviewRequest,
+    current_user: User = Depends(require_platform_action("registrations", "approve")),
+    db: Session = Depends(get_db),
+) -> RestaurantRegistrationBulkReviewResponse:
+    return service.bulk_review_restaurant_registrations(
+        db,
+        reviewer_user_id=current_user.id,
+        payload=payload,
+    )
 
 
 # ─── Super-admin: hotel logo ──────────────────────────────────────────────────
@@ -129,7 +483,7 @@ def delete_restaurant_by_id(
 async def upload_logo_for_restaurant(
     restaurant_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> RestaurantLogoUploadResponse:
     """Upload / replace the logo for any restaurant.  Super-admin only."""
@@ -145,7 +499,7 @@ async def upload_logo_for_restaurant(
 )
 def list_restaurant_staff(
     restaurant_id: int,
-    _current_user: User = Depends(require_roles("super_admin")),
+    _current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> list[StaffListItemResponse]:
     """List all staff for a specific hotel.  Super-admin only."""
@@ -161,7 +515,7 @@ def list_restaurant_staff(
 def add_restaurant_staff(
     restaurant_id: int,
     payload: StaffCreateRequest,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> StaffDetailResponse:
     """Add a staff member to a specific hotel.  Super-admin only.
@@ -173,6 +527,48 @@ def add_restaurant_staff(
     return users_service.add_staff(db, None, payload_for_hotel, current_user)
 
 
+@router.post(
+    "/{restaurant_id}/users/{user_id}/reset-password",
+    response_model=RestaurantStaffPasswordResetResponse,
+)
+def reset_restaurant_staff_password(
+    restaurant_id: int,
+    user_id: int,
+    payload: RestaurantStaffPasswordResetRequest,
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantStaffPasswordResetResponse:
+    """Reset owner/admin password and enforce password change on next login."""
+    return service.reset_restaurant_staff_password(
+        db,
+        restaurant_id=restaurant_id,
+        user_id=user_id,
+        payload=payload,
+        current_user_id=current_user.id,
+    )
+
+
+@router.post(
+    "/{restaurant_id}/users/{user_id}/reset-password/reveal",
+    response_model=RestaurantStaffPasswordRevealResponse,
+)
+def reveal_restaurant_staff_temporary_password(
+    restaurant_id: int,
+    user_id: int,
+    payload: RestaurantStaffPasswordRevealRequest,
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantStaffPasswordRevealResponse:
+    """Reveal reset password one time when email delivery fails."""
+    return service.reveal_restaurant_staff_temporary_password(
+        db,
+        restaurant_id=restaurant_id,
+        user_id=user_id,
+        reveal_token=payload.reveal_token,
+        current_user_id=current_user.id,
+    )
+
+
 @router.delete(
     "/{restaurant_id}/users/{user_id}",
     response_model=GenericMessageResponse,
@@ -180,7 +576,7 @@ def add_restaurant_staff(
 def delete_restaurant_staff(
     restaurant_id: int,
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> GenericMessageResponse:
     """Permanently remove a staff member from a hotel.  Super-admin only."""
@@ -194,7 +590,7 @@ def delete_restaurant_staff(
 def disable_restaurant_staff(
     restaurant_id: int,
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> StaffStatusResponse:
     """Deactivate a staff member in a hotel.  Super-admin only."""
@@ -208,7 +604,7 @@ def disable_restaurant_staff(
 def enable_restaurant_staff(
     restaurant_id: int,
     user_id: int,
-    current_user: User = Depends(require_roles("super_admin")),
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
     db: Session = Depends(get_db),
 ) -> StaffStatusResponse:
     """Re-activate a staff member in a hotel.  Super-admin only."""

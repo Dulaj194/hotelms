@@ -23,11 +23,11 @@ export default function OfferImagePicker({
         Upload Image
       </label>
 
-      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
         <div className="flex flex-wrap items-center gap-3">
           <label
             htmlFor="offer-image-upload"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
           >
             <UploadCloud className="h-4 w-4" />
             Choose Image
@@ -66,7 +66,7 @@ export default function OfferImagePicker({
           <img
             src={imagePreviewUrl || toAssetUrl(existingImagePath) || ""}
             alt="Offer preview"
-            className="h-44 w-full object-cover"
+            className="aspect-[16/9] w-full object-cover"
           />
         </div>
       )}

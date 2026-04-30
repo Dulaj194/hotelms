@@ -44,6 +44,7 @@ class TableSessionQrSecurityTests(unittest.TestCase):
         data = TableSessionStartRequest(
             restaurant_id=1,
             table_number="T1",
+            customer_name="Kasun",
             qr_access_key="x" * 32,
         )
 
@@ -69,6 +70,7 @@ class TableSessionQrSecurityTests(unittest.TestCase):
         data = TableSessionStartRequest(
             restaurant_id=10,
             table_number="T2",
+            customer_name="Nimali",
             qr_access_key="x" * 32,
         )
 
@@ -94,6 +96,7 @@ class TableSessionQrSecurityTests(unittest.TestCase):
         data = TableSessionStartRequest(
             restaurant_id=3,
             table_number=" A9 ",
+            customer_name="Tharindu",
             qr_access_key="x" * 32,
         )
 
@@ -118,10 +121,13 @@ class TableSessionQrSecurityTests(unittest.TestCase):
         self.assertTrue(db.committed)
         self.assertEqual(response.guest_token, "guest-token")
         self.assertEqual(response.table_number, "A9")
+        self.assertEqual(response.customer_name, "Tharindu")
+        self.assertEqual(response.session_status, "OPEN")
         deactivate.assert_called_once()
         create_session.assert_called_once()
         self.assertEqual(deactivate.call_args.kwargs["table_number"], "A9")
         self.assertEqual(create_session.call_args.kwargs["table_number"], "A9")
+        self.assertEqual(create_session.call_args.kwargs["customer_name"], "Tharindu")
 
 
 if __name__ == "__main__":

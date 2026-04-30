@@ -3,11 +3,19 @@ from decimal import Decimal
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.modules.packages import catalog as packages_catalog
 from app.modules.packages import repository
 from app.modules.packages.schemas import (
+    PackageAdminListResponse,
+    PackageCreateRequest,
+    PackageDeleteResponse,
     PackageDetailResponse,
     PackageListResponse,
+    PackagePrivilegeCatalogItem,
+    PackagePrivilegeCatalogResponse,
+    PackagePrivilegeModuleItem,
     PackageResponse,
+    PackageUpdateRequest,
 )
 
 _DEFAULT_PACKAGE_DEFINITIONS = [
@@ -39,6 +47,34 @@ _DEFAULT_PACKAGE_DEFINITIONS = [
         "privileges": ["QR_MENU", "HOUSEKEEPING", "OFFERS"],
     },
 ]
+
+def _serialize_package_detail(db: Session, package) -> PackageDetailResponse:
+    privileges = [
+        privilege.privilege_code for privilege in repository.list_package_privileges(db, package.id)
+    ]
+    return PackageDetailResponse(
+        id=package.id,
+        name=package.name,
+        code=package.code,
+        description=package.description,
+        price=package.price,
+        billing_period_days=package.billing_period_days,
+        is_active=package.is_active,
+        created_at=package.created_at,
+        updated_at=package.updated_at,
+        privileges=privileges,
+    )
+
+
+def _validate_privileges(privileges: list[str]) -> list[str]:
+    normalized = packages_catalog.normalize_privilege_codes(privileges)
+    invalid = packages_catalog.get_invalid_privilege_codes(normalized)
+    if invalid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported privilege code(s): {', '.join(invalid)}",
+        )
+    return normalized
 
 
 def ensure_default_packages(db: Session, *, commit: bool = True) -> None:
@@ -83,17 +119,130 @@ def get_package_detail(db: Session, package_id: int) -> PackageDetailResponse:
             detail="Package not found.",
         )
 
-    privileges = [p.privilege_code for p in repository.list_package_privileges(db, package.id)]
+    return _serialize_package_detail(db, package)
 
-    return PackageDetailResponse(
-        id=package.id,
-        name=package.name,
-        code=package.code,
-        description=package.description,
-        price=package.price,
-        billing_period_days=package.billing_period_days,
-        is_active=package.is_active,
-        created_at=package.created_at,
-        updated_at=package.updated_at,
-        privileges=privileges,
+
+def list_package_privilege_catalog() -> PackagePrivilegeCatalogResponse:
+    items = [
+        PackagePrivilegeCatalogItem(
+            code=definition.code,
+            label=definition.label,
+            description=definition.description,
+            modules=[
+                PackagePrivilegeModuleItem(
+                    key=module.key,
+                    label=module.label,
+                    description=module.description,
+                )
+                for module in definition.modules
+            ],
+        )
+        for definition in packages_catalog.list_privilege_definitions()
+    ]
+    return PackagePrivilegeCatalogResponse(items=items)
+
+
+def list_packages_for_super_admin(db: Session) -> PackageAdminListResponse:
+    ensure_default_packages(db)
+    packages = repository.list_all_packages(db)
+    items = [_serialize_package_detail(db, package) for package in packages]
+    return PackageAdminListResponse(items=items, total=len(items))
+
+
+def create_package_for_super_admin(
+    db: Session,
+    payload: PackageCreateRequest,
+) -> PackageDetailResponse:
+    ensure_default_packages(db)
+    _validate_privileges(payload.privileges)
+
+    existing = repository.get_package_by_code(db, payload.code)
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Package code '{payload.code}' already exists.",
+        )
+
+    package = repository.create_package(
+        db,
+        name=payload.name.strip(),
+        code=payload.code,
+        description=payload.description.strip() if payload.description else None,
+        price=payload.price,
+        billing_period_days=payload.billing_period_days,
+        is_active=payload.is_active,
+    )
+    for privilege in payload.privileges:
+        repository.add_package_privilege(db, package.id, privilege)
+
+    db.commit()
+    db.refresh(package)
+    return _serialize_package_detail(db, package)
+
+
+def update_package_for_super_admin(
+    db: Session,
+    package_id: int,
+    payload: PackageUpdateRequest,
+) -> PackageDetailResponse:
+    ensure_default_packages(db)
+    package = repository.get_package_by_id(db, package_id)
+    if package is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found.",
+        )
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if "code" in update_data:
+        existing = repository.get_package_by_code(db, update_data["code"])
+        if existing is not None and existing.id != package.id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Package code '{update_data['code']}' already exists.",
+            )
+    if "name" in update_data and update_data["name"] is not None:
+        update_data["name"] = update_data["name"].strip()
+    if "description" in update_data and update_data["description"] is not None:
+        update_data["description"] = update_data["description"].strip() or None
+    if "privileges" in update_data:
+        privileges = _validate_privileges(update_data.pop("privileges"))
+    else:
+        privileges = None
+
+    repository.update_package(db, package, update_data=update_data)
+    if privileges is not None:
+        repository.delete_package_privileges(db, package.id)
+        for privilege in privileges:
+            repository.add_package_privilege(db, package.id, privilege)
+
+    db.commit()
+    db.refresh(package)
+    return _serialize_package_detail(db, package)
+
+
+def delete_package_for_super_admin(
+    db: Session,
+    package_id: int,
+) -> PackageDeleteResponse:
+    ensure_default_packages(db)
+    package = repository.get_package_by_id(db, package_id)
+    if package is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found.",
+        )
+
+    active_subscriptions = repository.count_package_subscriptions(db, package.id)
+    if active_subscriptions > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Package cannot be deleted because it is linked to subscriptions.",
+        )
+
+    repository.delete_package(db, package)
+    db.commit()
+    return PackageDeleteResponse(
+        message="Package deleted successfully.",
+        package_id=package_id,
     )

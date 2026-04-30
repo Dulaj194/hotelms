@@ -4,19 +4,18 @@ import ActionDialog from "@/components/shared/ActionDialog";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import type {
   AssignedArea,
+  StaffManagementPolicyResponse,
   StaffListItemResponse,
   StaffCreateRequest,
   StaffUpdateRequest,
   UserRole,
 } from "@/types/user";
 import {
-  ASSIGNED_AREAS,
   ASSIGNED_AREA_LABELS,
+  isUserRole,
   ROLE_LABELS,
-  STAFF_ROLES,
 } from "@/types/user";
 import { ApiError } from "@/lib/api";
-import { getUser, normalizeRole } from "@/lib/auth";
 
 type DialogMode = { type: "add" } | { type: "edit"; staff: StaffListItemResponse } | null;
 type ConfirmActionState = {
@@ -34,20 +33,13 @@ const EMPTY_CREATE: StaffCreateRequest = {
   phone: "",
   password: "",
   role: "steward",
-  assigned_area: "steward",
+  assigned_area: null,
   is_active: true,
 };
 
 export default function Staff() {
-  const currentUserRole = normalizeRole(getUser()?.role);
-
-  function canManageRole(targetRole: UserRole): boolean {
-    if (currentUserRole === "owner") return targetRole !== "owner";
-    if (currentUserRole === "admin") return targetRole === "steward" || targetRole === "housekeeper";
-    return false;
-  }
-
   const [staffList, setStaffList] = useState<StaffListItemResponse[]>([]);
+  const [staffManagementPolicy, setStaffManagementPolicy] = useState<StaffManagementPolicyResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -64,14 +56,37 @@ export default function Staff() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const allowedRoles = useMemo<UserRole[]>(() => {
-    if (currentUserRole === "owner") {
-      return STAFF_ROLES.filter((role) => role !== "owner");
+    const policyRoles = (staffManagementPolicy?.manageable_roles ?? []).filter(isUserRole);
+    return policyRoles;
+  }, [staffManagementPolicy]);
+
+  const roleFilterOptions = useMemo<UserRole[]>(() => {
+    const seen = new Set<UserRole>();
+    for (const staff of staffList) {
+      seen.add(staff.role);
     }
-    if (currentUserRole === "admin") {
-      return ["steward", "housekeeper"];
+    return Array.from(seen);
+  }, [staffList]);
+
+  function canManageRole(targetRole: UserRole): boolean {
+    return allowedRoles.includes(targetRole);
+  }
+
+  function getDefaultAssignedArea(role: UserRole): AssignedArea | null {
+    const policyDefault = staffManagementPolicy?.default_assigned_area_by_role?.[role];
+    if (policyDefault !== undefined) {
+      return policyDefault;
     }
-    return ["steward", "housekeeper"];
-  }, [currentUserRole]);
+      return null;
+  }
+
+  const allowedAssignedAreas = useMemo(
+    () => {
+      const policyAreas = staffManagementPolicy?.allowed_assigned_areas_by_role?.[formData.role];
+      return policyAreas ?? [];
+    },
+    [formData.role, staffManagementPolicy],
+  );
 
   function loadStaff() {
     setLoading(true);
@@ -91,13 +106,33 @@ export default function Staff() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { loadStaff(); }, []);
+  function loadStaffManagementPolicy() {
+    api
+      .get<StaffManagementPolicyResponse>("/users/management-policy")
+      .then(setStaffManagementPolicy)
+      .catch((err: unknown) => {
+        const msg =
+          err instanceof ApiError
+            ? err.detail
+            : err instanceof Error
+              ? err.message
+              : "Failed to load staff management policy.";
+        setFetchError(msg);
+        // Fail closed for role-management UI when policy cannot be loaded.
+        setStaffManagementPolicy(null);
+      });
+  }
+
+  useEffect(() => {
+    loadStaff();
+    loadStaffManagementPolicy();
+  }, []);
 
   function openAdd() {
     setFormData({
       ...EMPTY_CREATE,
       role: allowedRoles[0] ?? "steward",
-      assigned_area: "steward",
+      assigned_area: getDefaultAssignedArea(allowedRoles[0] ?? "steward"),
     });
     setFormError(null);
     setDialog({ type: "add" });
@@ -295,6 +330,7 @@ export default function Staff() {
           <h1 className="text-2xl font-semibold">Staff</h1>
           <button
             onClick={openAdd}
+            disabled={allowedRoles.length === 0}
             className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             + Add staff
@@ -333,7 +369,7 @@ export default function Staff() {
               onChange={(e) => setRoleFilter(e.target.value as UserRole | "all")}
             >
               <option value="all">All roles</option>
-              {STAFF_ROLES.map((role) => (
+              {roleFilterOptions.map((role) => (
                 <option key={role} value={role}>
                   {ROLE_LABELS[role]}
                 </option>
@@ -356,7 +392,7 @@ export default function Staff() {
         </div>
 
         {loading ? (
-          <p className="text-gray-500 text-sm">Loadingâ€¦</p>
+          <p className="text-gray-500 text-sm">Loading...</p>
         ) : fetchError ? (
           <p className="text-red-600 text-sm">{fetchError}</p>
         ) : filteredStaff.length === 0 ? (
@@ -377,16 +413,16 @@ export default function Staff() {
                     </span>
                   </div>
                   <div className="mt-2 space-y-1 text-xs text-slate-600">
-                    <p>Username: {s.username ?? "Ã¢â‚¬â€"}</p>
-                    <p>Contact: {s.phone ?? "Ã¢â‚¬â€"}</p>
+                    <p>Username: {s.username ?? "-"}</p>
+                    <p>Contact: {s.phone ?? "-"}</p>
                     <p>Email: {s.email}</p>
                     <p>Role: {ROLE_LABELS[s.role]}</p>
-                    <p>Area: {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "Ã¢â‚¬â€"}</p>
+                    <p>Area: {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "-"}</p>
                     <p>
                       Load:{" "}
                       {s.pending_tasks_count > 0
                         ? `${s.pending_tasks_count} / ${s.load_per_staff.toFixed(2)}`
-                        : "Ã¢â‚¬â€"}
+                        : "-"}
                     </p>
                   </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -447,8 +483,8 @@ export default function Staff() {
                 {filteredStaff.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium">{s.full_name}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.username ?? "â€”"}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.phone ?? "â€”"}</td>
+                    <td className="px-4 py-3 text-gray-600">{s.username ?? "-"}</td>
+                    <td className="px-4 py-3 text-gray-600">{s.phone ?? "-"}</td>
                     <td className="px-4 py-3 text-gray-500">{s.email}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
@@ -456,12 +492,12 @@ export default function Staff() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "â€”"}
+                      {s.assigned_area ? ASSIGNED_AREA_LABELS[s.assigned_area] : "-"}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {s.pending_tasks_count > 0
                         ? `${s.pending_tasks_count} / ${s.load_per_staff.toFixed(2)}`
-                        : "â€”"}
+                        : "-"}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -563,7 +599,16 @@ export default function Staff() {
                 className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={formData.role}
                 onChange={(e) =>
-                  setFormData((f) => ({ ...f, role: e.target.value as UserRole }))
+                  setFormData((f) => {
+                    const nextRole = e.target.value as UserRole;
+                    const nextAreas =
+                      staffManagementPolicy?.allowed_assigned_areas_by_role?.[nextRole] ?? [];
+                    const nextAssignedArea =
+                      f.assigned_area && nextAreas.includes(f.assigned_area)
+                        ? f.assigned_area
+                        : getDefaultAssignedArea(nextRole);
+                    return { ...f, role: nextRole, assigned_area: nextAssignedArea };
+                  })
                 }
               >
                 {allowedRoles.map((r) => (
@@ -587,7 +632,7 @@ export default function Staff() {
                 }
               >
                 <option value="">Not assigned</option>
-                {ASSIGNED_AREAS.map((area) => (
+                {allowedAssignedAreas.map((area) => (
                   <option key={area} value={area}>
                     {ASSIGNED_AREA_LABELS[area]}
                   </option>
@@ -612,7 +657,7 @@ export default function Staff() {
                 disabled={submitting}
                 className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:w-auto"
               >
-                {submitting ? "Savingâ€¦" : dialog.type === "add" ? "Add member" : "Save changes"}
+                {submitting ? "Saving..." : dialog.type === "add" ? "Add member" : "Save changes"}
               </button>
               <button
                 onClick={closeDialog}

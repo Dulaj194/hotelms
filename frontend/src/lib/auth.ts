@@ -1,3 +1,10 @@
+import {
+  getDefaultSuperAdminPath,
+  hasAnyPlatformScope,
+  normalizePlatformScopes,
+} from "@/features/platform-access/catalog";
+import type { FeatureFlagSnapshot, ModuleAccessSnapshot } from "@/types/access";
+
 /**
  * Lightweight auth state helpers.
  *
@@ -37,6 +44,15 @@ export interface StoredUser {
   role: string;
   restaurant_id: number | null;
   must_change_password: boolean;
+  is_active?: boolean;
+  package_id?: number | null;
+  package_name?: string | null;
+  package_code?: string | null;
+  subscription_status?: string | null;
+  privileges?: string[];
+  super_admin_scopes?: string[];
+  feature_flags?: FeatureFlagSnapshot;
+  module_access?: ModuleAccessSnapshot;
 }
 
 export function normalizeRole(role: string | null | undefined): string {
@@ -76,7 +92,33 @@ export function getUser(): StoredUser | null {
 }
 
 export function setUser(user: StoredUser): void {
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  const normalizedSuperAdminScopes = normalizePlatformScopes(user.super_admin_scopes);
+  localStorage.setItem(
+    USER_KEY,
+    JSON.stringify({
+      ...user,
+      privileges: user.privileges ?? [],
+      super_admin_scopes: normalizedSuperAdminScopes,
+      feature_flags: user.feature_flags ?? {
+        steward: false,
+        housekeeping: false,
+        kds: false,
+        reports: false,
+        accountant: false,
+        cashier: false,
+      },
+      module_access: user.module_access ?? {
+        orders: false,
+        qr: false,
+        kds: false,
+        steward_ops: false,
+        reports: false,
+        billing: false,
+        housekeeping: false,
+        offers: false,
+      },
+    }),
+  );
 }
 
 export function clearUser(): void {
@@ -92,13 +134,27 @@ export function isAuthenticated(): boolean {
   return getAccessToken() !== null;
 }
 
-export function getRoleRedirect(role: string): string {
+export function hasSuperAdminScope(
+  requiredScopes: readonly string[],
+  scopes: readonly string[] | null | undefined,
+): boolean {
+  return hasAnyPlatformScope(scopes, requiredScopes);
+}
+
+export function getRoleRedirect(
+  role: string,
+  superAdminScopes?: string[] | null,
+): string {
   switch (normalizeRole(role)) {
     case "super_admin":
-      return "/super-admin/restaurants";
+      return getDefaultSuperAdminPath(superAdminScopes);
     case "owner":
     case "admin":
       return "/dashboard";
+    case "cashier":
+      return "/admin/billing/cashier";
+    case "accountant":
+      return "/admin/billing/accountant";
     case "steward":
       return "/admin/kitchen";
     case "housekeeper":

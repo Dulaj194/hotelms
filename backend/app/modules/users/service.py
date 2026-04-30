@@ -2,59 +2,139 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.modules.access import role_hierarchy
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.housekeeping.model import HousekeepingRequest
+from app.modules.platform_access import catalog as platform_access_catalog
 from app.modules.orders.model import OrderHeader, OrderStatus
 from app.modules.restaurants import repository as restaurant_repository
 from app.modules.users.model import User, UserRole
 from app.modules.users.repository import (
     count_active_owners,
+    count_active_platform_users,
+    count_active_platform_users_with_scope,
     create_staff,
+    create_platform_user as repo_create_platform_user,
     create_user as repo_create_user,
     delete_by_id,
+    delete_platform_user as repo_delete_platform_user,
     disable_by_id,
+    disable_platform_user as repo_disable_platform_user,
     enable_by_id,
+    enable_platform_user as repo_enable_platform_user,
     get_by_id,
     get_by_id_global,
     get_user_by_email,
     get_user_by_phone,
     get_user_by_username,
+    get_platform_user_for_super_admin,
     list_by_restaurant,
+    list_platform_users as repo_list_platform_users,
+    update_platform_user as repo_update_platform_user,
     update_by_id,
 )
 from app.modules.users.schemas import (
     GenericMessageResponse,
+    PlatformUserCreateRequest,
+    PlatformUserDetailResponse,
+    PlatformUserListItemResponse,
+    PlatformUserListResponse,
+    PlatformUserUpdateRequest,
     StaffCreateRequest,
     StaffDetailResponse,
     StaffListItemResponse,
+    StaffManagementPolicyResponse,
     StaffStatusResponse,
     StaffUpdateRequest,
     UserCreate,
     UserResponse,
 )
 
-# ─── Role hierarchy ───────────────────────────────────────────────────────────
-#
-# Defines which roles a given manager role is allowed to create / modify.
-# owner  → can manage admin, steward, housekeeper
-# admin  → can manage steward, housekeeper
-# steward / housekeeper → no management rights (enforced at router level too)
-
-_MANAGEABLE_ROLES: dict[str, set[UserRole]] = {
-    "super_admin": {UserRole.owner, UserRole.admin, UserRole.steward, UserRole.housekeeper},
-    "owner": {UserRole.admin, UserRole.steward, UserRole.housekeeper},
-    "admin": {UserRole.steward, UserRole.housekeeper},
-}
-
 
 def _assert_can_manage_role(manager: User, target_role: UserRole) -> None:
     """Raise 403 if the manager's role cannot manage the target role."""
-    allowed = _MANAGEABLE_ROLES.get(manager.role.value, set())
-    if target_role not in allowed:
+    if not role_hierarchy.can_manage_role(manager.role, target_role):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Your role '{manager.role.value}' cannot manage '{target_role.value}' users.",
         )
+
+
+def _normalize_assigned_area(
+    *,
+    role: UserRole,
+    assigned_area: str | None,
+) -> str | None:
+    if not role_hierarchy.is_allowed_assigned_area(role, assigned_area):
+        allowed_areas = role_hierarchy.get_allowed_assigned_areas(role)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"assigned_area '{assigned_area}' is not valid for the "
+                f"'{role.value}' role."
+            ),
+        )
+    return assigned_area if assigned_area is not None else role_hierarchy.get_default_assigned_area(role)
+
+
+def _normalize_super_admin_scopes(scopes: list[str] | None) -> list[str]:
+    return platform_access_catalog.normalize_platform_scopes(scopes)
+
+
+def _ensure_security_admin_retained(
+    db: Session,
+    *,
+    target_user: User,
+    next_is_active: bool,
+    next_scopes: list[str],
+) -> None:
+    current_scopes = set(target_user.super_admin_scopes)
+    next_scope_set = set(next_scopes)
+
+    losing_security_scope = "security_admin" in current_scopes and "security_admin" not in next_scope_set
+    deactivating_security_admin = "security_admin" in current_scopes and not next_is_active
+
+    if not losing_security_scope and not deactivating_security_admin:
+        return
+
+    if count_active_platform_users_with_scope(db, "security_admin") <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one active security admin scope is required.",
+        )
+
+
+def _assert_role_feature_enabled_for_restaurant(
+    db: Session,
+    *,
+    restaurant_id: int,
+    role: UserRole,
+) -> None:
+    required_feature_by_role = {
+        UserRole.steward: "steward",
+        UserRole.housekeeper: "housekeeping",
+        UserRole.cashier: "cashier",
+        UserRole.accountant: "accountant",
+    }
+    required_feature = required_feature_by_role.get(role)
+    if required_feature is None:
+        return
+
+    restaurant = restaurant_repository.get_by_id(db, restaurant_id)
+    if restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target restaurant not found.",
+        )
+
+    feature_flags = restaurant.feature_flags
+    if feature_flags.get(required_feature, True):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=f"The '{required_feature}' workflow is disabled for this restaurant.",
+    )
 
 
 # ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -76,6 +156,27 @@ def create_user(db: Session, data: UserCreate) -> UserResponse:
 def list_staff(db: Session, restaurant_id: int) -> list[StaffListItemResponse]:
     """List all staff for the current tenant restaurant."""
     return list_staff_filtered(db, restaurant_id)
+
+
+def get_staff_management_policy(current_user: User) -> StaffManagementPolicyResponse:
+    manageable_roles = role_hierarchy.get_manageable_roles(current_user.role)
+
+    allowed_assigned_areas_by_role: dict[UserRole, list[str]] = {}
+    default_assigned_area_by_role: dict[UserRole, str | None] = {}
+    for role in sorted(manageable_roles, key=lambda role_item: role_item.value):
+        allowed_assigned_areas_by_role[role] = sorted(
+            area
+            for area in role_hierarchy.get_allowed_assigned_areas(role)
+            if area is not None
+        )
+        default_assigned_area_by_role[role] = role_hierarchy.get_default_assigned_area(role)
+
+    return StaffManagementPolicyResponse(
+        manager_role=current_user.role,
+        manageable_roles=sorted(manageable_roles, key=lambda role_item: role_item.value),
+        allowed_assigned_areas_by_role=allowed_assigned_areas_by_role,
+        default_assigned_area_by_role=default_assigned_area_by_role,
+    )
 
 
 def list_staff_filtered(
@@ -188,10 +289,20 @@ def add_staff(
             detail="No restaurant context.",
         )
 
+    _assert_role_feature_enabled_for_restaurant(
+        db,
+        restaurant_id=target_restaurant_id,
+        role=data.role,
+    )
+
     normalized_username = data.username.strip().lower() if data.username else None
     normalized_phone = data.phone.strip() if data.phone else None
     data.username = normalized_username
     data.phone = normalized_phone
+    data.assigned_area = _normalize_assigned_area(
+        role=data.role,
+        assigned_area=data.assigned_area,
+    )
 
     # Check email uniqueness globally (email is unique across all tenants)
     if get_user_by_email(db, data.email):
@@ -255,6 +366,25 @@ def update_staff(
     # If role is being changed, validate the new role is manageable
     if data.role is not None:
         _assert_can_manage_role(current_user, data.role)
+
+    next_role = data.role or existing.role
+    _assert_role_feature_enabled_for_restaurant(
+        db,
+        restaurant_id=restaurant_id,
+        role=next_role,
+    )
+    assigned_area_provided = "assigned_area" in data.model_fields_set
+    candidate_assigned_area = (
+        data.assigned_area
+        if assigned_area_provided
+        else existing.assigned_area if data.role is None else None
+    )
+    normalized_assigned_area = _normalize_assigned_area(
+        role=next_role,
+        assigned_area=candidate_assigned_area,
+    )
+    if assigned_area_provided or data.role is not None:
+        data.assigned_area = normalized_assigned_area
 
     # Email uniqueness: if changing email, ensure it's not taken
     if data.email and data.email != existing.email:
@@ -408,3 +538,258 @@ def delete_staff(
     )
 
     return GenericMessageResponse(message="Staff member deleted successfully.")
+
+
+def list_platform_users(
+    db: Session,
+    *,
+    is_active: bool | None = None,
+) -> PlatformUserListResponse:
+    users = repo_list_platform_users(db, is_active=is_active)
+    return PlatformUserListResponse(
+        items=[PlatformUserListItemResponse.model_validate(user) for user in users],
+        total=len(users),
+    )
+
+
+def get_platform_user(
+    db: Session,
+    user_id: int,
+) -> PlatformUserDetailResponse:
+    user = get_platform_user_for_super_admin(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+    return PlatformUserDetailResponse.model_validate(user)
+
+
+def create_platform_user(
+    db: Session,
+    data: PlatformUserCreateRequest,
+    current_user: User,
+) -> PlatformUserDetailResponse:
+    normalized_username = data.username.strip().lower() if data.username else None
+    normalized_phone = data.phone.strip() if data.phone else None
+    normalized_scopes = _normalize_super_admin_scopes(data.super_admin_scopes)
+
+    if get_user_by_email(db, data.email):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this email already exists.",
+        )
+    if normalized_username and get_user_by_username(db, normalized_username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this username already exists.",
+        )
+    if normalized_phone and get_user_by_phone(db, normalized_phone):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this contact number already exists.",
+        )
+
+    user = repo_create_platform_user(
+        db,
+        full_name=data.full_name,
+        email=str(data.email),
+        username=normalized_username,
+        phone=normalized_phone,
+        password=data.password,
+        is_active=data.is_active,
+        must_change_password=data.must_change_password,
+        super_admin_scopes=normalized_scopes,
+    )
+
+    write_audit_log(
+        db,
+        event_type="platform_user_created",
+        user_id=current_user.id,
+        metadata={
+            "created_user_id": user.id,
+            "super_admin_scopes": normalized_scopes,
+        },
+    )
+    return PlatformUserDetailResponse.model_validate(user)
+
+
+def update_platform_user(
+    db: Session,
+    user_id: int,
+    data: PlatformUserUpdateRequest,
+    current_user: User,
+) -> PlatformUserDetailResponse:
+    user = get_platform_user_for_super_admin(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+
+    update_data = data.model_dump(exclude_unset=True)
+    if "email" in update_data and update_data["email"] != user.email:
+        if get_user_by_email(db, update_data["email"]):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this email already exists.",
+            )
+    if "username" in update_data:
+        normalized_username = update_data["username"].strip().lower() if update_data["username"] else None
+        if normalized_username != (user.username or None) and normalized_username and get_user_by_username(db, normalized_username):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this username already exists.",
+            )
+        update_data["username"] = normalized_username
+    if "phone" in update_data:
+        normalized_phone = update_data["phone"].strip() if update_data["phone"] else None
+        if normalized_phone != (user.phone or None) and normalized_phone and get_user_by_phone(db, normalized_phone):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this contact number already exists.",
+        )
+        update_data["phone"] = normalized_phone
+
+    next_scopes = user.super_admin_scopes
+    if "super_admin_scopes" in update_data:
+        next_scopes = _normalize_super_admin_scopes(update_data["super_admin_scopes"])
+        update_data["super_admin_scopes"] = next_scopes
+
+    if update_data.get("is_active") is False and user.is_active and count_active_platform_users(db) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot deactivate the last active super admin account.",
+        )
+
+    _ensure_security_admin_retained(
+        db,
+        target_user=user,
+        next_is_active=bool(update_data.get("is_active", user.is_active)),
+        next_scopes=next_scopes,
+    )
+
+    updated = repo_update_platform_user(db, user, update_data)
+    write_audit_log(
+        db,
+        event_type="platform_user_updated",
+        user_id=current_user.id,
+        metadata={
+            "updated_user_id": user_id,
+            "super_admin_scopes": updated.super_admin_scopes,
+        },
+    )
+    return PlatformUserDetailResponse.model_validate(updated)
+
+
+def disable_platform_user(
+    db: Session,
+    user_id: int,
+    current_user: User,
+) -> StaffStatusResponse:
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot disable your own platform account.",
+        )
+
+    user = get_platform_user_for_super_admin(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+    _ensure_security_admin_retained(
+        db,
+        target_user=user,
+        next_is_active=False,
+        next_scopes=user.super_admin_scopes,
+    )
+    if user.is_active and count_active_platform_users(db) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot disable the last active super admin account.",
+        )
+
+    updated = repo_disable_platform_user(db, user)
+    write_audit_log(
+        db,
+        event_type="platform_user_disabled",
+        user_id=current_user.id,
+        metadata={"disabled_user_id": user_id},
+    )
+    return StaffStatusResponse(
+        id=updated.id,
+        is_active=updated.is_active,
+        message="Platform user disabled.",
+    )
+
+
+def enable_platform_user(
+    db: Session,
+    user_id: int,
+    current_user: User,
+) -> StaffStatusResponse:
+    user = get_platform_user_for_super_admin(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+
+    updated = repo_enable_platform_user(db, user)
+    write_audit_log(
+        db,
+        event_type="platform_user_enabled",
+        user_id=current_user.id,
+        metadata={"enabled_user_id": user_id},
+    )
+    return StaffStatusResponse(
+        id=updated.id,
+        is_active=updated.is_active,
+        message="Platform user enabled.",
+    )
+
+
+def delete_platform_user(
+    db: Session,
+    user_id: int,
+    current_user: User,
+) -> GenericMessageResponse:
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot delete your own platform account.",
+        )
+
+    user = get_platform_user_for_super_admin(db, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+    _ensure_security_admin_retained(
+        db,
+        target_user=user,
+        next_is_active=False,
+        next_scopes=user.super_admin_scopes,
+    )
+    if user.is_active and count_active_platform_users(db) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete the last active super admin account.",
+        )
+    if user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Deactivate the platform account before deleting it.",
+        )
+
+    repo_delete_platform_user(db, user)
+    write_audit_log(
+        db,
+        event_type="platform_user_deleted",
+        user_id=current_user.id,
+        metadata={"deleted_user_id": user_id},
+    )
+    return GenericMessageResponse(message="Platform user deleted successfully.")

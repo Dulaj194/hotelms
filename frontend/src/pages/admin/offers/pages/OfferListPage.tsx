@@ -71,7 +71,7 @@ export default function OfferListPage() {
               type="button"
               onClick={() => navigate("/admin/offers/new")}
               disabled={privilegeLoading || !offersEnabled}
-              className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:py-2"
             >
               Add New Offer
             </button>
@@ -101,7 +101,7 @@ export default function OfferListPage() {
         )}
 
         {offersEnabled && !loading && offers.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {offers.map((offer) => (
               <OfferCard
                 key={offer.id}

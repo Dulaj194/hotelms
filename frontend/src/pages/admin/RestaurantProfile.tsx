@@ -4,7 +4,15 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Star } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
+import { getFeatureFlagEntries } from "@/features/access/catalog";
 import { ApiError, api } from "@/lib/api";
+import { toAssetUrl } from "@/lib/assets";
+import {
+  ACCEPTED_LOGO_INPUT,
+  MAX_LOGO_SIZE_MB,
+  validateLogoFile,
+} from "@/lib/logoUpload";
+import type { SettingsRequestListResponse, SettingsRequestResponse } from "@/types/settings";
 import type {
   AdminDashboardOverviewResponse,
   DashboardSetupRequirement,
@@ -35,7 +43,7 @@ interface BusinessFormState {
   country_id: string;
   currency_id: string;
   billing_email: string;
-  tax_id: string;
+  public_menu_banner_urls_text: string;
 }
 
 interface ScheduleFormState {
@@ -47,7 +55,6 @@ const SETUP_SECTION_LABELS: Record<string, string> = {
   country: "Business Details",
   currency: "Business Details",
   billing_email: "Business Details",
-  tax_id: "Business Details",
   logo_url: "Branding",
   opening_time: "Operating Schedule",
   closing_time: "Operating Schedule",
@@ -79,7 +86,7 @@ export default function RestaurantProfile() {
     country_id: "",
     currency_id: "",
     billing_email: "",
-    tax_id: "",
+    public_menu_banner_urls_text: "",
   });
 
   const [editingSchedule, setEditingSchedule] = useState(false);
@@ -92,6 +99,11 @@ export default function RestaurantProfile() {
 
   const [uploading, setUploading] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<NoticeMessage | null>(null);
+  const [accessRequestFlags, setAccessRequestFlags] = useState(restaurantFeatureFlagDefaults());
+  const [accessRequestReason, setAccessRequestReason] = useState("");
+  const [submittingAccessRequest, setSubmittingAccessRequest] = useState(false);
+  const [accessRequestNotice, setAccessRequestNotice] = useState<NoticeMessage | null>(null);
+  const [pendingAccessRequest, setPendingAccessRequest] = useState<SettingsRequestResponse | null>(null);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -119,7 +131,8 @@ export default function RestaurantProfile() {
       setRestaurant(profileData);
       resetBusinessForm(profileData);
       resetScheduleForm(profileData);
-      await loadReferenceLookups();
+      setAccessRequestFlags(profileData.feature_flags);
+      await Promise.all([loadReferenceLookups(), loadPendingAccessRequest()]);
     } catch (err) {
       if (!aliveRef.current) {
         return;
@@ -168,6 +181,23 @@ export default function RestaurantProfile() {
     }
   }
 
+  async function loadPendingAccessRequest() {
+    try {
+      const response = await api.get<SettingsRequestListResponse>("/settings/requests?limit=50");
+      if (!aliveRef.current) {
+        return;
+      }
+
+      const pending = response.items.find((item) => item.status === "PENDING") ?? null;
+      setPendingAccessRequest(pending);
+    } catch {
+      if (!aliveRef.current) {
+        return;
+      }
+      setPendingAccessRequest(null);
+    }
+  }
+
   async function loadReferenceLookups() {
     try {
       const [countryData, currencyData] = await Promise.all([
@@ -198,8 +228,8 @@ export default function RestaurantProfile() {
       address: data.address ?? "",
       country_id: data.country_id ? String(data.country_id) : "",
       currency_id: data.currency_id ? String(data.currency_id) : "",
-      billing_email: data.billing_email ?? "",
-      tax_id: data.tax_id ?? "",
+      billing_email: data.billing_email ?? data.email ?? "",
+      public_menu_banner_urls_text: toBannerUrlsText(data.public_menu_banner_urls ?? []),
     });
   }
 
@@ -208,6 +238,70 @@ export default function RestaurantProfile() {
       opening_time: data.opening_time ?? "",
       closing_time: data.closing_time ?? "",
     });
+  }
+
+  async function handleAccessRequestSubmit() {
+    if (!restaurant) {
+      return;
+    }
+
+    if (pendingAccessRequest) {
+      setAccessRequestNotice({
+        tone: "error",
+        text: `Pending request #${pendingAccessRequest.request_id} is already awaiting super admin review.`,
+      });
+      return;
+    }
+
+    const requestedChanges = getRequestedFeatureFlagChanges(
+      restaurant.feature_flags,
+      accessRequestFlags,
+    );
+
+    if (Object.keys(requestedChanges).length === 0) {
+      setAccessRequestNotice({
+        tone: "error",
+        text: "Change at least one module toggle before submitting. Request reason alone is not enough.",
+      });
+      return;
+    }
+
+    setSubmittingAccessRequest(true);
+    setAccessRequestNotice(null);
+    try {
+      const response = await api.post<SettingsRequestResponse>("/settings/requests", {
+        requested_changes: requestedChanges,
+        request_reason: toNullable(accessRequestReason),
+      });
+
+      if (!aliveRef.current) {
+        return;
+      }
+
+      setAccessRequestNotice({
+        tone: "success",
+        text: `Access request #${response.request_id} submitted for super admin review.`,
+      });
+      setPendingAccessRequest(response);
+      setAccessRequestReason("");
+    } catch (error) {
+      if (!aliveRef.current) {
+        return;
+      }
+
+      if (error instanceof ApiError && error.status === 409) {
+        await loadPendingAccessRequest();
+      }
+
+      setAccessRequestNotice({
+        tone: "error",
+        text: getErrorMessage(error, "Failed to submit the access request."),
+      });
+    } finally {
+      if (aliveRef.current) {
+        setSubmittingAccessRequest(false);
+      }
+    }
   }
 
   async function handleRefresh() {
@@ -265,16 +359,20 @@ export default function RestaurantProfile() {
     setSavingBusiness(true);
     setProfileNotice(null);
 
+    const primaryEmail = toNullable(businessForm.email);
+    const billingEmail = toNullable(businessForm.billing_email) ?? primaryEmail;
+    const publicMenuBannerUrls = parseBannerUrlsText(businessForm.public_menu_banner_urls_text);
+
     const updated = await saveProfileChanges(
       {
         name: trimmedName,
-        email: toNullable(businessForm.email),
+        email: primaryEmail,
         phone: toNullable(businessForm.phone),
         address: toNullable(businessForm.address),
         country_id: toNullableNumber(businessForm.country_id),
         currency_id: toNullableNumber(businessForm.currency_id),
-        billing_email: toNullable(businessForm.billing_email),
-        tax_id: toNullable(businessForm.tax_id),
+        billing_email: billingEmail,
+        public_menu_banner_urls: publicMenuBannerUrls,
       },
       {
         success: "Business details updated successfully.",
@@ -345,6 +443,15 @@ export default function RestaurantProfile() {
       return;
     }
 
+    const validationError = validateLogoFile(file);
+    if (validationError) {
+      setUploadNotice({ tone: "error", text: validationError });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
     setUploading(true);
     setUploadNotice(null);
 
@@ -364,7 +471,10 @@ export default function RestaurantProfile() {
         return;
       }
 
-      setUploadNotice({ tone: "success", text: "Logo uploaded successfully." });
+      setUploadNotice({
+        tone: "success",
+        text: restaurant.logo_url ? "Logo updated successfully." : "Logo uploaded successfully.",
+      });
     } catch (err) {
       if (!aliveRef.current) {
         return;
@@ -412,9 +522,7 @@ export default function RestaurantProfile() {
     );
   }
 
-  const logoSrc = restaurant.logo_url
-    ? `${import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8000"}${restaurant.logo_url}`
-    : null;
+  const logoSrc = toAssetUrl(restaurant.logo_url) ?? null;
 
   const trialDaysRemaining = subscriptionSummary?.days_remaining ?? null;
   const showTrialBanner =
@@ -450,6 +558,19 @@ export default function RestaurantProfile() {
       label: restaurant.currency ?? `Currency #${businessForm.currency_id}`,
     });
   }
+  const billingEmailSuggestion = toNullable(businessForm.email);
+  const billingEmailValue = toNullable(businessForm.billing_email);
+  const billingEmailMatchesPrimary = emailsEqual(billingEmailSuggestion, billingEmailValue);
+  const featureFlagEntries = getFeatureFlagEntries(accessRequestFlags);
+  const requestedAccessChanges = getRequestedFeatureFlagChanges(
+    restaurant.feature_flags,
+    accessRequestFlags,
+  );
+  const changedFeatureEntries = featureFlagEntries.filter(
+    (flag) => requestedAccessChanges[flag.key] !== undefined,
+  );
+  const canSubmitAccessRequest =
+    !submittingAccessRequest && !pendingAccessRequest && changedFeatureEntries.length > 0;
 
   return (
     <DashboardLayout>
@@ -592,36 +713,42 @@ export default function RestaurantProfile() {
             description="Upload a logo to represent your restaurant in menus and dashboard views."
           />
 
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            {logoSrc ? (
-              <img
-                src={logoSrc}
-                alt="Restaurant logo"
-                className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
-              />
-            ) : (
-              <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs font-medium text-slate-400">
-                No logo
-              </div>
-            )}
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="mx-auto sm:mx-0">
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  alt="Restaurant logo"
+                  className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
+                />
+              ) : (
+                <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs font-medium text-slate-400">
+                  No logo
+                </div>
+              )}
+            </div>
 
-            <div className="space-y-2">
-              <label
-                htmlFor="logo-upload"
-                className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            <div className="w-full space-y-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
-                {uploading ? "Uploading..." : "Upload logo"}
-              </label>
+                {uploading ? "Saving Logo..." : logoSrc ? "Edit Logo" : "Upload Logo"}
+              </button>
               <input
                 id="logo-upload"
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept={ACCEPTED_LOGO_INPUT}
                 className="hidden"
                 onChange={handleLogoUpload}
                 disabled={uploading}
               />
-              <p className="text-xs text-slate-500">Supported: JPG, PNG, WebP. Max size: 5 MB.</p>
+              <p className="text-xs text-slate-500">
+                Supported: JPG, PNG, WebP, GIF. Max size: {MAX_LOGO_SIZE_MB} MB.
+              </p>
               {uploadNotice && <NoticeText tone={uploadNotice.tone}>{uploadNotice.text}</NoticeText>}
             </div>
           </div>
@@ -686,15 +813,39 @@ export default function RestaurantProfile() {
                   label="Billing Email"
                   type="email"
                   value={businessForm.billing_email}
+                  placeholder={billingEmailSuggestion ?? "Use the main email for billing notices"}
                   onChange={(value) =>
                     setBusinessForm((prev) => ({ ...prev, billing_email: value }))
                   }
-                />
-                <InputField
-                  label="Tax ID"
-                  value={businessForm.tax_id}
-                  onChange={(value) => setBusinessForm((prev) => ({ ...prev, tax_id: value }))}
-                />
+                >
+                  {billingEmailSuggestion ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span>
+                        {billingEmailMatchesPrimary
+                          ? "Billing notices will use the same email as the primary contact."
+                          : `Suggested from the main email: ${billingEmailSuggestion}`}
+                      </span>
+                      {!billingEmailMatchesPrimary && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBusinessForm((prev) => ({
+                              ...prev,
+                              billing_email: billingEmailSuggestion,
+                            }))
+                          }
+                          className="font-semibold text-blue-600 hover:text-blue-700"
+                        >
+                          Use main email
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Add the main email above to reuse it for invoices and subscription notices.
+                    </p>
+                  )}
+                </InputField>
               </div>
 
               <TextAreaField
@@ -703,9 +854,20 @@ export default function RestaurantProfile() {
                 onChange={(value) => setBusinessForm((prev) => ({ ...prev, address: value }))}
               />
 
+              <TextAreaField
+                label="Public Menu Featured Banner URLs"
+                value={businessForm.public_menu_banner_urls_text}
+                onChange={(value) =>
+                  setBusinessForm((prev) => ({ ...prev, public_menu_banner_urls_text: value }))
+                }
+              />
+              <p className="-mt-2 text-xs text-slate-500">
+                Add one image URL per line. These banners rotate every 1 minute on the guest menu.
+              </p>
+
               <p className="text-xs text-slate-500">
-                Country and currency are required to clear setup blockers. Billing email and tax ID
-                help with invoices and subscription notifications.
+                Country and currency are required to clear setup blockers. Billing email defaults
+                to the main email and is used for invoices and subscription notifications.
               </p>
 
               <div className="flex flex-wrap gap-2">
@@ -734,7 +896,14 @@ export default function RestaurantProfile() {
               <DetailItem label="Country" value={restaurant.country} />
               <DetailItem label="Currency" value={restaurant.currency} />
               <DetailItem label="Billing Email" value={restaurant.billing_email} />
-              <DetailItem label="Tax ID" value={restaurant.tax_id} />
+              <DetailItem
+                label="Menu Banners"
+                value={
+                  restaurant.public_menu_banner_urls.length > 0
+                    ? `${restaurant.public_menu_banner_urls.length} configured`
+                    : "Not configured"
+                }
+              />
               <DetailItem label="Status" value={restaurant.is_active ? "Active" : "Inactive"} />
               <DetailItem label="Address" value={restaurant.address} fullWidth />
             </dl>
@@ -809,6 +978,103 @@ export default function RestaurantProfile() {
             </dl>
           )}
         </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <SectionHeader
+            title="Module Access Requests"
+            description="Request hotel-level feature toggle changes. Package access must still exist for each module."
+          />
+
+          {accessRequestNotice && (
+            <div className="mt-4">
+              <NoticeBanner tone={accessRequestNotice.tone} text={accessRequestNotice.text} />
+            </div>
+          )}
+
+          {pendingAccessRequest && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Request #{pendingAccessRequest.request_id} is pending review. You can submit new changes after it is approved or rejected.
+            </div>
+          )}
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {featureFlagEntries.map((flag) => (
+              <label
+                key={flag.key}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={flag.enabled}
+                    disabled={Boolean(pendingAccessRequest)}
+                    onChange={(event) =>
+                      setAccessRequestFlags((prev) => ({
+                        ...prev,
+                        [flag.key]: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-900">{flag.label}</span>
+                    <span className="mt-1 block text-xs text-slate-500">{flag.description}</span>
+                    <span className="mt-2 inline-flex rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                      Current: {restaurant.feature_flags[flag.key] ? "Enabled" : "Disabled"}
+                    </span>
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Request Reason
+            </label>
+            <textarea
+              rows={3}
+              value={accessRequestReason}
+              onChange={(event) => setAccessRequestReason(event.target.value)}
+              placeholder="Explain why this access change is needed..."
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Tip: You must change at least one module toggle. Reason only cannot be submitted.
+            </p>
+          </div>
+
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            {changedFeatureEntries.length > 0
+              ? `Ready to request ${changedFeatureEntries.length} module change(s): ${changedFeatureEntries
+                  .map((flag) => flag.label)
+                  .join(", ")}.`
+              : "No module changes selected yet."}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleAccessRequestSubmit()}
+              disabled={!canSubmitAccessRequest}
+              className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submittingAccessRequest ? "Submitting..." : "Submit Access Request"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAccessRequestFlags(restaurant.feature_flags);
+                setAccessRequestReason("");
+                setAccessRequestNotice(null);
+              }}
+              disabled={submittingAccessRequest}
+              className="rounded-md border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Reset
+            </button>
+          </div>
+        </section>
       </div>
     </DashboardLayout>
   );
@@ -849,11 +1115,15 @@ function InputField({
   label,
   value,
   type = "text",
+  placeholder,
+  children,
   onChange,
 }: {
   label: string;
   value: string;
   type?: string;
+  placeholder?: string;
+  children?: ReactNode;
   onChange: (value: string) => void;
 }) {
   return (
@@ -862,9 +1132,11 @@ function InputField({
       <input
         type={type}
         value={value}
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
       />
+      {children}
     </div>
   );
 }
@@ -945,12 +1217,58 @@ function toNullable(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
+function parseBannerUrlsText(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function toBannerUrlsText(urls: string[]): string {
+  return urls.join("\n");
+}
+
+function emailsEqual(left: string | null, right: string | null): boolean {
+  if (!left || !right) {
+    return false;
+  }
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
 function toNullableNumber(value: string): number | null {
   const normalized = toNullable(value);
   if (!normalized) return null;
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed) || parsed <= 0) return null;
   return parsed;
+}
+
+function restaurantFeatureFlagDefaults() {
+  return {
+    steward: false,
+    housekeeping: false,
+    kds: false,
+    reports: false,
+    accountant: false,
+    cashier: false,
+  };
+}
+
+function getRequestedFeatureFlagChanges(
+  currentFlags: ReturnType<typeof restaurantFeatureFlagDefaults>,
+  nextFlags: ReturnType<typeof restaurantFeatureFlagDefaults>,
+): Record<string, boolean> {
+  return Object.entries(nextFlags).reduce<Record<string, boolean>>((accumulator, [key, value]) => {
+    const typedKey = key as keyof ReturnType<typeof restaurantFeatureFlagDefaults>;
+    if (currentFlags[typedKey] !== value) {
+      accumulator[key] = value;
+    }
+    return accumulator;
+  }, {});
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {

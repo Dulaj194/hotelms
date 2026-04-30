@@ -1,5 +1,6 @@
 /**
  * Central API client for communicating with the hotelms backend.
+ * Includes automatic retry logic for transient errors (502, 504).
  *
  * Usage:
  *   import { api } from "@/lib/api";
@@ -8,9 +9,9 @@
 
 import { getAccessToken } from "@/lib/auth";
 import { clearAuth, setAccessToken } from "@/lib/auth";
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 
-const BASE_URL =
-  import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+const BASE_URL = RESOLVED_API_BASE_URL;
 const REFRESH_PATH = "/auth/refresh";
 const NO_REFRESH_RETRY_PATHS = new Set([
   "/auth/login",
@@ -23,11 +24,16 @@ const NO_REFRESH_RETRY_PATHS = new Set([
   REFRESH_PATH,
 ]);
 
+// Retry configuration for transient errors
+const RETRYABLE_STATUS_CODES = new Set([502, 503, 504]); // Bad Gateway, Service Unavailable, Gateway Timeout
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY_MS = 100; // Start with 100ms
+
 let refreshPromise: Promise<string | null> | null = null;
 
 function redirectToLoginIfNeeded(): void {
   if (typeof window === "undefined") return;
-  if (window.location.pathname === "/login") return;
+  if (window.location.pathname.startsWith("/login")) return;
   window.location.replace("/login");
 }
 
@@ -40,7 +46,7 @@ export class ApiError extends Error {
   detail: string;
 
   constructor(status: number, detail: string, method: string, path: string) {
-    super(`${method} ${path} failed — ${status} ${detail}`);
+    super(`${method} ${path} failed - ${status} ${detail}`);
     this.name = "ApiError";
     this.status = status;
     this.detail = detail;
@@ -51,12 +57,24 @@ function shouldRetryWithRefresh(path: string, retryOnAuth: boolean): boolean {
   return retryOnAuth && !NO_REFRESH_RETRY_PATHS.has(path);
 }
 
+/**
+ * Exponential backoff delay with jitter to avoid thundering herd.
+ * delay = min(base * 2^retry, max) + random(0, jitter)
+ */
+function getRetryDelay(retryCount: number, maxDelayMs = 2000, jitterMs = 100): number {
+  const baseDelay = INITIAL_RETRY_DELAY_MS * Math.pow(2, retryCount);
+  const cappedDelay = Math.min(baseDelay, maxDelayMs);
+  const jitter = Math.random() * jitterMs;
+  return cappedDelay + jitter;
+}
+
 async function request<T>(
   method: string,
   path: string,
   body?: unknown,
   options?: ApiRequestOptions,
   retryOnAuth = true,
+  retryCount = 0,
 ): Promise<T> {
   const token = getAccessToken();
   const isFormData = body instanceof FormData;
@@ -80,13 +98,34 @@ async function request<T>(
       credentials: "include",
       ...(body !== undefined && { body: isFormData ? (body as FormData) : JSON.stringify(body) }),
     });
-  } catch {
+  } catch (error) {
+    // Network error - retry with exponential backoff
+    if (retryCount < MAX_RETRIES) {
+      const delayMs = getRetryDelay(retryCount);
+      console.warn(
+        `Network error on ${method} ${path}, retrying in ${delayMs.toFixed(0)}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`,
+        error,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return request<T>(method, path, body, options, retryOnAuth, retryCount + 1);
+    }
+    
     throw new ApiError(
       0,
       "Unable to connect to the server. Please check backend service and try again.",
       method,
       path,
     );
+  }
+
+  // Retry on transient server errors (502, 503, 504)
+  if (RETRYABLE_STATUS_CODES.has(response.status) && retryCount < MAX_RETRIES) {
+    const delayMs = getRetryDelay(retryCount);
+    console.warn(
+      `Transient error (${response.status}) on ${method} ${path}, retrying in ${delayMs.toFixed(0)}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return request<T>(method, path, body, options, retryOnAuth, retryCount + 1);
   }
 
   if (response.status === 401 && shouldRetryWithRefresh(path, retryOnAuth)) {

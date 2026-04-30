@@ -11,7 +11,7 @@ class CategoryCreateRequest(BaseModel):
     image_path: str | None = None
     sort_order: int = 0
     is_active: bool = True
-    menu_id: int | None = None
+    menu_id: int = Field(..., gt=0)
 
 
 class CategoryUpdateRequest(BaseModel):
@@ -20,7 +20,7 @@ class CategoryUpdateRequest(BaseModel):
     image_path: str | None = None
     sort_order: int | None = None
     is_active: bool | None = None
-    menu_id: int | None = None
+    menu_id: int | None = Field(None, gt=0)
 
 
 class CategoryImageUploadResponse(BaseModel):
@@ -34,7 +34,7 @@ class CategoryResponse(BaseModel):
     image_path: str | None
     sort_order: int
     is_active: bool
-    menu_id: int | None
+    menu_id: int
     restaurant_id: int
     created_at: datetime
     updated_at: datetime

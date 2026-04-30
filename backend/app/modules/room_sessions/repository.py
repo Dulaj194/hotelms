@@ -1,7 +1,4 @@
-"""Repository layer for room_sessions.
-
-All methods are tenant-scoped where restaurant context is needed.
-"""
+"""Repository layer for room_sessions."""
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -20,7 +17,6 @@ def create_room_session(
     room_number_snapshot: str,
     expires_at: datetime,
 ) -> RoomSession:
-    """Persist a new room session record. Does NOT store the raw signed token."""
     session = RoomSession(
         session_id=session_id,
         restaurant_id=restaurant_id,
@@ -41,7 +37,6 @@ def deactivate_active_sessions_for_room(
     restaurant_id: int,
     room_id: int,
 ) -> int:
-    """Deactivate all currently active sessions for the given room."""
     sessions = (
         db.query(RoomSession)
         .filter(
@@ -64,7 +59,6 @@ def cleanup_stale_room_sessions(
     *,
     idle_timeout_minutes: int,
 ) -> int:
-    """Deactivate active sessions that are expired or idle beyond the timeout."""
     now = datetime.now(UTC)
     idle_cutoff = now - timedelta(minutes=max(idle_timeout_minutes, 1))
     sessions = (
@@ -84,12 +78,9 @@ def cleanup_stale_room_sessions(
 
 
 def get_active_room_session_by_session_id(
-    db: Session, session_id: str
+    db: Session,
+    session_id: str,
 ) -> RoomSession | None:
-    """Fetch an active, non-expired room session by its session_id.
-
-    Used by the get_current_room_session dependency to authorize guest requests.
-    """
     now = datetime.now(UTC)
     return (
         db.query(RoomSession)
@@ -103,9 +94,10 @@ def get_active_room_session_by_session_id(
 
 
 def get_room_session_by_id_and_restaurant(
-    db: Session, session_id: str, restaurant_id: int
+    db: Session,
+    session_id: str,
+    restaurant_id: int,
 ) -> RoomSession | None:
-    """Fetch a session regardless of active/expiry state — for admin/billing use."""
     return (
         db.query(RoomSession)
         .filter(
@@ -116,13 +108,74 @@ def get_room_session_by_id_and_restaurant(
     )
 
 
+def get_latest_session_by_room_number(
+    db: Session,
+    restaurant_id: int,
+    room_number: str,
+) -> RoomSession | None:
+    return (
+        db.query(RoomSession)
+        .filter(
+            RoomSession.restaurant_id == restaurant_id,
+            RoomSession.room_number_snapshot == room_number,
+        )
+        .order_by(RoomSession.created_at.desc(), RoomSession.id.desc())
+        .first()
+    )
+
+
+def list_sessions_by_id_prefix(
+    db: Session,
+    *,
+    restaurant_id: int,
+    session_id_prefix: str,
+    limit: int = 5,
+) -> list[RoomSession]:
+    prefix = (session_id_prefix or "").strip()
+    if not prefix:
+        return []
+
+    return (
+        db.query(RoomSession)
+        .filter(
+            RoomSession.restaurant_id == restaurant_id,
+            RoomSession.session_id.like(f"{prefix}%"),
+        )
+        .order_by(RoomSession.created_at.desc(), RoomSession.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def list_sessions_by_room_number(
+    db: Session,
+    *,
+    restaurant_id: int,
+    room_number: str,
+    limit: int = 5,
+) -> list[RoomSession]:
+    candidate = (room_number or "").strip()
+    if not candidate:
+        return []
+
+    return (
+        db.query(RoomSession)
+        .filter(
+            RoomSession.restaurant_id == restaurant_id,
+            RoomSession.room_number_snapshot == candidate,
+        )
+        .order_by(RoomSession.created_at.desc(), RoomSession.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
 def touch_room_session_activity(
     db: Session,
     *,
     session_id: str,
     restaurant_id: int,
 ) -> None:
-    """Update last_activity_at timestamp."""
     session = (
         db.query(RoomSession)
         .filter(
@@ -142,7 +195,6 @@ def deactivate_room_session(
     session_id: str,
     restaurant_id: int,
 ) -> None:
-    """Mark a room session as inactive."""
     session = (
         db.query(RoomSession)
         .filter(
@@ -154,3 +206,16 @@ def deactivate_room_session(
     if session:
         session.is_active = False
         db.commit()
+
+
+def close_session_by_id(
+    db: Session,
+    *,
+    session_id: str,
+    restaurant_id: int,
+) -> RoomSession | None:
+    session = get_room_session_by_id_and_restaurant(db, session_id, restaurant_id)
+    if session:
+        session.is_active = False
+        db.flush()
+    return session

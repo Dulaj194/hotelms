@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_restaurant_user, require_roles
+from app.modules.access import role_catalog
 from app.modules.audit_logs.service import write_audit_log
 from app.modules.dashboard import repository
 from app.modules.dashboard import service
@@ -16,12 +17,14 @@ from app.modules.dashboard.schemas import (
 
 router = APIRouter()
 
+_TENANT_STAFF_ROLES = role_catalog.TENANT_STAFF_ROLES
+
 
 @router.get("/admin-overview", response_model=AdminDashboardOverviewResponse)
 def get_admin_dashboard_overview(
     current_user=Depends(require_restaurant_user),
     db: Session = Depends(get_db),
-    _=Depends(require_roles("owner", "admin", "steward", "housekeeper")),
+    _=Depends(require_roles(*_TENANT_STAFF_ROLES)),
 ) -> AdminDashboardOverviewResponse:
     restaurant_id = current_user.restaurant_id
     if restaurant_id is None:

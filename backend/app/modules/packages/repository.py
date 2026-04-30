@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.modules.packages.model import Package, PackagePrivilege
+from app.modules.subscriptions.model import RestaurantSubscription
 
 
 def list_active_packages(db: Session) -> Sequence[Package]:
@@ -11,6 +12,14 @@ def list_active_packages(db: Session) -> Sequence[Package]:
         db.query(Package)
         .filter(Package.is_active.is_(True))
         .order_by(Package.price.asc(), Package.id.asc())
+        .all()
+    )
+
+
+def list_all_packages(db: Session) -> Sequence[Package]:
+    return (
+        db.query(Package)
+        .order_by(Package.is_active.desc(), Package.price.asc(), Package.id.asc())
         .all()
     )
 
@@ -45,6 +54,24 @@ def create_package(
     db.flush()
     db.refresh(package)
     return package
+
+
+def update_package(
+    db: Session,
+    package: Package,
+    *,
+    update_data: dict,
+) -> Package:
+    for field, value in update_data.items():
+        setattr(package, field, value)
+    db.flush()
+    db.refresh(package)
+    return package
+
+
+def delete_package(db: Session, package: Package) -> None:
+    db.delete(package)
+    db.flush()
 
 
 def list_package_privileges(db: Session, package_id: int) -> Sequence[PackagePrivilege]:
@@ -84,3 +111,20 @@ def add_package_privilege(
     db.flush()
     db.refresh(privilege)
     return privilege
+
+
+def delete_package_privileges(db: Session, package_id: int) -> None:
+    (
+        db.query(PackagePrivilege)
+        .filter(PackagePrivilege.package_id == package_id)
+        .delete(synchronize_session=False)
+    )
+    db.flush()
+
+
+def count_package_subscriptions(db: Session, package_id: int) -> int:
+    return (
+        db.query(RestaurantSubscription)
+        .filter(RestaurantSubscription.package_id == package_id)
+        .count()
+    )

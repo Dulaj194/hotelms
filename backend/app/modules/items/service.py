@@ -1,10 +1,9 @@
-import uuid
-from pathlib import Path
-
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.file_storage import delete_uploaded_file, save_upload_file
 from app.modules.items import repository
 from app.modules.items.schemas import (
     ItemCreateRequest,
@@ -30,9 +29,33 @@ _MEDIA_SLOT_TO_FIELD = {
 }
 
 
-def list_items(db: Session, restaurant_id: int) -> list[ItemResponse]:
-    items = repository.list_by_restaurant(db, restaurant_id)
-    return [ItemResponse.model_validate(i) for i in items]
+def list_items(
+    db: Session,
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    category_id: int | None = None,
+) -> tuple[list[ItemResponse], int]:
+    """List items for restaurant with pagination.
+
+    Returns:
+        Tuple of (items, total_count)
+    """
+    if category_id is not None:
+        if not repository.category_belongs_to_restaurant(db, category_id, restaurant_id):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Category not found in your restaurant.",
+            )
+
+    items, total = repository.list_by_restaurant(
+        db,
+        restaurant_id,
+        skip=skip,
+        limit=limit,
+        category_id=category_id,
+    )
+    return [ItemResponse.model_validate(i) for i in items], total
 
 
 def get_item(db: Session, item_id: int, restaurant_id: int) -> ItemResponse:
@@ -45,20 +68,13 @@ def get_item(db: Session, item_id: int, restaurant_id: int) -> ItemResponse:
 def add_item(db: Session, restaurant_id: int, data: ItemCreateRequest) -> ItemResponse:
     """Create item under the current restaurant.
 
-    Validates that the target category and optional subcategory also belong to this
-    restaurant to prevent cross-tenant injection.
+    Validates that the target category also belongs to this restaurant to prevent cross-tenant injection.
     """
     if not repository.category_belongs_to_restaurant(db, data.category_id, restaurant_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Category not found in your restaurant.",
         )
-    if data.subcategory_id is not None:
-        if not repository.subcategory_belongs_to_restaurant(db, data.subcategory_id, restaurant_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Subcategory not found or does not belong to your restaurant.",
-            )
 
     restaurant = restaurant_repository.get_by_id(db, restaurant_id)
     if restaurant is not None:
@@ -68,23 +84,20 @@ def add_item(db: Session, restaurant_id: int, data: ItemCreateRequest) -> ItemRe
     return ItemResponse.model_validate(item)
 
 
-def update_item(
-    db: Session, item_id: int, restaurant_id: int, data: ItemUpdateRequest
-) -> ItemResponse:
-    # If changing category, verify it belongs to this restaurant
-    if data.category_id is not None:
-        if not repository.category_belongs_to_restaurant(db, data.category_id, restaurant_id):
+def update_item(db: Session, item_id: int, restaurant_id: int, data: ItemUpdateRequest) -> ItemResponse:
+    payload = data.model_dump(exclude_unset=True)
+    if "category_id" in payload:
+        if payload["category_id"] is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Item must belong to a category.",
+            )
+        if not repository.category_belongs_to_restaurant(db, payload["category_id"], restaurant_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Category not found in your restaurant.",
             )
-    # If changing subcategory, verify it belongs to this restaurant
-    if data.subcategory_id is not None:
-        if not repository.subcategory_belongs_to_restaurant(db, data.subcategory_id, restaurant_id):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Subcategory not found or does not belong to your restaurant.",
-            )
+
     item = repository.update_by_id(db, item_id, restaurant_id, data)
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found.")
@@ -115,23 +128,25 @@ async def upload_item_image(
             detail=f"Invalid file type '{file.content_type}'. Allowed: jpg, png, webp.",
         )
 
-    content = await file.read()
-    max_bytes = settings.max_upload_size_mb * 1024 * 1024
-    if len(content) > max_bytes:
+    image_path = await save_upload_file(
+        file=file,
+        upload_root=settings.upload_dir,
+        subdir="items",
+        allowed_content_types=_ALLOWED_CONTENT_TYPES,
+        ext_map=_EXT_MAP,
+        max_size_mb=settings.max_upload_size_mb,
+    )
+    try:
+        item = repository.update_image_path(db, item_id, restaurant_id, image_path)
+    except SQLAlchemyError:
+        db.rollback()
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds the {settings.max_upload_size_mb} MB size limit.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Item image could not be saved. Please try again.",
         )
-
-    ext = _EXT_MAP[file.content_type]  # type: ignore[index]
-    filename = f"{uuid.uuid4().hex}{ext}"
-    upload_path = Path(settings.upload_dir) / "items"
-    upload_path.mkdir(parents=True, exist_ok=True)
-    (upload_path / filename).write_bytes(content)
-
-    image_path = f"/uploads/items/{filename}"
-    item = repository.update_image_path(db, item_id, restaurant_id, image_path)
     if not item:
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found.")
 
     return ItemImageUploadResponse(image_path=image_path)
@@ -151,9 +166,7 @@ async def upload_item_media(
         )
 
     is_video_slot = slot == "video"
-    allowed_content_types = (
-        _ALLOWED_VIDEO_CONTENT_TYPES if is_video_slot else _ALLOWED_CONTENT_TYPES
-    )
+    allowed_content_types = _ALLOWED_VIDEO_CONTENT_TYPES if is_video_slot else _ALLOWED_CONTENT_TYPES
     ext_map = _VIDEO_EXT_MAP if is_video_slot else _EXT_MAP
 
     if file.content_type not in allowed_content_types:
@@ -163,26 +176,28 @@ async def upload_item_media(
             detail=f"Invalid file type '{file.content_type}'. Allowed: {expected}.",
         )
 
-    content = await file.read()
     max_mb = 25 if is_video_slot else settings.max_upload_size_mb
-    max_bytes = max_mb * 1024 * 1024
-    if len(content) > max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds the {max_mb} MB size limit.",
-        )
-
-    ext = ext_map[file.content_type]  # type: ignore[index]
-    filename = f"{uuid.uuid4().hex}{ext}"
     folder = "videos" if is_video_slot else "items"
-    upload_path = Path(settings.upload_dir) / folder
-    upload_path.mkdir(parents=True, exist_ok=True)
-    (upload_path / filename).write_bytes(content)
-
-    media_path = f"/uploads/{folder}/{filename}"
+    media_path = await save_upload_file(
+        file=file,
+        upload_root=settings.upload_dir,
+        subdir=folder,
+        allowed_content_types=allowed_content_types,
+        ext_map=ext_map,
+        max_size_mb=max_mb,
+    )
     field_name = _MEDIA_SLOT_TO_FIELD[slot]
-    item = repository.update_media_path(db, item_id, restaurant_id, field_name, media_path)
+    try:
+        item = repository.update_media_path(db, item_id, restaurant_id, field_name, media_path)
+    except SQLAlchemyError:
+        db.rollback()
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=media_path)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Item media could not be saved. Please try again.",
+        )
     if not item:
+        delete_uploaded_file(upload_root=settings.upload_dir, public_path=media_path)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found.")
 
     return ItemMediaUploadResponse(slot=slot, path=media_path)

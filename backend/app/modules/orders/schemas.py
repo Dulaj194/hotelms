@@ -11,6 +11,17 @@ from app.modules.payments.schemas import PaymentResponse
 
 # ── Request ───────────────────────────────────────────────────────────────────
 
+class PlaceOrderItemRequest(BaseModel):
+    """Client cart line submitted at checkout.
+
+    Name/price from the browser are intentionally not accepted; the service
+    reloads item names and prices from the restaurant-scoped DB rows.
+    """
+
+    item_id: int = Field(..., gt=0)
+    quantity: int = Field(..., ge=1, le=99)
+
+
 class PlaceOrderRequest(BaseModel):
     """Minimal body for guest order placement.
 
@@ -21,6 +32,8 @@ class PlaceOrderRequest(BaseModel):
     notes: str | None = Field(default=None, max_length=500)
     customer_name: str | None = Field(default=None, max_length=255)
     customer_phone: str | None = Field(default=None, max_length=50)
+    promo_code: str | None = Field(default=None, min_length=1, max_length=100)
+    items: list[PlaceOrderItemRequest] = Field(default_factory=list)
 
 
 class UpdateOrderStatusRequest(BaseModel):
@@ -33,12 +46,21 @@ class OrderItemResponse(BaseModel):
     id: int
     item_id: int
     item_name_snapshot: str
+    item_image_snapshot: str | None
     unit_price_snapshot: float
     quantity: int
     line_total: float
     notes: str | None
 
     model_config = {"from_attributes": True}
+
+
+class OrderItemPreviewResponse(BaseModel):
+    item_name_snapshot: str
+    item_image_snapshot: str | None
+    unit_price_snapshot: float
+    quantity: int
+    line_total: float
 
 
 class OrderHeaderResponse(BaseModel):
@@ -65,6 +87,8 @@ class OrderHeaderResponse(BaseModel):
     completed_at: datetime | None
     rejected_at: datetime | None
     paid_at: datetime | None
+    primary_item_name: str | None = None
+    item_previews: list[OrderItemPreviewResponse] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -80,6 +104,7 @@ class OrderDetailResponse(OrderHeaderResponse):
 class PlaceOrderResponse(BaseModel):
     order: OrderDetailResponse
     message: str = "Order placed successfully."
+    guest_token: str | None = None
 
 
 class PendingOrderListResponse(BaseModel):

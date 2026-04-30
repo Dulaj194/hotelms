@@ -8,7 +8,6 @@ export interface DashboardRestaurantSummary {
   country: string | null;
   currency: string | null;
   billing_email: string | null;
-  tax_id: string | null;
   opening_time: string | null;
   closing_time: string | null;
 }

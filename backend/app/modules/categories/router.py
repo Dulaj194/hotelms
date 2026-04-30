@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
+from app.core.pagination import PaginationParams, create_paginated_response, pagination_depends
+from app.modules.access import role_catalog
 from app.modules.categories import service
 from app.modules.categories.schemas import (
     CategoryCreateRequest,
@@ -13,19 +15,31 @@ from app.modules.users.model import User
 
 router = APIRouter()
 
+_RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 
-@router.get("", response_model=list[CategoryResponse])
+
+@router.get("", response_model=dict)
 def list_categories(
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+    pagination: PaginationParams = Depends(pagination_depends),
+    menu_id: int | None = Query(None, gt=0),
     db: Session = Depends(get_db),
-) -> list[CategoryResponse]:
-    return service.list_categories(db, current_user.restaurant_id)  # type: ignore[arg-type]
+) -> dict:
+    """List categories for restaurant with pagination."""
+    categories, total = service.list_categories(
+        db,
+        current_user.restaurant_id,  # type: ignore[arg-type]
+        skip=pagination.skip,
+        limit=pagination.limit,
+        menu_id=menu_id,
+    )
+    return create_paginated_response(categories, total, pagination.page, pagination.limit)
 
 
 @router.post("", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 def add_category(
     payload: CategoryCreateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> CategoryResponse:
     """SECURITY: restaurant_id comes from token, not payload."""
@@ -37,7 +51,7 @@ def add_category(
 @router.get("/{category_id}", response_model=CategoryResponse)
 def get_category(
     category_id: int,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> CategoryResponse:
     return service.get_category(db, category_id, current_user.restaurant_id)  # type: ignore[arg-type]
@@ -47,7 +61,7 @@ def get_category(
 def update_category(
     category_id: int,
     payload: CategoryUpdateRequest,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> CategoryResponse:
     return service.update_category(db, category_id, current_user.restaurant_id, payload)  # type: ignore[arg-type]
@@ -56,7 +70,7 @@ def update_category(
 @router.delete("/{category_id}")
 def delete_category(
     category_id: int,
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> dict:
     return service.delete_category(db, category_id, current_user.restaurant_id)  # type: ignore[arg-type]
@@ -66,7 +80,7 @@ def delete_category(
 async def upload_category_image(
     category_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("owner", "admin")),
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
 ) -> CategoryImageUploadResponse:
     """Upload/replace category image. Owner/admin only.
@@ -76,6 +90,4 @@ async def upload_category_image(
     """
     if current_user.restaurant_id is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="No restaurant context.")
-    return await service.upload_category_image(
-        db, category_id, current_user.restaurant_id, file
-    )
+    return await service.upload_category_image(db, category_id, current_user.restaurant_id, file)

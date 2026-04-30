@@ -1,45 +1,77 @@
-import { ArrowRight, ChevronDown, Lock, Menu, Sparkles, X } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  ChefHat,
+  ChevronDown,
+  Lock,
+  Menu,
+  QrCode,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { trackAnalyticsEvent } from "@/features/public/analytics";
+import { buildPortalLoginPath, NAVBAR_LOGIN_PORTALS } from "@/features/public/authEntry";
+import { buildTrackedPath } from "@/features/public/attribution";
 import type {
-  AudienceCardData,
-  BenefitCardData,
-  BlogCardData,
-  FeatureCardData,
-  MockupData,
-  Stat,
-  TestimonialData,
-  UseCaseCardData,
-} from "./content";
+  BlogPostSummary,
+  LandingPageContent,
+  SiteAudience,
+  SiteBenefit,
+  SiteCta,
+  SiteFeature,
+  SiteFeatureIconKey,
+  SiteFooter,
+  SiteMockup,
+  SiteTestimonial,
+  SiteUseCase,
+} from "@/types/siteContent";
 
 type NavLinkItem = {
   label: string;
   href?: string;
   to?: string;
+  trackingEntryPoint?: string;
 };
 
 const navLinks: NavLinkItem[] = [
-  { label: "Home", href: "#home" },
-  { label: "Features", href: "#features" },
-  { label: "Services", href: "#use-cases" },
-  { label: "About", href: "#benefits" },
-  { label: "Blogs", href: "#blog" },
-  { label: "Contact", href: "#contact" },
+  { label: "Home", to: "/" },
+  { label: "Features", href: "/#features" },
+  { label: "Services", href: "/#use-cases" },
+  { label: "About", to: "/about" },
+  { label: "Blogs", to: "/blog" },
+  { label: "Contact", to: "/contact" },
 ];
+
+const featureIcons: Record<SiteFeatureIconKey, typeof QrCode> = {
+  qr_code: QrCode,
+  chef_hat: ChefHat,
+  bar_chart: BarChart3,
+  shield_check: ShieldCheck,
+};
 
 export function NavLink({ item, onClick }: { item: NavLinkItem; onClick?: () => void }) {
   if (item.to) {
+    const target = buildTrackedPath(item.to, {
+      entry_point: item.trackingEntryPoint,
+    });
     return (
-      <Link to={item.to} onClick={onClick} className="rounded-lg px-3 py-2 hover:bg-slate-100">
+      <Link to={target} onClick={onClick} className="rounded-lg px-3 py-2 hover:bg-slate-100">
         {item.label}
       </Link>
     );
   }
 
+  const target = item.href
+    ? buildTrackedPath(item.href, { entry_point: item.trackingEntryPoint })
+    : undefined;
+
   return (
     <a
-      href={item.href}
+      href={target}
       onClick={onClick}
       className="rounded-lg px-3 py-2 hover:bg-slate-100"
     >
@@ -53,11 +85,13 @@ export function CTAButton({
   to,
   href,
   variant = "primary",
+  trackingEntryPoint,
 }: {
   label: string;
   to?: string;
   href?: string;
   variant?: "primary" | "secondary" | "dark";
+  trackingEntryPoint?: string;
 }) {
   const base =
     "inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition";
@@ -70,16 +104,38 @@ export function CTAButton({
         : "border border-emerald-600 bg-white text-emerald-700 hover:bg-emerald-50";
 
   if (to) {
+    const target = buildTrackedPath(to, { entry_point: trackingEntryPoint });
     return (
-      <Link to={to} className={`${base} ${style}`}>
+      <Link
+        to={target}
+        onClick={() =>
+          trackAnalyticsEvent("cta_click", {
+            label,
+            destination: to,
+            entry_point: trackingEntryPoint,
+          })
+        }
+        className={`${base} ${style}`}
+      >
         {label}
         {variant === "primary" && <ArrowRight className="h-4 w-4" />}
       </Link>
     );
   }
 
+  const target = href ? buildTrackedPath(href, { entry_point: trackingEntryPoint }) : undefined;
   return (
-    <a href={href} className={`${base} ${style}`}>
+    <a
+      href={target}
+      onClick={() =>
+        trackAnalyticsEvent("cta_click", {
+          label,
+          destination: href,
+          entry_point: trackingEntryPoint,
+        })
+      }
+      className={`${base} ${style}`}
+    >
       {label}
       {variant === "primary" && <ArrowRight className="h-4 w-4" />}
     </a>
@@ -99,15 +155,22 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
+  function handlePortalClick(label: string, entryPoint: string) {
+    trackAnalyticsEvent("login_portal_click", {
+      label,
+      entry_point: entryPoint,
+    });
+  }
+
   return (
-    <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3">
+        <Link to={buildTrackedPath("/")} className="flex items-center gap-3">
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-600 text-sm font-bold text-white">
             R
           </div>
           <p className="text-sm font-extrabold tracking-[0.16em] text-emerald-900">R.LUMINUOUS</p>
-        </div>
+        </Link>
 
         <nav className="hidden items-center gap-2 text-[17px] font-semibold text-slate-600 lg:flex">
           {navLinks.map((item) => (
@@ -118,33 +181,32 @@ export function Navbar() {
               More
               <ChevronDown className="h-4 w-4" />
             </button>
-            <div className="invisible absolute right-0 top-9 w-48 rounded-xl border border-slate-200 bg-white p-2 opacity-0 shadow-md transition group-hover:visible group-hover:opacity-100">
-              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
-                Restaurant Admin
-              </Link>
-              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
-                Super Admin
-              </Link>
-              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
-                Steward Login
-              </Link>
-              <Link to="/login" className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100">
-                HouseKeeper Login
-              </Link>
+            <div className="invisible absolute right-0 top-9 w-56 rounded-xl border border-slate-200 bg-white p-2 opacity-0 shadow-md transition group-hover:visible group-hover:opacity-100">
+              {NAVBAR_LOGIN_PORTALS.map((portal) => (
+                <Link
+                  key={portal.key}
+                  to={buildPortalLoginPath(portal.key, "navbar_more")}
+                  onClick={() => handlePortalClick(portal.label, "navbar_more")}
+                  className="block rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                >
+                  {portal.label}
+                </Link>
+              ))}
             </div>
           </div>
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
           <Link
-            to="/register"
+            to={buildTrackedPath("/register", { entry_point: "navbar_register" })}
             className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-base font-semibold text-slate-700 hover:bg-slate-100"
           >
             Register Restaurant
             <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
-            to="/login"
+            to={buildPortalLoginPath("restaurant-admin", "navbar_primary_login")}
+            onClick={() => handlePortalClick("Restaurant Admin", "navbar_primary_login")}
             className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-5 py-3 text-base font-bold text-teal-700 hover:bg-slate-200"
           >
             Restaurant Login
@@ -166,11 +228,7 @@ export function Navbar() {
         <div className="border-t border-slate-200 bg-white px-4 py-3 lg:hidden">
           <div className="flex flex-col gap-2 text-sm font-medium text-slate-700">
             {navLinks.map((item) => (
-              <NavLink
-                key={item.label}
-                item={item}
-                onClick={() => setMobileOpen(false)}
-              />
+              <NavLink key={item.label} item={item} onClick={() => setMobileOpen(false)} />
             ))}
 
             <button
@@ -186,39 +244,24 @@ export function Navbar() {
 
             {mobileMoreOpen && (
               <div className="ml-3 flex flex-col gap-1 border-l border-slate-200 pl-3">
-                <Link
-                  to="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  Restaurant Admin
-                </Link>
-                <Link
-                  to="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  Super Admin
-                </Link>
-                <Link
-                  to="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  Steward Login
-                </Link>
-                <Link
-                  to="/login"
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                >
-                  HouseKeeper Login
-                </Link>
+                {NAVBAR_LOGIN_PORTALS.map((portal) => (
+                  <Link
+                    key={portal.key}
+                    to={buildPortalLoginPath(portal.key, "navbar_more_mobile")}
+                    onClick={() => {
+                      handlePortalClick(portal.label, "navbar_more_mobile");
+                      setMobileOpen(false);
+                    }}
+                    className="rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                  >
+                    {portal.label}
+                  </Link>
+                ))}
               </div>
             )}
 
             <Link
-              to="/register"
+              to={buildTrackedPath("/register", { entry_point: "navbar_register_mobile" })}
               onClick={() => setMobileOpen(false)}
               className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
             >
@@ -227,8 +270,11 @@ export function Navbar() {
             </Link>
 
             <Link
-              to="/login"
-              onClick={() => setMobileOpen(false)}
+              to={buildPortalLoginPath("restaurant-admin", "navbar_primary_login_mobile")}
+              onClick={() => {
+                handlePortalClick("Restaurant Admin", "navbar_primary_login_mobile");
+                setMobileOpen(false);
+              }}
               className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
             >
               Restaurant Login
@@ -242,16 +288,16 @@ export function Navbar() {
 }
 
 export function HeroBlock({
-  productName,
-  whatItDoes,
-  whoItHelps,
-  whyItMatters,
-}: {
-  productName: string;
-  whatItDoes: string;
-  whoItHelps: string;
-  whyItMatters: string;
-}) {
+  hero_badge,
+  product_name,
+  hero_title,
+  hero_description,
+  primary_cta_label,
+  primary_cta_to,
+  secondary_cta_label,
+  secondary_cta_to,
+  hero_image_url,
+}: LandingPageContent) {
   return (
     <section
       id="home"
@@ -263,30 +309,38 @@ export function HeroBlock({
         <div className="flex flex-col justify-center">
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
             <Sparkles className="h-4 w-4" />
-            QR-Powered Restaurant & Hotel Solution
+            {hero_badge}
           </span>
 
           <h1 className="mt-6 text-3xl font-black leading-tight sm:text-4xl lg:text-5xl">
-            <span className="block text-emerald-700">{productName}</span>
+            <span className="block text-emerald-700">{product_name}</span>
             <br />
-            {whatItDoes}
+            {hero_title}
           </h1>
 
-          <p className="mt-5 max-w-xl text-lg text-slate-600">
-            {whoItHelps}. {whyItMatters}
-          </p>
+          <p className="mt-5 max-w-xl text-lg text-slate-600">{hero_description}</p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <CTAButton label="Start Free Trial" to="/register" variant="primary" />
-            <CTAButton label="Request a Demo" href="#contact" variant="secondary" />
+            <CTAButton
+              label={primary_cta_label}
+              to={primary_cta_to}
+              variant="primary"
+              trackingEntryPoint="landing_hero_primary"
+            />
+            <CTAButton
+              label={secondary_cta_label}
+              to={secondary_cta_to}
+              variant="secondary"
+              trackingEntryPoint="landing_hero_secondary"
+            />
           </div>
         </div>
 
         <div className="order-last rounded-3xl border border-slate-200/80 bg-white/95 p-5 shadow-sm lg:order-none">
           <div className="relative overflow-hidden rounded-2xl bg-emerald-900 p-4">
             <img
-              src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80"
-              alt={`Restaurant operations powered by ${productName}`}
+              src={hero_image_url}
+              alt={`Restaurant operations powered by ${product_name}`}
               className="h-[350px] w-full rounded-xl object-cover opacity-80"
             />
             <div className="absolute left-7 top-7 rounded-lg bg-white px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -302,7 +356,35 @@ export function HeroBlock({
   );
 }
 
-export function StatCard({ item }: { item: Stat }) {
+export function PageHero({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  children?: ReactNode;
+}) {
+  return (
+    <section className="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.18),transparent_55%)]" />
+      <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+          {eyebrow}
+        </span>
+        <h1 className="mt-4 max-w-4xl text-4xl font-black leading-tight text-slate-900 sm:text-5xl">
+          {title}
+        </h1>
+        <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-600">{description}</p>
+        {children && <div className="mt-8">{children}</div>}
+      </div>
+    </section>
+  );
+}
+
+export function StatCard({ item }: { item: LandingPageContent["stats"][number] }) {
   return (
     <div className="h-full rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
       <p className="text-3xl font-extrabold text-emerald-700">{item.value}</p>
@@ -311,7 +393,7 @@ export function StatCard({ item }: { item: Stat }) {
   );
 }
 
-export function AudienceCard({ item }: { item: AudienceCardData }) {
+export function AudienceCard({ item }: { item: SiteAudience }) {
   return (
     <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
@@ -320,7 +402,7 @@ export function AudienceCard({ item }: { item: AudienceCardData }) {
   );
 }
 
-export function BenefitCard({ item }: { item: BenefitCardData }) {
+export function BenefitCard({ item }: { item: SiteBenefit }) {
   return (
     <article className="h-full rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
       <h3 className="text-lg font-bold">{item.title}</h3>
@@ -336,8 +418,8 @@ export function BenefitCard({ item }: { item: BenefitCardData }) {
   );
 }
 
-export function FeatureCard({ item }: { item: FeatureCardData }) {
-  const Icon = item.icon;
+export function FeatureCard({ item }: { item: SiteFeature }) {
+  const Icon = featureIcons[item.icon_key] ?? QrCode;
   return (
     <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 ring-1 ring-emerald-100">
@@ -346,13 +428,13 @@ export function FeatureCard({ item }: { item: FeatureCardData }) {
       <h3 className="mt-4 text-lg font-bold">{item.capability}</h3>
       <p className="mt-2 text-sm leading-6 text-slate-600">{item.explanation}</p>
       <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-        {item.visualHint}
+        {item.visual_hint}
       </p>
     </article>
   );
 }
 
-export function MockupStrip({ items }: { items: MockupData[] }) {
+export function MockupStrip({ items }: { items: SiteMockup[] }) {
   return (
     <section className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
       <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -368,11 +450,7 @@ export function MockupStrip({ items }: { items: MockupData[] }) {
               key={item.title}
               className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
             >
-              <img
-                src={item.imageUrl}
-                alt={item.title}
-                className="h-28 w-full object-cover"
-              />
+              <img src={item.image_url} alt={item.title} className="h-28 w-full object-cover" />
               <p className="px-3 py-2 text-xs font-semibold text-slate-700">{item.title}</p>
             </article>
           ))}
@@ -393,19 +471,27 @@ export function StepCard({ step, index }: { step: string; index: number }) {
   );
 }
 
-export function BlogCard({ item }: { item: BlogCardData }) {
+export function BlogCard({ item }: { item: BlogPostSummary }) {
   return (
     <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
+      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+        <span>{item.category}</span>
+        <span className="text-slate-300">|</span>
+        <span>{item.reading_minutes} min read</span>
+      </div>
+      <h3 className="mt-3 text-lg font-bold text-slate-900">{item.title}</h3>
       <p className="mt-3 text-sm leading-6 text-slate-600">{item.excerpt}</p>
-      <a href="#contact" className="mt-4 inline-flex text-sm font-semibold text-emerald-700">
+      <Link
+        to={buildTrackedPath(`/blog/${item.slug}`)}
+        className="mt-4 inline-flex text-sm font-semibold text-emerald-700"
+      >
         Read more
-      </a>
+      </Link>
     </article>
   );
 }
 
-export function UseCaseCard({ item }: { item: UseCaseCardData }) {
+export function UseCaseCard({ item }: { item: SiteUseCase }) {
   return (
     <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
@@ -414,13 +500,15 @@ export function UseCaseCard({ item }: { item: UseCaseCardData }) {
   );
 }
 
-export function TestimonialBlock({ item }: { item: TestimonialData }) {
+export function TestimonialBlock({ item }: { item: SiteTestimonial }) {
   return (
     <section id="trust" className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="rounded-3xl border border-emerald-200 bg-emerald-50/60 p-8 sm:p-10">
-        <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Trusted Results</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+          Trusted Results
+        </p>
         <blockquote className="mt-3 text-xl font-semibold leading-8 text-slate-900 sm:text-2xl">
-          “{item.quote}”
+          "{item.quote}"
         </blockquote>
         <p className="mt-5 text-sm font-semibold text-slate-800">{item.author}</p>
         <p className="text-sm text-slate-600">{item.role}</p>
@@ -432,14 +520,10 @@ export function TestimonialBlock({ item }: { item: TestimonialData }) {
 export function CTASection({
   title,
   message,
-  actionLabel,
-  actionTo,
-}: {
-  title: string;
-  message: string;
-  actionLabel: string;
-  actionTo: string;
-}) {
+  action_label,
+  action_to,
+  trackingEntryPoint = "cta_section",
+}: SiteCta & { trackingEntryPoint?: string }) {
   return (
     <section id="contact" className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
       <div className="rounded-3xl bg-slate-900 p-8 text-white sm:p-10">
@@ -447,10 +531,17 @@ export function CTASection({
         <p className="mt-3 max-w-2xl text-slate-300">{message}</p>
         <div className="mt-7">
           <Link
-            to={actionTo}
+            to={buildTrackedPath(action_to, { entry_point: trackingEntryPoint })}
+            onClick={() =>
+              trackAnalyticsEvent("cta_click", {
+                label: action_label,
+                destination: action_to,
+                entry_point: trackingEntryPoint,
+              })
+            }
             className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-bold text-white hover:bg-emerald-400"
           >
-            {actionLabel}
+            {action_label}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
@@ -471,5 +562,36 @@ export function FooterColumn({
       <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-900">{title}</h3>
       <div className="mt-3 space-y-2 text-sm text-slate-600">{children}</div>
     </div>
+  );
+}
+
+export function PublicFooter({ footer }: { footer: SiteFooter }) {
+  return (
+    <footer className="border-t border-slate-200 bg-white">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
+        <div>
+          <p className="text-lg font-bold text-emerald-700">R.LUMINUOUS</p>
+          <p className="mt-3 text-sm text-slate-600">{footer.trust_info}</p>
+        </div>
+
+        <FooterColumn title="Product">
+          <a href={buildTrackedPath("/#features")} className="block">Features</a>
+          <a href={buildTrackedPath("/#how-it-works")} className="block">How it works</a>
+          <Link to={buildTrackedPath("/pricing")} className="block">Pricing</Link>
+        </FooterColumn>
+
+        <FooterColumn title="Company">
+          <Link to={buildTrackedPath("/about")} className="block">About</Link>
+          <Link to={buildTrackedPath("/blog")} className="block">Blog</Link>
+          <Link to={buildTrackedPath("/contact", { entry_point: "footer_contact" })} className="block">Contact</Link>
+        </FooterColumn>
+
+        <FooterColumn title="Contact">
+          {footer.contact_points.map((point) => (
+            <p key={point}>{point}</p>
+          ))}
+        </FooterColumn>
+      </div>
+    </footer>
   );
 }

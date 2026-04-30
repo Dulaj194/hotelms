@@ -10,6 +10,8 @@ import sqlalchemy as sa
 
 SNAKE_CASE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 IGNORED_EXTRA_TABLES = {"alembic_version"}
+DEPRECATED_MODULES: set[str] = set()
+MAX_CONSTRAINT_DETAIL_ITEMS = 15
 
 
 @dataclass
@@ -50,9 +52,7 @@ def check_metadata_naming() -> CheckResult:
             violations.append(f"Table '{table_name}' must be snake_case.")
         for column in table.columns:
             if not SNAKE_CASE_PATTERN.fullmatch(column.name):
-                violations.append(
-                    f"Column '{table_name}.{column.name}' must be snake_case."
-                )
+                violations.append(f"Column '{table_name}.{column.name}' must be snake_case.")
 
     if violations:
         return CheckResult(
@@ -69,11 +69,7 @@ def check_metadata_naming() -> CheckResult:
 
 def _modules_with_router() -> set[str]:
     modules_dir = _backend_root() / "app" / "modules"
-    return {
-        entry.name
-        for entry in modules_dir.iterdir()
-        if entry.is_dir() and (entry / "router.py").exists()
-    }
+    return {entry.name for entry in modules_dir.iterdir() if entry.is_dir() and (entry / "router.py").exists()}
 
 
 def _extract_router_imports_and_usage(
@@ -87,12 +83,7 @@ def _extract_router_imports_and_usage(
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
             parts = node.module.split(".")
-            if (
-                len(parts) == 4
-                and parts[0] == "app"
-                and parts[1] == "modules"
-                and parts[3] == "router"
-            ):
+            if len(parts) == 4 and parts[0] == "app" and parts[1] == "modules" and parts[3] == "router":
                 module_name = parts[2]
                 imported_modules.add(module_name)
                 for alias in node.names:
@@ -120,30 +111,22 @@ def check_router_registration() -> CheckResult:
             details=[f"Missing API router file: {router_path}"],
         )
 
-    expected_modules = _modules_with_router()
-    imported_modules, imported_aliases, included_aliases = _extract_router_imports_and_usage(
-        router_path
-    )
+    expected_modules = _modules_with_router() - DEPRECATED_MODULES
+    imported_modules, imported_aliases, included_aliases = _extract_router_imports_and_usage(router_path)
 
     missing_module_imports = sorted(expected_modules - imported_modules)
     imported_but_not_included = sorted(
-        {
-            module
-            for alias, module in imported_aliases.items()
-            if alias not in included_aliases
-        }
+        {module for alias, module in imported_aliases.items() if alias not in included_aliases}
     )
 
     failures: list[str] = []
     if missing_module_imports:
         failures.append(
-            "Modules with router.py missing import in app/api/router.py: "
-            + ", ".join(missing_module_imports)
+            "Modules with router.py missing import in app/api/router.py: " + ", ".join(missing_module_imports)
         )
     if imported_but_not_included:
         failures.append(
-            "Router modules imported but not included with include_router(...): "
-            + ", ".join(imported_but_not_included)
+            "Router modules imported but not included with include_router(...): " + ", ".join(imported_but_not_included)
         )
 
     if failures:
@@ -155,9 +138,7 @@ def check_router_registration() -> CheckResult:
     return CheckResult(
         name="Module router registration",
         ok=True,
-        details=[
-            f"All {len(expected_modules)} module routers are imported and registered."
-        ],
+        details=[f"All {len(expected_modules)} module routers are imported and registered."],
     )
 
 
@@ -183,9 +164,7 @@ def check_compose_secret_injection(compose_file: Path | None = None) -> CheckRes
     for line_no, line in enumerate(compose_path.read_text(encoding="utf-8").splitlines(), start=1):
         for key, pattern in required_env_patterns.items():
             if line.lstrip().startswith(f"{key}:") and not pattern.search(line):
-                failures.append(
-                    f"{compose_path.name}:{line_no} has hardcoded {key}. Use env interpolation."
-                )
+                failures.append(f"{compose_path.name}:{line_no} has hardcoded {key}. Use env interpolation.")
 
     if failures:
         return CheckResult(
@@ -228,7 +207,6 @@ def _parse_compose_service_names(compose_path: Path) -> set[str]:
 def check_active_track_clarity(
     compose_file: Path | None = None,
     run_script: Path | None = None,
-    legacy_start_script: Path | None = None,
 ) -> CheckResult:
     compose_path = compose_file or (_project_root() / "docker-compose.yml")
     run_script_path = run_script or (_project_root() / "run.ps1")
@@ -246,9 +224,7 @@ def check_active_track_clarity(
         missing_services = sorted(expected_services - actual_services)
         extra_services = sorted(actual_services - expected_services)
         if missing_services:
-            failures.append(
-                "docker-compose.yml is missing primary active services: " + ", ".join(missing_services)
-            )
+            failures.append("docker-compose.yml is missing primary active services: " + ", ".join(missing_services))
         if extra_services:
             failures.append(
                 "docker-compose.yml contains non-primary services (drift risk): " + ", ".join(extra_services)
@@ -287,10 +263,7 @@ def check_active_track_clarity(
         name="Active track clarity",
         ok=True,
         details=[
-            "Compose stack and startup scripts clearly enforce the primary active system.",
-            "Legacy runtime script guard verified."
-            if legacy_script_checked
-            else "Legacy runtime script not present in tracked tree; root stack guard is enforced.",
+            "Compose stack and startup script clearly enforce the primary active system.",
         ],
     )
 
@@ -306,11 +279,7 @@ def check_production_guardrails(
 
         app_env = settings.app_env if app_env is None else app_env
         secret_key = settings.secret_key if secret_key is None else secret_key
-        db_auto_schema_sync = (
-            settings.db_auto_schema_sync
-            if db_auto_schema_sync is None
-            else db_auto_schema_sync
-        )
+        db_auto_schema_sync = settings.db_auto_schema_sync if db_auto_schema_sync is None else db_auto_schema_sync
 
     normalized_env = app_env.lower()
     if normalized_env != "production":
@@ -327,13 +296,9 @@ def check_production_guardrails(
         "change-this-to-a-long-random-string",
     }
     if secret_key in weak_secret_values or len(secret_key) < 32:
-        failures.append(
-            "SECRET_KEY is weak for production. Use at least 32 random characters."
-        )
+        failures.append("SECRET_KEY is weak for production. Use at least 32 random characters.")
     if db_auto_schema_sync:
-        failures.append(
-            "DB_AUTO_SCHEMA_SYNC is true in production. Disable it and run Alembic migrations."
-        )
+        failures.append("DB_AUTO_SCHEMA_SYNC is true in production. Disable it and run Alembic migrations.")
 
     if failures:
         return CheckResult(
@@ -346,6 +311,95 @@ def check_production_guardrails(
         ok=True,
         details=["Production guardrails are satisfied."],
     )
+
+
+def _normalized_fk_signature(
+    *,
+    table_name: str,
+    constrained_columns: list[str] | tuple[str, ...],
+    referred_table: str,
+    referred_columns: list[str] | tuple[str, ...],
+) -> tuple[str, tuple[str, ...], str, tuple[str, ...]]:
+    return (
+        table_name.lower(),
+        tuple(column.lower() for column in constrained_columns),
+        referred_table.lower(),
+        tuple(column.lower() for column in referred_columns),
+    )
+
+
+def _expected_foreign_keys(
+    metadata: sa.MetaData,
+    table_names: set[str],
+) -> set[tuple[str, tuple[str, ...], str, tuple[str, ...]]]:
+    expected: set[tuple[str, tuple[str, ...], str, tuple[str, ...]]] = set()
+    for table_name in table_names:
+        table = metadata.tables.get(table_name)
+        if table is None:
+            continue
+        for fk_constraint in table.foreign_key_constraints:
+            constrained_columns = [column.name for column in fk_constraint.columns]
+            referred_columns = [element.column.name for element in fk_constraint.elements]
+            referred_table = fk_constraint.referred_table.name if fk_constraint.referred_table is not None else ""
+            if not constrained_columns or not referred_columns or not referred_table:
+                continue
+            expected.add(
+                _normalized_fk_signature(
+                    table_name=table_name,
+                    constrained_columns=constrained_columns,
+                    referred_table=referred_table,
+                    referred_columns=referred_columns,
+                )
+            )
+    return expected
+
+
+def _actual_foreign_keys(
+    inspector,
+    table_names: set[str],
+) -> set[tuple[str, tuple[str, ...], str, tuple[str, ...]]]:
+    actual: set[tuple[str, tuple[str, ...], str, tuple[str, ...]]] = set()
+    for table_name in table_names:
+        for fk in inspector.get_foreign_keys(table_name):
+            constrained_columns = fk.get("constrained_columns") or []
+            referred_columns = fk.get("referred_columns") or []
+            referred_table = fk.get("referred_table") or ""
+            if not constrained_columns or not referred_columns or not referred_table:
+                continue
+            actual.add(
+                _normalized_fk_signature(
+                    table_name=table_name,
+                    constrained_columns=constrained_columns,
+                    referred_table=referred_table,
+                    referred_columns=referred_columns,
+                )
+            )
+    return actual
+
+
+def _format_fk_signature(
+    signature: tuple[str, tuple[str, ...], str, tuple[str, ...]],
+) -> str:
+    table_name, constrained_columns, referred_table, referred_columns = signature
+    constrained = ",".join(constrained_columns)
+    referred = ",".join(referred_columns)
+    return f"{table_name}({constrained}) -> {referred_table}({referred})"
+
+
+def _append_constraint_detail(
+    details: list[str],
+    *,
+    label: str,
+    signatures: list[tuple[str, tuple[str, ...], str, tuple[str, ...]]],
+) -> None:
+    if not signatures:
+        return
+    shown = signatures[:MAX_CONSTRAINT_DETAIL_ITEMS]
+    rendered = ", ".join(_format_fk_signature(signature) for signature in shown)
+    hidden_count = len(signatures) - len(shown)
+    if hidden_count > 0:
+        rendered = f"{rendered}, ... (+{hidden_count} more)"
+    details.append(f"{label}: {rendered}")
 
 
 def check_schema_drift(database_url: str | None) -> CheckResult:
@@ -364,6 +418,9 @@ def check_schema_drift(database_url: str | None) -> CheckResult:
         with engine.connect() as connection:
             inspector = sa.inspect(connection)
             actual_tables = set(inspector.get_table_names())
+            comparable_tables = expected_tables & actual_tables
+            expected_foreign_keys = _expected_foreign_keys(metadata, comparable_tables)
+            actual_foreign_keys = _actual_foreign_keys(inspector, comparable_tables)
     except Exception as exc:  # pragma: no cover - depends on runtime DB availability
         return CheckResult(
             name="Schema drift",
@@ -376,19 +433,33 @@ def check_schema_drift(database_url: str | None) -> CheckResult:
 
     missing = sorted(expected_tables - actual_tables)
     unexpected = sorted(actual_tables - expected_tables - IGNORED_EXTRA_TABLES)
+    missing_foreign_keys = sorted(expected_foreign_keys - actual_foreign_keys)
+    unexpected_foreign_keys = sorted(actual_foreign_keys - expected_foreign_keys)
 
     details = [
         f"Expected tables: {len(expected_tables)}",
         f"Actual tables: {len(actual_tables)}",
+        f"Expected foreign keys: {len(expected_foreign_keys)}",
+        f"Actual foreign keys: {len(actual_foreign_keys)}",
     ]
     if missing:
         details.append("Missing tables: " + ", ".join(missing))
     if unexpected:
         details.append("Unexpected tables: " + ", ".join(unexpected))
+    _append_constraint_detail(
+        details,
+        label="Missing foreign keys",
+        signatures=missing_foreign_keys,
+    )
+    _append_constraint_detail(
+        details,
+        label="Unexpected foreign keys",
+        signatures=unexpected_foreign_keys,
+    )
 
-    ok = not missing and not unexpected
+    ok = not missing and not unexpected and not missing_foreign_keys and not unexpected_foreign_keys
     if ok:
-        details.append("Database schema matches ORM metadata.")
+        details.append("Database schema and foreign key integrity match ORM metadata.")
     else:
         details.append("Run 'alembic upgrade head' against this DATABASE_URL to reconcile drift.")
 

@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import AssetImage from "@/components/shared/AssetImage";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import {
   TenantContextBadge,
   TenantScopeEmptyState,
 } from "@/components/shared/TenantScopeNotice";
 import { useTenantContext } from "@/hooks/useTenantContext";
-import { api } from "@/lib/api";
-import { toAssetUrl } from "@/lib/assets";
+import { ApiError, api } from "@/lib/api";
 import type { Menu } from "@/types/menu";
 
 interface FormData {
@@ -25,7 +26,11 @@ const EMPTY_FORM: FormData = {
   is_active: true,
 };
 
-const CARDS_PER_PAGE = 6;
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) return error.detail || fallback;
+  if (error instanceof Error) return error.message || fallback;
+  return fallback;
+}
 
 export default function Menus() {
   const navigate = useNavigate();
@@ -48,7 +53,6 @@ export default function Menus() {
   const [uploadTarget, setUploadTarget] = useState<Menu | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [currentPage, setCurrentPage] = useState(1);
 
   const loadMenus = useCallback(async () => {
     setLoading(true);
@@ -57,10 +61,7 @@ export default function Menus() {
       const response = await api.get<Menu[]>("/menus");
       setMenus(response);
     } catch (err: unknown) {
-      const errMsg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? "Failed to load menus.";
-      setError(errMsg);
+      setError(getErrorMessage(err, "Failed to load menus."));
     } finally {
       setLoading(false);
     }
@@ -69,13 +70,6 @@ export default function Menus() {
   useEffect(() => {
     loadMenus();
   }, [loadMenus]);
-
-  useEffect(() => {
-    const computedTotalPages = Math.max(1, Math.ceil(menus.length / CARDS_PER_PAGE));
-    if (currentPage > computedTotalPages) {
-      setCurrentPage(computedTotalPages);
-    }
-  }, [menus.length, currentPage]);
 
   function openCreate() {
     setEditingMenu(null);
@@ -114,6 +108,7 @@ export default function Menus() {
 
     setSaving(true);
     setFormError(null);
+    setSuccessMessage(null);
 
     try {
       const payload = {
@@ -140,11 +135,11 @@ export default function Menus() {
 
       closeModal();
       await loadMenus();
+      setSuccessMessage(
+        editingMenu ? "Menu updated successfully." : "Menu created successfully."
+      );
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? "Failed to save menu.";
-      setFormError(msg);
+      setFormError(getErrorMessage(err, "Failed to save menu."));
     } finally {
       setSaving(false);
     }
@@ -190,10 +185,7 @@ export default function Menus() {
       await loadMenus();
       setSuccessMessage(`Menu \"${targetName}\" deleted successfully.`);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? "Failed to delete menu.";
-      setError(msg);
+      setError(getErrorMessage(err, "Failed to delete menu."));
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
@@ -216,7 +208,9 @@ export default function Menus() {
       fd.append("file", file);
       await api.post(`/menus/${uploadTarget.id}/image`, fd);
       await loadMenus();
-    } catch {
+      setSuccessMessage("Menu image updated successfully.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to upload menu image."));
       await loadMenus();
     } finally {
       setUploading(false);
@@ -230,31 +224,26 @@ export default function Menus() {
     return a.id - b.id;
   });
 
-  const totalPages = Math.max(1, Math.ceil(sortedMenus.length / CARDS_PER_PAGE));
-  const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * CARDS_PER_PAGE;
-  const endIndex = startIndex + CARDS_PER_PAGE;
-  const paginatedMenus = sortedMenus.slice(startIndex, endIndex);
-
   return (
     <DashboardLayout>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Menus</h1>
+      <div className="mb-5 flex flex-col gap-3 sm:mb-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Menus</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Standard view: paginated menu cards with a clean action layout.
+            Standard view: scrollable menu cards with a clean action layout.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
           <span className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
             Total: {sortedMenus.length}
           </span>
           <TenantContextBadge tenantContext={tenantContext} />
           <button
             onClick={openCreate}
-            className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
+            className="w-full rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-600 sm:w-auto sm:py-2"
           >
-            + Add Menu
+            <Plus className="mr-2 inline h-4 w-4" />
+            Add Menu
           </button>
         </div>
       </div>
@@ -280,123 +269,120 @@ export default function Menus() {
       )}
 
       {!loading && menus.length > 0 && (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {paginatedMenus.map((menu) => (
-            <article
-              key={menu.id}
-              className="flex h-full min-h-[410px] w-full flex-col rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div className="aspect-[16/10] w-full overflow-hidden rounded-lg bg-slate-100">
-                {menu.image_path ? (
-                  <img
-                    src={toAssetUrl(menu.image_path)}
-                    alt={menu.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm font-medium text-slate-500">
-                    No image available
+        <div className="rounded-xl border border-slate-200 bg-white p-3">
+          <div className="max-h-[70vh] overflow-y-auto pr-1">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {sortedMenus.map((menu) => (
+                <article
+                  key={menu.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/admin/menu/categories?menuId=${menu.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      navigate(`/admin/menu/categories?menuId=${menu.id}`);
+                    }
+                  }}
+                  className="flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                >
+                  <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-100">
+                    <AssetImage
+                      path={menu.image_path}
+                      alt={menu.name}
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Change image for ${menu.name}`}
+                      title="Change image"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openUpload(menu);
+                      }}
+                      disabled={uploading && uploadTarget?.id === menu.id}
+                      className="absolute bottom-2 right-2 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/80 bg-slate-950/85 text-white shadow-lg backdrop-blur transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <Camera className="h-4 w-4" />
+                    </button>
                   </div>
-                )}
-              </div>
 
-              <div className="mt-3 flex flex-1 flex-col">
-                <div className="flex items-start justify-between gap-2">
-                  <h2 className="line-clamp-1 text-2xl font-semibold leading-tight text-slate-900">
-                    {menu.name}
-                  </h2>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                      menu.is_active
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {menu.is_active ? "Active" : "Inactive"}
-                  </span>
-                </div>
+                  <div className="flex flex-1 flex-col p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h2 className="line-clamp-1 text-lg font-semibold leading-tight text-slate-900">
+                        {menu.name}
+                      </h2>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          menu.is_active
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {menu.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
 
-                <p className="mt-2 min-h-[38px] text-sm text-slate-600 line-clamp-2">
-                  {menu.description?.trim() || "No description added yet."}
-                </p>
+                    <p className="mt-1 line-clamp-1 text-sm leading-5 text-slate-600">
+                      {menu.description?.trim() || "No description added yet."}
+                    </p>
 
-                <div className="mt-3 flex items-center justify-between text-xs font-medium text-slate-500">
-                  <span>Sort: {menu.sort_order}</span>
-                  <span>Menu #{menu.id}</span>
-                </div>
+                    <div className="mt-2 flex items-center justify-end text-xs font-medium text-slate-500">
+                      <span>Menu #{menu.id}</span>
+                    </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => navigate(`/admin/menu/categories?menuId=${menu.id}`)}
-                    className="col-span-2 rounded-lg bg-cyan-500 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-600"
-                  >
-                    Explore
-                  </button>
-                  <button
-                    onClick={() => openEdit(menu)}
-                    className="rounded-lg bg-amber-400 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-500"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(menu)}
-                    className="rounded-lg bg-rose-600 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
-                  >
-                    Delete
-                  </button>
-                  <button
-                    onClick={() => openUpload(menu)}
-                    disabled={uploading && uploadTarget?.id === menu.id}
-                    className="col-span-2 rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {uploading && uploadTarget?.id === menu.id
-                      ? "Uploading image..."
-                      : "Change image"}
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-
-      {!loading && sortedMenus.length > CARDS_PER_PAGE && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-          <p className="text-sm text-slate-600">
-            Showing {startIndex + 1}-{Math.min(endIndex, sortedMenus.length)} of {sortedMenus.length} menus
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={safePage === 1}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span className="text-sm font-medium text-slate-700">
-              Page {safePage} of {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={safePage === totalPages}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Next
-            </button>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEdit(menu);
+                        }}
+                        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:min-h-0"
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDeleteTarget(menu);
+                        }}
+                        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-100 sm:min-h-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       {modalOpen && (
         <div className="app-modal-shell">
-          <div className="app-modal-panel max-w-sm">
-            <h2 className="mb-4 text-lg font-semibold text-gray-900">
-              {editingMenu ? "Edit Menu" : "Add Menu"}
-            </h2>
+          <div className="app-modal-panel max-w-lg">
+            <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {editingMenu ? "Edit Menu" : "Add Menu"}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">Keep the menu name, image, and visibility ready for guests.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeModal}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700">
                   Name <span className="text-red-500">*</span>
@@ -407,7 +393,7 @@ export default function Menus() {
                   onChange={(event) =>
                     setFormData((current) => ({ ...current, name: event.target.value }))
                   }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   placeholder="e.g., Breakfast Menu"
                 />
               </div>
@@ -421,7 +407,7 @@ export default function Menus() {
                   }
                   rows={2}
                   maxLength={500}
-                  className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                   placeholder="Optional description"
                 />
               </div>
@@ -432,7 +418,7 @@ export default function Menus() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   onChange={handleModalImageChange}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100"
                 />
                 <p className="mt-1 text-[11px] text-gray-400">
                   Max file size 5MB (JPG, PNG, WebP)
@@ -452,7 +438,7 @@ export default function Menus() {
                       sort_order: parseInt(event.target.value, 10) || 0,
                     }))
                   }
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
                 />
               </div>
 
@@ -477,15 +463,17 @@ export default function Menus() {
             <div className="app-form-actions mt-5">
               <button
                 onClick={closeModal}
-                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
               >
+                <X className="h-4 w-4" />
                 Cancel
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="w-full rounded-lg bg-orange-500 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:opacity-50 sm:w-auto"
               >
+                <Save className="h-4 w-4" />
                 {saving ? "Saving..." : editingMenu ? "Update" : "Create"}
               </button>
             </div>
@@ -499,20 +487,21 @@ export default function Menus() {
             <h2 className="mb-2 text-lg font-semibold text-gray-900">Delete Menu?</h2>
             <p className="mb-5 text-sm text-gray-600">
               <span className="font-medium">{deleteTarget.name}</span> will be permanently deleted.
-              Categories linked to this menu will become uncategorized.
+              Categories and items linked to this menu will also be deleted.
             </p>
             <div className="app-form-actions">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="w-full rounded-lg border border-gray-200 py-2 text-sm text-gray-600 transition-colors hover:bg-gray-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmDelete}
                 disabled={deleting}
-                className="w-full rounded-lg bg-red-600 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700 disabled:opacity-50 sm:w-auto"
               >
+                <Trash2 className="h-4 w-4" />
                 {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>

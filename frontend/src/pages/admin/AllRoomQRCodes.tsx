@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import ActionDialog from "@/components/shared/ActionDialog";
 import DashboardLayout from "@/components/shared/DashboardLayout";
-import { ApiError, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import type {
   QRCodeDeleteResponse,
+  QRCodeListResponse,
   QRCodeResponse,
-  RoomQRCodeListResponse,
 } from "@/types/publicMenu";
 
-const API_ORIGIN =
-  import.meta.env.VITE_BACKEND_URL ??
-  (import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1").replace(
-    /\/api\/v1\/?$/,
-    ""
-  );
+import {
+  FeedbackAlert,
+  QRCodeCard,
+  getApiErrorMessage,
+  sortQRCodes,
+} from "./qr/shared";
 
 type ConfirmActionState = {
   title: string;
@@ -23,118 +24,28 @@ type ConfirmActionState = {
   onConfirm: () => Promise<void>;
 } | null;
 
-function getApiErrorMessage(error: unknown, fallbackMessage: string): string {
-  if (error instanceof ApiError) {
-    return error.detail || fallbackMessage;
-  }
-
-  if (error instanceof Error) {
-    return error.message || fallbackMessage;
-  }
-
-  return fallbackMessage;
-}
-
-type FeedbackAlertProps = {
-  type: "error" | "success";
-  message: string;
-  onClose: () => void;
-};
-
-function FeedbackAlert({ type, message, onClose }: FeedbackAlertProps) {
-  const styles =
-    type === "error"
-      ? {
-          container: "bg-red-50 border-red-200 text-red-700",
-          button: "text-red-500",
-        }
-      : {
-          container: "bg-green-50 border-green-200 text-green-700",
-          button: "text-green-700",
-        };
-
-  return (
-    <div
-      className={`flex items-center justify-between gap-3 rounded-lg border p-3 text-sm ${styles.container}`}
-    >
-      <span>{message}</span>
-      <button onClick={onClose} className={`font-semibold ${styles.button}`}>
-        x
-      </button>
-    </div>
-  );
-}
-
-type RoomQRCodeCardProps = {
-  qr: QRCodeResponse;
-  working: boolean;
-  onDelete: (roomNumber: string) => void;
-};
-
-function RoomQRCodeCard({ qr, working, onDelete }: RoomQRCodeCardProps) {
-  const imageUrl = `${API_ORIGIN}${qr.qr_image_url}`;
-
-  return (
-    <div className="rounded-xl border bg-gray-50 p-4">
-      <img
-        src={imageUrl}
-        alt={`QR for Room ${qr.target_number}`}
-        className="mx-auto h-40 w-40 rounded border bg-white"
-      />
-
-      <div className="mt-4 space-y-2 text-sm">
-        <p className="font-semibold text-gray-900">Room {qr.target_number}</p>
-        <p className="break-all text-xs text-gray-500">{qr.frontend_url}</p>
-
-        <div className="flex items-center gap-2">
-          <a
-            href={imageUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="app-btn-compact border border-gray-300 bg-white text-gray-700 hover:bg-white"
-          >
-            Open
-          </a>
-
-          <a
-            href={imageUrl}
-            download
-            className="app-btn-compact bg-gray-900 text-white hover:bg-black"
-          >
-            Download
-          </a>
-
-          <button
-            onClick={() => onDelete(qr.target_number)}
-            disabled={working}
-            className="app-btn-compact border border-red-200 text-red-700 hover:bg-red-50"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AllRoomQRCodes() {
   const [qrcodes, setQRCodes] = useState<QRCodeResponse[]>([]);
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmActionState>(null);
 
-  const orderedQRCodes = useMemo(() => {
-    return [...qrcodes].sort((a, b) =>
-      a.target_number.localeCompare(b.target_number, undefined, {
-        numeric: true,
-        sensitivity: "base",
-      })
+  const filteredQRCodes = useMemo(() => {
+    const orderedQRCodes = sortQRCodes(qrcodes);
+    const keyword = search.trim().toLowerCase();
+
+    if (!keyword) {
+      return orderedQRCodes;
+    }
+
+    return orderedQRCodes.filter((qr) =>
+      qr.target_number.toLowerCase().includes(keyword),
     );
-  }, [qrcodes]);
+  }, [qrcodes, search]);
 
   const clearMessages = useCallback(() => {
     setError(null);
@@ -146,10 +57,10 @@ export default function AllRoomQRCodes() {
     setError(null);
 
     try {
-      const data = await api.get<RoomQRCodeListResponse>("/qr/rooms");
+      const data = await api.get<QRCodeListResponse>("/qr/rooms");
       setQRCodes(data.qrcodes);
-    } catch (error) {
-      setError(getApiErrorMessage(error, "Failed to load room QR codes."));
+    } catch (loadError) {
+      setError(getApiErrorMessage(loadError, "Failed to load room QR codes."));
     } finally {
       setLoading(false);
     }
@@ -170,29 +81,32 @@ export default function AllRoomQRCodes() {
         const data = await api.delete<QRCodeDeleteResponse>(endpoint);
         setNotice(data.message);
         await loadRoomQRCodes();
-      } catch (error) {
-        throw new Error(getApiErrorMessage(error, fallbackErrorMessage));
+      } catch (deleteError) {
+        throw new Error(getApiErrorMessage(deleteError, fallbackErrorMessage));
       } finally {
         setWorking(false);
       }
     },
-    [clearMessages, loadRoomQRCodes]
+    [clearMessages, loadRoomQRCodes],
   );
 
-  const openDeleteSingleConfirm = useCallback((roomNumber: string) => {
-    setConfirmError(null);
-    setConfirmAction({
-      title: `Delete Room ${roomNumber} QR`,
-      description:
-        "This QR code will no longer be available for room login until regenerated.",
-      confirmLabel: "Delete QR",
-      onConfirm: () =>
-        executeDelete({
-          endpoint: `/qr/room/${encodeURIComponent(roomNumber)}`,
-          fallbackErrorMessage: "Failed to delete room QR.",
-        }),
-    });
-  }, [executeDelete]);
+  const openDeleteSingleConfirm = useCallback(
+    (roomNumber: string) => {
+      setConfirmError(null);
+      setConfirmAction({
+        title: `Delete Room ${roomNumber} QR`,
+        description:
+          "This QR code will no longer be available for room login until regenerated.",
+        confirmLabel: "Delete QR",
+        onConfirm: () =>
+          executeDelete({
+            endpoint: `/qr/room/${encodeURIComponent(roomNumber)}`,
+            fallbackErrorMessage: "Failed to delete room QR.",
+          }),
+      });
+    },
+    [executeDelete],
+  );
 
   const openDeleteAllConfirm = useCallback(() => {
     setConfirmError(null);
@@ -210,22 +124,26 @@ export default function AllRoomQRCodes() {
   }, [executeDelete]);
 
   const closeConfirmDialog = useCallback(() => {
-    if (working) return;
+    if (working) {
+      return;
+    }
 
     setConfirmAction(null);
     setConfirmError(null);
   }, [working]);
 
   const handleConfirmAction = useCallback(async () => {
-    if (!confirmAction) return;
+    if (!confirmAction) {
+      return;
+    }
 
     setConfirmError(null);
 
     try {
       await confirmAction.onConfirm();
       setConfirmAction(null);
-    } catch (error) {
-      setConfirmError(getApiErrorMessage(error, "Action failed."));
+    } catch (confirmActionError) {
+      setConfirmError(getApiErrorMessage(confirmActionError, "Action failed."));
     }
   }, [confirmAction]);
 
@@ -240,12 +158,20 @@ export default function AllRoomQRCodes() {
           <div>
             <h1 className="app-page-title text-gray-900">All Room QR Codes</h1>
             <p className="app-muted-text mt-1 text-gray-500">
-              View and manage generated room QR codes for operations.
+              View, search, download, and retire room QR codes for guest operations.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/admin/qr/rooms/generate"
+              className="app-btn-base bg-orange-500 text-white hover:bg-orange-600"
+            >
+              Generate Room QRs
+            </Link>
+
             <button
+              type="button"
               onClick={() => void loadRoomQRCodes()}
               disabled={loading || working}
               className="app-btn-base border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
@@ -254,6 +180,7 @@ export default function AllRoomQRCodes() {
             </button>
 
             <button
+              type="button"
               onClick={openDeleteAllConfirm}
               disabled={loading || working || qrcodes.length === 0}
               className="app-btn-base border border-red-200 bg-white text-red-700 hover:bg-red-50"
@@ -279,30 +206,47 @@ export default function AllRoomQRCodes() {
           />
         )}
 
-        <div className="rounded-xl border bg-white p-6">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <h2 className="app-section-title text-gray-900">
-              Generated Room QRs
-            </h2>
-            <p className="app-muted-text text-gray-500">
-              {qrcodes.length} total
-            </p>
+        <div className="space-y-4 rounded-xl border bg-white p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="app-section-title text-gray-900">
+                Generated Room QRs
+              </h2>
+              <p className="app-muted-text mt-1 text-gray-500">
+                {filteredQRCodes.length} shown of {qrcodes.length} total
+              </p>
+            </div>
+
+            <div className="w-full max-w-sm">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Search Room
+              </label>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Room number"
+                className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+            </div>
           </div>
 
           {loading ? (
             <div className="py-12 text-center text-gray-400">
               Loading room QR codes...
             </div>
-          ) : orderedQRCodes.length === 0 ? (
+          ) : filteredQRCodes.length === 0 ? (
             <div className="py-12 text-center text-gray-400">
-              No room QR codes found. Generate room QR codes first.
+              {qrcodes.length === 0
+                ? "No room QR codes found. Generate room QR codes first."
+                : "No room QR codes match your search."}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {orderedQRCodes.map((qr) => (
-                <RoomQRCodeCard
+              {filteredQRCodes.map((qr) => (
+                <QRCodeCard
                   key={`${qr.qr_type}-${qr.target_number}`}
                   qr={qr}
+                  labelPrefix="Room"
                   working={working}
                   onDelete={openDeleteSingleConfirm}
                 />

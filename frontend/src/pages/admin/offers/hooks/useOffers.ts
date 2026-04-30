@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "@/lib/api";
+import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
 import type { Category, Item, Menu } from "@/types/menu";
 import type { OfferListResponse, OfferResponse } from "@/types/offer";
 
@@ -28,14 +29,14 @@ export function useOffers(enabled: boolean) {
       const [offersRes, menusRes, categoriesRes, itemsRes] = await Promise.all([
         api.get<OfferListResponse>("/offers"),
         api.get<Menu[]>("/menus"),
-        api.get<Category[]>("/categories"),
-        api.get<Item[]>("/items"),
+        api.get<Category[] | PaginatedResponse<Category>>("/categories?limit=500"),
+        api.get<Item[] | PaginatedResponse<Item>>("/items?limit=500"),
       ]);
 
       setOffers(offersRes.items);
       setMenus(menusRes);
-      setCategories(categoriesRes);
-      setItems(itemsRes);
+      setCategories(unwrapPaginated(categoriesRes));
+      setItems(unwrapPaginated(itemsRes));
     } catch (error) {
       setError(getErrorMessage(error, "Failed to load offers."));
     } finally {

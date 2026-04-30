@@ -29,7 +29,10 @@ from app.modules.room_sessions.router import (
 )
 from app.modules.rooms.router import router as rooms_router
 from app.modules.settings.router import router as settings_router
-from app.modules.subcategories.router import router as subcategories_router
+from app.modules.site_content.router import (
+    admin_router as site_content_admin_router,
+    router as site_content_router,
+)
 from app.modules.subscriptions.router import router as subscriptions_router
 from app.modules.table_sessions.router import router as table_sessions_router
 from app.modules.users.router import router as users_router
@@ -46,13 +49,14 @@ router.include_router(users_router, prefix="/users", tags=["users"])
 router.include_router(restaurants_router, prefix="/restaurants", tags=["restaurants"])
 router.include_router(menus_router, prefix="/menus", tags=["menus"])
 router.include_router(categories_router, prefix="/categories", tags=["categories"])
-router.include_router(subcategories_router, prefix="/subcategories", tags=["subcategories"])
 router.include_router(items_router, prefix="/items", tags=["items"])
 router.include_router(offers_router, prefix="/offers", tags=["offers"])
 router.include_router(reference_data_router, prefix="/reference-data", tags=["reference-data"])
 
 # Public and guest ordering
 router.include_router(public_router, prefix="/public", tags=["public"])
+router.include_router(site_content_router, prefix="/public/site", tags=["site-content"])
+router.include_router(site_content_admin_router, prefix="/site-content/admin", tags=["site-content-admin"])
 router.include_router(qr_router, prefix="/qr", tags=["qr"])
 router.include_router(table_sessions_router, prefix="/table-sessions", tags=["table-sessions"])
 router.include_router(cart_router, prefix="/cart", tags=["cart"])

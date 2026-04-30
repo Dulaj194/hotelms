@@ -2,14 +2,60 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu } from "lucide-react";
+import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
+import { getRequiredScopesForPlatformAction } from "@/features/platform-access/permissions";
 import { clearAuth, getUser } from "@/lib/auth";
 import {
   clearInAppNavigationHistory,
 } from "@/lib/navigationHistory";
 
 const SUPER_ADMIN_NAV = [
-  { path: "/super-admin/restaurants", label: "Hotels" },
-  { path: "/super-admin/settings-requests", label: "Settings Requests" },
+  { path: "/super-admin", label: "Overview", scopes: null },
+  {
+    path: "/super-admin/notifications",
+    label: "Notifications",
+    scopes: getRequiredScopesForPlatformAction("notifications_queue", "view"),
+  },
+  {
+    path: "/super-admin/registrations",
+    label: "Registrations",
+    scopes: getRequiredScopesForPlatformAction("registrations", "view"),
+  },
+  {
+    path: "/super-admin/restaurants",
+    label: "Hotels",
+    scopes: getRequiredScopesForPlatformAction("restaurants", "view"),
+  },
+  {
+    path: "/super-admin/packages",
+    label: "Packages",
+    scopes: getRequiredScopesForPlatformAction("packages", "view"),
+  },
+  {
+    path: "/super-admin/settings-requests",
+    label: "Settings Requests",
+    scopes: getRequiredScopesForPlatformAction("settings_requests", "view"),
+  },
+  {
+    path: "/super-admin/site-content",
+    label: "Site Content",
+    scopes: getRequiredScopesForPlatformAction("site_content", "view"),
+  },
+  {
+    path: "/super-admin/promo-codes",
+    label: "Promo Codes",
+    scopes: getRequiredScopesForPlatformAction("promo_codes", "view"),
+  },
+  {
+    path: "/super-admin/platform-users",
+    label: "Platform Users",
+    scopes: getRequiredScopesForPlatformAction("platform_users", "view"),
+  },
+  {
+    path: "/super-admin/audit-logs",
+    label: "Audit Logs",
+    scopes: getRequiredScopesForPlatformAction("audit_logs", "view"),
+  },
 ];
 
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.superAdmin";
@@ -22,8 +68,18 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const user = getUser();
+  const visibleNavItems = SUPER_ADMIN_NAV.filter((item) =>
+    item.scopes ? hasAnyPlatformScope(user?.super_admin_scopes, item.scopes) : true,
+  );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const sidebarNavRef = useRef<HTMLElement | null>(null);
+
+  const isNavItemActive = (path: string): boolean => {
+    if (path === "/super-admin") {
+      return location.pathname === "/super-admin";
+    }
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
 
   function handleLogout() {
     clearInAppNavigationHistory();
@@ -124,8 +180,8 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
           onScroll={handleSidebarScroll}
           className="scrollbar-hide flex-1 overflow-y-auto space-y-0.5 px-2 py-4"
         >
-          {SUPER_ADMIN_NAV.map((item) => {
-            const active = location.pathname === item.path;
+          {visibleNavItems.map((item) => {
+            const active = isNavItemActive(item.path);
             return (
               <Link
                 key={item.path}

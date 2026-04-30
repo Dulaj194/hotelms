@@ -21,21 +21,144 @@ def _table_exists(conn: Connection, table_name: str) -> bool:
 
 
 def _column_exists(conn: Connection, table_name: str, column_name: str) -> bool:
-    query = text(
-        """
+    query = text("""
         SELECT 1
         FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = :table_name
           AND COLUMN_NAME = :column_name
         LIMIT 1
-        """
-    )
+        """)
     row = conn.execute(
         query,
         {"table_name": table_name, "column_name": column_name},
     ).first()
     return row is not None
+
+
+def _table_exists(conn: Connection, table_name: str) -> bool:
+    query = text("""
+        SELECT 1
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = :table_name
+        LIMIT 1
+        """)
+    row = conn.execute(query, {"table_name": table_name}).first()
+    return row is not None
+
+
+def _foreign_key_exists(
+    conn: Connection,
+    *,
+    table_name: str,
+    column_name: str,
+    referenced_table: str,
+    referenced_column: str,
+) -> bool:
+    query = text("""
+        SELECT 1
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = :table_name
+          AND COLUMN_NAME = :column_name
+          AND REFERENCED_TABLE_NAME = :referenced_table
+          AND REFERENCED_COLUMN_NAME = :referenced_column
+        LIMIT 1
+        """)
+    row = conn.execute(
+        query,
+        {
+            "table_name": table_name,
+            "column_name": column_name,
+            "referenced_table": referenced_table,
+            "referenced_column": referenced_column,
+        },
+    ).first()
+    return row is not None
+
+
+def _get_or_create_default_menu_id(conn: Connection, restaurant_id: int) -> int:
+    existing = conn.execute(
+        text("""
+            SELECT id
+            FROM menus
+            WHERE restaurant_id = :restaurant_id
+            ORDER BY sort_order ASC, id ASC
+            LIMIT 1
+            """),
+        {"restaurant_id": restaurant_id},
+    ).first()
+    if existing:
+        return int(existing[0])
+
+    result = conn.execute(
+        text("""
+            INSERT INTO menus (
+                name, description, sort_order, is_active,
+                restaurant_id, created_at, updated_at
+            )
+            VALUES (
+                'Main Menu',
+                'Created automatically during development schema compatibility sync.',
+                0,
+                TRUE,
+                :restaurant_id,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            )
+            """),
+        {"restaurant_id": restaurant_id},
+    )
+    inserted_id = getattr(result, "lastrowid", None)
+    if inserted_id:
+        return int(inserted_id)
+
+    fallback = conn.execute(
+        text("""
+            SELECT id
+            FROM menus
+            WHERE restaurant_id = :restaurant_id
+              AND name = 'Main Menu'
+            ORDER BY id DESC
+            LIMIT 1
+            """),
+        {"restaurant_id": restaurant_id},
+    ).first()
+    if not fallback:
+        raise RuntimeError("Unable to create a default menu for legacy categories.")
+    return int(fallback[0])
+
+
+def _backfill_category_menu_ids(conn: Connection, logger) -> None:
+    if not (_table_exists(conn, "menus") and _table_exists(conn, "categories")):
+        return
+    if not _column_exists(conn, "categories", "menu_id"):
+        return
+
+    restaurant_rows = conn.execute(text("""
+            SELECT DISTINCT restaurant_id
+            FROM categories
+            WHERE menu_id IS NULL
+            """)).all()
+    for row in restaurant_rows:
+        restaurant_id = int(row[0])
+        menu_id = _get_or_create_default_menu_id(conn, restaurant_id)
+        result = conn.execute(
+            text("""
+                UPDATE categories
+                SET menu_id = :menu_id
+                WHERE restaurant_id = :restaurant_id
+                  AND menu_id IS NULL
+                """),
+            {"menu_id": menu_id, "restaurant_id": restaurant_id},
+        )
+        if result.rowcount and result.rowcount > 0:
+            logger.warning(
+                "Applied development schema patch: linked %s legacy category row(s) to menu %s.",
+                result.rowcount,
+                menu_id,
+            )
 
 
 def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
@@ -82,6 +205,10 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             "ALTER TABLE users ADD COLUMN assigned_area VARCHAR(32) NULL",
         ),
         (
+            "platform_scopes_json",
+            "ALTER TABLE users ADD COLUMN platform_scopes_json TEXT NULL",
+        ),
+        (
             "must_change_password",
             "ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE",
         ),
@@ -113,16 +240,72 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
             "ALTER TABLE restaurants ADD COLUMN billing_email VARCHAR(191) NULL",
         ),
         (
-            "tax_id",
-            "ALTER TABLE restaurants ADD COLUMN tax_id VARCHAR(100) NULL",
-        ),
-        (
             "opening_time",
             "ALTER TABLE restaurants ADD COLUMN opening_time VARCHAR(8) NULL",
         ),
         (
+            "enable_steward",
+            "ALTER TABLE restaurants ADD COLUMN enable_steward BOOLEAN NOT NULL DEFAULT TRUE",
+        ),
+        (
             "closing_time",
             "ALTER TABLE restaurants ADD COLUMN closing_time VARCHAR(8) NULL",
+        ),
+        (
+            "integration_api_key_hash",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_hash VARCHAR(128) NULL",
+        ),
+        (
+            "integration_api_key_prefix",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_prefix VARCHAR(16) NULL",
+        ),
+        (
+            "integration_api_key_last4",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_last4 VARCHAR(4) NULL",
+        ),
+        (
+            "integration_api_key_active",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_active BOOLEAN NOT NULL DEFAULT FALSE",
+        ),
+        (
+            "integration_api_key_rotated_at",
+            "ALTER TABLE restaurants ADD COLUMN integration_api_key_rotated_at DATETIME NULL",
+        ),
+        (
+            "integration_public_ordering_enabled",
+            "ALTER TABLE restaurants ADD COLUMN integration_public_ordering_enabled BOOLEAN NOT NULL DEFAULT FALSE",
+        ),
+        (
+            "integration_webhook_url",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_url VARCHAR(500) NULL",
+        ),
+        (
+            "integration_webhook_secret_header_name",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_secret_header_name VARCHAR(100) NULL",
+        ),
+        (
+            "integration_webhook_secret_ciphertext",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_secret_ciphertext TEXT NULL",
+        ),
+        (
+            "integration_webhook_secret_last4",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_secret_last4 VARCHAR(4) NULL",
+        ),
+        (
+            "integration_webhook_secret_rotated_at",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_secret_rotated_at DATETIME NULL",
+        ),
+        (
+            "integration_webhook_status",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_status VARCHAR(32) NOT NULL DEFAULT 'not_configured'",
+        ),
+        (
+            "integration_webhook_last_checked_at",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_last_checked_at DATETIME NULL",
+        ),
+        (
+            "integration_webhook_last_error",
+            "ALTER TABLE restaurants ADD COLUMN integration_webhook_last_error TEXT NULL",
         ),
     )
 
@@ -134,10 +317,6 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
     )
 
     item_column_patches: Sequence[tuple[str, str]] = (
-        (
-            "subcategory_id",
-            "ALTER TABLE items ADD COLUMN subcategory_id INT NULL",
-        ),
         (
             "more_details",
             "ALTER TABLE items ADD COLUMN more_details TEXT NULL",
@@ -262,6 +441,53 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
         ),
     )
 
+    audit_log_column_patches: Sequence[tuple[str, str]] = (
+        (
+            "restaurant_id",
+            "ALTER TABLE audit_logs ADD COLUMN restaurant_id INT NULL",
+        ),
+    )
+
+    subscription_change_log_column_patches: Sequence[tuple[str, str]] = (
+        (
+            "previous_package_name_snapshot",
+            "ALTER TABLE subscription_change_logs ADD COLUMN previous_package_name_snapshot VARCHAR(100) NULL",
+        ),
+        (
+            "previous_package_code_snapshot",
+            "ALTER TABLE subscription_change_logs ADD COLUMN previous_package_code_snapshot VARCHAR(50) NULL",
+        ),
+        (
+            "next_package_name_snapshot",
+            "ALTER TABLE subscription_change_logs ADD COLUMN next_package_name_snapshot VARCHAR(100) NULL",
+        ),
+        (
+            "next_package_code_snapshot",
+            "ALTER TABLE subscription_change_logs ADD COLUMN next_package_code_snapshot VARCHAR(50) NULL",
+        ),
+    )
+
+    restaurant_fk_patches: Sequence[tuple[str, str, str, str, str]] = (
+        (
+            "country_id",
+            "countries",
+            "id",
+            "fk_restaurants_country_id",
+            "ALTER TABLE restaurants "
+            "ADD CONSTRAINT fk_restaurants_country_id "
+            "FOREIGN KEY (country_id) REFERENCES countries(id) ON DELETE SET NULL",
+        ),
+        (
+            "currency_id",
+            "currency_types",
+            "id",
+            "fk_restaurants_currency_id",
+            "ALTER TABLE restaurants "
+            "ADD CONSTRAINT fk_restaurants_currency_id "
+            "FOREIGN KEY (currency_id) REFERENCES currency_types(id) ON DELETE SET NULL",
+        ),
+    )
+
     with engine.begin() as conn:
         if not _table_exists(conn, "order_headers"):
             logger.warning(
@@ -290,6 +516,24 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 )
 
         if not _table_exists(conn, "restaurants"):
+        if _table_exists(conn, "users") and _column_exists(conn, "users", "role"):
+            conn.execute(text("""
+                    ALTER TABLE users
+                    MODIFY COLUMN role ENUM(
+                        'owner',
+                        'admin',
+                        'steward',
+                        'housekeeper',
+                        'cashier',
+                        'accountant',
+                        'super_admin'
+                    ) NOT NULL
+                    """))
+
+        for column_name, alter_sql in restaurant_column_patches:
+            if _column_exists(conn, "restaurants", column_name):
+                continue
+            conn.execute(text(alter_sql))
             logger.warning(
                 "Skipped development schema patch for restaurants: table does not exist."
             )
@@ -304,6 +548,24 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 )
 
         if not _table_exists(conn, "categories"):
+        if _column_exists(conn, "restaurants", "billing_email") and _column_exists(conn, "restaurants", "email"):
+            result = conn.execute(text("""
+                    UPDATE restaurants
+                    SET billing_email = email
+                    WHERE (billing_email IS NULL OR billing_email = '')
+                      AND email IS NOT NULL
+                      AND email <> ''
+                    """))
+            if result.rowcount and result.rowcount > 0:
+                logger.warning(
+                    "Applied development schema patch: backfilled restaurants.billing_email from restaurants.email for %s row(s).",
+                    result.rowcount,
+                )
+
+        for column_name, alter_sql in category_column_patches:
+            if _column_exists(conn, "categories", column_name):
+                continue
+            conn.execute(text(alter_sql))
             logger.warning(
                 "Skipped development schema patch for categories: table does not exist."
             )
@@ -328,6 +590,16 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                     "Applied development schema patch: items.%s was missing and has been added.",
                     column_name,
                 )
+        _backfill_category_menu_ids(conn, logger)
+
+        for column_name, alter_sql in item_column_patches:
+            if _column_exists(conn, "items", column_name):
+                continue
+            conn.execute(text(alter_sql))
+            logger.warning(
+                "Applied development schema patch: items.%s was missing and has been added.",
+                column_name,
+            )
 
         if not _table_exists(conn, "housekeeping_requests"):
             logger.warning(
@@ -353,4 +625,183 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 logger.warning(
                     "Applied development schema patch: rooms.%s was missing and has been added.",
                     column_name,
+                )
+        for column_name, alter_sql in room_column_patches:
+            if _column_exists(conn, "rooms", column_name):
+                continue
+            conn.execute(text(alter_sql))
+            logger.warning(
+                "Applied development schema patch: rooms.%s was missing and has been added.",
+                column_name,
+            )
+
+        for column_name, alter_sql in audit_log_column_patches:
+            if _column_exists(conn, "audit_logs", column_name):
+                continue
+            conn.execute(text(alter_sql))
+            logger.warning(
+                "Applied development schema patch: audit_logs.%s was missing and has been added.",
+                column_name,
+            )
+
+        if not _table_exists(conn, "subscription_change_logs"):
+            conn.execute(text("""
+                    CREATE TABLE subscription_change_logs (
+                        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        restaurant_id INT NOT NULL,
+                        subscription_id INT NULL,
+                        actor_user_id INT NULL,
+                        action ENUM('trial_assigned', 'activated', 'updated', 'cancelled', 'expired') NOT NULL,
+                        source VARCHAR(50) NOT NULL DEFAULT 'system',
+                        change_reason TEXT NULL,
+                        previous_package_id INT NULL,
+                        next_package_id INT NULL,
+                        previous_status ENUM('trial', 'active', 'expired', 'cancelled') NULL,
+                        next_status ENUM('trial', 'active', 'expired', 'cancelled') NULL,
+                        previous_expires_at DATETIME NULL,
+                        next_expires_at DATETIME NULL,
+                        metadata_json TEXT NULL,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        INDEX ix_subscription_change_logs_restaurant_id (restaurant_id),
+                        INDEX ix_subscription_change_logs_subscription_id (subscription_id),
+                        INDEX ix_subscription_change_logs_actor_user_id (actor_user_id),
+                        INDEX ix_subscription_change_logs_created_at (created_at),
+                        CONSTRAINT fk_subscription_change_logs_restaurant
+                            FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_subscription_change_logs_subscription
+                            FOREIGN KEY (subscription_id) REFERENCES restaurant_subscriptions(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_subscription_change_logs_actor
+                            FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_subscription_change_logs_previous_package
+                            FOREIGN KEY (previous_package_id) REFERENCES packages(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_subscription_change_logs_next_package
+                            FOREIGN KEY (next_package_id) REFERENCES packages(id) ON DELETE SET NULL
+                    )
+                    """))
+            logger.warning(
+                "Applied development schema patch: subscription_change_logs table was missing and has been created.",
+            )
+
+        if _table_exists(conn, "subscription_change_logs"):
+            for column_name, alter_sql in subscription_change_log_column_patches:
+                if _column_exists(conn, "subscription_change_logs", column_name):
+                    continue
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: subscription_change_logs.%s was missing and has been added.",
+                    column_name,
+                )
+
+        if not _table_exists(conn, "super_admin_notification_states"):
+            conn.execute(text("""
+                    CREATE TABLE super_admin_notification_states (
+                        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        audit_log_id INT NOT NULL,
+                        is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                        read_at DATETIME NULL,
+                        read_by_user_id INT NULL,
+                        assigned_user_id INT NULL,
+                        assigned_at DATETIME NULL,
+                        acknowledged_at DATETIME NULL,
+                        acknowledged_by_user_id INT NULL,
+                        snoozed_until DATETIME NULL,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE KEY uq_super_admin_notification_states_audit_log_id (audit_log_id),
+                        INDEX ix_super_admin_notification_states_is_read (is_read),
+                        INDEX ix_super_admin_notification_states_read_by_user_id (read_by_user_id),
+                        INDEX ix_super_admin_notification_states_assigned_user_id (assigned_user_id),
+                        INDEX ix_super_admin_notification_states_acknowledged_at (acknowledged_at),
+                        INDEX ix_super_admin_notification_states_acknowledged_by_user_id (acknowledged_by_user_id),
+                        INDEX ix_super_admin_notification_states_snoozed_until (snoozed_until),
+                        CONSTRAINT fk_super_admin_notification_states_audit_log
+                            FOREIGN KEY (audit_log_id) REFERENCES audit_logs(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_super_admin_notification_states_read_by
+                            FOREIGN KEY (read_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_super_admin_notification_states_assigned_to
+                            FOREIGN KEY (assigned_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_super_admin_notification_states_acknowledged_by
+                            FOREIGN KEY (acknowledged_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+                    )
+                    """))
+            logger.warning(
+                "Applied development schema patch: super_admin_notification_states table was missing and has been created.",
+            )
+
+        if not _table_exists(conn, "restaurant_webhook_deliveries"):
+            conn.execute(text("""
+                    CREATE TABLE restaurant_webhook_deliveries (
+                        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                        restaurant_id INT NOT NULL,
+                        triggered_by_user_id INT NULL,
+                        retried_from_delivery_id INT NULL,
+                        event_type VARCHAR(100) NOT NULL,
+                        request_url VARCHAR(500) NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        delivery_status VARCHAR(20) NOT NULL DEFAULT 'success',
+                        attempt_number INT NOT NULL DEFAULT 1,
+                        is_retry BOOLEAN NOT NULL DEFAULT FALSE,
+                        http_status_code INT NULL,
+                        error_message TEXT NULL,
+                        response_excerpt TEXT NULL,
+                        response_time_ms INT NULL,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        INDEX ix_restaurant_webhook_deliveries_restaurant_id (restaurant_id),
+                        INDEX ix_restaurant_webhook_deliveries_triggered_by_user_id (triggered_by_user_id),
+                        INDEX ix_restaurant_webhook_deliveries_retried_from_delivery_id (retried_from_delivery_id),
+                        INDEX ix_restaurant_webhook_deliveries_event_type (event_type),
+                        INDEX ix_restaurant_webhook_deliveries_created_at (created_at),
+                        CONSTRAINT fk_restaurant_webhook_deliveries_restaurant
+                            FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_restaurant_webhook_deliveries_triggered_by
+                            FOREIGN KEY (triggered_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_restaurant_webhook_deliveries_retried_from
+                            FOREIGN KEY (retried_from_delivery_id) REFERENCES restaurant_webhook_deliveries(id) ON DELETE SET NULL
+                    )
+                    """))
+            logger.warning(
+                "Applied development schema patch: restaurant_webhook_deliveries table was missing and has been created.",
+            )
+
+        for (
+            column_name,
+            referenced_table,
+            referenced_column,
+            constraint_name,
+            alter_sql,
+        ) in restaurant_fk_patches:
+            if not _column_exists(conn, "restaurants", column_name):
+                continue
+            if not _table_exists(conn, referenced_table):
+                logger.warning(
+                    "Skipped development schema FK patch: restaurants.%s -> %s.%s because referenced table is missing.",
+                    column_name,
+                    referenced_table,
+                    referenced_column,
+                )
+                continue
+            if _foreign_key_exists(
+                conn,
+                table_name="restaurants",
+                column_name=column_name,
+                referenced_table=referenced_table,
+                referenced_column=referenced_column,
+            ):
+                continue
+
+            try:
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: added FK %s on restaurants.%s -> %s.%s.",
+                    constraint_name,
+                    column_name,
+                    referenced_table,
+                    referenced_column,
+                )
+            except Exception as exc:  # pragma: no cover - depends on live DB data quality
+                logger.warning(
+                    "Skipped development schema FK patch %s (%s): %s",
+                    constraint_name,
+                    column_name,
+                    exc,
                 )

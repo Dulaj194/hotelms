@@ -14,6 +14,7 @@ class TableSessionStartRequest(BaseModel):
 
     restaurant_id: int
     table_number: str = Field(..., min_length=1, max_length=50)
+    customer_name: str = Field(..., min_length=1, max_length=120)
     qr_access_key: str = Field(..., min_length=16, max_length=2000)
 
 
@@ -29,6 +30,8 @@ class TableSessionStartResponse(BaseModel):
     guest_token: str
     restaurant_id: int
     table_number: str
+    customer_name: str
+    session_status: str
     expires_at: datetime
 
     model_config = {"from_attributes": True}

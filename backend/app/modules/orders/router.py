@@ -2,6 +2,7 @@
 
 Route groups:
   POST   /orders               — guest: place order from cart
+  GET    /orders/my            — guest: list all own orders (X-Guest-Session required)
   GET    /orders/my/{order_id} — guest: view own order (X-Guest-Session required)
   GET    /orders/pending       — staff: pending orders (kitchen dashboard)
   GET    /orders/processing    — staff: confirmed + processing orders (kitchen)
@@ -12,7 +13,7 @@ Route groups:
   PATCH  /orders/{order_id}/status — staff: update order status + publish event
 """
 import redis as redis_lib
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import (
@@ -20,9 +21,11 @@ from app.core.dependencies import (
     get_current_restaurant_id,
     get_db,
     get_redis,
-    require_privilege,
+    resolve_guest_session_token,
+    require_module_access,
     require_roles,
 )
+from app.modules.access import role_catalog
 from app.modules.orders import service
 from app.modules.orders.model import OrderStatus
 from app.modules.orders.schemas import (
@@ -39,7 +42,7 @@ from app.modules.table_sessions.model import TableSession
 router = APIRouter()
 
 # ── Staff auth shorthand ──────────────────────────────────────────────────────
-_STAFF_ROLES = ("owner", "admin", "steward")
+_STAFF_ROLES = role_catalog.QR_MENU_STAFF_ROLES
 
 
 # ── Guest endpoints ───────────────────────────────────────────────────────────
@@ -47,16 +50,38 @@ _STAFF_ROLES = ("owner", "admin", "steward")
 @router.post("", response_model=PlaceOrderResponse, status_code=201)
 def place_order(
     payload: PlaceOrderRequest,
-    session: TableSession = Depends(get_current_guest_session),
+    x_guest_session: str | None = Header(default=None, alias="X-Guest-Session"),
+    x_table_key: str | None = Header(default=None, alias="X-Table-Key"),
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
 ) -> PlaceOrderResponse:
-    """Place an order from the guest's current cart.
+    """Place a table order at checkout.
 
-    Requires X-Guest-Session header. restaurant_id comes from the validated
-    session — not from the request body.
+    Accepts either an existing X-Guest-Session token or the original X-Table-Key
+    QR credential. restaurant_id and table context are validated server-side.
     """
-    return service.place_order(db, r, session, payload)
+    if x_guest_session:
+        session = resolve_guest_session_token(x_guest_session, db)
+        return service.place_order(db, r, session, payload)
+    if x_table_key:
+        return service.place_order_from_qr_key(db, r, x_table_key, payload)
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Missing table checkout credential.",
+    )
+
+
+@router.get("/my", response_model=ActiveOrderListResponse)
+def list_my_orders(
+    session: TableSession = Depends(get_current_guest_session),
+    db: Session = Depends(get_db),
+) -> ActiveOrderListResponse:
+    """Return all orders for the guest's current session.
+
+    Includes all order statuses (pending, confirmed, processing, completed, paid, rejected).
+    Scoped to the guest session — a guest can only see their own orders.
+    """
+    return service.list_orders_for_guest(db, session)
 
 
 @router.get("/my/{order_id}", response_model=OrderDetailResponse)
@@ -72,6 +97,17 @@ def get_my_order(
     return service.get_order_for_guest(db, order_id, session)
 
 
+@router.post("/my/{order_id}/cancel", response_model=OrderStatusResponse)
+def cancel_my_order(
+    order_id: int,
+    session: TableSession = Depends(get_current_guest_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+) -> OrderStatusResponse:
+    """Cancel a guest's own pending order within the 5-second grace window."""
+    return service.cancel_order_for_guest(db, order_id, session, r)
+
+
 # ── Kitchen dashboard endpoints ───────────────────────────────────────────────
 
 @router.get("/pending", response_model=KitchenOrderListResponse)
@@ -79,7 +115,7 @@ def list_pending_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> KitchenOrderListResponse:
     """List pending orders with item summaries for the kitchen dashboard."""
     return service.list_pending_orders(db, restaurant_id)
@@ -90,7 +126,7 @@ def list_processing_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> KitchenOrderListResponse:
     """List confirmed + processing orders with item summaries for the kitchen."""
     return service.list_processing_orders(db, restaurant_id)
@@ -101,7 +137,7 @@ def list_completed_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> KitchenOrderListResponse:
     """List recently completed orders for the kitchen completed section."""
     return service.list_kitchen_completed_orders(db, restaurant_id)
@@ -114,7 +150,7 @@ def list_active_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> ActiveOrderListResponse:
     """List all non-finalized orders (pending / confirmed / processing)."""
     return service.list_active_orders(db, restaurant_id)
@@ -125,7 +161,7 @@ def list_history_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> ActiveOrderListResponse:
     """List completed / paid / rejected orders for the restaurant."""
     return service.list_history_orders(db, restaurant_id)
@@ -137,7 +173,7 @@ def get_order_detail(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> OrderDetailResponse:
     """Return full order details for staff/admin, scoped to their restaurant."""
     return service.get_order_for_staff(db, order_id, restaurant_id)
@@ -151,7 +187,7 @@ def update_order_status(
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
     _=Depends(require_roles(*_STAFF_ROLES)),
-    __=Depends(require_privilege("QR_MENU")),
+    __=Depends(require_module_access("kds")),
 ) -> OrderStatusResponse:
     """Update order status with transition validation.
 

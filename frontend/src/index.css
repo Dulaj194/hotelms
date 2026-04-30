@@ -68,10 +68,32 @@
   video,
   canvas {
     max-width: 100%;
+  html {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-background text-foreground;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  #root {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
   }
 }
 
@@ -125,11 +147,11 @@
   }
 
   .app-modal-shell {
-    @apply fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 sm:p-6;
+    @apply fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-3 sm:p-6;
   }
 
   .app-modal-panel {
-    @apply w-full rounded-xl bg-white p-4 shadow-xl sm:p-6;
+    @apply max-h-[92vh] w-full overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6;
   }
 }
 
