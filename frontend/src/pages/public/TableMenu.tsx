@@ -259,7 +259,7 @@ export default function TableMenu() {
 
         {/* Category tabs */}
         {menu.categories.length > 1 && (
-          <div className="scrollbar-hide mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 gap-1 overflow-x-auto px-4 pb-2">
+          <div className="scrollbar-hide mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 gap-1 overflow-x-auto shrink-0 px-4 pb-2">
             {menu.categories.map((cat) => (
               <button
                 key={cat.id}
@@ -329,12 +329,12 @@ export default function TableMenu() {
 
       {/* Cart FAB for mobile */}
       {(cart?.item_count ?? 0) > 0 && !cartOpen && (
-        <div className="fixed bottom-4 left-0 right-0 z-30 box-border w-full max-w-full px-4">
+        <div className="fixed inset-x-0 bottom-0 z-30 box-border w-full max-w-full min-w-0 px-4">
           <button
             onClick={() => setCartOpen(true)}
             className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 rounded-2xl bg-orange-500 px-5 py-3 text-white shadow-lg transition-colors hover:bg-orange-600"
           >
-            <span className="min-w-0 truncate font-semibold">
+            <span className="max-w-full truncate font-semibold">
               {cart!.item_count} item{cart!.item_count !== 1 ? "s" : ""} in cart
             </span>
             <span className="shrink-0 font-bold">${cart!.total.toFixed(2)}</span>
