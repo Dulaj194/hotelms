@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   Bell,
   ChevronRight,
-  Home,
   LogOut,
   Menu,
   MessageCircle,
@@ -40,6 +39,29 @@ type MenuTile = {
   categoryId: number;
   categoryName: string;
 };
+
+type FloatingCartButtonProps = {
+  itemCount: number;
+  onOpenCart: () => void;
+};
+
+function FloatingCartButton({ itemCount, onOpenCart }: FloatingCartButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onOpenCart}
+      className="relative -mt-7 mx-auto grid h-16 w-16 place-items-center rounded-full bg-orange-500 text-white shadow-[0_20px_40px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
+      aria-label={itemCount > 0 ? `Open cart, ${itemCount} items` : "Open cart"}
+    >
+      <ShoppingCart className="h-7 w-7" />
+      {itemCount > 0 && (
+        <span className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-slate-900 px-1.5 text-[11px] font-bold text-white ring-2 ring-white">
+          {itemCount}
+        </span>
+      )}
+    </button>
+  );
+}
 
 export default function TableMenu() {
   const [searchParams] = useSearchParams();
@@ -251,6 +273,10 @@ export default function TableMenu() {
     navigate(nextPath);
     return orderId;
   }, [placeOrder, navigate, restaurantId, tableNumber, qrAccessKey]);
+
+  const handleOpenCart = useCallback(() => {
+    setCartOpen(true);
+  }, []);
 
   const handleNameSubmit = useCallback(() => {
     const trimmed = guestNameInput.trim();
@@ -505,33 +531,6 @@ export default function TableMenu() {
           </div>
 
           <div className="flex items-center gap-2">
-            {restaurantId && tableNumber && (
-              <Link
-                to={
-                  qrAccessKey
-                    ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
-                    : `/orders/my/${restaurantId}/${tableNumber}`
-                }
-                className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex"
-              >
-                <Bell className="h-4 w-4 text-orange-500" />
-                Orders
-              </Link>
-            )}
-
-            <button
-              onClick={() => setCartOpen(true)}
-              className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800"
-              aria-label="Open cart"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {cartItemCount > 0 && (
-                <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-orange-500 px-1 text-[11px] font-bold text-white">
-                  {cartItemCount}
-                </span>
-              )}
-            </button>
-
             <button
               onClick={() => setProfileDrawerOpen(true)}
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-900 transition hover:bg-slate-200"
@@ -676,14 +675,7 @@ export default function TableMenu() {
             Search
           </button>
 
-          <button
-            type="button"
-            onClick={() => handleScrollTo("menu-top")}
-            className="-mt-7 mx-auto grid h-16 w-16 place-items-center rounded-full bg-orange-500 text-white shadow-[0_20px_40px_rgba(249,115,22,0.35)] transition hover:bg-orange-600"
-            aria-label="Go to home"
-          >
-            <Home className="h-7 w-7" />
-          </button>
+          <FloatingCartButton itemCount={cartItemCount} onOpenCart={handleOpenCart} />
 
           <button
             type="button"
