@@ -5,7 +5,6 @@ import {
   ChevronRight,
   LogOut,
   Menu,
-  MessageCircle,
   Search,
   ShoppingCart,
   Sparkles,
@@ -467,14 +466,16 @@ export default function TableMenu() {
           <img
             src={imageUrl}
             alt={item.name}
-            className="h-28 w-full object-cover transition duration-300 group-hover:scale-[1.03] sm:h-36"
+            loading="lazy"
+            decoding="async"
+            className="aspect-[4/3] w-full object-cover transition duration-300 group-hover:scale-[1.03]"
           />
         ) : (
-          <div className="flex h-28 w-full items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300 sm:h-36">
-            <UtensilsCrossed className="h-10 w-10" />
+          <div className="flex aspect-[4/3] w-full items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300">
+            <UtensilsCrossed className="h-9 w-9" />
           </div>
         )}
-          <div className="flex flex-1 flex-col gap-2 p-3">
+          <div className="flex flex-1 flex-col gap-2.5 p-3">
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-bold text-slate-900 leading-tight line-clamp-2">
                 {item.name}
@@ -502,14 +503,14 @@ export default function TableMenu() {
             </div>
 
             {qtyInCart > 0 ? (
-              <div className="flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
+              <div className="flex min-h-10 items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
                 <button
                   onClick={() =>
                     qtyInCart > 1
                       ? updateItem(item.id, qtyInCart - 1)
                       : removeItem(item.id)
                   }
-                  className="grid h-8 w-8 place-items-center rounded-full text-xs font-bold text-slate-600 transition hover:bg-white"
+                  className="grid h-9 w-9 place-items-center rounded-full text-sm font-bold text-slate-600 transition hover:bg-white"
                   aria-label="Decrease"
                 >
                   -
@@ -519,7 +520,7 @@ export default function TableMenu() {
                 </span>
                 <button
                   onClick={() => updateItem(item.id, qtyInCart + 1)}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-xs font-bold text-white transition hover:bg-orange-600"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-sm font-bold text-white transition hover:bg-orange-600"
                   aria-label="Increase"
                 >
                   +
@@ -529,7 +530,7 @@ export default function TableMenu() {
               <button
                 disabled={isAdding || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isAdding ? "Adding..." : "Add to Cart"}
                 {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
@@ -551,6 +552,7 @@ export default function TableMenu() {
               <img
                 src={toAssetUrl(menu.restaurant.logo_url)}
                 alt={menu.restaurant.name}
+                decoding="async"
                 className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200"
               />
             ) : (
@@ -636,31 +638,32 @@ export default function TableMenu() {
         {...menuSwipeHandlers}
       >
         <section>
-          <div className="relative min-h-[11rem] overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
+          <div className="relative min-h-[8.75rem] overflow-hidden rounded-2xl bg-slate-950 px-4 py-4 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
             {featuredBannerUrls.length > 0 && (
               <img
                 src={featuredBannerUrls[activeBannerIndex]}
                 alt="Featured menu banner"
+                decoding="async"
                 className="absolute inset-0 h-full w-full object-cover"
               />
             )}
             <div className="absolute inset-0 bg-slate-950/65" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.1)_0%,rgba(15,23,42,0.55)_100%)]" />
-            <div className="relative z-10 flex h-full min-h-[calc(11rem-2.5rem)] flex-col justify-between gap-5 sm:min-h-[calc(13rem-3rem)] lg:min-h-[calc(15rem-3rem)]">
+            <div className="relative z-10 flex h-full min-h-[calc(8.75rem-2rem)] flex-col justify-between gap-3 sm:min-h-[calc(13rem-3rem)] sm:gap-5 lg:min-h-[calc(15rem-3rem)]">
               <div className="min-w-0">
-                <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-white/80">
+                <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 sm:text-xs">
                   <Sparkles className="h-3.5 w-3.5" />
                   Featured picks
                 </p>
-                <h2 className="mt-4 max-w-xl text-2xl font-black leading-tight tracking-tight sm:text-3xl">
+                <h2 className="mt-3 max-w-xl text-xl font-black leading-tight tracking-tight sm:mt-4 sm:text-3xl">
                   Order faster from your table.
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">
+                <p className="mt-1.5 max-w-2xl text-xs leading-5 text-white/80 sm:mt-2 sm:text-sm sm:leading-6">
                   Choose favorites, update quantities, and place your order without leaving the menu.
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2 text-xs font-semibold text-white/80">
+              <div className="hidden flex-wrap gap-2 text-xs font-semibold text-white/80 sm:flex">
                 <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add</span>
                 <span className="rounded-full bg-white/10 px-3 py-1.5">Table session</span>
                 <span className="rounded-full bg-white/10 px-3 py-1.5">Live cart</span>
@@ -699,7 +702,7 @@ export default function TableMenu() {
               No items match the current filter.
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {visibleTiles.map(renderItemCard)}
             </div>
           )}
@@ -748,8 +751,8 @@ export default function TableMenu() {
             onClick={() => setProfileDrawerOpen(true)}
             className="flex flex-col items-center gap-1 rounded-2xl py-2 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
           >
-            <MessageCircle className="h-5 w-5" />
-            Chat
+            <UserRound className="h-5 w-5" />
+            Profile
           </button>
         </div>
       </div>
@@ -791,14 +794,14 @@ export default function TableMenu() {
             {/* Content */}
             <div className="flex-1 overflow-y-auto">
               {/* Guest Info Section */}
-              <div className="border-b border-slate-200 px-6 py-6">
+              <div className="border-b border-slate-200 px-5 py-5 sm:px-6 sm:py-6">
                 <div className="mb-4 flex items-center gap-4">
                   <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-2xl font-bold text-white">
                     {guestName?.charAt(0).toUpperCase() ?? "G"}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-semibold text-slate-500">Guest Name</p>
-                    <p className="text-lg font-bold text-slate-900">{guestName ?? "Guest"}</p>
+                    <p className="truncate text-lg font-bold text-slate-900">{guestName ?? "Guest"}</p>
                   </div>
                 </div>
 
@@ -807,7 +810,7 @@ export default function TableMenu() {
                     <p className="text-slate-600">
                       <span className="font-semibold text-slate-900">Table:</span> {tableNumber}
                     </p>
-                    <p className="text-slate-600">
+                    <p className="break-words text-slate-600">
                       <span className="font-semibold text-slate-900">Restaurant:</span> {menu?.restaurant.name}
                     </p>
                   </div>
@@ -815,7 +818,7 @@ export default function TableMenu() {
               </div>
 
               {/* Menu Items */}
-              <div className="py-4">
+              <div className="py-3">
                 {restaurantId && tableNumber && (
                   <Link
                     to={
@@ -824,7 +827,7 @@ export default function TableMenu() {
                         : `/orders/my/${restaurantId}/${tableNumber}`
                     }
                     onClick={() => setProfileDrawerOpen(false)}
-                    className="flex items-center justify-between px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                    className="flex min-h-12 items-center justify-between px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-6"
                   >
                     <span>My Orders</span>
                     <ChevronRight className="h-4 w-4 text-slate-400" />
@@ -832,58 +835,27 @@ export default function TableMenu() {
                 )}
 
                 <button
-                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-                  onClick={() => setProfileDrawerOpen(false)}
-                  disabled
+                  type="button"
+                  className="flex min-h-12 w-full items-center justify-between px-5 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-6"
+                  onClick={() => {
+                    setProfileDrawerOpen(false);
+                    handleFocusSearch();
+                  }}
                 >
-                  <div className="flex items-center justify-between">
-                    <span>My Profile</span>
-                    <ChevronRight className="h-4 w-4 text-slate-400" />
-                  </div>
+                  <span>Search menu</span>
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
                 </button>
 
                 <button
-                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-                  onClick={() => setProfileDrawerOpen(false)}
-                  disabled
+                  type="button"
+                  className="flex min-h-12 w-full items-center justify-between px-5 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-6"
+                  onClick={() => {
+                    setProfileDrawerOpen(false);
+                    handleScrollTo("menu-top");
+                  }}
                 >
-                  <div className="flex items-center justify-between">
-                    <span>Payment Methods</span>
-                    <ChevronRight className="h-4 w-4 text-slate-400" />
-                  </div>
-                </button>
-
-                <button
-                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-                  onClick={() => setProfileDrawerOpen(false)}
-                  disabled
-                >
-                  <div className="flex items-center justify-between">
-                    <span>Contact Us</span>
-                    <ChevronRight className="h-4 w-4 text-slate-400" />
-                  </div>
-                </button>
-
-                <button
-                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-                  onClick={() => setProfileDrawerOpen(false)}
-                  disabled
-                >
-                  <div className="flex items-center justify-between">
-                    <span>Settings</span>
-                    <ChevronRight className="h-4 w-4 text-slate-400" />
-                  </div>
-                </button>
-
-                <button
-                  className="w-full px-6 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-                  onClick={() => setProfileDrawerOpen(false)}
-                  disabled
-                >
-                  <div className="flex items-center justify-between">
-                    <span>Help & FAQs</span>
-                    <ChevronRight className="h-4 w-4 text-slate-400" />
-                  </div>
+                  <span>Back to top</span>
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
                 </button>
               </div>
             </div>

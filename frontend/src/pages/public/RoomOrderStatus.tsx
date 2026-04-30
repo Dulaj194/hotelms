@@ -393,7 +393,7 @@ export default function RoomOrderStatus() {
               }
               className="inline-flex min-h-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
             >
-              📋 View my orders
+              View my orders
             </Link>
             <Link
               to={

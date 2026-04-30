@@ -78,20 +78,20 @@ function RoomCartDrawer({
       )}
 
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-xl z-50 flex flex-col
+        className={`fixed top-0 right-0 z-50 flex h-full w-full max-w-sm flex-col bg-white shadow-xl
           transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}
         role="dialog"
         aria-modal="true"
         aria-label="Room cart"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b">
+        <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-lg font-semibold">
             Cart{itemCount > 0 ? ` (${itemCount})` : ""}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            className="grid h-10 w-10 place-items-center rounded-full transition-colors hover:bg-gray-100"
             aria-label="Close cart"
           >
             <svg
@@ -144,14 +144,14 @@ function RoomCartDrawer({
             <div className="w-full space-y-2">
               <button
                 onClick={onTrackOrder}
-                className="w-full py-2.5 bg-orange-500 text-white rounded-xl text-sm font-semibold
+                className="min-h-11 w-full rounded-xl bg-orange-500 py-2.5 text-sm font-semibold text-white
                            hover:bg-orange-600 transition-colors"
               >
                 Track Order
               </button>
               <button
                 onClick={onContinueBrowsing}
-                className="w-full py-2 border border-orange-200 text-orange-600 rounded-xl text-sm font-semibold
+                className="min-h-11 w-full rounded-xl border border-orange-200 py-2 text-sm font-semibold text-orange-600
                            hover:bg-orange-50 transition-colors"
               >
                 Continue Browsing
@@ -163,14 +163,14 @@ function RoomCartDrawer({
         {/* Cart items */}
         {!orderPlaced && (
           <>
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
               {!cart || cart.items.length === 0 ? (
                 <p className="text-center text-gray-400 mt-8">Your cart is empty.</p>
               ) : (
                 cart.items.map((item) => (
                   <div
                     key={item.item_id}
-                    className="p-2 rounded-lg border space-y-1.5"
+                    className="space-y-2 rounded-xl border p-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -186,7 +186,7 @@ function RoomCartDrawer({
                       {/* Remove button */}
                       <button
                         onClick={() => onRemoveItem(item.item_id)}
-                        className="p-1 text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                        className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
                         aria-label={`Remove ${item.name}`}
                       >
                         <svg
@@ -208,26 +208,24 @@ function RoomCartDrawer({
 
                     <div className="flex items-center justify-between gap-2">
                       {/* Quantity controls */}
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 p-1">
                         <button
                           onClick={() =>
                             item.quantity > 1
                               ? onUpdateItem(item.item_id, item.quantity - 1)
                               : onRemoveItem(item.item_id)
                           }
-                          className="w-5 h-5 flex items-center justify-center rounded border
-                                     hover:bg-gray-100 text-[11px] font-medium"
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors hover:bg-white"
                           aria-label="Decrease"
                         >
                           -
                         </button>
-                        <span className="w-4 text-center text-[11px] font-medium">
+                        <span className="w-6 text-center text-sm font-semibold">
                           {item.quantity}
                         </span>
                         <button
                           onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
-                          className="w-5 h-5 flex items-center justify-center rounded border
-                                     hover:bg-gray-100 text-[11px] font-medium"
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
                           aria-label="Increase"
                         >
                           +
@@ -245,7 +243,7 @@ function RoomCartDrawer({
             </div>
 
             {cart && cart.items.length > 0 && (
-              <div className="px-4 py-4 border-t space-y-3">
+              <div className="space-y-3 border-t px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <div className="flex justify-between font-semibold text-base">
                   <span>Total</span>
                   <span>${total.toFixed(2)}</span>
@@ -258,7 +256,7 @@ function RoomCartDrawer({
                 <button
                   onClick={handlePlaceOrder}
                   disabled={placing}
-                  className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold text-sm
+                  className="min-h-12 w-full rounded-xl bg-orange-500 py-3 text-sm font-semibold text-white
                              hover:bg-orange-600 transition-colors disabled:opacity-60"
                 >
                   {placing ? "Placing order..." : `Place Order - $${total.toFixed(2)}`}
@@ -267,7 +265,7 @@ function RoomCartDrawer({
                 <button
                   onClick={onClearCart}
                   disabled={placing}
-                  className="w-full py-2 text-sm text-red-600 border border-red-200 rounded-lg
+                  className="min-h-11 w-full rounded-lg border border-red-200 py-2 text-sm font-semibold text-red-600
                              hover:bg-red-50 transition-colors disabled:opacity-50"
                 >
                   Clear cart
@@ -458,10 +456,12 @@ export default function RoomMenu() {
           <img
             src={toAssetUrl(item.image_path)}
             alt={item.name}
-            className="w-full h-36 object-cover"
+            loading="lazy"
+            decoding="async"
+            className="aspect-[4/3] w-full object-cover"
           />
         )}
-        <div className="p-3 flex flex-col gap-2 flex-1">
+        <div className="flex flex-1 flex-col gap-2.5 p-3">
           <div className="flex items-start justify-between gap-2">
             <p className="font-semibold text-sm leading-tight line-clamp-2">{item.name}</p>
             {metaLabel && (
@@ -487,14 +487,14 @@ export default function RoomMenu() {
           </div>
 
           {qtyInCart > 0 ? (
-            <div className="flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
+            <div className="flex min-h-10 items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
               <button
                 onClick={() =>
                   qtyInCart > 1
                     ? updateItem(item.id, qtyInCart - 1)
                     : removeItem(item.id)
                 }
-                className="w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold text-gray-600 transition-colors hover:bg-white"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-gray-600 transition-colors hover:bg-white"
                 aria-label="Decrease"
               >
                 -
@@ -502,7 +502,7 @@ export default function RoomMenu() {
               <span className="text-sm font-semibold w-6 text-center">{qtyInCart}</span>
               <button
                 onClick={() => updateItem(item.id, qtyInCart + 1)}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors text-xs font-bold"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white transition-colors hover:bg-orange-600"
                 aria-label="Increase"
               >
                 +
@@ -512,7 +512,7 @@ export default function RoomMenu() {
             <button
               disabled={isAdding || !sessionReady}
               onClick={() => handleAddToCart(item.id)}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-[11px] font-semibold text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
+              className="flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
             >
               {isAdding ? "Adding..." : "Add to Cart"}
               {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
@@ -528,16 +528,17 @@ export default function RoomMenu() {
       {/* Top bar */}
       <header className="sticky top-0 z-30 bg-white border-b shadow-sm">
         <div className="max-w-2xl mx-auto flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
               <img
-                src={menu.restaurant.logo_url}
+                src={toAssetUrl(menu.restaurant.logo_url) ?? undefined}
                 alt={menu.restaurant.name}
+                decoding="async"
                 className="h-9 w-9 rounded-full object-cover"
               />
             )}
-            <div>
-              <p className="font-semibold text-sm leading-tight">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold leading-tight">
                 {menu.restaurant.name}
               </p>
               {roomNumber && (
@@ -547,7 +548,7 @@ export default function RoomMenu() {
           </div>
 
           {/* Service request link + Cart button */}
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {restaurantId && roomNumber && (
               <Link
                 to={
@@ -620,7 +621,7 @@ export default function RoomMenu() {
               {category.items.length === 0 ? (
                 <p className="text-center text-gray-400 py-10">No items in this category.</p>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
                   {category.items.map(renderItemCard)}
                 </div>
               )}

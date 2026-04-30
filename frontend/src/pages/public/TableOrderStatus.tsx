@@ -238,7 +238,7 @@ export default function TableOrderStatus() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-slate-900">{item.item_name_snapshot}</p>
                   <p className="text-xs text-slate-500">
-                  {item.quantity} × ${item.unit_price_snapshot.toFixed(2)}
+                  {item.quantity} x ${item.unit_price_snapshot.toFixed(2)}
                   </p>
                 </div>
                 <p className="ml-2 shrink-0 font-semibold text-slate-900">${item.line_total.toFixed(2)}</p>
@@ -262,7 +262,7 @@ export default function TableOrderStatus() {
           {order.discount_amount > 0 && (
             <div className="flex justify-between py-1 text-emerald-600">
               <span>Discount</span>
-              <span>−${order.discount_amount.toFixed(2)}</span>
+              <span>-${order.discount_amount.toFixed(2)}</span>
             </div>
           )}
           <div className="mt-2 flex justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-900">
@@ -298,7 +298,7 @@ export default function TableOrderStatus() {
               }
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
             >
-              📋 View my orders
+              View my orders
             </Link>
             <Link
               to={
@@ -308,7 +308,7 @@ export default function TableOrderStatus() {
               }
               className="inline-flex min-h-11 items-center justify-center rounded-xl border border-orange-200 px-4 text-sm font-semibold text-orange-700 transition hover:bg-orange-50"
             >
-              ← Back to menu
+              Back to menu
             </Link>
           </div>
         )}

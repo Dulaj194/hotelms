@@ -235,7 +235,7 @@ export default function RoomOrdersList() {
             }
             className="block w-full rounded-xl border border-orange-200 bg-orange-50 py-3 text-center text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
           >
-            ← Back to room menu
+            Back to room menu
           </Link>
         </div>
       )}
