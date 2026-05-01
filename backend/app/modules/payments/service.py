@@ -294,11 +294,13 @@ def _handle_checkout_completed(db: Session, event: dict[str, Any]) -> None:
         return
 
     metadata = obj.get("metadata", {}) or {}
+    restaurant_id_value = metadata.get("restaurant_id")
+    package_id_value = metadata.get("package_id")
     transaction_id_value = metadata.get("billing_transaction_id")
     promo_code_value = (metadata.get("promo_code") or "").strip().upper()
 
     transaction = payment_repo.get_billing_transaction_by_checkout_session(db, checkout_session_id)
-    if transaction is None and transaction_id_value and transaction_id_value.isdigit():
+    if transaction is None and transaction_id_value and str(transaction_id_value).isdigit():
         transaction = payment_repo.get_billing_transaction_by_id(db, int(transaction_id_value))
 
     if transaction is None:
@@ -314,7 +316,7 @@ def _handle_checkout_completed(db: Session, event: dict[str, Any]) -> None:
     if transaction.status == BillingTransactionStatus.paid:
         return
 
-    if not package_id_value or not restaurant_id_value:
+    if not metadata or not transaction_id_value:
         payment_repo.mark_billing_transaction_failed(
             db,
             transaction=transaction,
@@ -329,23 +331,26 @@ def _handle_checkout_completed(db: Session, event: dict[str, Any]) -> None:
         )
         return
 
-    try:
-        package_id = int(package_id_value)
-        restaurant_id = int(restaurant_id_value)
-    except ValueError:
-        payment_repo.mark_billing_transaction_failed(
-            db,
-            transaction=transaction,
-            failure_reason="Invalid metadata values in Stripe checkout session.",
-        )
-        _record_stripe_webhook_failure(
-            db,
-            reason="invalid_metadata_values",
-            stripe_event_type=event.get("type"),
-            restaurant_id=transaction.restaurant_id,
-            billing_transaction_id=transaction.id,
-        )
-        return
+    if package_id_value or restaurant_id_value:
+        try:
+            if package_id_value:
+                int(package_id_value)
+            if restaurant_id_value:
+                int(restaurant_id_value)
+        except (ValueError, TypeError):
+            payment_repo.mark_billing_transaction_failed(
+                db,
+                transaction=transaction,
+                failure_reason="Invalid metadata values in Stripe checkout session.",
+            )
+            _record_stripe_webhook_failure(
+                db,
+                reason="invalid_metadata_values",
+                stripe_event_type=event.get("type"),
+                restaurant_id=transaction.restaurant_id,
+                billing_transaction_id=transaction.id,
+            )
+            return
 
     subscription = subscriptions_service.activate_paid_subscription(
         db,

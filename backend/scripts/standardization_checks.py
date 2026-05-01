@@ -207,6 +207,7 @@ def _parse_compose_service_names(compose_path: Path) -> set[str]:
 def check_active_track_clarity(
     compose_file: Path | None = None,
     run_script: Path | None = None,
+    legacy_start_script: Path | None = None,
 ) -> CheckResult:
     compose_path = compose_file or (_project_root() / "docker-compose.yml")
     run_script_path = run_script or (_project_root() / "run.ps1")
