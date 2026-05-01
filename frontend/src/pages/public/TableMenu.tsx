@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import {
   Bell,
   ChevronRight,
+  ClipboardList,
   LogOut,
   Menu,
   MessageCircle,
@@ -13,6 +14,7 @@ import {
   UserRound,
   UtensilsCrossed,
   X,
+  ArrowUp,
 } from "lucide-react";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
@@ -83,11 +85,6 @@ export default function TableMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const [categoryRailVisible, setCategoryRailVisible] = useState(true);
-  const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
-  const categoryRailShellRef = useRef<HTMLDivElement>(null);
-  const lastMenuScrollYRef = useRef(0);
-  const menuScrollFrameRef = useRef<number | null>(null);
 
   const { cart, addItem, updateItem, removeItem } = useLocalTableCart({
     restaurantId: restaurantContextId,
@@ -142,63 +139,11 @@ export default function TableMenu() {
   }, [featuredBannerPaths.length]);
 
   useEffect(() => {
-    const topRevealOffset = 16;
-    const scrollDeltaThreshold = 8;
-
-    lastMenuScrollYRef.current = window.scrollY;
-
-    if (!categoryRailAutoHideEnabled) {
-      setCategoryRailVisible(true);
-      return;
-    }
-
-    const updateCategoryRailVisibility = () => {
-      const currentScrollY = window.scrollY;
-      const lastScrollY = lastMenuScrollYRef.current;
-      const scrollDelta = currentScrollY - lastScrollY;
-
-      if (currentScrollY <= topRevealOffset) {
-        setCategoryRailVisible(true);
-        lastMenuScrollYRef.current = currentScrollY;
-        menuScrollFrameRef.current = null;
-        return;
-      }
-
-      if (Math.abs(scrollDelta) >= scrollDeltaThreshold) {
-        setCategoryRailVisible(scrollDelta < 0);
-        lastMenuScrollYRef.current = currentScrollY;
-      }
-
-      menuScrollFrameRef.current = null;
-    };
-
-    const handleWindowScroll = () => {
-      if (menuScrollFrameRef.current !== null) return;
-      menuScrollFrameRef.current = window.requestAnimationFrame(updateCategoryRailVisibility);
-    };
-
-    window.addEventListener("scroll", handleWindowScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleWindowScroll);
-      if (menuScrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(menuScrollFrameRef.current);
-      }
-    };
-  }, [categoryRailAutoHideEnabled]);
-
-  useEffect(() => {
-    if (featuredBannerPaths.length <= 1) {
-      return;
-    }
-
+    if (featuredBannerPaths.length <= 1) return;
     const timerId = window.setInterval(() => {
       setActiveBannerIndex((current) => (current + 1) % featuredBannerPaths.length);
     }, 60_000);
-
-    return () => {
-      window.clearInterval(timerId);
-    };
+    return () => window.clearInterval(timerId);
   }, [featuredBannerPaths.length]);
 
   const visibleTiles = useMemo(() => {
@@ -213,71 +158,6 @@ export default function TableMenu() {
   }, [flattenedTiles, searchQuery]);
 
   useEffect(() => {
-    const scrollableContentBuffer = 24;
-    let frameId: number | null = null;
-
-    const updateCategoryRailMode = () => {
-      const menuContent = document.getElementById("menu-content");
-      const header = document.getElementById("menu-top");
-      const railHeight = categoryRailShellRef.current?.offsetHeight ?? 0;
-      const headerHeightWithoutRail = Math.max(0, (header?.offsetHeight ?? 0) - railHeight);
-      const menuContentHeight = menuContent?.scrollHeight ?? document.documentElement.scrollHeight;
-      const menuContentStyle = menuContent ? window.getComputedStyle(menuContent) : null;
-      const menuBottomPadding = menuContentStyle
-        ? Number.parseFloat(menuContentStyle.paddingBottom || "0")
-        : 0;
-      const usableContentHeight =
-        headerHeightWithoutRail + Math.max(0, menuContentHeight - menuBottomPadding);
-      const canAutoHide = usableContentHeight > window.innerHeight + scrollableContentBuffer;
-
-      setCategoryRailAutoHideEnabled(canAutoHide);
-      if (!canAutoHide) {
-        setCategoryRailVisible(true);
-      }
-
-      frameId = null;
-    };
-
-    const scheduleCategoryRailModeUpdate = () => {
-      if (frameId !== null) return;
-      frameId = window.requestAnimationFrame(updateCategoryRailMode);
-    };
-
-    scheduleCategoryRailModeUpdate();
-    window.addEventListener("resize", scheduleCategoryRailModeUpdate);
-    window.addEventListener("orientationchange", scheduleCategoryRailModeUpdate);
-
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(scheduleCategoryRailModeUpdate)
-        : null;
-
-    const menuContent = document.getElementById("menu-content");
-    if (resizeObserver) {
-      resizeObserver.observe(document.body);
-      if (menuContent) {
-        resizeObserver.observe(menuContent);
-      }
-    }
-
-    return () => {
-      window.removeEventListener("resize", scheduleCategoryRailModeUpdate);
-      window.removeEventListener("orientationchange", scheduleCategoryRailModeUpdate);
-      resizeObserver?.disconnect();
-      if (frameId !== null) {
-        window.cancelAnimationFrame(frameId);
-      }
-    };
-  }, [
-    activeCategoryId,
-    featuredBannerPaths.length,
-    searchPanelOpen,
-    searchQuery,
-    visibleCategories.length,
-    visibleTiles.length,
-  ]);
-
-  useEffect(() => {
     if (!restaurantId || !tableNumber) return;
     const parsedRestaurantId = Number(restaurantId);
     if (Number.isNaN(parsedRestaurantId)) return;
@@ -288,56 +168,34 @@ export default function TableMenu() {
     }
   }, [restaurantId, tableNumber]);
 
-  // 1. Preserve QR context locally. Cart mutations stay client-side until checkout.
   useEffect(() => {
     if (!restaurantId || !tableNumber || !guestName) return;
     const parsedRestaurantId = Number(restaurantId);
     if (Number.isNaN(parsedRestaurantId)) {
-      setPageError("Invalid restaurant context. Please scan the table QR code again.");
+      setPageError("Invalid restaurant context. Please scan the QR code again.");
       return;
     }
-
-    if (qrAccessKey) {
-      setGuestQrAccessKey(parsedRestaurantId, tableNumber, qrAccessKey);
-    }
-
-    if (!qrAccessKey && !getGuestQrAccessKey(parsedRestaurantId, tableNumber)) {
-      setPageError("Invalid table QR link. Please scan the table QR code again.");
-      return;
-    }
-
+    if (qrAccessKey) setGuestQrAccessKey(parsedRestaurantId, tableNumber, qrAccessKey);
     setSessionReady(true);
   }, [restaurantId, tableNumber, qrAccessKey, guestName]);
 
-  // 2. Fetch public menu
   useEffect(() => {
     if (!restaurantId) return;
-
     const fetchMenu = async () => {
       try {
-        const data = await publicGet<PublicMenuResponse>(
-          `/public/restaurants/${restaurantId}/menu`
-        );
+        const data = await publicGet<PublicMenuResponse>(`/public/restaurants/${restaurantId}/menu`);
         setMenu(data);
       } catch {
-        setPageError("Failed to load the menu. Please try again.");
+        setPageError("Failed to load the menu.");
       }
     };
-
     void fetchMenu();
   }, [restaurantId]);
 
-  const handleAddToCart = useCallback(
-    async (itemId: number) => {
-      setAddingItemId(itemId);
-      try {
-        await addItem(itemId, 1);
-      } finally {
-        setAddingItemId(null);
-      }
-    },
-    [addItem]
-  );
+  const handleAddToCart = useCallback(async (itemId: number) => {
+    setAddingItemId(itemId);
+    try { await addItem(itemId, 1); } finally { setAddingItemId(null); }
+  }, [addItem]);
 
   const handleOpenCart = useCallback(() => {
     if (!restaurantId || !tableNumber) return;
@@ -347,24 +205,19 @@ export default function TableMenu() {
 
   const handleNameSubmit = useCallback(() => {
     const trimmed = guestNameInput.trim();
-    if (!trimmed) {
-      setNameError("Please enter your name to start ordering.");
-      return;
-    }
+    if (!trimmed) { setNameError("Please enter your name."); return; }
     setNameError(null);
     setGuestName(trimmed);
   }, [guestNameInput]);
 
   const handleScrollTo = useCallback((elementId: string) => {
     const element = document.getElementById(elementId);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    if (element) element.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
   const handleFocusSearch = useCallback(() => {
     setSearchPanelOpen(true);
-    searchInputRef.current?.focus();
+    setTimeout(() => searchInputRef.current?.focus(), 100);
   }, []);
 
   const handleCloseSearch = useCallback(() => {
@@ -381,96 +234,33 @@ export default function TableMenu() {
   const handleContactStaff = useCallback(() => {
     const phoneNumber = menu?.restaurant.phone?.trim();
     const callablePhone = phoneNumber?.replace(/[^\d+]/g, "");
-    if (callablePhone) {
-      window.location.href = `tel:${callablePhone}`;
-      return;
-    }
-
-    setProfileDrawerOpen(true);
+    if (callablePhone) { window.location.href = `tel:${callablePhone}`; }
+    else { setProfileDrawerOpen(true); }
   }, [menu?.restaurant.phone]);
 
-  if (pageError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-red-600 text-center max-w-sm">{pageError}</p>
-      </div>
-    );
-  }
-
-  if (!menu) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-400 animate-pulse">Loading menu...</p>
-      </div>
-    );
-  }
+  if (pageError) return <div className="p-6 text-center text-red-600">{pageError}</div>;
+  if (!menu) return <div className="p-12 text-center animate-pulse text-gray-400">Loading...</div>;
 
   if (!guestName) {
     return (
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.12),_transparent_34%),linear-gradient(180deg,#fff8f1_0%,#ffffff_28%,#f8fafc_100%)] px-4 py-6 text-slate-900">
         <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md items-center justify-center">
           <div className="w-full overflow-hidden rounded-[2rem] border border-orange-100 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur">
-            <div className="bg-gradient-to-br from-orange-500 via-orange-500 to-amber-500 px-6 pb-8 pt-6 text-white">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/80">
-                Table Session
-              </p>
-              <div className="mt-4 flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <h1 className="text-3xl font-black leading-tight tracking-tight">
-                    {menu?.restaurant.name ?? "Welcome"}
-                  </h1>
-                  <p className="mt-2 text-sm text-white/85">
-                    Enter your name once and continue to menu, cart, and order tracking.
-                  </p>
-                </div>
-                <SafeMenuAsset
-                  path={menu?.restaurant.logo_url}
-                  alt={menu.restaurant.name}
-                  className="h-14 w-14 shrink-0 rounded-2xl bg-white/15 object-cover ring-4 ring-white/20"
-                  fallbackClassName="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/15 ring-4 ring-white/20"
-                  fallback={
-                    <Store className="h-6 w-6" />
-                  }
-                />
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
-                <span className="rounded-full bg-white/15 px-3 py-1.5">Table {tableNumber}</span>
-                <span className="rounded-full bg-white/15 px-3 py-1.5">QR Menu</span>
-                <span className="rounded-full bg-white/15 px-3 py-1.5">Fast ordering</span>
-              </div>
+            <div className="bg-gradient-to-br from-orange-500 via-orange-500 to-amber-500 px-6 pb-8 pt-6 text-white text-center">
+              <h1 className="text-3xl font-black">{menu.restaurant.name}</h1>
+              <p className="mt-2 text-sm opacity-90">Enter your name to start ordering at Table {tableNumber}.</p>
             </div>
-
-            <div className="px-6 py-6">
-              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Your name
-              </label>
+            <div className="px-6 py-8">
               <input
                 value={guestNameInput}
-                onChange={(event) => setGuestNameInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleNameSubmit();
-                  }
-                }}
-                placeholder="e.g. Kasun"
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                onChange={(e) => setGuestNameInput(e.target.value)}
+                placeholder="Your name"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-orange-400 focus:bg-white"
               />
               {nameError && <p className="mt-2 text-xs text-red-600">{nameError}</p>}
-
-              <button
-                type="button"
-                onClick={handleNameSubmit}
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-              >
-                Start session
-                <ChevronRight className="h-4 w-4" />
+              <button onClick={handleNameSubmit} className="mt-5 w-full rounded-2xl bg-slate-900 px-4 py-3 font-semibold text-white">
+                Start Ordering
               </button>
-
-              <p className="mt-4 text-center text-xs leading-5 text-slate-500">
-                By continuing, you will get a mobile menu, cart, and order tracking flow.
-              </p>
             </div>
           </div>
         </div>
@@ -478,414 +268,157 @@ export default function TableMenu() {
     );
   }
 
-  const displayTableNumber =
-    tableNumber && /^\d+$/.test(tableNumber) ? tableNumber.padStart(2, "0") : tableNumber;
+  const displayTableNumber = tableNumber && /^\d+$/.test(tableNumber) ? tableNumber.padStart(2, "0") : tableNumber;
 
   const renderItemCard = ({ item, categoryName }: MenuTile) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
-    const metaLabel = categoryName;
 
     return (
-      <div
-        key={item.id}
-        className={`group box-border flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)] ${
-          !item.is_available ? "opacity-55" : ""
-        }`}
-      >
-        <SafeMenuAsset
-          path={item.image_path}
-          alt={item.name}
-          className="block aspect-[4/3] w-full max-w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-          fallbackClassName="flex aspect-[4/3] w-full max-w-full shrink-0 items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300"
-          fallback={
-            <UtensilsCrossed className="h-9 w-9" />
-          }
-        />
-          <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
-            <div className="flex min-w-0 items-start justify-between gap-2">
-              <p className="min-w-0 break-words text-sm font-bold leading-tight text-slate-900 line-clamp-2">
-                {item.name}
-              </p>
-              {metaLabel && (
-                <span className="min-w-0 max-w-[45%] truncate text-right text-[11px] text-slate-400">
-                  {metaLabel}
-                </span>
-              )}
-            </div>
-
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-              <span className="min-w-0 text-sm font-black text-orange-600">
-                ${item.price.toFixed(2)}
-              </span>
-              {item.is_available ? (
-                <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
-                  Available
-                </span>
-              ) : (
-                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                  Sold out
-                </span>
-              )}
-            </div>
-
-            {qtyInCart > 0 ? (
-              <div className="box-border flex min-h-10 w-full max-w-full items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
-                <button
-                  onClick={() =>
-                    qtyInCart > 1
-                      ? updateItem(item.id, qtyInCart - 1)
-                      : removeItem(item.id)
-                  }
-                  className="grid h-9 w-9 place-items-center rounded-full text-sm font-bold text-slate-600 transition hover:bg-white"
-                  aria-label="Decrease"
-                >
-                  -
-                </button>
-                <span className="min-w-6 text-center text-sm font-semibold text-slate-900">
-                  {qtyInCart}
-                </span>
-                <button
-                  onClick={() => updateItem(item.id, qtyInCart + 1)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-sm font-bold text-white transition hover:bg-orange-600"
-                  aria-label="Increase"
-                >
-                  +
-                </button>
-              </div>
-            ) : (
-              <button
-                disabled={isAdding || !sessionReady}
-                onClick={() => handleAddToCart(item.id)}
-                className="box-border inline-flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isAdding ? "Adding..." : "Add to Cart"}
-                {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
-              </button>
-            )}
+      <div key={item.id} className="group box-border flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5">
+        <SafeMenuAsset path={item.image_path} alt={item.name} className="block aspect-[4/3] w-full object-cover" />
+        <div className="flex flex-1 flex-col gap-2.5 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="min-w-0 break-words text-sm font-bold leading-tight text-slate-900 line-clamp-2">{item.name}</p>
+            <span className="shrink-0 text-[11px] text-slate-400">{categoryName}</span>
           </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-black text-orange-600">${item.price.toFixed(2)}</span>
+            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${item.is_available ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+              {item.is_available ? 'Available' : 'Sold out'}
+            </span>
+          </div>
+          {qtyInCart > 0 ? (
+            <div className="box-border flex min-h-10 items-center justify-between rounded-full border bg-slate-50 p-1">
+              <button onClick={() => updateItem(item.id, qtyInCart - 1)} className="grid h-8 w-8 place-items-center rounded-full bg-white">-</button>
+              <span className="text-sm font-bold">{qtyInCart}</span>
+              <button onClick={() => updateItem(item.id, qtyInCart + 1)} className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-white">+</button>
+            </div>
+          ) : (
+            <button
+              disabled={isAdding || !sessionReady || !item.is_available}
+              onClick={() => handleAddToCart(item.id)}
+              className="box-border inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:opacity-50"
+            >
+              {isAdding ? "Adding..." : "Add to Cart"}
+            </button>
+          )}
+        </div>
       </div>
     );
   };
 
-  const cartItemCount = cart?.item_count ?? 0;
-
   return (
-    <div className="box-border min-h-screen w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
-      <header id="menu-top" className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b border-white/60 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <SafeMenuAsset
-              path={menu.restaurant.logo_url}
-              alt={menu.restaurant.name}
-              className="h-11 w-11 rounded-2xl object-cover ring-1 ring-slate-200"
-              fallbackClassName="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-900 text-white"
-              fallback={
-                <Store className="h-5 w-5" />
-              }
-            />
-
+    <div className="box-border min-h-screen w-full overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
+      <header id="menu-top" className="sticky top-0 z-30 w-full bg-white/90 backdrop-blur-xl border-b border-white/60">
+        <div className="mx-auto flex max-w-[min(72rem,100%)] items-center justify-between px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <SafeMenuAsset path={menu.restaurant.logo_url} alt={menu.restaurant.name} className="h-11 w-11 rounded-2xl object-cover ring-1 ring-slate-200" fallback={<Store className="h-5 w-5" />} />
             <div className="min-w-0">
-              <p className="truncate text-lg font-black leading-tight text-slate-900">
-                {menu.restaurant.name}
-              </p>
-              {(guestName || displayTableNumber) && (
-                <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-500">
-                  {guestName && <span className="min-w-0 truncate">{guestName}</span>}
-                  {displayTableNumber && (
-                    <span className="shrink-0 text-slate-400">Table {displayTableNumber}</span>
-                  )}
-                </div>
-              )}
+              <p className="truncate text-lg font-black">{menu.restaurant.name}</p>
+              <p className="text-[10px] font-semibold text-slate-500">{guestName} • Table {displayTableNumber}</p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setProfileDrawerOpen(true)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-900 transition hover:bg-slate-200"
-              aria-label="Open profile menu"
-            >
+            <button onClick={() => setProfileDrawerOpen(true)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 transition hover:bg-slate-200">
               <UserRound className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        <div className={`mx-auto box-border w-full max-w-[min(72rem,100%)] min-w-0 px-4 sm:px-5 lg:px-6 ${searchPanelOpen ? "pb-2" : "pb-0"}`}>
-          <div
-            className={`overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ${
-              searchPanelOpen ? "max-h-24 opacity-100" : "max-h-0 border-transparent opacity-0"
-            }`}
-          >
-            <div className="p-3 sm:p-4">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  ref={searchInputRef}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search dishes, ingredients, or category"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
-                />
-                <button
-                  type="button"
-                  onClick={handleCloseSearch}
-                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                  aria-label="Close search"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
+        <div className={`mx-auto max-w-[min(72rem,100%)] px-4 transition-all duration-300 ${searchPanelOpen ? "pb-3 opacity-100" : "h-0 opacity-0 overflow-hidden"}`}>
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search dishes..."
+              className="w-full rounded-2xl border bg-slate-50 py-3 pl-11 pr-12 text-sm outline-none focus:border-orange-400"
+            />
+            <button onClick={handleCloseSearch} className="absolute right-2 top-1/2 -translate-y-1/2 p-2"><X className="h-4 w-4" /></button>
           </div>
         </div>
 
-        <div
-          ref={categoryRailShellRef}
-          className={`mx-auto box-border w-full max-w-[min(72rem,100%)] min-w-0 overflow-hidden px-4 transition-[max-height,padding-bottom,opacity,transform] duration-300 ease-out sm:px-5 lg:px-6 ${
-            categoryRailVisible
-              ? "max-h-20 translate-y-0 pb-2 opacity-100"
-              : "max-h-0 -translate-y-2 pb-0 opacity-0 pointer-events-none"
-          }`}
-          aria-hidden={!categoryRailVisible}
-        >
-          <MenuBrowserRail
-            visibleCategories={visibleCategories}
-            activeCategoryId={activeCategoryId}
-            onSelectCategory={setActiveCategoryId}
-          />
+        <div className="mx-auto max-w-[min(72rem,100%)] px-4 pb-2">
+          <MenuBrowserRail visibleCategories={visibleCategories} activeCategoryId={activeCategoryId} onSelectCategory={setActiveCategoryId} />
         </div>
       </header>
 
-      <main
-        id="menu-content"
-        className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 touch-pan-y flex-1 flex-col gap-3 overflow-x-hidden px-4 py-3 pb-28 sm:px-5 lg:px-6"
-        {...menuSwipeHandlers}
-      >
-        <section className="box-border w-full max-w-full min-w-0">
-          <div className="relative box-border min-h-[12.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13.5rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
-            {featuredBannerPaths.length > 0 && (
-              <SafeMenuAsset
-                path={featuredBannerPaths[activeBannerIndex]}
-                alt="Featured menu banner"
-                loading="eager"
-                className="absolute inset-0 h-full w-full object-cover"
-                fallbackClassName="absolute inset-0 bg-slate-950"
-                fallback={null}
-              />
-            )}
-            <div className="absolute inset-0 bg-slate-950/65" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.1)_0%,rgba(15,23,42,0.55)_100%)]" />
-            <div className="relative z-10 flex h-full min-h-[calc(12.75rem-2.5rem)] flex-col justify-between gap-4 sm:min-h-[calc(13.5rem-3rem)] sm:gap-5 lg:min-h-[calc(15rem-3rem)]">
-              <div className="min-w-0">
-                <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 sm:text-xs">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Featured picks
-                </p>
-                <h2 className="mt-4 max-w-full break-words text-[1.65rem] font-black leading-tight tracking-tight sm:max-w-xl sm:text-3xl">
-                  Order faster from your table.
-                </h2>
-                <p className="mt-2 max-w-full break-words text-sm leading-6 text-white/80 sm:max-w-2xl">
-                  Choose favorites, update quantities, and place your order without leaving the menu.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-white/80 sm:text-xs">
-                <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add</span>
-                <span className="rounded-full bg-white/10 px-3 py-1.5">Table session</span>
-                <span className="rounded-full bg-white/10 px-3 py-1.5">Live cart</span>
-              </div>
-            </div>
+      <main id="menu-content" className="mx-auto max-w-[min(72rem,100%)] w-full flex-1 touch-pan-y space-y-6 px-4 py-6 pb-28" {...menuSwipeHandlers}>
+        <section className="relative overflow-hidden rounded-2xl bg-slate-950 p-6 text-white shadow-lg min-h-[160px] flex flex-col justify-center">
+          {featuredBannerPaths.length > 0 && (
+            <SafeMenuAsset path={featuredBannerPaths[activeBannerIndex]} alt="Banner" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+          )}
+          <div className="relative z-10">
+            <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest"><Sparkles className="h-3 w-3" /> Featured picks</p>
+            <h2 className="mt-3 text-2xl font-black">Order faster from your table.</h2>
           </div>
         </section>
 
-        <section id="menu-list" className="box-border w-full max-w-full min-w-0 space-y-3">
-          <div className="flex min-w-0 items-end justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="text-xl font-black tracking-tight text-slate-900">
-                {searchQuery ? "Search results" : selectedCategory?.name ?? "All items"}
-              </h2>
-              {selectedCategory?.description && !searchQuery && (
-                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-                  {selectedCategory.description}
-                </p>
-              )}
-            </div>
-
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-              >
-                <X className="h-3.5 w-3.5" />
-                Clear
-              </button>
-            )}
-          </div>
-
+        <section id="menu-list" className="space-y-4">
+          <h2 className="text-xl font-black">{searchQuery ? "Search results" : selectedCategory?.name ?? "All items"}</h2>
           {visibleTiles.length === 0 ? (
-            <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
-              No items match the current filter.
-            </div>
+            <div className="rounded-2xl border border-dashed p-12 text-center text-slate-500">No items found.</div>
           ) : (
-            <div className="grid w-full max-w-full min-w-0 grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
               {visibleTiles.map(renderItemCard)}
             </div>
           )}
         </section>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 box-border w-full max-w-full overflow-hidden border-t border-white/70 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
-        <div className="mx-auto grid w-full max-w-[min(72rem,100%)] min-w-0 grid-cols-5 items-end gap-1 min-[360px]:gap-2">
-          <button
-            type="button"
-            onClick={() => handleScrollTo("menu-list")}
-            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
-          >
-            <Menu className="h-5 w-5" />
-            <span className="max-w-full truncate">Menu</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleFocusSearch}
-            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
-          >
-            <Search className="h-5 w-5" />
-            <span className="max-w-full truncate">Search</span>
-          </button>
-
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-lg backdrop-blur-xl">
+        <div className="mx-auto grid max-w-[min(72rem,100%)] grid-cols-5 items-end gap-1">
+          <button onClick={() => handleScrollTo("menu-list")} className="flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500"><Menu className="h-5 w-5" /> Menu</button>
+          <button onClick={handleFocusSearch} className="flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500"><Search className="h-5 w-5" /> Search</button>
           <FloatingCartButton itemCount={cartItemCount} onOpenCart={handleOpenCart} />
-
-          <button
-            type="button"
-            onClick={() => {
-              if (!restaurantId || !tableNumber) return;
-              const target = qrAccessKey
-                ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
-                : `/orders/my/${restaurantId}/${tableNumber}`;
-              navigate(target);
-            }}
-            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="max-w-full truncate">Orders</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleContactStaff}
-            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
-            aria-label="Contact staff"
-          >
-            <MessageCircle className="h-5 w-5" />
-            <span className="max-w-full truncate">Chat</span>
-          </button>
+          <button onClick={() => navigate(`/orders/my/${restaurantId}/${tableNumber}`)} className="flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500"><Bell className="h-5 w-5" /> Orders</button>
+          <button onClick={handleContactStaff} className="flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500"><MessageCircle className="h-5 w-5" /> Chat</button>
         </div>
-      </div>
+      </nav>
 
-      {/* Profile drawer */}
       {profileDrawerOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/50 transition-opacity animate-in fade-in-0 duration-300"
-            onClick={() => setProfileDrawerOpen(false)}
-          />
-
-          {/* Drawer Panel */}
-          <div className="absolute bottom-0 right-0 top-0 box-border flex w-full max-w-[min(24rem,100%)] flex-col bg-white shadow-2xl transition-all duration-300 animate-in slide-in-from-right-40">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h2 className="text-lg font-bold text-slate-900">Profile</h2>
-              <button
-                onClick={() => setProfileDrawerOpen(false)}
-                className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                aria-label="Close profile menu"
-              >
-                <X className="h-5 w-5" />
-              </button>
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setProfileDrawerOpen(false)} />
+          <div className="absolute bottom-0 right-0 top-0 w-full max-w-[min(24rem,100%)] flex flex-col bg-white shadow-2xl animate-in slide-in-from-right-40">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h2 className="text-lg font-bold">Profile</h2>
+              <button onClick={() => setProfileDrawerOpen(false)} className="p-2"><X className="h-5 w-5" /></button>
             </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto">
-              {/* Guest Info Section */}
-              <div className="border-b border-slate-200 px-5 py-5 sm:px-6 sm:py-6">
-                <div className="mb-4 flex items-center gap-4">
-                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-2xl font-bold text-white">
-                    {guestName?.charAt(0).toUpperCase() ?? "G"}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-500">Guest Name</p>
-                    <p className="truncate text-lg font-bold text-slate-900">{guestName ?? "Guest"}</p>
-                  </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-2xl font-bold text-white">
+                  {guestName?.charAt(0).toUpperCase()}
                 </div>
-
-                {tableNumber && restaurantId && (
-                  <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm">
-                    <p className="text-slate-600">
-                      <span className="font-semibold text-slate-900">Table:</span> {tableNumber}
-                    </p>
-                    <p className="break-words text-slate-600">
-                      <span className="font-semibold text-slate-900">Restaurant:</span> {menu?.restaurant.name}
-                    </p>
-                  </div>
-                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-500">Guest Name</p>
+                  <p className="truncate text-lg font-bold">{guestName}</p>
+                </div>
               </div>
-
-              {/* Menu Items */}
-              <div className="py-3">
-                {restaurantId && tableNumber && (
-                  <Link
-                    to={
-                      qrAccessKey
-                        ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(qrAccessKey)}`
-                        : `/orders/my/${restaurantId}/${tableNumber}`
-                    }
-                    onClick={() => setProfileDrawerOpen(false)}
-                    className="flex min-h-12 items-center justify-between px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-6"
-                  >
-                    <span>My Orders</span>
-                    <ChevronRight className="h-4 w-4 text-slate-400" />
-                  </Link>
-                )}
-
-                <button
-                  type="button"
-                  className="flex min-h-12 w-full items-center justify-between px-5 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-6"
-                  onClick={() => {
-                    setProfileDrawerOpen(false);
-                    handleFocusSearch();
-                  }}
-                >
-                  <span>Search menu</span>
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm space-y-2">
+                <p><span className="font-semibold">Table:</span> {tableNumber}</p>
+                <p><span className="font-semibold">Restaurant:</span> {menu.restaurant.name}</p>
+              </div>
+              <div className="space-y-1">
+                <Link to={`/orders/my/${restaurantId}/${tableNumber}`} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 text-sm font-semibold">
+                  <div className="flex items-center gap-3"><ClipboardList className="h-5 w-5 text-slate-400" /> My Orders</div>
+                  <ChevronRight className="h-4 w-4 text-slate-400" />
+                </Link>
+                <button onClick={() => { setProfileDrawerOpen(false); handleFocusSearch(); }} className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 text-sm font-semibold text-left">
+                  <div className="flex items-center gap-3"><Search className="h-5 w-5 text-slate-400" /> Search Menu</div>
                   <ChevronRight className="h-4 w-4 text-slate-400" />
                 </button>
-
-                <button
-                  type="button"
-                  className="flex min-h-12 w-full items-center justify-between px-5 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-6"
-                  onClick={() => {
-                    setProfileDrawerOpen(false);
-                    handleScrollTo("menu-top");
-                  }}
-                >
-                  <span>Back to top</span>
+                <button onClick={() => { setProfileDrawerOpen(false); handleScrollTo("menu-top"); }} className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 text-sm font-semibold text-left">
+                  <div className="flex items-center gap-3"><ArrowUp className="h-5 w-5 text-slate-400" /> Back to top</div>
                   <ChevronRight className="h-4 w-4 text-slate-400" />
                 </button>
               </div>
             </div>
-
-            {/* Footer - Logout Button */}
-            <div className="border-t border-slate-200 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <button
-                onClick={handleLogout}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-50 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100"
-              >
-                <LogOut className="h-4 w-4" />
-                Log Out
+            <div className="border-t p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+              <button onClick={handleLogout} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-50 py-3 font-bold text-red-600 hover:bg-red-100 transition">
+                <LogOut className="h-4 w-4" /> Log Out
               </button>
             </div>
           </div>

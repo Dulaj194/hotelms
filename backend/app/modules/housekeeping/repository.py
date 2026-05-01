@@ -58,7 +58,7 @@ def create_housekeeping_request(
             )
         )
 
-    db.commit()
+    db.flush()
     db.refresh(req)
     return req
 
@@ -139,7 +139,7 @@ def list_requests_by_session(
 
 def save_request(db: Session, req: HousekeepingRequest) -> HousekeepingRequest:
     db.add(req)
-    db.commit()
+    db.flush()
     db.refresh(req)
     return req
 
@@ -202,7 +202,7 @@ def create_maintenance_ticket(
         status="open",
     )
     db.add(ticket)
-    db.commit()
+    db.flush()
     db.refresh(ticket)
     return ticket
 
@@ -249,7 +249,7 @@ def save_maintenance_ticket(
     ticket: HousekeepingMaintenanceTicket,
 ) -> HousekeepingMaintenanceTicket:
     db.add(ticket)
-    db.commit()
+    db.flush()
     db.refresh(ticket)
     return ticket
 
@@ -275,7 +275,7 @@ def create_event_log(
         note=note,
     )
     db.add(event)
-    db.commit()
+    db.flush()
     db.refresh(event)
     return event
 
@@ -325,7 +325,7 @@ def delete_request_by_restaurant(
     if req is None:
         return None
     db.delete(req)
-    db.commit()
+    db.flush()
     return req
 
 
@@ -345,7 +345,7 @@ def delete_request_by_session(
     if req is None:
         return None
     db.delete(req)
-    db.commit()
+    db.flush()
     return req
 
 
@@ -398,5 +398,5 @@ def delete_requests_by_ids(
         )
         .delete(synchronize_session=False)
     )
-    db.commit()
+    db.flush()
     return int(deleted)

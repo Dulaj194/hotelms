@@ -24,6 +24,7 @@ function Ensure-EnvFile([string]$path, [string]$content) {
 
 function Show-TrackClarityBanner() {
   Write-Host "[Track] Primary active system: root Docker stack (mysql + redis + backend + frontend)." -ForegroundColor Green
+  Write-Host "[Track] Legacy reference: ./Anawuma-Resturant-App- (reference-only, do not use as active runtime)." -ForegroundColor Yellow
   Write-Step $primaryStackMarker
 }
 

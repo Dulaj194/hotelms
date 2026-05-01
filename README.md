@@ -47,6 +47,30 @@ hotelms/
 
 Backend tests use Python `unittest` as the default runner.
 
+### Standard Build Verification
+
+Before pushing changes, run the standardized verification flow:
+
+```powershell
+cd d:\in_project\hotelms
+
+# Primary system checks (backend standards + frontend production build)
+.\build-standard.ps1
+
+# Also include live DB drift verification
+.\build-standard.ps1 -CheckDb
+
+# Include reference app build verification (Anawuma-Resturant-App-)
+.\build-standard.ps1 -IncludeReference
+```
+
+Use `-InstallDeps` when dependencies are not yet installed:
+
+```powershell
+.\build-standard.ps1 -InstallDeps
+```
+
+---
 1. Create and activate the backend virtual environment.
 2. Install backend dependencies:
    `backend/venv/Scripts/python.exe -m pip install -r backend/requirements.txt`

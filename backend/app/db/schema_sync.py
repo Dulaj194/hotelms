@@ -6,6 +6,20 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
 
+def _table_exists(conn: Connection, table_name: str) -> bool:
+    query = text(
+        """
+        SELECT 1
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = :table_name
+        LIMIT 1
+        """
+    )
+    row = conn.execute(query, {"table_name": table_name}).first()
+    return row is not None
+
+
 def _column_exists(conn: Connection, table_name: str, column_name: str) -> bool:
     query = text("""
         SELECT 1
@@ -475,24 +489,33 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
     )
 
     with engine.begin() as conn:
-        for column_name, alter_sql in order_header_column_patches:
-            if _column_exists(conn, "order_headers", column_name):
-                continue
-            conn.execute(text(alter_sql))
+        if not _table_exists(conn, "order_headers"):
             logger.warning(
-                "Applied development schema patch: order_headers.%s was missing and has been added.",
-                column_name,
+                "Skipped development schema patch for order_headers: table does not exist."
             )
+        else:
+            for column_name, alter_sql in order_header_column_patches:
+                if _column_exists(conn, "order_headers", column_name):
+                    continue
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: order_headers.%s was missing and has been added.",
+                    column_name,
+                )
 
-        for column_name, alter_sql in user_column_patches:
-            if _column_exists(conn, "users", column_name):
-                continue
-            conn.execute(text(alter_sql))
-            logger.warning(
-                "Applied development schema patch: users.%s was missing and has been added.",
-                column_name,
-            )
+        if not _table_exists(conn, "users"):
+            logger.warning("Skipped development schema patch for users: table does not exist.")
+        else:
+            for column_name, alter_sql in user_column_patches:
+                if _column_exists(conn, "users", column_name):
+                    continue
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: users.%s was missing and has been added.",
+                    column_name,
+                )
 
+        if not _table_exists(conn, "restaurants"):
         if _table_exists(conn, "users") and _column_exists(conn, "users", "role"):
             conn.execute(text("""
                     ALTER TABLE users
@@ -512,10 +535,19 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 continue
             conn.execute(text(alter_sql))
             logger.warning(
-                "Applied development schema patch: restaurants.%s was missing and has been added.",
-                column_name,
+                "Skipped development schema patch for restaurants: table does not exist."
             )
+        else:
+            for column_name, alter_sql in restaurant_column_patches:
+                if _column_exists(conn, "restaurants", column_name):
+                    continue
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: restaurants.%s was missing and has been added.",
+                    column_name,
+                )
 
+        if not _table_exists(conn, "categories"):
         if _column_exists(conn, "restaurants", "billing_email") and _column_exists(conn, "restaurants", "email"):
             result = conn.execute(text("""
                     UPDATE restaurants
@@ -535,10 +567,29 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 continue
             conn.execute(text(alter_sql))
             logger.warning(
-                "Applied development schema patch: categories.%s was missing and has been added.",
-                column_name,
+                "Skipped development schema patch for categories: table does not exist."
             )
+        else:
+            for column_name, alter_sql in category_column_patches:
+                if _column_exists(conn, "categories", column_name):
+                    continue
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: categories.%s was missing and has been added.",
+                    column_name,
+                )
 
+        if not _table_exists(conn, "items"):
+            logger.warning("Skipped development schema patch for items: table does not exist.")
+        else:
+            for column_name, alter_sql in item_column_patches:
+                if _column_exists(conn, "items", column_name):
+                    continue
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: items.%s was missing and has been added.",
+                    column_name,
+                )
         _backfill_category_menu_ids(conn, logger)
 
         for column_name, alter_sql in item_column_patches:
@@ -550,15 +601,31 @@ def ensure_development_schema_compatibility(engine: Engine, logger) -> None:
                 column_name,
             )
 
-        for column_name, alter_sql in housekeeping_column_patches:
-            if _column_exists(conn, "housekeeping_requests", column_name):
-                continue
-            conn.execute(text(alter_sql))
+        if not _table_exists(conn, "housekeeping_requests"):
             logger.warning(
-                "Applied development schema patch: housekeeping_requests.%s was missing and has been added.",
-                column_name,
+                "Skipped development schema patch for housekeeping_requests: table does not exist."
             )
+        else:
+            for column_name, alter_sql in housekeeping_column_patches:
+                if _column_exists(conn, "housekeeping_requests", column_name):
+                    continue
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: housekeeping_requests.%s was missing and has been added.",
+                    column_name,
+                )
 
+        if not _table_exists(conn, "rooms"):
+            logger.warning("Skipped development schema patch for rooms: table does not exist.")
+        else:
+            for column_name, alter_sql in room_column_patches:
+                if _column_exists(conn, "rooms", column_name):
+                    continue
+                conn.execute(text(alter_sql))
+                logger.warning(
+                    "Applied development schema patch: rooms.%s was missing and has been added.",
+                    column_name,
+                )
         for column_name, alter_sql in room_column_patches:
             if _column_exists(conn, "rooms", column_name):
                 continue

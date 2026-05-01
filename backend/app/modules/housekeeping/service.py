@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import UTC, date, datetime, time, timedelta
 
 from fastapi import HTTPException, UploadFile, status
@@ -92,6 +93,17 @@ _AUDIO_EXT_MAP = {
 }
 
 
+@contextmanager
+def _atomic_write(db: Session):
+    """Ensure multi-step write flows commit once and rollback on any failure."""
+    try:
+        yield
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
 def _normalize_status(value: str) -> str:
     if value == "pending":
         return "pending_assignment"
@@ -165,11 +177,12 @@ def _cleanup_old_requests_for_restaurant(db: Session, *, restaurant_id: int) -> 
         _delete_attached_audio_if_local(req.audio_url)
 
     request_ids = [req.id for req in expired]
-    return repository.delete_requests_by_ids(
-        db,
-        restaurant_id=restaurant_id,
-        request_ids=request_ids,
-    )
+    with _atomic_write(db):
+        return repository.delete_requests_by_ids(
+            db,
+            restaurant_id=restaurant_id,
+            request_ids=request_ids,
+        )
 
 
 def _to_checklist_response(item: HousekeepingChecklistItem):
@@ -283,15 +296,12 @@ def _set_room_status(
     room = room_repository.get_room_by_id_and_restaurant(db, room_id, restaurant_id)
     if room is None:
         return None, None
-    updates: dict[str, object] = {}
     if housekeeping_status is not None:
-        updates["housekeeping_status"] = housekeeping_status
+        room.housekeeping_status = housekeeping_status
     if maintenance_required is not None:
-        updates["maintenance_required"] = maintenance_required
-    if updates:
-        room = room_repository.update_room_by_id(db, room_id, restaurant_id, updates)
-    if room is None:
-        return None, None
+        room.maintenance_required = maintenance_required
+    db.add(room)
+    db.flush()
     return room.housekeeping_status, room.maintenance_required
 
 
@@ -330,70 +340,70 @@ def submit_request(
     checklist_template = CHECKLIST_TEMPLATES.get(payload.request_type, CHECKLIST_TEMPLATES["other"])
     initial_status = "pending_assignment"
 
-    req = repository.create_housekeeping_request(
-        db,
-        restaurant_id=room_session.restaurant_id,
-        room_id=room_session.room_id,
-        room_session_id=room_session.session_id,
-        room_number_snapshot=room_session.room_number_snapshot,
-        guest_name=payload.guest_name,
-        request_type=payload.request_type,
-        priority=priority,
-        message=payload.message,
-        requested_for_at=requested_for_at,
-        due_at=due_at,
-        audio_url=payload.audio_url,
-        status=initial_status,
-        checklist_items=checklist_template,
-    )
-
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=None,
-        event_type="task_created",
-        from_status=None,
-        to_status=initial_status,
-        note="Guest request created",
-    )
-
-    if payload.request_type == "maintenance":
-        req = repository.get_request_by_id_and_restaurant(db, req.id, req.restaurant_id) or req
-        req.status = "blocked"
-        req.blocked_reason = "Guest maintenance issue reported"
-        repository.save_request(db, req)
-        repository.create_maintenance_ticket(
+    with _atomic_write(db):
+        req = repository.create_housekeeping_request(
             db,
-            request_id=req.id,
-            restaurant_id=req.restaurant_id,
-            room_id=req.room_id,
-            issue_type="guest_reported_maintenance",
-            description=payload.message,
-            photo_proof_url=None,
-            created_by_user_id=None,
+            restaurant_id=room_session.restaurant_id,
+            room_id=room_session.room_id,
+            room_session_id=room_session.session_id,
+            room_number_snapshot=room_session.room_number_snapshot,
+            guest_name=payload.guest_name,
+            request_type=payload.request_type,
+            priority=priority,
+            message=payload.message,
+            requested_for_at=requested_for_at,
+            due_at=due_at,
+            audio_url=payload.audio_url,
+            status=initial_status,
+            checklist_items=checklist_template,
         )
-        _set_room_status(
-            db,
-            restaurant_id=req.restaurant_id,
-            room_id=req.room_id,
-            maintenance_required=True,
-        )
+
         _append_event(
             db,
             req=req,
             actor_user_id=None,
-            event_type="task_blocked",
-            from_status="pending_assignment",
-            to_status="blocked",
-            note="Maintenance ticket auto-created from guest request",
+            event_type="task_created",
+            from_status=None,
+            to_status=initial_status,
+            note="Guest request created",
         )
-    else:
-        _set_room_status(
-            db,
-            restaurant_id=req.restaurant_id,
-            room_id=req.room_id,
-            housekeeping_status=RoomHousekeepingStatus.vacant_dirty.value,
-        )
+
+        if payload.request_type == "maintenance":
+            req.status = "blocked"
+            req.blocked_reason = "Guest maintenance issue reported"
+            req = repository.save_request(db, req)
+            repository.create_maintenance_ticket(
+                db,
+                request_id=req.id,
+                restaurant_id=req.restaurant_id,
+                room_id=req.room_id,
+                issue_type="guest_reported_maintenance",
+                description=payload.message,
+                photo_proof_url=None,
+                created_by_user_id=None,
+            )
+            _set_room_status(
+                db,
+                restaurant_id=req.restaurant_id,
+                room_id=req.room_id,
+                maintenance_required=True,
+            )
+            _append_event(
+                db,
+                req=req,
+                actor_user_id=None,
+                event_type="task_blocked",
+                from_status="pending_assignment",
+                to_status="blocked",
+                note="Maintenance ticket auto-created from guest request",
+            )
+        else:
+            _set_room_status(
+                db,
+                restaurant_id=req.restaurant_id,
+                room_id=req.room_id,
+                housekeeping_status=RoomHousekeepingStatus.vacant_dirty.value,
+            )
 
     return HousekeepingRequestCreateResponse(
         id=req.id,
@@ -464,16 +474,17 @@ def cancel_my_request(
     previous_status = req.status
     req.status = "cancelled"
     req.cancelled_at = datetime.now(UTC)
-    req = repository.save_request(db, req)
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=None,
-        event_type="task_cancelled",
-        from_status=_normalize_status(previous_status),
-        to_status="cancelled",
-        note="Cancelled by guest",
-    )
+    with _atomic_write(db):
+        req = repository.save_request(db, req)
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=None,
+            event_type="task_cancelled",
+            from_status=_normalize_status(previous_status),
+            to_status="cancelled",
+            note="Cancelled by guest",
+        )
     return _to_status_response(req)
 
 
@@ -499,12 +510,13 @@ def delete_my_request(
             detail=f"Only pending requests can be cancelled (current: {current_status}).",
         )
 
-    deleted_req = repository.delete_request_by_session(
-        db,
-        request_id=request_id,
-        restaurant_id=room_session.restaurant_id,
-        room_session_id=room_session.session_id,
-    )
+    with _atomic_write(db):
+        deleted_req = repository.delete_request_by_session(
+            db,
+            request_id=request_id,
+            restaurant_id=room_session.restaurant_id,
+            room_session_id=room_session.session_id,
+        )
     if deleted_req is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Housekeeping request not found.")
     _delete_attached_audio_if_local(deleted_req.audio_url)
@@ -577,22 +589,23 @@ def assign_request(
     if payload.priority is not None:
         req.priority = payload.priority
 
-    req = repository.save_request(db, req)
-    room_status, maintenance_required = _set_room_status(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=req.room_id,
-        housekeeping_status=RoomHousekeepingStatus.assigned.value,
-    )
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=actor_user.id,
-        event_type="task_assigned",
-        from_status=previous_status,
-        to_status="assigned",
-        note=f"Assigned to user #{payload.assigned_to_user_id}",
-    )
+    with _atomic_write(db):
+        req = repository.save_request(db, req)
+        room_status, maintenance_required = _set_room_status(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=req.room_id,
+            housekeeping_status=RoomHousekeepingStatus.assigned.value,
+        )
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=actor_user.id,
+            event_type="task_assigned",
+            from_status=previous_status,
+            to_status="assigned",
+            note=f"Assigned to user #{payload.assigned_to_user_id}",
+        )
     return _to_status_response(req, room_housekeeping_status=room_status, maintenance_required=maintenance_required)
 
 
@@ -623,22 +636,23 @@ def claim_request(
     req.assigned_to_user_id = actor_user.id
     req.assigned_at = req.assigned_at or datetime.now(UTC)
     req.status = "assigned"
-    req = repository.save_request(db, req)
-    room_status, maintenance_required = _set_room_status(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=req.room_id,
-        housekeeping_status=RoomHousekeepingStatus.assigned.value,
-    )
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=actor_user.id,
-        event_type="task_claimed",
-        from_status=previous_status,
-        to_status="assigned",
-        note="Self-claimed by housekeeper",
-    )
+    with _atomic_write(db):
+        req = repository.save_request(db, req)
+        room_status, maintenance_required = _set_room_status(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=req.room_id,
+            housekeeping_status=RoomHousekeepingStatus.assigned.value,
+        )
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=actor_user.id,
+            event_type="task_claimed",
+            from_status=previous_status,
+            to_status="assigned",
+            note="Self-claimed by housekeeper",
+        )
     return _to_status_response(req, room_housekeeping_status=room_status, maintenance_required=maintenance_required)
 
 
@@ -665,21 +679,22 @@ def start_request(
     previous_status = current_status
     req.status = "in_progress"
     req.started_at = datetime.now(UTC)
-    req = repository.save_request(db, req)
-    room_status, maintenance_required = _set_room_status(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=req.room_id,
-        housekeeping_status=RoomHousekeepingStatus.in_progress.value,
-    )
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=actor_user.id,
-        event_type="task_started",
-        from_status=previous_status,
-        to_status="in_progress",
-    )
+    with _atomic_write(db):
+        req = repository.save_request(db, req)
+        room_status, maintenance_required = _set_room_status(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=req.room_id,
+            housekeeping_status=RoomHousekeepingStatus.in_progress.value,
+        )
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=actor_user.id,
+            event_type="task_started",
+            from_status=previous_status,
+            to_status="in_progress",
+        )
     return _to_status_response(req, room_housekeeping_status=room_status, maintenance_required=maintenance_required)
 
 
@@ -718,20 +733,21 @@ def update_checklist_item_status(
     else:
         item.completed_at = None
         item.completed_by_user_id = None
-    db.add(item)
-    db.commit()
-    db.refresh(item)
+    with _atomic_write(db):
+        db.add(item)
+        db.flush()
+        db.refresh(item)
 
-    req = repository.get_request_by_id_and_restaurant(db, request_id, restaurant_id) or req
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=actor_user.id,
-        event_type="checklist_item_updated",
-        from_status=current_status,
-        to_status=current_status,
-        note=f"Checklist item #{checklist_item_id} set to {is_completed}",
-    )
+        req = repository.get_request_by_id_and_restaurant(db, request_id, restaurant_id) or req
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=actor_user.id,
+            event_type="checklist_item_updated",
+            from_status=current_status,
+            to_status=current_status,
+            note=f"Checklist item #{checklist_item_id} set to {is_completed}",
+        )
     req = repository.get_request_by_id_and_restaurant(db, request_id, restaurant_id) or req
     return _to_response(req)
 
@@ -775,22 +791,23 @@ def submit_for_inspection(
     if req.due_at and now_utc > req.due_at:
         req.sla_breached = True
 
-    req = repository.save_request(db, req)
-    room_status, maintenance_required = _set_room_status(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=req.room_id,
-        housekeeping_status=RoomHousekeepingStatus.inspection.value,
-    )
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=actor_user.id,
-        event_type="task_submitted_for_inspection",
-        from_status=previous_status,
-        to_status="inspection",
-        note=payload.remarks,
-    )
+    with _atomic_write(db):
+        req = repository.save_request(db, req)
+        room_status, maintenance_required = _set_room_status(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=req.room_id,
+            housekeeping_status=RoomHousekeepingStatus.inspection.value,
+        )
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=actor_user.id,
+            event_type="task_submitted_for_inspection",
+            from_status=previous_status,
+            to_status="inspection",
+            note=payload.remarks,
+        )
     return _to_status_response(req, room_housekeeping_status=room_status, maintenance_required=maintenance_required)
 
 
@@ -825,22 +842,23 @@ def inspect_request(
     if payload.decision == "pass":
         req.status = "ready"
         req.done_at = now_utc
-        req = repository.save_request(db, req)
-        room_status, maintenance_required = _set_room_status(
-            db,
-            restaurant_id=restaurant_id,
-            room_id=req.room_id,
-            housekeeping_status=RoomHousekeepingStatus.ready.value,
-        )
-        _append_event(
-            db,
-            req=req,
-            actor_user_id=actor_user.id,
-            event_type="inspection_passed",
-            from_status=previous_status,
-            to_status="ready",
-            note=payload.notes,
-        )
+        with _atomic_write(db):
+            req = repository.save_request(db, req)
+            room_status, maintenance_required = _set_room_status(
+                db,
+                restaurant_id=restaurant_id,
+                room_id=req.room_id,
+                housekeeping_status=RoomHousekeepingStatus.ready.value,
+            )
+            _append_event(
+                db,
+                req=req,
+                actor_user_id=actor_user.id,
+                event_type="inspection_passed",
+                from_status=previous_status,
+                to_status="ready",
+                note=payload.notes,
+            )
         return _to_status_response(req, room_housekeeping_status=room_status, maintenance_required=maintenance_required)
 
     req.status = "rework_required"
@@ -849,22 +867,23 @@ def inspect_request(
         req.assigned_to_user_id = payload.reassign_to_user_id
         req.assigned_by_user_id = actor_user.id
         req.assigned_at = now_utc
-    req = repository.save_request(db, req)
-    room_status, maintenance_required = _set_room_status(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=req.room_id,
-        housekeeping_status=RoomHousekeepingStatus.assigned.value,
-    )
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=actor_user.id,
-        event_type="inspection_failed",
-        from_status=previous_status,
-        to_status="rework_required",
-        note=payload.notes,
-    )
+    with _atomic_write(db):
+        req = repository.save_request(db, req)
+        room_status, maintenance_required = _set_room_status(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=req.room_id,
+            housekeeping_status=RoomHousekeepingStatus.assigned.value,
+        )
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=actor_user.id,
+            event_type="inspection_failed",
+            from_status=previous_status,
+            to_status="rework_required",
+            note=payload.notes,
+        )
     return _to_status_response(req, room_housekeeping_status=room_status, maintenance_required=maintenance_required)
 
 
@@ -887,32 +906,33 @@ def block_request_for_issue(
     previous_status = current_status
     req.status = "blocked"
     req.blocked_reason = payload.description
-    req = repository.save_request(db, req)
-    repository.create_maintenance_ticket(
-        db,
-        request_id=req.id,
-        restaurant_id=req.restaurant_id,
-        room_id=req.room_id,
-        issue_type=payload.issue_type,
-        description=payload.description,
-        photo_proof_url=payload.photo_proof_url,
-        created_by_user_id=actor_user.id,
-    )
-    _set_room_status(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=req.room_id,
-        maintenance_required=True,
-    )
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=actor_user.id,
-        event_type="task_blocked",
-        from_status=previous_status,
-        to_status="blocked",
-        note=payload.description,
-    )
+    with _atomic_write(db):
+        req = repository.save_request(db, req)
+        repository.create_maintenance_ticket(
+            db,
+            request_id=req.id,
+            restaurant_id=req.restaurant_id,
+            room_id=req.room_id,
+            issue_type=payload.issue_type,
+            description=payload.description,
+            photo_proof_url=payload.photo_proof_url,
+            created_by_user_id=actor_user.id,
+        )
+        _set_room_status(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=req.room_id,
+            maintenance_required=True,
+        )
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=actor_user.id,
+            event_type="task_blocked",
+            from_status=previous_status,
+            to_status="blocked",
+            note=payload.description,
+        )
     req = repository.get_request_by_id_and_restaurant(db, req.id, req.restaurant_id) or req
     return _to_response(req)
 
@@ -947,34 +967,35 @@ def resolve_maintenance_ticket(
     ticket.status = "resolved"
     ticket.resolved_at = now_utc
     ticket.resolved_by_user_id = actor_user.id
-    repository.save_maintenance_ticket(db, ticket)
-
     previous_status = _normalize_status(req.status)
-    if previous_status == "blocked":
-        req.status = "assigned" if req.assigned_to_user_id else "pending_assignment"
-        req.blocked_reason = None
-        req = repository.save_request(db, req)
+    with _atomic_write(db):
+        repository.save_maintenance_ticket(db, ticket)
 
-    room_has_open_ticket = repository.has_open_maintenance_ticket_for_room(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=req.room_id,
-    )
-    _set_room_status(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=req.room_id,
-        maintenance_required=room_has_open_ticket,
-    )
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=actor_user.id,
-        event_type="maintenance_resolved",
-        from_status=previous_status,
-        to_status=_normalize_status(req.status),
-        note=payload.resolution_note,
-    )
+        if previous_status == "blocked":
+            req.status = "assigned" if req.assigned_to_user_id else "pending_assignment"
+            req.blocked_reason = None
+            req = repository.save_request(db, req)
+
+        room_has_open_ticket = repository.has_open_maintenance_ticket_for_room(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=req.room_id,
+        )
+        _set_room_status(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=req.room_id,
+            maintenance_required=room_has_open_ticket,
+        )
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=actor_user.id,
+            event_type="maintenance_resolved",
+            from_status=previous_status,
+            to_status=_normalize_status(req.status),
+            note=payload.resolution_note,
+        )
     req = repository.get_request_by_id_and_restaurant(db, req.id, req.restaurant_id) or req
     return _to_response(req)
 
@@ -1006,11 +1027,12 @@ def delete_request(
     request_id: int,
     restaurant_id: int,
 ) -> None:
-    deleted_req = repository.delete_request_by_restaurant(
-        db,
-        request_id=request_id,
-        restaurant_id=restaurant_id,
-    )
+    with _atomic_write(db):
+        deleted_req = repository.delete_request_by_restaurant(
+            db,
+            request_id=request_id,
+            restaurant_id=restaurant_id,
+        )
     if deleted_req is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Housekeeping request not found.")
     _delete_attached_audio_if_local(deleted_req.audio_url)
@@ -1037,37 +1059,38 @@ def create_manual_task(
     if room is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found.")
 
-    req = repository.create_housekeeping_request(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=room_id,
-        room_session_id=None,
-        room_number_snapshot=room.room_number,
-        guest_name=None,
-        request_type=request_type,
-        priority=priority,
-        message=message,
-        requested_for_at=None,
-        due_at=effective_due_at,
-        audio_url=None,
-        status="pending_assignment",
-        checklist_items=checklist_template,
-    )
-    _append_event(
-        db,
-        req=req,
-        actor_user_id=actor_user.id,
-        event_type="task_created_manual",
-        from_status=None,
-        to_status="pending_assignment",
-        note="Manual task created by supervisor",
-    )
-    _set_room_status(
-        db,
-        restaurant_id=restaurant_id,
-        room_id=room_id,
-        housekeeping_status=RoomHousekeepingStatus.vacant_dirty.value,
-    )
+    with _atomic_write(db):
+        req = repository.create_housekeeping_request(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=room_id,
+            room_session_id=None,
+            room_number_snapshot=room.room_number,
+            guest_name=None,
+            request_type=request_type,
+            priority=priority,
+            message=message,
+            requested_for_at=None,
+            due_at=effective_due_at,
+            audio_url=None,
+            status="pending_assignment",
+            checklist_items=checklist_template,
+        )
+        _append_event(
+            db,
+            req=req,
+            actor_user_id=actor_user.id,
+            event_type="task_created_manual",
+            from_status=None,
+            to_status="pending_assignment",
+            note="Manual task created by supervisor",
+        )
+        _set_room_status(
+            db,
+            restaurant_id=restaurant_id,
+            room_id=room_id,
+            housekeeping_status=RoomHousekeepingStatus.vacant_dirty.value,
+        )
     return HousekeepingRequestCreateResponse(
         id=req.id,
         room_number=req.room_number_snapshot,

@@ -76,15 +76,15 @@ function RoomCartDrawer({
       )}
 
       <div
-        className={`fixed top-0 right-0 z-50 box-border flex h-full w-full max-w-[min(24rem,100%)] flex-col bg-white shadow-xl
+        className={`fixed right-0 top-0 z-50 box-border flex h-full w-full max-w-[min(24rem,100%)] min-w-0 flex-col overflow-x-hidden bg-white shadow-xl
           transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}
         role="dialog"
         aria-modal="true"
         aria-label="Room cart"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h2 className="text-lg font-semibold">
+        <div className="flex min-w-0 items-center justify-between gap-3 border-b px-4 py-3">
+          <h2 className="min-w-0 truncate text-lg font-semibold">
             Cart{itemCount > 0 ? ` (${itemCount})` : ""}
           </h2>
           <button
@@ -111,7 +111,7 @@ function RoomCartDrawer({
 
         {/* Order confirmation */}
         {orderPlaced && (
-          <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+          <div className="flex min-w-0 flex-1 flex-col items-center justify-center px-6 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -132,7 +132,7 @@ function RoomCartDrawer({
             <p className="text-gray-500 text-sm mb-3">
               Your order has been sent to the kitchen.
             </p>
-            <div className="bg-gray-50 rounded-lg px-4 py-3 w-full mb-4">
+            <div className="mb-4 w-full max-w-full rounded-lg bg-gray-50 px-4 py-3">
               <p className="text-xs text-gray-500 mb-1">Order number</p>
               <p className="font-bold text-gray-900">{orderPlaced.order_number}</p>
             </div>
@@ -161,27 +161,41 @@ function RoomCartDrawer({
         {/* Cart items */}
         {!orderPlaced && (
           <>
-            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            <div className="min-w-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
               {!cart || cart.items.length === 0 ? (
                 <p className="text-center text-gray-400 mt-8">Your cart is empty.</p>
               ) : (
                 cart.items.map((item) => (
                   <div
                     key={item.item_id}
-                    className="space-y-2 rounded-xl border p-3"
+                    className="box-border flex w-full max-w-full min-w-0 flex-wrap items-start gap-3 rounded-lg border p-3"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm break-words">{item.name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          ${item.unit_price.toFixed(2)} each
-                        </p>
-                        {!item.is_available && (
-                          <p className="text-xs text-red-500 mt-0.5">Unavailable</p>
-                        )}
-                      </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{item.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        ${item.unit_price.toFixed(2)} each
+                      </p>
+                      {!item.is_available && (
+                        <p className="text-xs text-red-500 mt-0.5">Unavailable</p>
+                      )}
+                    </div>
 
-                      {/* Remove button */}
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        onClick={() =>
+                          item.quantity > 1
+                            ? onUpdateItem(item.item_id, item.quantity - 1)
+                            : onRemoveItem(item.item_id)
+                        }
+                        className="w-7 h-7 flex items-center justify-center rounded-full border
+                                   hover:bg-gray-100 text-sm font-medium"
+                        aria-label="Decrease"
+                      >
+                        -
+                      </button>
+                      <span className="w-6 text-center text-sm font-medium">
+                        {item.quantity}
+                      </span>
                       <button
                         onClick={() => onRemoveItem(item.item_id)}
                         className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
@@ -384,16 +398,16 @@ export default function RoomMenu() {
 
   if (pageError) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-red-600 text-center max-w-sm">{pageError}</p>
+      <div className="box-border flex min-h-screen w-full max-w-full items-center justify-center overflow-x-hidden p-6">
+        <p className="max-w-sm text-center text-red-600">{pageError}</p>
       </div>
     );
   }
 
   if (!menu) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-400 animate-pulse">Loading menu...</p>
+      <div className="box-border flex min-h-screen w-full max-w-full items-center justify-center overflow-x-hidden">
+        <p className="animate-pulse text-gray-400">Loading menu...</p>
       </div>
     );
   }
@@ -418,29 +432,55 @@ export default function RoomMenu() {
           <img
             src={toAssetUrl(item.image_path)}
             alt={item.name}
-            loading="lazy"
-            decoding="async"
-            className="block aspect-[4/3] w-full max-w-full object-cover"
+            className="h-36 w-full max-w-full object-cover"
           />
         )}
-        <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <p className="min-w-0 break-words text-sm font-semibold leading-tight line-clamp-2">{item.name}</p>
-            {metaLabel && (
-              <span className="min-w-0 max-w-[45%] truncate text-right text-[11px] text-gray-400">
-                {metaLabel}
-              </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
+          <div className="min-w-0 flex-1">
+            <p className="min-w-0 break-words text-sm font-bold leading-tight line-clamp-2">
+              {item.name}
+            </p>
+            {item.description && (
+              <p className="mt-0.5 min-w-0 break-words text-xs text-gray-500 line-clamp-2">
+                {item.description}
+              </p>
             )}
           </div>
 
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+          <div className="mt-1 flex min-w-0 flex-wrap items-center justify-between gap-2">
             <span className="min-w-0 text-sm font-bold text-orange-600">
               ${item.price.toFixed(2)}
             </span>
-            {item.is_available ? (
-              <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
-                Available
-              </span>
+
+            {!item.is_available ? (
+              <span className="text-xs text-gray-400">Unavailable</span>
+            ) : qtyInCart > 0 ? (
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  onClick={() =>
+                    qtyInCart > 1
+                      ? updateItem(item.id, qtyInCart - 1)
+                      : removeItem(item.id)
+                  }
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border
+                             hover:bg-gray-100 transition-colors text-sm font-bold"
+                  aria-label="Decrease"
+                >
+                  -
+                </button>
+                <span className="text-sm font-semibold w-5 text-center">
+                  {qtyInCart}
+                </span>
+                <button
+                  onClick={() => updateItem(item.id, qtyInCart + 1)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full
+                             bg-orange-500 text-white hover:bg-orange-600 transition-colors
+                             text-sm font-bold"
+                  aria-label="Increase"
+                >
+                  +
+                </button>
+              </div>
             ) : (
               <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
                 Sold out
@@ -528,7 +568,7 @@ export default function RoomMenu() {
           {/* Cart button */}
           <button
             onClick={() => setCartOpen(true)}
-            className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+            className="relative shrink-0 rounded-full p-2 transition-colors hover:bg-gray-100"
             aria-label="Open cart"
           >
             <svg
@@ -600,10 +640,10 @@ export default function RoomMenu() {
             className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] items-center justify-between bg-orange-500
                        text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-orange-600 transition-colors"
           >
-            <span className="font-semibold">
+            <span className="min-w-0 truncate font-semibold">
               {cart!.item_count} item{cart!.item_count !== 1 ? "s" : ""} in cart
             </span>
-            <span className="font-bold">${cart!.total.toFixed(2)}</span>
+            <span className="shrink-0 font-bold">${cart!.total.toFixed(2)}</span>
           </button>
         </div>
       )}

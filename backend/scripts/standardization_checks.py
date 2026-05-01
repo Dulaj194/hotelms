@@ -207,9 +207,13 @@ def _parse_compose_service_names(compose_path: Path) -> set[str]:
 def check_active_track_clarity(
     compose_file: Path | None = None,
     run_script: Path | None = None,
+    legacy_start_script: Path | None = None,
 ) -> CheckResult:
     compose_path = compose_file or (_project_root() / "docker-compose.yml")
     run_script_path = run_script or (_project_root() / "run.ps1")
+    legacy_script_path = legacy_start_script or (
+        _project_root() / "Anawuma-Resturant-App-" / "START_SERVER.bat"
+    )
 
     failures: list[str] = []
 
@@ -233,6 +237,21 @@ def check_active_track_clarity(
         run_text = run_script_path.read_text(encoding="utf-8")
         if "PRIMARY_ACTIVE_SYSTEM=hotelms_root_stack" not in run_text:
             failures.append("run.ps1 must declare PRIMARY_ACTIVE_SYSTEM=hotelms_root_stack.")
+        if "Anawuma-Resturant-App-" not in run_text:
+            failures.append("run.ps1 must mention Anawuma-Resturant-App- as legacy reference-only.")
+
+    legacy_script_checked = False
+    if legacy_script_path.exists():
+        legacy_script_checked = True
+        legacy_text = legacy_script_path.read_text(encoding="utf-8")
+        if "LEGACY_REFERENCE_ONLY=1" not in legacy_text:
+            failures.append(
+                "Anawuma-Resturant-App-/START_SERVER.bat must be marked LEGACY_REFERENCE_ONLY=1."
+            )
+        if "ALLOW_LEGACY_RUNTIME" not in legacy_text:
+            failures.append(
+                "Anawuma-Resturant-App-/START_SERVER.bat must require ALLOW_LEGACY_RUNTIME override."
+            )
 
     if failures:
         return CheckResult(
