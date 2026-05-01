@@ -384,7 +384,7 @@ export default function RoomMenu() {
 
   if (pageError) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="min-h-dvh flex items-center justify-center p-6">
         <p className="text-red-600 text-center max-w-sm">{pageError}</p>
       </div>
     );
@@ -392,7 +392,7 @@ export default function RoomMenu() {
 
   if (!menu) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <p className="text-gray-400 animate-pulse">Loading menu...</p>
       </div>
     );
@@ -486,7 +486,7 @@ export default function RoomMenu() {
   };
 
   return (
-    <div className="box-border flex min-h-screen w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50">
+    <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50">
       {/* Top bar */}
       <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b bg-white shadow-sm">
         <div className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 py-3">

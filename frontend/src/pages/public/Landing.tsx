@@ -52,7 +52,7 @@ export default function Landing() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900">
+    <main className="min-h-dvh bg-gradient-to-b from-slate-50 to-white text-slate-900">
       <SeoHead
         title="Hospitality Operations Platform"
         description="Unify QR ordering, room service, billing handoff, and staff workflows in one hospitality platform."

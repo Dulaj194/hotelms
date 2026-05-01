@@ -203,7 +203,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 py-6 sm:px-6 sm:py-10 flex items-center justify-center">
+    <div className="min-h-dvh bg-background px-4 py-6 sm:px-6 sm:py-10 flex items-center justify-center">
       <SeoHead
         title={loginConfig.title}
         description={loginConfig.subtitle}

@@ -69,7 +69,7 @@ export default function QRResolve({ mode }: QRResolveProps) {
   }, [mode, navigate, roomKey, tableKey]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-5 text-center">
+    <div className="flex min-h-dvh items-center justify-center bg-slate-50 p-5 text-center">
       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <p className="text-sm font-semibold text-slate-700">
           {error ?? "Opening menu..."}

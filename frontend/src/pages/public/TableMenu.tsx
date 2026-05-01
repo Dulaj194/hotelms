@@ -391,7 +391,7 @@ export default function TableMenu() {
 
   if (pageError) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="min-h-dvh flex items-center justify-center p-6">
         <p className="text-red-600 text-center max-w-sm">{pageError}</p>
       </div>
     );
@@ -399,7 +399,7 @@ export default function TableMenu() {
 
   if (!menu) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-dvh flex items-center justify-center">
         <p className="text-gray-400 animate-pulse">Loading menu...</p>
       </div>
     );
@@ -407,8 +407,8 @@ export default function TableMenu() {
 
   if (!guestName) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.12),_transparent_34%),linear-gradient(180deg,#fff8f1_0%,#ffffff_28%,#f8fafc_100%)] px-4 py-6 text-slate-900">
-        <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md items-center justify-center">
+      <div className="min-h-dvh bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.12),_transparent_34%),linear-gradient(180deg,#fff8f1_0%,#ffffff_28%,#f8fafc_100%)] px-4 py-6 text-slate-900">
+        <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-md items-center justify-center">
           <div className="w-full overflow-hidden rounded-[2rem] border border-orange-100 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur">
             <div className="bg-gradient-to-br from-orange-500 via-orange-500 to-amber-500 px-6 pb-8 pt-6 text-white">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/80">
@@ -572,7 +572,7 @@ export default function TableMenu() {
   const cartItemCount = cart?.item_count ?? 0;
 
   return (
-    <div className="box-border min-h-screen w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
+    <div className="box-border min-h-dvh w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
       <header id="menu-top" className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b border-white/60 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">

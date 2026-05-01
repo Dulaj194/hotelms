@@ -126,7 +126,7 @@ export default function RoomOrdersList() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+      <div className="min-h-dvh flex items-center justify-center bg-slate-50 p-6">
         <div className="w-full max-w-sm rounded-2xl border border-rose-200 bg-white p-5 text-center shadow-sm">
           <p className="text-sm font-medium text-rose-600">{error}</p>
         </div>
@@ -136,14 +136,14 @@ export default function RoomOrdersList() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-dvh flex items-center justify-center bg-slate-50">
         <p className="animate-pulse text-sm text-slate-500">Loading room orders...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-dvh bg-slate-50 flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 py-3 sm:px-5">

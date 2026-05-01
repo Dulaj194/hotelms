@@ -55,7 +55,7 @@ export default function FirstTimePasswordChange() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-6 p-8 border border-border rounded-lg shadow-sm bg-card">
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">

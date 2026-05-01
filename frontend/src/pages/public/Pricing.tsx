@@ -46,7 +46,7 @@ export default function Pricing() {
   }, [packages]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-dvh bg-gray-50">
       <div className="app-content-container mx-auto max-w-6xl py-12">
         <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>

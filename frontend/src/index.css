@@ -87,7 +87,7 @@ body::-webkit-scrollbar,
   #root {
     width: 100%;
     max-width: 100%;
-    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   body {
@@ -159,7 +159,7 @@ body::-webkit-scrollbar,
   }
 
   .app-modal-panel {
-    @apply max-h-[92vh] w-full overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6;
+    @apply max-h-[92dvh] w-full overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6;
   }
 }
 

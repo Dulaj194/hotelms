@@ -87,7 +87,7 @@ export default function ServiceRequest() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+      <div className="min-h-dvh flex items-center justify-center p-6 bg-gray-50">
         <div className="bg-white rounded-2xl shadow p-8 max-w-sm w-full text-center">
           <h2 className="text-lg font-bold text-gray-900 mb-2">Session Expired</h2>
           <p className="text-sm text-gray-500">
@@ -204,7 +204,7 @@ export default function ServiceRequest() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-dvh bg-gray-50 flex flex-col">
       <header className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           {restaurantId && roomNumber && (

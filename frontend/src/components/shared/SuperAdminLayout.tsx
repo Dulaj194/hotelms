@@ -144,7 +144,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   }, [mobileSidebarOpen]);
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50 md:grid md:grid-cols-[14rem_1fr]">
+    <div className="h-dvh overflow-hidden bg-gray-50 md:grid md:grid-cols-[14rem_1fr]">
       <button
         type="button"
         onClick={toggleMobileSidebar}
@@ -166,7 +166,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-56 transform flex-col overflow-hidden bg-slate-900 text-white transition-transform duration-300 md:static md:z-auto md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-56 transform flex-col overflow-hidden bg-slate-900 text-white transition-transform duration-300 md:static md:z-auto md:translate-x-0 ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -208,7 +208,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
         </div>
       </aside>
 
-      <main className="h-screen overflow-y-auto">
+      <main className="h-dvh overflow-y-auto">
         <div className="app-content-container py-8">
           {children}
         </div>

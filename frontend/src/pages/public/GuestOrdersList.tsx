@@ -197,7 +197,7 @@ export default function GuestOrdersList() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+      <div className="min-h-dvh flex items-center justify-center bg-slate-50 p-6">
         <div className="w-full max-w-sm rounded-2xl border border-rose-200 bg-white p-5 text-center shadow-sm">
           <p className="text-sm font-medium text-rose-600">{error}</p>
         </div>
@@ -207,14 +207,14 @@ export default function GuestOrdersList() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-dvh flex items-center justify-center bg-slate-50">
         <p className="animate-pulse text-sm text-slate-500">Loading orders...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#fbeaec_0%,#f8fafc_35%,#f8fafc_100%)] text-slate-900">
+    <div className="min-h-dvh bg-[linear-gradient(180deg,#fbeaec_0%,#f8fafc_35%,#f8fafc_100%)] text-slate-900">
       <header className="sticky top-0 z-30 border-b border-rose-100/80 bg-white/95 backdrop-blur-xl">
         <div className="mx-auto w-full max-w-lg px-4 pb-4 pt-3 sm:px-5">
           <div className="flex items-center justify-between gap-3">

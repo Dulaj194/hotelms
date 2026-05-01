@@ -96,7 +96,7 @@ function BillingRouteEntry() {
 }
 
 const routeFallback = (
-  <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">
+  <div className="flex min-h-dvh items-center justify-center text-sm text-gray-500">
     Loading...
   </div>
 );

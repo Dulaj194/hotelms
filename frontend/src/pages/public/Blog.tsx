@@ -64,7 +64,7 @@ export default function Blog() {
 
   if (!content && error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+      <div className="flex min-h-dvh items-center justify-center bg-slate-50 p-6">
         <p className="max-w-md text-center text-sm text-red-600">{error}</p>
       </div>
     );
@@ -72,14 +72,14 @@ export default function Blog() {
 
   if (!content) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-dvh items-center justify-center bg-slate-50">
         <p className="animate-pulse text-sm text-slate-500">Loading blog content...</p>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
+    <main className="min-h-dvh bg-slate-50 text-slate-900">
       <SeoHead
         title={
           category !== "All" ? `${category} Hospitality Guides` : "Hospitality Insights and Blog"

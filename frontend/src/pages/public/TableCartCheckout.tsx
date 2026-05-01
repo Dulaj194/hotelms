@@ -345,7 +345,7 @@ export default function TableCartCheckout() {
 
   if (pageError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-5 text-center">
+      <div className="flex min-h-dvh items-center justify-center bg-slate-50 p-5 text-center">
         <div className="w-full max-w-sm rounded-2xl border border-red-100 bg-white p-5 shadow-sm">
           <p className="text-sm font-semibold text-red-600">{pageError}</p>
           <button
@@ -362,14 +362,14 @@ export default function TableCartCheckout() {
 
   if (!menu || !sessionReady) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-dvh items-center justify-center bg-slate-50">
         <p className="animate-pulse text-sm text-slate-500">Loading cart...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#fffaf5_0%,#f8fafc_34%,#eef7f3_100%)] text-slate-900">
+    <div className="min-h-dvh bg-[linear-gradient(180deg,#fffaf5_0%,#f8fafc_34%,#eef7f3_100%)] text-slate-900">
       <header className="sticky top-0 z-40 border-b border-white/70 bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 w-full max-w-md items-center gap-3 px-4 py-2">
           <button

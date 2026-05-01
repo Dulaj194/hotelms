@@ -259,7 +259,7 @@ export default function RoomOrderStatus() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+      <div className="flex min-h-dvh items-center justify-center bg-slate-50 p-6">
         <div className="max-w-sm rounded-3xl border border-red-200 bg-white p-6 text-center shadow-sm">
           <p className="text-sm font-medium text-red-600">{error}</p>
         </div>
@@ -269,7 +269,7 @@ export default function RoomOrderStatus() {
 
   if (!order) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-dvh items-center justify-center bg-slate-50">
         <p className="animate-pulse text-sm text-slate-500">Loading room order...</p>
       </div>
     );
@@ -280,7 +280,7 @@ export default function RoomOrderStatus() {
   const statusColor = ORDER_STATUS_COLOR[statusKey];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-dvh bg-slate-50">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-4 py-4">
           <div>

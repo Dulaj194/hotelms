@@ -518,7 +518,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50 md:grid md:grid-cols-[14rem_1fr]">
+    <div className="h-dvh overflow-hidden bg-gray-50 md:grid md:grid-cols-[14rem_1fr]">
       <button
         type="button"
         onClick={toggleMobileSidebar}
@@ -541,7 +541,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-56 h-screen bg-gray-900 text-white flex flex-col overflow-hidden transform transition-transform duration-300 md:static md:translate-x-0 md:z-auto ${
+        className={`fixed inset-y-0 left-0 z-50 w-56 h-dvh bg-gray-900 text-white flex flex-col overflow-hidden transform transition-transform duration-300 md:static md:translate-x-0 md:z-auto ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -859,7 +859,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </aside>
 
       {/* Main content */}
-      <main className="h-screen overflow-y-auto">
+      <main className="h-dvh overflow-y-auto">
         <div className="app-content-container py-8">
           {children}
         </div>

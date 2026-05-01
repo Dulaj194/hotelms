@@ -48,7 +48,7 @@ export default function ResetPassword() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="min-h-dvh bg-background flex items-center justify-center px-4">
         <div className="w-full max-w-md p-8 border border-border rounded-lg shadow-sm bg-card text-center space-y-3">
           <h2 className="text-xl font-semibold text-foreground">
             Password updated!
@@ -62,7 +62,7 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="min-h-dvh bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-6 p-8 border border-border rounded-lg shadow-sm bg-card">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
