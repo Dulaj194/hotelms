@@ -2,33 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Global scrollbar removal - Forcefully remove for all elements */
-* {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-}
-
-*::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}
-
-/* Specific targeting for main containers */
-html, body, #root {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
-  overflow-x: hidden !important; /* Prevent horizontal scrollbar system-wide */
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar,
-#root::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -74,38 +47,42 @@ body::-webkit-scrollbar,
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
     box-sizing: border-box;
   }
 
+  /* 1. Fluid Layouts & 2. Viewport Management */
   html,
   body,
   #root {
     width: 100%;
     max-width: 100%;
     min-height: 100dvh;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden; /* Prevent unwanted horizontal scroll */
   }
 
   body {
     @apply bg-background text-foreground;
-    min-width: 0;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Fluid Media - Ensure all media scales correctly with its container */
+  /* Fluid Images & Media */
   img,
   svg,
   video,
   canvas {
-    max-width: 100% !important;
-    height: auto !important;
+    max-width: 100%;
+    height: auto;
     display: block;
   }
 
-  /* Touch Friendly Interaction - Standardize interactive elements */
+  /* 4. Touch Friendly Design */
   button, 
   a, 
   input, 
@@ -113,58 +90,40 @@ body::-webkit-scrollbar,
   textarea {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
-    /* Minimum touch target size for accessibility */
-    min-height: 44px;
   }
 
-  /* Exception for compact items that need to stay small */
-  .touch-target-compact,
-  nav a,
-  nav button,
-  table button {
-    min-height: auto;
+  /* Standardizing interactive targets for mobile */
+  @media (max-width: 640px) {
+    button, 
+    a, 
+    input, 
+    select {
+      min-height: 44px;
+    }
   }
 }
 
+/* 3. Media Queries (Component Layer) */
 @layer components {
   .app-content-container {
-    @apply w-full min-w-0 px-4 sm:px-6 lg:px-8;
+    @apply w-full mx-auto px-4 sm:px-6 lg:px-8;
   }
 
   .app-page-stack {
-    @apply w-full min-w-0 space-y-5 sm:space-y-6;
+    @apply w-full space-y-6 sm:space-y-8;
   }
 
   .app-form-grid {
-    @apply grid grid-cols-1 gap-4 md:grid-cols-2;
+    @apply grid grid-cols-1 gap-6 md:grid-cols-2;
   }
 
-  .app-form-actions {
-    @apply flex flex-col gap-3 sm:flex-row sm:items-center;
-  }
-
-  .app-page-title {
-    @apply text-xl font-bold leading-tight tracking-tight sm:text-2xl md:text-3xl lg:text-4xl;
-  }
-
-  .app-section-title {
-    @apply text-base font-semibold leading-tight sm:text-lg md:text-xl lg:text-2xl;
-  }
-
-  .app-body-text {
-    @apply text-sm leading-6 md:text-base;
-  }
-
-  .app-muted-text {
-    @apply text-xs leading-5 sm:text-sm md:text-base;
-  }
-
+  /* Touch-friendly buttons */
   .app-btn-base {
     @apply inline-flex min-h-[48px] items-center justify-center rounded-xl px-6 py-3 text-sm font-bold transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 md:text-base;
   }
 
   .app-btn-compact {
-    @apply inline-flex min-h-[38px] items-center justify-center rounded-lg px-4 py-2 text-xs font-semibold transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm;
+    @apply inline-flex min-h-[40px] items-center justify-center rounded-lg px-4 py-2 text-xs font-semibold transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm;
   }
 
   .app-btn-ghost {
@@ -176,23 +135,22 @@ body::-webkit-scrollbar,
   }
 
   .app-modal-shell {
-    @apply fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-3 sm:p-6;
+    @apply fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 sm:p-6;
   }
 
   .app-modal-panel {
-    @apply max-h-[92dvh] w-full overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6;
+    @apply max-h-[90dvh] w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8;
   }
 }
 
 @layer utilities {
+  /* Clean Scrollbar Handling Utility */
   .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
   }
 
   .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-    width: 0;
-    height: 0;
+    display: none; /* Chrome, Safari and Opera */
   }
 }
