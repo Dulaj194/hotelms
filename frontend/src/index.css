@@ -95,13 +95,34 @@ body::-webkit-scrollbar,
     min-width: 0;
   }
 
+  /* Fluid Media - Ensure all media scales correctly with its container */
   img,
   svg,
   video,
   canvas {
-    max-width: 100%;
-    height: auto;
+    max-width: 100% !important;
+    height: auto !important;
     display: block;
+  }
+
+  /* Touch Friendly Interaction - Standardize interactive elements */
+  button, 
+  a, 
+  input, 
+  select, 
+  textarea {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    /* Minimum touch target size for accessibility */
+    min-height: 44px;
+  }
+
+  /* Exception for compact items that need to stay small */
+  .touch-target-compact,
+  nav a,
+  nav button,
+  table button {
+    min-height: auto;
   }
 }
 
@@ -139,15 +160,15 @@ body::-webkit-scrollbar,
   }
 
   .app-btn-base {
-    @apply inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold leading-5 transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 sm:py-2.5 md:text-base;
+    @apply inline-flex min-h-[48px] items-center justify-center rounded-xl px-6 py-3 text-sm font-bold transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 md:text-base;
   }
 
   .app-btn-compact {
-    @apply inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-semibold leading-5 transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:px-3.5 sm:py-2 sm:text-sm;
+    @apply inline-flex min-h-[38px] items-center justify-center rounded-lg px-4 py-2 text-xs font-semibold transition-all active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm;
   }
 
   .app-btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 md:text-base;
+    @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 md:text-base;
   }
 
   .app-table-scroll {
