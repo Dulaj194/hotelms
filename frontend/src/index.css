@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global scrollbar removal - Forcefully remove for all elements */
+* {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Specific targeting for main containers */
+html, body, #root {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  overflow-x: hidden !important; /* Prevent horizontal scrollbar system-wide */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -55,25 +82,17 @@
     box-sizing: border-box;
   }
 
-  html {
+  html,
+  body,
+  #root {
     width: 100%;
     max-width: 100%;
-    overflow-x: hidden;
+    min-height: 100vh;
   }
 
   body {
     @apply bg-background text-foreground;
-    width: 100%;
     min-width: 0;
-    max-width: 100%;
-    overflow-x: hidden;
-  }
-
-  #root {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    overflow-x: hidden;
   }
 
   img,
@@ -81,6 +100,8 @@
   video,
   canvas {
     max-width: 100%;
+    height: auto;
+    display: block;
   }
 }
 
