@@ -85,11 +85,6 @@ export default function TableMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const [categoryRailVisible, setCategoryRailVisible] = useState(true);
-  const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
-  const categoryRailShellRef = useRef<HTMLDivElement>(null);
-  const lastMenuScrollYRef = useRef(0);
-  const menuScrollFrameRef = useRef<number | null>(null);
 
   const { cart, addItem, updateItem, removeItem } = useLocalTableCart({
     restaurantId: restaurantContextId,
@@ -144,52 +139,6 @@ export default function TableMenu() {
   }, [featuredBannerPaths.length]);
 
   useEffect(() => {
-    const topRevealOffset = 16;
-    const scrollDeltaThreshold = 8;
-
-    lastMenuScrollYRef.current = window.scrollY;
-
-    if (!categoryRailAutoHideEnabled) {
-      setCategoryRailVisible(true);
-      return;
-    }
-
-    const updateCategoryRailVisibility = () => {
-      const currentScrollY = window.scrollY;
-      const lastScrollY = lastMenuScrollYRef.current;
-      const scrollDelta = currentScrollY - lastScrollY;
-
-      if (currentScrollY <= topRevealOffset) {
-        setCategoryRailVisible(true);
-        lastMenuScrollYRef.current = currentScrollY;
-        menuScrollFrameRef.current = null;
-        return;
-      }
-
-      if (Math.abs(scrollDelta) >= scrollDeltaThreshold) {
-        setCategoryRailVisible(scrollDelta < 0);
-        lastMenuScrollYRef.current = currentScrollY;
-      }
-
-      menuScrollFrameRef.current = null;
-    };
-
-    const handleWindowScroll = () => {
-      if (menuScrollFrameRef.current !== null) return;
-      menuScrollFrameRef.current = window.requestAnimationFrame(updateCategoryRailVisibility);
-    };
-
-    window.addEventListener("scroll", handleWindowScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleWindowScroll);
-      if (menuScrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(menuScrollFrameRef.current);
-      }
-    };
-  }, [categoryRailAutoHideEnabled]);
-
-  useEffect(() => {
     if (featuredBannerPaths.length <= 1) return;
     const timerId = window.setInterval(() => {
       setActiveBannerIndex((current) => (current + 1) % featuredBannerPaths.length);
@@ -207,37 +156,6 @@ export default function TableMenu() {
       );
     });
   }, [flattenedTiles, searchQuery]);
-
-  useEffect(() => {
-    const scrollableContentBuffer = 24;
-    let frameId: number | null = null;
-
-    const updateCategoryRailMode = () => {
-      const menuContent = document.getElementById("menu-content");
-      const header = document.getElementById("menu-top");
-      const railHeight = categoryRailShellRef.current?.offsetHeight ?? 0;
-      const headerHeightWithoutRail = Math.max(0, (header?.offsetHeight ?? 0) - railHeight);
-      const menuContentHeight = menuContent?.scrollHeight ?? document.documentElement.scrollHeight;
-      const usableContentHeight = headerHeightWithoutRail + Math.max(0, menuContentHeight);
-      const canAutoHide = usableContentHeight > window.innerHeight + scrollableContentBuffer;
-
-      setCategoryRailAutoHideEnabled(canAutoHide);
-      if (!canAutoHide) setCategoryRailVisible(true);
-      frameId = null;
-    };
-
-    const scheduleCategoryRailModeUpdate = () => {
-      if (frameId !== null) return;
-      frameId = window.requestAnimationFrame(updateCategoryRailMode);
-    };
-
-    scheduleCategoryRailModeUpdate();
-    window.addEventListener("resize", scheduleCategoryRailModeUpdate);
-    return () => {
-      window.removeEventListener("resize", scheduleCategoryRailModeUpdate);
-      if (frameId !== null) window.cancelAnimationFrame(frameId);
-    };
-  }, [activeCategoryId, featuredBannerPaths.length, searchPanelOpen, searchQuery, visibleCategories.length]);
 
   useEffect(() => {
     if (!restaurantId || !tableNumber) return;
@@ -423,7 +341,7 @@ export default function TableMenu() {
           </div>
         </div>
 
-        <div ref={categoryRailShellRef} className={`mx-auto max-w-[min(72rem,100%)] px-4 pb-2 transition-all duration-300 ${categoryRailVisible ? "max-h-20" : "max-h-0 opacity-0 pointer-events-none"}`}>
+        <div className="mx-auto max-w-[min(72rem,100%)] px-4 pb-2">
           <MenuBrowserRail visibleCategories={visibleCategories} activeCategoryId={activeCategoryId} onSelectCategory={setActiveCategoryId} />
         </div>
       </header>
