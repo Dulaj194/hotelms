@@ -70,7 +70,7 @@ async function postJson<T>(
     } catch {
       // Keep status text.
     }
-    throw new Error(detail);
+    throw new Error(`[${response.status}] ${detail}`);
   }
 
   return response.json() as Promise<T>;
@@ -211,7 +211,7 @@ export function useLocalTableCart(params: {
         } catch (err) {
           // If we tried with a guest token and got 401, maybe the session expired.
           // Try one more time with the original QR key if available.
-          if (guestToken && qrAccessKey && err instanceof Error && err.message.includes("401")) {
+          if (guestToken && qrAccessKey && err instanceof Error && (err.message.includes("401") || err.message.includes("session"))) {
             const retryResponse = await postJson<PlaceOrderResponse>(
               "/orders",
               {
