@@ -85,8 +85,6 @@ export default function TableMenu() {
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const categoryRailShellRef = useRef<HTMLDivElement>(null);
-  const lastMenuScrollYRef = useRef(0);
-  const menuScrollFrameRef = useRef<number | null>(null);
 
   const { cart, addItem, updateItem, removeItem } = useLocalTableCart({
     restaurantId: restaurantContextId,
