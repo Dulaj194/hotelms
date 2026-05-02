@@ -44,10 +44,10 @@ export default function MenuBrowserRail({
         type="button"
         onClick={() => onSelectCategory(null)}
         aria-pressed={activeCategoryId === null}
-        className={`box-border inline-flex h-11 max-w-[5.5rem] shrink-0 items-center rounded-full border px-4 text-left text-sm font-semibold transition duration-200 min-[360px]:px-5 ${
+        className={`box-border inline-flex h-12 shrink-0 items-center rounded-full border px-6 text-sm font-bold transition-all duration-300 active:scale-[0.96] ${
           activeCategoryId === null
-            ? "border-orange-300 bg-orange-50 text-orange-700 shadow-[0_8px_18px_rgba(249,115,22,0.14)]"
-            : "border-slate-200 bg-white text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.05)] hover:border-orange-200 hover:bg-orange-50/50 hover:text-orange-700"
+            ? "border-orange-500 bg-orange-500 text-white shadow-[0_8px_20px_-4px_rgba(249,115,22,0.4)]"
+            : "border-slate-200 bg-white text-slate-600 shadow-sm hover:border-orange-200 hover:bg-orange-50/50"
         }`}
       >
         All
@@ -67,29 +67,33 @@ export default function MenuBrowserRail({
               type="button"
               onClick={() => onSelectCategory(category.id)}
               aria-pressed={isActive}
-              className={`group box-border inline-flex h-11 max-w-[9rem] shrink-0 snap-start items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-left transition duration-200 min-[390px]:max-w-[11.5rem] min-[390px]:pr-4 ${
+              className={`group box-border inline-flex h-12 max-w-[12rem] shrink-0 snap-start items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-5 text-left transition-all duration-300 active:scale-[0.96] ${
                 isActive
-                  ? "border-orange-300 bg-orange-50 text-orange-700 shadow-[0_8px_18px_rgba(249,115,22,0.14)]"
-                  : "border-slate-200 bg-white text-slate-700 shadow-[0_6px_16px_rgba(15,23,42,0.04)] hover:border-orange-200 hover:bg-orange-50/50 hover:text-orange-700"
+                  ? "border-orange-500 bg-orange-500 text-white shadow-[0_8px_20px_-4px_rgba(249,115,22,0.4)]"
+                  : "border-slate-200 bg-white text-slate-600 shadow-sm hover:border-orange-200 hover:bg-orange-50/50"
               }`}
             >
               <span
-                className={`grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full ring-1 transition ${
-                  isActive ? "ring-orange-200" : "ring-slate-100"
+                className={`grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full transition-all ${
+                  isActive ? "bg-white/20 ring-1 ring-white/30" : "bg-slate-50 ring-1 ring-slate-100"
                 }`}
               >
                 <SafeMenuAsset
                   path={category.image_path}
                   alt=""
                   className="h-full w-full object-cover"
-                  fallbackClassName="grid h-full w-full place-items-center bg-gradient-to-br from-orange-50 via-white to-amber-100 text-orange-400"
+                  fallbackClassName={`grid h-full w-full place-items-center bg-gradient-to-br transition ${
+                    isActive ? "from-white/10 to-white/20 text-white" : "from-orange-50 to-amber-50 text-orange-400"
+                  }`}
                   fallback={
-                    <UtensilsCrossed className="h-4 w-4" />
+                    <UtensilsCrossed className="h-4.5 w-4.5" />
                   }
                 />
               </span>
 
-              <span className="min-w-0 truncate text-sm font-semibold leading-5">
+              <span className={`min-w-0 truncate text-sm font-bold tracking-tight ${
+                isActive ? "text-white" : "text-slate-700"
+              }`}>
                 {category.name}
               </span>
             </button>
