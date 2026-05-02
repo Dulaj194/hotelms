@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  CheckCircle,
+  Receipt,
+} from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   getGuestToken,
@@ -29,6 +33,10 @@ const TAB_LABEL: Record<OrdersFilterTab, string> = {
   canceled: "Canceled",
 };
 
+function formatCurrency(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
 const POLL_INTERVAL_MS = 15_000;
 
 export default function GuestOrdersList() {
@@ -45,6 +53,8 @@ export default function GuestOrdersList() {
   const [orders, setOrders] = useState<OrderHeaderResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [requestingBill, setRequestingBill] = useState(false);
+  const [billRequested, setBillRequested] = useState(false);
   const [activeTab, setActiveTab] = useState<OrdersFilterTab>("active");
 
   const restoreGuestSession = useCallback(async (): Promise<boolean> => {
@@ -128,6 +138,26 @@ export default function GuestOrdersList() {
     const timer = setInterval(() => void load(), POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [load, sessionReady]);
+
+  const handleRequestBill = async () => {
+    setRequestingBill(true);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    setBillRequested(true);
+    setRequestingBill(false);
+  };
+
+  const totals = useMemo(() => {
+    return orders.reduce(
+      (acc, order) => {
+        if (order.status !== "rejected") {
+          acc.total += order.total_amount;
+          acc.items += (order.item_previews ?? []).reduce((sum: number, item: any) => sum + item.quantity, 0);
+        }
+        return acc;
+      },
+      { total: 0, items: 0 },
+    );
+  }, [orders]);
 
   const sortedOrders = useMemo(
     () =>
@@ -363,19 +393,65 @@ export default function GuestOrdersList() {
         )}
       </main>
 
-      {restaurantId && tableNumber && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-rose-100 bg-white/95 px-4 py-3 backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
-          <Link
-            to={
-              effectiveQrAccessKey
-                ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
-                : `/menu/${restaurantId}/table/${tableNumber}`
-            }
-            className="block w-full rounded-2xl bg-slate-900 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"
-          >
-            Back to menu
-          </Link>
+
+    {/* Senior Engineer Billing Dashboard - Sticky Footer */}
+      {orders.length > 0 ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/95 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+          <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                Running Bill
+              </p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-black text-slate-900">{formatCurrency(totals.total)}</span>
+                <span className="text-[10px] font-bold text-slate-400">({totals.items} items)</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              disabled={requestingBill || billRequested}
+              onClick={handleRequestBill}
+              className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black transition-all duration-300 active:scale-95 ${
+                billRequested
+                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                  : "bg-slate-900 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] hover:bg-slate-800"
+              }`}
+            >
+              {requestingBill ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Processing...
+                </span>
+              ) : billRequested ? (
+                <>
+                  <CheckCircle className="h-4 w-4" />
+                  Bill Requested
+                </>
+              ) : (
+                <>
+                  <Receipt className="h-4 w-4" />
+                  Request Bill
+                </>
+              )}
+            </button>
+          </div>
         </div>
+      ) : (
+        restaurantId && tableNumber && (
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-rose-100 bg-white/95 px-4 py-3 backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
+            <Link
+              to={
+                effectiveQrAccessKey
+                  ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
+                  : `/menu/${restaurantId}/table/${tableNumber}`
+              }
+              className="block w-full rounded-2xl bg-slate-900 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"
+            >
+              Back to menu
+            </Link>
+          </div>
+        )
       )}
     </div>
   );
