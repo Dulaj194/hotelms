@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight, Menu as MenuIcon, Utensils } from "lucide-react";
-import type { PublicMenuSectionResponse, PublicCategoryResponse } from "@/types/publicMenu";
+import { ChevronDown, Menu as MenuIcon, Utensils } from "lucide-react";
+import type { PublicMenuSectionResponse } from "@/types/publicMenu";
 
 interface PublicMenuSelectorProps {
   menus: PublicMenuSectionResponse[];
@@ -34,10 +34,6 @@ export default function PublicMenuSelector({
   const activeCategory = menus
     .flatMap((m) => m.categories)
     .find((c) => c.id === activeCategoryId);
-
-  const activeMenu = menus.find((m) =>
-    m.categories.some((c) => c.id === activeCategoryId)
-  );
 
   const handleCategoryClick = (categoryId: number | null) => {
     onSelectCategory(categoryId);
