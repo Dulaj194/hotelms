@@ -13,6 +13,7 @@ import {
 } from "@/features/public/tableSession";
 import type { OrderHeaderResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
+import { toAssetUrl } from "@/lib/assets";
 
 const BASE_URL = RESOLVED_API_BASE_URL;
 
@@ -178,9 +179,8 @@ export default function GuestOrdersList() {
     });
   };
 
-  const getItemImageUrl = (imagePath: string | null | undefined): string | null => {
-    if (!imagePath) return null;
-    return `${BASE_URL}/uploads${imagePath}`;
+  const getItemImageUrl = (imagePath: string | null | undefined): string | undefined => {
+    return toAssetUrl(imagePath);
   };
 
   const formatBreakdownText = (order: OrderHeaderResponse): string => {
