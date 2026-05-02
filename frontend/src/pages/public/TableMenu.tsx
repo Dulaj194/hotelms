@@ -599,10 +599,10 @@ export default function TableMenu() {
 
   return (
     <div className="box-border min-h-dvh w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900 pb-[env(safe-area-inset-bottom,0px)]">
-      <header id="menu-top" className="fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top,0px)] will-change-transform">
-        <div className={`mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 transition-all duration-500 ease-out sm:px-5 lg:px-6 ${
-          headerVisible ? "h-16 opacity-100" : "h-0 opacity-0 pointer-events-none -translate-y-8 overflow-hidden"
-        }`}>
+      <header id="menu-top" className={`fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top,0px)] transition-transform duration-500 ease-in-out ${
+        headerVisible ? "translate-y-0" : "-translate-y-16"
+      }`}>
+        <div className="mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 sm:px-5 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <SafeMenuAsset
               path={menu.restaurant.logo_url}
@@ -641,7 +641,7 @@ export default function TableMenu() {
         </div>
 
         <div className={`mx-auto box-border w-full max-w-[min(72rem,100%)] min-w-0 px-4 transition-all duration-300 sm:px-5 lg:px-6 ${
-          headerVisible ? (searchPanelOpen ? "pb-2" : "pb-0") : "pb-0"
+          searchPanelOpen ? "pb-2" : "pb-0"
         }`}>
           <div
             className={`overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ${
@@ -685,10 +685,8 @@ export default function TableMenu() {
         </div>
       </header>
 
-      {/* Spacer to push content down below the fixed header */}
-      <div className={`transition-all duration-500 ease-out ${
-        headerVisible ? "h-[calc(4rem+4rem+env(safe-area-inset-top,0px))]" : "h-[calc(4rem+env(safe-area-inset-top,0px))]"
-      }`} />
+      {/* Fixed-height Spacer: Prevents jittering by never changing its layout height */}
+      <div className="h-[calc(4rem+4rem+env(safe-area-inset-top,0px))]" />
 
       <main
         id="menu-content"

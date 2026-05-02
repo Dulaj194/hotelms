@@ -33,7 +33,7 @@ export default function MenuBrowserRail({
 
   return (
     <div
-      className="box-border flex w-full max-w-full min-w-0 items-center gap-2 overflow-hidden pb-1 min-[360px]:gap-2.5"
+      className="box-border flex w-full max-w-full min-w-0 items-center justify-center gap-2.5 overflow-hidden pb-1"
       aria-label="Menu categories"
     >
       <button
@@ -53,7 +53,7 @@ export default function MenuBrowserRail({
         All
       </button>
 
-      <div className="no-scrollbar box-border flex w-full max-w-full min-w-0 flex-1 snap-x touch-pan-x gap-2 overflow-x-auto overscroll-x-contain scroll-smooth min-[360px]:gap-2.5">
+      <div className="no-scrollbar box-border flex w-full max-w-full min-w-0 flex-1 snap-x touch-pan-x justify-start gap-2.5 overflow-x-auto overscroll-x-contain scroll-smooth sm:justify-center">
         {visibleCategories.map((category) => {
           const isActive = activeCategoryId === category.id;
           const categoryKey = `category-${category.id}`;

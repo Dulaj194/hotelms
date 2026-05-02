@@ -185,4 +185,13 @@
   .app-modal-panel {
     @apply max-h-[90dvh] w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8;
   }
+
+  /* Utility to hide scrollbars while keeping functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
