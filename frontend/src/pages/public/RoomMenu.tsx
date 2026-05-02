@@ -612,7 +612,7 @@ export default function RoomMenu() {
         </div>
 
         {/* Category rail */}
-        <div className="mx-auto box-border flex min-h-[3.5rem] w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 pb-2">
+        <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
           <div className="w-full">
             <MenuBrowserRail
               visibleCategories={visibleCategories}
