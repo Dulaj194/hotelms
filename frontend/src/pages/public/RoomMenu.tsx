@@ -488,8 +488,8 @@ export default function RoomMenu() {
   return (
     <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50 pb-[env(safe-area-inset-bottom,0px)]">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b bg-white shadow-sm pt-[env(safe-area-inset-top,0px)]">
-        <div className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 py-3">
+      <header className="w-full max-w-full overflow-x-hidden border-b bg-white shadow-sm">
+        <div className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
               <img
@@ -554,16 +554,18 @@ export default function RoomMenu() {
           </button>
           </div>
         </div>
+      </header>
 
-        {/* Category tabs */}
-        <div className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 px-4 pb-2">
+      {/* Category tabs - Sticky */}
+      <div className="sticky top-0 z-30 w-full border-b bg-white/95 shadow-sm backdrop-blur-xl">
+        <div className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 px-4 py-2">
           <MenuBrowserRail
             visibleCategories={visibleCategories}
             activeCategoryId={activeCategoryId}
             onSelectCategory={setActiveCategoryId}
           />
         </div>
-      </header>
+      </div>
 
       {/* Item grid */}
       <main

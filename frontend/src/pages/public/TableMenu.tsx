@@ -84,8 +84,6 @@ export default function TableMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const [categoryRailVisible, setCategoryRailVisible] = useState(true);
-  const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
   const categoryRailShellRef = useRef<HTMLDivElement>(null);
   const lastMenuScrollYRef = useRef(0);
   const menuScrollFrameRef = useRef<number | null>(null);
@@ -142,51 +140,6 @@ export default function TableMenu() {
     setActiveBannerIndex(0);
   }, [featuredBannerPaths.length]);
 
-  useEffect(() => {
-    const topRevealOffset = 16;
-    const scrollDeltaThreshold = 8;
-
-    lastMenuScrollYRef.current = window.scrollY;
-
-    if (!categoryRailAutoHideEnabled) {
-      setCategoryRailVisible(true);
-      return;
-    }
-
-    const updateCategoryRailVisibility = () => {
-      const currentScrollY = window.scrollY;
-      const lastScrollY = lastMenuScrollYRef.current;
-      const scrollDelta = currentScrollY - lastScrollY;
-
-      if (currentScrollY <= topRevealOffset) {
-        setCategoryRailVisible(true);
-        lastMenuScrollYRef.current = currentScrollY;
-        menuScrollFrameRef.current = null;
-        return;
-      }
-
-      if (Math.abs(scrollDelta) >= scrollDeltaThreshold) {
-        setCategoryRailVisible(scrollDelta < 0);
-        lastMenuScrollYRef.current = currentScrollY;
-      }
-
-      menuScrollFrameRef.current = null;
-    };
-
-    const handleWindowScroll = () => {
-      if (menuScrollFrameRef.current !== null) return;
-      menuScrollFrameRef.current = window.requestAnimationFrame(updateCategoryRailVisibility);
-    };
-
-    window.addEventListener("scroll", handleWindowScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleWindowScroll);
-      if (menuScrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(menuScrollFrameRef.current);
-      }
-    };
-  }, [categoryRailAutoHideEnabled]);
 
   useEffect(() => {
     if (featuredBannerPaths.length <= 1) {
@@ -213,70 +166,6 @@ export default function TableMenu() {
     });
   }, [flattenedTiles, searchQuery]);
 
-  useEffect(() => {
-    const scrollableContentBuffer = 24;
-    let frameId: number | null = null;
-
-    const updateCategoryRailMode = () => {
-      const menuContent = document.getElementById("menu-content");
-      const header = document.getElementById("menu-top");
-      const railHeight = categoryRailShellRef.current?.offsetHeight ?? 0;
-      const headerHeightWithoutRail = Math.max(0, (header?.offsetHeight ?? 0) - railHeight);
-      const menuContentHeight = menuContent?.scrollHeight ?? document.documentElement.scrollHeight;
-      const menuContentStyle = menuContent ? window.getComputedStyle(menuContent) : null;
-      const menuBottomPadding = menuContentStyle
-        ? Number.parseFloat(menuContentStyle.paddingBottom || "0")
-        : 0;
-      const usableContentHeight =
-        headerHeightWithoutRail + Math.max(0, menuContentHeight - menuBottomPadding);
-      const canAutoHide = usableContentHeight > window.innerHeight + scrollableContentBuffer;
-
-      setCategoryRailAutoHideEnabled(canAutoHide);
-      if (!canAutoHide) {
-        setCategoryRailVisible(true);
-      }
-
-      frameId = null;
-    };
-
-    const scheduleCategoryRailModeUpdate = () => {
-      if (frameId !== null) return;
-      frameId = window.requestAnimationFrame(updateCategoryRailMode);
-    };
-
-    scheduleCategoryRailModeUpdate();
-    window.addEventListener("resize", scheduleCategoryRailModeUpdate);
-    window.addEventListener("orientationchange", scheduleCategoryRailModeUpdate);
-
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(scheduleCategoryRailModeUpdate)
-        : null;
-
-    const menuContent = document.getElementById("menu-content");
-    if (resizeObserver) {
-      resizeObserver.observe(document.body);
-      if (menuContent) {
-        resizeObserver.observe(menuContent);
-      }
-    }
-
-    return () => {
-      window.removeEventListener("resize", scheduleCategoryRailModeUpdate);
-      window.removeEventListener("orientationchange", scheduleCategoryRailModeUpdate);
-      resizeObserver?.disconnect();
-      if (frameId !== null) {
-        window.cancelAnimationFrame(frameId);
-      }
-    };
-  }, [
-    activeCategoryId,
-    featuredBannerPaths.length,
-    searchPanelOpen,
-    searchQuery,
-    visibleCategories.length,
-    visibleTiles.length,
-  ]);
 
   useEffect(() => {
     if (!restaurantId || !tableNumber) return;
@@ -589,8 +478,8 @@ export default function TableMenu() {
 
   return (
     <div className="box-border min-h-dvh w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900 pb-[env(safe-area-inset-bottom,0px)]">
-      <header id="menu-top" className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b border-white/60 bg-white/90 backdrop-blur-xl pt-[env(safe-area-inset-top,0px)]">
-        <div className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 py-2.5 sm:px-5 lg:px-6">
+      <header id="menu-top" className="w-full max-w-full overflow-x-hidden bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] sm:px-5 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <SafeMenuAsset
               path={menu.restaurant.logo_url}
@@ -656,15 +545,12 @@ export default function TableMenu() {
             </div>
           </div>
         </div>
+      </header>
 
+      <div className="sticky top-0 z-30 w-full border-b border-white/60 bg-white/95 shadow-sm backdrop-blur-xl">
         <div
           ref={categoryRailShellRef}
-          className={`mx-auto box-border w-full max-w-[min(72rem,100%)] min-w-0 overflow-hidden px-4 transition-[max-height,padding-bottom,opacity,transform] duration-300 ease-out sm:px-5 lg:px-6 ${
-            categoryRailVisible
-              ? "max-h-20 translate-y-0 pb-2 opacity-100"
-              : "max-h-0 -translate-y-2 pb-0 opacity-0 pointer-events-none"
-          }`}
-          aria-hidden={!categoryRailVisible}
+          className="mx-auto box-border w-full max-w-[min(72rem,100%)] min-w-0 overflow-hidden px-4 py-2 sm:px-5 lg:px-6"
         >
           <MenuBrowserRail
             visibleCategories={visibleCategories}
@@ -672,7 +558,7 @@ export default function TableMenu() {
             onSelectCategory={setActiveCategoryId}
           />
         </div>
-      </header>
+      </div>
 
       <main
         id="menu-content"
