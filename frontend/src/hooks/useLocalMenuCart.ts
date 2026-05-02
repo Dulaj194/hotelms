@@ -182,27 +182,58 @@ export function useLocalTableCart(params: {
         const guestToken = hasGuestSessionForContext(restaurantId, tableNumber)
           ? getGuestToken()
           : null;
-        const response = await postJson<PlaceOrderResponse>(
-          "/orders",
-          {
-            ...data,
-            customer_name: data.customer_name ?? customerName ?? "Guest",
-            items: orderItems,
-          },
-          guestToken
-            ? { "X-Guest-Session": guestToken }
-            : { "X-Table-Key": qrAccessKey },
-        );
-        if (response.guest_token) {
-          setGuestSessionTokenForContext({
-            guestToken: response.guest_token,
-            restaurantId,
-            tableNumber,
-            customerName: customerName ?? data.customer_name ?? "Guest",
-          });
+
+        const headers: Record<string, string> = guestToken
+          ? { "X-Guest-Session": guestToken }
+          : { "X-Table-Key": qrAccessKey };
+
+        try {
+          const response = await postJson<PlaceOrderResponse>(
+            "/orders",
+            {
+              ...data,
+              customer_name: data.customer_name ?? customerName ?? "Guest",
+              items: orderItems,
+            },
+            headers,
+          );
+
+          if (response.guest_token) {
+            setGuestSessionTokenForContext({
+              guestToken: response.guest_token,
+              restaurantId,
+              tableNumber,
+              customerName: customerName ?? data.customer_name ?? "Guest",
+            });
+          }
+          setQuantities({});
+          return response;
+        } catch (err) {
+          // If we tried with a guest token and got 401, maybe the session expired.
+          // Try one more time with the original QR key if available.
+          if (guestToken && qrAccessKey && err instanceof Error && err.message.includes("401")) {
+            const retryResponse = await postJson<PlaceOrderResponse>(
+              "/orders",
+              {
+                ...data,
+                customer_name: data.customer_name ?? customerName ?? "Guest",
+                items: orderItems,
+              },
+              { "X-Table-Key": qrAccessKey },
+            );
+            if (retryResponse.guest_token) {
+              setGuestSessionTokenForContext({
+                guestToken: retryResponse.guest_token,
+                restaurantId,
+                tableNumber,
+                customerName: customerName ?? data.customer_name ?? "Guest",
+              });
+            }
+            setQuantities({});
+            return retryResponse;
+          }
+          throw err;
         }
-        setQuantities({});
-        return response;
       } finally {
         setPlacing(false);
       }

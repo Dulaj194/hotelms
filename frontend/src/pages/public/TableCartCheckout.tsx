@@ -223,7 +223,12 @@ export default function TableCartCheckout() {
       const base = `/menu/${restaurantId}/table/${tableNumber}/order/${result.order.id}`;
       navigate(qrAccessKey ? `${base}?k=${encodeURIComponent(qrAccessKey)}` : base);
     } catch (err) {
-      setPlaceError(err instanceof Error ? err.message : "Failed to place order.");
+      const msg = err instanceof Error ? err.message : "Failed to place order.";
+      if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
+        setPlaceError("Your session has expired. Please go back to the menu or scan the QR code again.");
+      } else {
+        setPlaceError(msg);
+      }
     }
   }, [appliedCoupon, itemCount, navigate, placeOrder, qrAccessKey, restaurantId, tableNumber]);
 
@@ -558,15 +563,22 @@ export default function TableCartCheckout() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
               Payable
             </p>
-            <p className="text-lg font-black text-slate-900">{formatCurrency(grandTotal)}</p>
+            <p key={grandTotal} className="text-lg font-black text-slate-900 animate-pop-in">{formatCurrency(grandTotal)}</p>
           </div>
           <button
             type="button"
             onClick={handlePlaceOrder}
             disabled={placing || itemCount === 0}
-            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-orange-500 px-5 text-sm font-black text-white shadow-[0_14px_28px_rgba(249,115,22,0.28)] transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-orange-500 px-5 text-sm font-black text-white shadow-[0_14px_28px_rgba(249,115,22,0.28)] transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95"
           >
-            {placing ? "Placing order..." : "Place Order"}
+            {placing ? (
+              <span className="flex items-center gap-2">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                Placing...
+              </span>
+            ) : (
+              "Place Order"
+            )}
           </button>
         </div>
       </div>
