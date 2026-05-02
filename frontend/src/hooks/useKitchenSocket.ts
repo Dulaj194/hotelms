@@ -16,6 +16,7 @@ import { getAccessToken } from "@/lib/auth";
 import { refreshAccessToken } from "@/lib/api";
 import { RESOLVED_WS_BASE_URL } from "@/lib/networkBase";
 import type {
+  BillRequestedEvent,
   KitchenEvent,
   NewOrderEvent,
   OrderStatusUpdatedEvent,
@@ -31,6 +32,7 @@ interface UseKitchenSocketOptions {
   restaurantId: number | null | undefined;
   onNewOrder?: (event: NewOrderEvent) => void;
   onStatusUpdate?: (event: OrderStatusUpdatedEvent) => void;
+  onBillRequested?: (event: BillRequestedEvent) => void;
 }
 
 export interface UseKitchenSocketReturn {
@@ -42,6 +44,7 @@ export function useKitchenSocket({
   restaurantId,
   onNewOrder,
   onStatusUpdate,
+  onBillRequested,
 }: UseKitchenSocketOptions): UseKitchenSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -54,8 +57,10 @@ export function useKitchenSocket({
   // Stable refs for callbacks — updating these never re-triggers the effect
   const onNewOrderRef = useRef(onNewOrder);
   const onStatusUpdateRef = useRef(onStatusUpdate);
+  const onBillRequestedRef = useRef(onBillRequested);
   onNewOrderRef.current = onNewOrder;
   onStatusUpdateRef.current = onStatusUpdate;
+  onBillRequestedRef.current = onBillRequested;
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -96,6 +101,8 @@ export function useKitchenSocket({
             onNewOrderRef.current?.(data as NewOrderEvent);
           } else if (data.event === "order_status_updated") {
             onStatusUpdateRef.current?.(data as OrderStatusUpdatedEvent);
+          } else if (data.event === "bill_requested") {
+            onBillRequestedRef.current?.(data as BillRequestedEvent);
           }
         } catch {
           // ignore malformed messages

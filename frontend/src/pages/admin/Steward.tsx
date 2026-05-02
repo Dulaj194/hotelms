@@ -6,7 +6,11 @@ import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
-import type { NewOrderEvent, OrderStatusUpdatedEvent } from "@/types/realtime";
+import type { 
+  BillRequestedEvent,
+  NewOrderEvent, 
+  OrderStatusUpdatedEvent, 
+} from "@/types/realtime";
 import type {
   KitchenOrderCard,
   KitchenOrderItemSummary,
@@ -326,10 +330,22 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     [loadData]
   );
 
+  const handleBillRequested = useCallback(
+    (event: BillRequestedEvent) => {
+      const { table_number, customer_name } = event.data;
+      showAlert(
+        `Table ${table_number} (${customer_name || "Guest"}) is requesting the bill!`,
+        true
+      );
+    },
+    [showAlert]
+  );
+
   const { isConnected, connectionError } = useKitchenSocket({
     restaurantId: canAccessSteward ? restaurantId : null,
     onNewOrder: handleNewOrder,
     onStatusUpdate: handleStatusUpdate,
+    onBillRequested: handleBillRequested,
   });
 
   const handlePendingAction = useCallback(async (orderId: number, newStatus: string) => {

@@ -54,6 +54,21 @@ export interface OrderStatusUpdatedEvent {
   data: OrderStatusUpdatedEventData;
 }
 
+// ── bill_requested event ──────────────────────────────────────────────────────
+
+export interface BillRequestedEventData {
+  table_number: string;
+  session_id: string;
+  customer_name: string | null;
+  requested_at: string;
+}
+
+export interface BillRequestedEvent {
+  event: "bill_requested";
+  restaurant_id: number;
+  data: BillRequestedEventData;
+}
+
 // ── Union type for all kitchen events ─────────────────────────────────────────
 
-export type KitchenEvent = NewOrderEvent | OrderStatusUpdatedEvent;
+export type KitchenEvent = NewOrderEvent | OrderStatusUpdatedEvent | BillRequestedEvent;
