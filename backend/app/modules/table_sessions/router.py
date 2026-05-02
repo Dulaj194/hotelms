@@ -1,8 +1,10 @@
+import redis as redis_lib
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, get_redis, get_current_guest_session
 from app.modules.table_sessions import service
+from app.modules.table_sessions.model import TableSession
 from app.modules.table_sessions.schemas import (
     TableSessionStartRequest,
     TableSessionStartResponse,
@@ -25,3 +27,14 @@ def start_session(
     never sufficient for cart authorization.
     """
     return service.start_table_session(db, payload)
+
+
+@router.post("/my/request-bill")
+def request_bill(
+    session: TableSession = Depends(get_current_guest_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+):
+    """Notify staff that the guest is ready for the bill."""
+    service.request_bill(db, r, session)
+    return {"message": "Bill request sent to staff."}

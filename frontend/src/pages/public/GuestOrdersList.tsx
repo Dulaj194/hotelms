@@ -141,9 +141,17 @@ export default function GuestOrdersList() {
 
   const handleRequestBill = async () => {
     setRequestingBill(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setBillRequested(true);
-    setRequestingBill(false);
+    try {
+      await fetchGuestSessionJson("/table-sessions/my/request-bill", {
+        method: "POST",
+      });
+      setBillRequested(true);
+    } catch (err) {
+      console.error("Failed to request bill:", err);
+      // Even if it fails, we might want to show a message, but for now we keep it simple
+    } finally {
+      setRequestingBill(false);
+    }
   };
 
   const totals = useMemo(() => {

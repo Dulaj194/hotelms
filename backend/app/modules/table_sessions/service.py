@@ -1,14 +1,17 @@
 import uuid
 from datetime import UTC, datetime, timedelta
 
+import redis as redis_lib
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.core.security import create_guest_session_token, decode_table_qr_access_token
+from app.modules.realtime import service as realtime_service
 from app.modules.restaurants.repository import get_by_id as get_restaurant
 from app.modules.table_sessions import repository
+from app.modules.table_sessions.model import TableSession, TableSessionStatus
 from app.modules.table_sessions.schemas import (
     TableSessionStartRequest,
     TableSessionStartResponse,
@@ -120,3 +123,30 @@ def start_table_session(
         session_status="OPEN",
         expires_at=expires_at,
     )
+
+
+def request_bill(
+    db: Session,
+    r: redis_lib.Redis,
+    session: TableSession,
+) -> TableSession:
+    """Mark the table session as requesting the bill and alert staff."""
+    try:
+        session.session_status = TableSessionStatus.BILL_REQUESTED
+        session.updated_at = datetime.now(UTC)
+        db.commit()
+        db.refresh(session)
+        
+        # Broadcast real-time notification to staff
+        realtime_service.publish_bill_requested(
+            r,
+            restaurant_id=session.restaurant_id,
+            table_number=session.table_number,
+            session_id=session.session_id,
+            customer_name=session.customer_name,
+        )
+        
+        return session
+    except SQLAlchemyError:
+        db.rollback()
+        raise

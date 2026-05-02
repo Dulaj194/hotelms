@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 class TableSessionStatus(str, enum.Enum):
     OPEN = "OPEN"
     CLOSED = "CLOSED"
+    BILL_REQUESTED = "BILL_REQUESTED"
 
 
 class TableSession(Base):
