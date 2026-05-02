@@ -96,6 +96,19 @@ export function getGuestDisplayName(
   }
 }
 
+export function setGuestDisplayName(
+  restaurantId: number,
+  tableNumber: string,
+  customerName: string,
+): void {
+  const profile: GuestProfile = {
+    restaurant_id: restaurantId,
+    table_number: tableNumber,
+    customer_name: customerName,
+  };
+  sessionStorage.setItem(GUEST_PROFILE_KEY, JSON.stringify(profile));
+}
+
 export function setGuestQrAccessKey(
   restaurantId: number,
   tableNumber: string,

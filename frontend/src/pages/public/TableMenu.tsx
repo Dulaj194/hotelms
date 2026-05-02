@@ -21,6 +21,7 @@ import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import {
   clearGuestSession,
   getGuestDisplayName,
+  setGuestDisplayName,
   getGuestQrAccessKey,
   setGuestQrAccessKey,
 } from "@/hooks/useGuestSession";
@@ -353,7 +354,12 @@ export default function TableMenu() {
     }
     setNameError(null);
     setGuestName(trimmed);
-  }, [guestNameInput]);
+
+    // Senior Engineer Approach: Persist name so it's not lost on refresh
+    if (restaurantContextId && tableNumber) {
+      setGuestDisplayName(restaurantContextId, tableNumber, trimmed);
+    }
+  }, [guestNameInput, restaurantContextId, tableNumber]);
 
   const handleScrollTo = useCallback((elementId: string) => {
     const element = document.getElementById(elementId);
@@ -407,70 +413,80 @@ export default function TableMenu() {
 
   if (!guestName) {
     return (
-      <div className="min-h-dvh bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.12),_transparent_34%),linear-gradient(180deg,#fff8f1_0%,#ffffff_28%,#f8fafc_100%)] px-4 py-6 text-slate-900">
-        <div className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-md items-center justify-center">
-          <div className="w-full overflow-hidden rounded-[2rem] border border-orange-100 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.12)] backdrop-blur">
-            <div className="bg-gradient-to-br from-orange-500 via-orange-500 to-amber-500 px-6 pb-8 pt-6 text-white">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/80">
-                Table Session
-              </p>
-              <div className="mt-4 flex items-start justify-between gap-4">
+      <div className="box-border min-h-dvh w-full overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.15),_transparent_45%),linear-gradient(180deg,#fffaf5_0%,#ffffff_35%,#f8fafc_100%)] px-4 py-6 text-slate-900 pb-[env(safe-area-inset-bottom,24px)] pt-[env(safe-area-inset-top,24px)]">
+        <div className="mx-auto flex min-h-[calc(100dvh-6rem)] w-full max-w-md items-center justify-center">
+          <div className="w-full overflow-hidden rounded-[2.5rem] border border-orange-100 bg-white shadow-[0_32px_64px_-16px_rgba(15,23,42,0.15)] backdrop-blur-xl">
+            <div className="bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 px-6 pb-10 pt-8 text-white">
+              <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <h1 className="text-3xl font-black leading-tight tracking-tight">
-                    {menu?.restaurant.name ?? "Welcome"}
-                  </h1>
-                  <p className="mt-2 text-sm text-white/85">
-                    Enter your name once and continue to menu, cart, and order tracking.
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/70">
+                    Table Session
                   </p>
+                  <h1 className="mt-3 text-3xl font-black leading-[1.1] tracking-tight sm:text-4xl">
+                    {menu?.restaurant.name ?? "Luminous Hotel"}
+                  </h1>
                 </div>
-                <SafeMenuAsset
-                  path={menu?.restaurant.logo_url}
-                  alt={menu.restaurant.name}
-                  className="h-14 w-14 shrink-0 rounded-2xl bg-white/15 object-cover ring-4 ring-white/20"
-                  fallbackClassName="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/15 ring-4 ring-white/20"
-                  fallback={
-                    <Store className="h-6 w-6" />
-                  }
-                />
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20 shadow-inner backdrop-blur-md ring-1 ring-white/30">
+                  <Store className="h-7 w-7 text-white" />
+                </div>
               </div>
 
-              <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
-                <span className="rounded-full bg-white/15 px-3 py-1.5">Table {tableNumber}</span>
-                <span className="rounded-full bg-white/15 px-3 py-1.5">QR Menu</span>
-                <span className="rounded-full bg-white/15 px-3 py-1.5">Fast ordering</span>
+              <div className="mt-8 flex flex-wrap gap-2">
+                <span className="rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
+                  Table {tableNumber}
+                </span>
+                <span className="rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
+                  QR Menu
+                </span>
+                <span className="rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-[11px] font-bold text-emerald-100 backdrop-blur-md ring-1 ring-emerald-500/30">
+                  Fast ordering
+                </span>
               </div>
             </div>
 
-            <div className="px-6 py-6">
-              <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Your name
-              </label>
-              <input
-                value={guestNameInput}
-                onChange={(event) => setGuestNameInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    handleNameSubmit();
-                  }
-                }}
-                placeholder="e.g. Kasun"
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
-              />
-              {nameError && <p className="mt-2 text-xs text-red-600">{nameError}</p>}
+            <div className="px-7 py-8">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                  Your name
+                </label>
+                <input
+                  value={guestNameInput}
+                  onChange={(event) => setGuestNameInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleNameSubmit();
+                    }
+                  }}
+                  placeholder="e.g. Kasun"
+                  className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-5 py-4 text-base font-medium outline-none transition-all placeholder:text-slate-300 focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/10"
+                />
+                {nameError && (
+                  <p className="flex items-center gap-1.5 px-1 text-[11px] font-semibold text-red-500">
+                    <span className="h-1 w-1 rounded-full bg-red-500" />
+                    {nameError}
+                  </p>
+                )}
+              </div>
 
               <button
                 type="button"
                 onClick={handleNameSubmit}
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="mt-8 group relative inline-flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-4 text-base font-bold text-white transition-all active:scale-[0.98] hover:bg-slate-800"
               >
-                Start session
-                <ChevronRight className="h-4 w-4" />
+                <span className="relative z-10 flex items-center gap-2">
+                  Start session
+                  <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+                </span>
+                <div className="absolute inset-0 z-0 bg-gradient-to-r from-orange-500 to-amber-500 opacity-0 transition-opacity group-hover:opacity-10" />
               </button>
 
-              <p className="mt-4 text-center text-xs leading-5 text-slate-500">
-                By continuing, you will get a mobile menu, cart, and order tracking flow.
-              </p>
+              <div className="mt-8 rounded-2xl bg-slate-50 p-4 text-center">
+                <p className="text-[11px] leading-relaxed font-medium text-slate-500">
+                  Enter your name once to start your digital ordering experience. 
+                  Your cart and orders will be tracked for this session.
+                </p>
+              </div>
             </div>
           </div>
         </div>
