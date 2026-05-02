@@ -1,6 +1,8 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/backend/venv/Scripts/python.exe",
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}/backend"
-  ]
+  "css.lint.unknownAtRules": "ignore",
+  "tailwindCSS.includeLanguages": {
+    "plaintext": "ts",
+    "typescript": "ts",
+    "typescriptreact": "tsx"
+  }
 }
