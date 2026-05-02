@@ -8,12 +8,14 @@ type MenuBrowserRailProps = {
   visibleCategories: PublicCategoryResponse[];
   activeCategoryId: number | null;
   onSelectCategory: (categoryId: number | null) => void;
+  hideAllButton?: boolean;
 };
 
 export default function MenuBrowserRail({
   visibleCategories,
   activeCategoryId,
   onSelectCategory,
+  hideAllButton = false,
 }: MenuBrowserRailProps) {
   const categoryRefs = useRef(new Map<string, HTMLButtonElement | null>());
 
@@ -36,22 +38,24 @@ export default function MenuBrowserRail({
       className="box-border flex w-full max-w-full min-w-0 items-center justify-center gap-2.5 overflow-hidden pb-1"
       aria-label="Menu categories"
     >
-      <button
-        key="all"
-        ref={(node) => {
-          categoryRefs.current.set("all", node);
-        }}
-        type="button"
-        onClick={() => onSelectCategory(null)}
-        aria-pressed={activeCategoryId === null}
-        className={`box-border inline-flex h-12 shrink-0 items-center rounded-full border px-6 text-sm font-bold transition-all duration-300 active:scale-[0.96] ${
-          activeCategoryId === null
-            ? "border-orange-500 bg-orange-500 text-white shadow-[0_8px_20px_-4px_rgba(249,115,22,0.4)]"
-            : "border-slate-200 bg-white text-slate-600 shadow-sm hover:border-orange-200 hover:bg-orange-50/50"
-        }`}
-      >
-        All
-      </button>
+      {!hideAllButton && (
+        <button
+          key="all"
+          ref={(node) => {
+            categoryRefs.current.set("all", node);
+          }}
+          type="button"
+          onClick={() => onSelectCategory(null)}
+          aria-pressed={activeCategoryId === null}
+          className={`box-border inline-flex h-12 shrink-0 items-center rounded-full border px-6 text-sm font-bold transition-all duration-300 active:scale-[0.96] ${
+            activeCategoryId === null
+              ? "border-orange-500 bg-orange-500 text-white shadow-[0_8px_20px_-4px_rgba(249,115,22,0.4)]"
+              : "border-slate-200 bg-white text-slate-600 shadow-sm hover:border-orange-200 hover:bg-orange-50/50"
+          }`}
+        >
+          All
+        </button>
+      )}
 
       <div className="no-scrollbar box-border flex w-full max-w-full min-w-0 flex-1 snap-x touch-pan-x justify-start gap-2.5 overflow-x-auto overscroll-x-contain scroll-smooth sm:justify-center">
         {visibleCategories.map((category) => {

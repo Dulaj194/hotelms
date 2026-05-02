@@ -15,10 +15,10 @@ import {
   X,
 } from "lucide-react";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
+import PublicMenuSelector from "@/components/public/PublicMenuSelector";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
-import CategoryMenuDrawer from "@/components/public/CategoryMenuDrawer";
 import {
   clearGuestSession,
   getGuestDisplayName,
@@ -81,7 +81,6 @@ export default function TableMenu() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
-  const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
@@ -675,13 +674,21 @@ export default function TableMenu() {
 
         <div
           ref={categoryRailShellRef}
-          className="mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center px-4 py-2 sm:px-5 lg:px-6"
+          className="mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center gap-3 px-4 py-2 sm:px-5 lg:px-6"
         >
-          <div className="w-full">
+          <div className="shrink-0">
+            <PublicMenuSelector
+              menus={menu.menus}
+              activeCategoryId={activeCategoryId}
+              onSelectCategory={setActiveCategoryId}
+            />
+          </div>
+          <div className="min-w-0 flex-1 border-l border-slate-100 pl-3">
             <MenuBrowserRail
               visibleCategories={visibleCategories}
               activeCategoryId={activeCategoryId}
               onSelectCategory={setActiveCategoryId}
+              hideAllButton={true}
             />
           </div>
         </div>
@@ -773,7 +780,7 @@ export default function TableMenu() {
         <div className="mx-auto grid w-full max-w-[min(72rem,100%)] min-w-0 grid-cols-5 items-end gap-1 min-[360px]:gap-2">
           <button
             type="button"
-            onClick={() => setMenuDrawerOpen(true)}
+            onClick={() => handleScrollTo("menu-list")}
             className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Menu className="h-5 w-5" />
@@ -923,18 +930,6 @@ export default function TableMenu() {
           </div>
         </div>
       )}
-
-      {/* Category Menu Drawer */}
-      <CategoryMenuDrawer
-        isOpen={menuDrawerOpen}
-        onClose={() => setMenuDrawerOpen(false)}
-        categories={visibleCategories}
-        activeCategoryId={activeCategoryId}
-        onSelectCategory={(id) => {
-          setActiveCategoryId(id);
-          handleScrollTo("menu-list");
-        }}
-      />
     </div>
   );
 }

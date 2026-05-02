@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
+import PublicMenuSelector from "@/components/public/PublicMenuSelector";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { useLocalRoomCart } from "@/hooks/useLocalMenuCart";
@@ -611,13 +612,21 @@ export default function RoomMenu() {
           </div>
         </div>
 
-        {/* Category rail */}
-        <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
-          <div className="w-full">
+        {/* Menu & Category Navigation */}
+        <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center gap-3 px-4 py-2">
+          <div className="shrink-0">
+            <PublicMenuSelector
+              menus={menu.menus}
+              activeCategoryId={activeCategoryId}
+              onSelectCategory={setActiveCategoryId}
+            />
+          </div>
+          <div className="min-w-0 flex-1 border-l pl-3">
             <MenuBrowserRail
               visibleCategories={visibleCategories}
               activeCategoryId={activeCategoryId}
               onSelectCategory={setActiveCategoryId}
+              hideAllButton={true} // We'll hide the 'All' button in the rail since the dropdown handles it
             />
           </div>
         </div>
