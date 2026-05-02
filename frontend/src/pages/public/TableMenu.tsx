@@ -18,6 +18,7 @@ import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
+import CategoryMenuDrawer from "@/components/public/CategoryMenuDrawer";
 import {
   clearGuestSession,
   getGuestDisplayName,
@@ -80,6 +81,7 @@ export default function TableMenu() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
@@ -771,7 +773,7 @@ export default function TableMenu() {
         <div className="mx-auto grid w-full max-w-[min(72rem,100%)] min-w-0 grid-cols-5 items-end gap-1 min-[360px]:gap-2">
           <button
             type="button"
-            onClick={() => handleScrollTo("menu-list")}
+            onClick={() => setMenuDrawerOpen(true)}
             className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Menu className="h-5 w-5" />
@@ -921,6 +923,18 @@ export default function TableMenu() {
           </div>
         </div>
       )}
+
+      {/* Category Menu Drawer */}
+      <CategoryMenuDrawer
+        isOpen={menuDrawerOpen}
+        onClose={() => setMenuDrawerOpen(false)}
+        categories={visibleCategories}
+        activeCategoryId={activeCategoryId}
+        onSelectCategory={(id) => {
+          setActiveCategoryId(id);
+          handleScrollTo("menu-list");
+        }}
+      />
     </div>
   );
 }
