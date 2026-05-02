@@ -92,6 +92,14 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Safe Area Handling for modern mobile browsers */
+  :root {
+    --safe-top: env(safe-area-inset-top);
+    --safe-bottom: env(safe-area-inset-bottom);
+    --safe-left: env(safe-area-inset-left);
+    --safe-right: env(safe-area-inset-right);
+  }
+
   /* Standardizing interactive targets for mobile */
   @media (max-width: 640px) {
     button, 
@@ -140,17 +148,5 @@
 
   .app-modal-panel {
     @apply max-h-[90dvh] w-full overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8;
-  }
-}
-
-@layer utilities {
-  /* Clean Scrollbar Handling Utility */
-  .scrollbar-hide {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
   }
 }

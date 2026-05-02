@@ -486,9 +486,9 @@ export default function RoomMenu() {
   };
 
   return (
-    <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50">
+    <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50 pb-[env(safe-area-inset-bottom,0px)]">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b bg-white shadow-sm">
+      <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b bg-white shadow-sm pt-[env(safe-area-inset-top,0px)]">
         <div className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
@@ -583,7 +583,7 @@ export default function RoomMenu() {
               {category.items.length === 0 ? (
                 <p className="text-center text-gray-400 py-10">No items in this category.</p>
               ) : (
-                <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2">
                   {category.items.map(renderItemCard)}
                 </div>
               )}

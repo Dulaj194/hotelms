@@ -178,7 +178,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
         <nav
           ref={sidebarNavRef}
           onScroll={handleSidebarScroll}
-          className="scrollbar-hide flex-1 overflow-y-auto space-y-0.5 px-2 py-4"
+          className="flex-1 overflow-y-auto space-y-0.5 px-2 py-4"
         >
           {visibleNavItems.map((item) => {
             const active = isNavItemActive(item.path);

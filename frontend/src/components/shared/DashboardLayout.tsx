@@ -554,7 +554,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <nav
           ref={sidebarNavRef}
           onScroll={handleSidebarScroll}
-          className="flex-1 overflow-y-auto scrollbar-hide py-4 space-y-0.5 px-2"
+          className="flex-1 overflow-y-auto py-4 space-y-0.5 px-2"
         >
           {isMenuGroupVisible && (
             <div className="mb-1">

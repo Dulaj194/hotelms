@@ -53,7 +53,7 @@ export default function MenuBrowserRail({
         All
       </button>
 
-      <div className="scrollbar-hide box-border flex w-full max-w-full min-w-0 flex-1 snap-x touch-pan-x gap-2 overflow-x-auto overscroll-x-contain scroll-smooth min-[360px]:gap-2.5">
+      <div className="no-scrollbar box-border flex w-full max-w-full min-w-0 flex-1 snap-x touch-pan-x gap-2 overflow-x-auto overscroll-x-contain scroll-smooth min-[360px]:gap-2.5">
         {visibleCategories.map((category) => {
           const isActive = activeCategoryId === category.id;
           const categoryKey = `category-${category.id}`;
