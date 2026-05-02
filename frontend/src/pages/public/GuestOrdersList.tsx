@@ -3,7 +3,6 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   getGuestToken,
 } from "@/hooks/useGuestSession";
-import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import { isSessionHttpError } from "@/features/public/sessionHttp";
 import {
   fetchGuestSessionJson,
@@ -15,7 +14,6 @@ import type { OrderHeaderResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 import { toAssetUrl } from "@/lib/assets";
 
-const BASE_URL = RESOLVED_API_BASE_URL;
 
 type OrdersFilterTab = "active" | "completed" | "canceled";
 
