@@ -533,9 +533,9 @@ export default function RoomMenu() {
   return (
     <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50 pb-[env(safe-area-inset-bottom,0px)]">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b bg-white/95 shadow-sm pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
+      <header className="sticky top-0 z-40 w-full max-w-full overflow-x-hidden border-b bg-white/95 shadow-sm pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
         <div className={`mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 transition-all duration-300 ease-in-out ${
-          headerVisible ? "max-h-24 py-3 opacity-100" : "max-h-0 py-0 opacity-0 pointer-events-none -translate-y-4"
+          headerVisible ? "max-h-24 py-3 opacity-100" : "max-h-0 py-0 opacity-0 pointer-events-none -translate-y-10"
         }`}>
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
@@ -602,13 +602,15 @@ export default function RoomMenu() {
           </div>
         </div>
 
-        {/* Category tabs */}
-        <div className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 px-4 pb-2">
-          <MenuBrowserRail
-            visibleCategories={visibleCategories}
-            activeCategoryId={activeCategoryId}
-            onSelectCategory={setActiveCategoryId}
-          />
+        {/* Category rail */}
+        <div className="mx-auto box-border flex min-h-[3.5rem] w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 pb-2">
+          <div className="w-full">
+            <MenuBrowserRail
+              visibleCategories={visibleCategories}
+              activeCategoryId={activeCategoryId}
+              onSelectCategory={setActiveCategoryId}
+            />
+          </div>
         </div>
       </header>
 

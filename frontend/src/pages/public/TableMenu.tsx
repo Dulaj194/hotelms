@@ -589,9 +589,9 @@ export default function TableMenu() {
 
   return (
     <div className="box-border min-h-dvh w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900 pb-[env(safe-area-inset-bottom,0px)]">
-      <header id="menu-top" className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b border-white/60 bg-white/90 backdrop-blur-xl pt-[env(safe-area-inset-top,0px)]">
+      <header id="menu-top" className="sticky top-0 z-40 w-full max-w-full overflow-x-hidden border-b border-slate-200 bg-white/95 backdrop-blur-xl pt-[env(safe-area-inset-top,0px)]">
         <div className={`mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 transition-all duration-300 ease-in-out sm:px-5 lg:px-6 ${
-          headerVisible ? "max-h-24 py-2.5 opacity-100" : "max-h-0 py-0 opacity-0 pointer-events-none -translate-y-4"
+          headerVisible ? "max-h-24 py-2.5 opacity-100" : "max-h-0 py-0 opacity-0 pointer-events-none -translate-y-10"
         }`}>
           <div className="flex min-w-0 items-center gap-3">
             <SafeMenuAsset
@@ -663,13 +663,15 @@ export default function TableMenu() {
 
         <div
           ref={categoryRailShellRef}
-          className="mx-auto box-border w-full max-w-[min(72rem,100%)] min-w-0 overflow-hidden px-4 pb-2 sm:px-5 lg:px-6"
+          className="mx-auto box-border flex min-h-[4rem] w-full max-w-[min(72rem,100%)] min-w-0 items-center px-4 pb-2 sm:px-5 lg:px-6"
         >
-          <MenuBrowserRail
-            visibleCategories={visibleCategories}
-            activeCategoryId={activeCategoryId}
-            onSelectCategory={setActiveCategoryId}
-          />
+          <div className="w-full">
+            <MenuBrowserRail
+              visibleCategories={visibleCategories}
+              activeCategoryId={activeCategoryId}
+              onSelectCategory={setActiveCategoryId}
+            />
+          </div>
         </div>
       </header>
 
