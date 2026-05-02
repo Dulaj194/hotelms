@@ -79,6 +79,7 @@ export default function TableCartCheckout() {
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const customerName =
     restaurantContextId && tableNumber
@@ -220,9 +221,12 @@ export default function TableCartCheckout() {
       await placeOrder(
         appliedCoupon ? { promo_code: appliedCoupon.code } : {},
       );
-      // Senior Engineer Approach: Redirect to the unified "My Orders" list instead of a single order page
-      const base = `/orders/my/${restaurantId}/${tableNumber}`;
-      navigate(qrAccessKey ? `${base}?k=${encodeURIComponent(qrAccessKey)}` : base);
+      // Senior Engineer Approach: Show a brief success state before redirection
+      setShowSuccess(true);
+      setTimeout(() => {
+        const base = `/orders/my/${restaurantId}/${tableNumber}`;
+        navigate(qrAccessKey ? `${base}?k=${encodeURIComponent(qrAccessKey)}` : base);
+      }, 1200);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to place order.";
       if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
@@ -376,6 +380,18 @@ export default function TableCartCheckout() {
 
   return (
     <div className="min-h-dvh bg-[linear-gradient(180deg,#fffaf5_0%,#f8fafc_34%,#eef7f3_100%)] text-slate-900">
+      {/* Success Overlay */}
+      {showSuccess && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/90 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="text-center animate-in zoom-in-95 duration-500">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
+              <Check className="h-10 w-10 stroke-[3]" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900">Order Confirmed!</h2>
+            <p className="mt-2 text-slate-500">Sending you to your order list...</p>
+          </div>
+        </div>
+      )}
       <header className="sticky top-0 z-40 border-b border-white/70 bg-white/95 backdrop-blur-xl">
         <div className="mx-auto flex min-h-16 w-full max-w-md items-center gap-3 px-4 py-2">
           <button
