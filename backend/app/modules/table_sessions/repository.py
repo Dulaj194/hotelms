@@ -71,7 +71,9 @@ def get_active_session_by_session_id(
         .filter(
             TableSession.session_id == session_id,
             TableSession.is_active.is_(True),
-            TableSession.session_status == TableSessionStatus.OPEN,
+            TableSession.session_status.in_(
+                [TableSessionStatus.OPEN, TableSessionStatus.BILL_REQUESTED]
+            ),
             TableSession.expires_at > now,
         )
         .first()
