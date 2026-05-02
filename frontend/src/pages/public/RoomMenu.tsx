@@ -533,9 +533,9 @@ export default function RoomMenu() {
   return (
     <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50 pb-[env(safe-area-inset-bottom,0px)]">
       {/* Top bar */}
-      <header className="sticky top-0 z-50 w-full max-w-full border-b bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
+      <header className="fixed top-0 left-0 right-0 z-50 w-full border-b bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] pt-[env(safe-area-inset-top,0px)] backdrop-blur-md will-change-transform">
         <div className={`mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 transition-all duration-500 ease-out ${
-          headerVisible ? "h-16 opacity-100" : "h-0 opacity-0 pointer-events-none -translate-y-4 overflow-hidden"
+          headerVisible ? "h-16 opacity-100" : "h-0 opacity-0 pointer-events-none -translate-y-8 overflow-hidden"
         }`}>
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
@@ -613,6 +613,11 @@ export default function RoomMenu() {
           </div>
         </div>
       </header>
+
+      {/* Spacer to push content down below the fixed header */}
+      <div className={`transition-all duration-500 ease-out ${
+        headerVisible ? "h-[calc(4rem+3.5rem+env(safe-area-inset-top,0px))]" : "h-[calc(3.5rem+env(safe-area-inset-top,0px))]"
+      }`} />
 
       {/* Item grid */}
       <main

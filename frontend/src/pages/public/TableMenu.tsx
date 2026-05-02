@@ -589,9 +589,9 @@ export default function TableMenu() {
 
   return (
     <div className="box-border min-h-dvh w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900 pb-[env(safe-area-inset-bottom,0px)]">
-      <header id="menu-top" className="sticky top-0 z-50 w-full max-w-full border-b border-slate-200/60 bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top,0px)]">
+      <header id="menu-top" className="fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top,0px)] will-change-transform">
         <div className={`mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 transition-all duration-500 ease-out sm:px-5 lg:px-6 ${
-          headerVisible ? "h-16 opacity-100" : "h-0 opacity-0 pointer-events-none -translate-y-4 overflow-hidden"
+          headerVisible ? "h-16 opacity-100" : "h-0 opacity-0 pointer-events-none -translate-y-8 overflow-hidden"
         }`}>
           <div className="flex min-w-0 items-center gap-3">
             <SafeMenuAsset
@@ -674,6 +674,11 @@ export default function TableMenu() {
           </div>
         </div>
       </header>
+
+      {/* Spacer to push content down below the fixed header */}
+      <div className={`transition-all duration-500 ease-out ${
+        headerVisible ? "h-[calc(4rem+4rem+env(safe-area-inset-top,0px))]" : "h-[calc(4rem+env(safe-area-inset-top,0px))]"
+      }`} />
 
       <main
         id="menu-content"
