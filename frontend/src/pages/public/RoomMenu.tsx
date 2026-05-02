@@ -12,10 +12,10 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { Bell, ChevronRight, Menu as MenuIcon, Search } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
-import PublicMenuSelector from "@/components/public/PublicMenuSelector";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { useLocalRoomCart } from "@/hooks/useLocalMenuCart";
@@ -298,6 +298,7 @@ export default function RoomMenu() {
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [placedOrder, setPlacedOrder] = useState<RoomOrderDetailResponse | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
+  const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
   const lastMenuScrollYRef = useRef(0);
   const menuScrollFrameRef = useRef<number | null>(null);
 
@@ -435,6 +436,13 @@ export default function RoomMenu() {
     setCartOpen(false);
   }, []);
 
+  const handleScrollTo = useCallback((elementId: string) => {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+
   // Render
 
   if (pageError) {
@@ -541,9 +549,9 @@ export default function RoomMenu() {
   };
 
   return (
-    <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50 pb-[env(safe-area-inset-bottom,0px)]">
+    <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50 pb-28">
       {/* Top bar */}
-      <header className={`fixed top-0 left-0 right-0 z-50 w-full border-b bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] pt-[env(safe-area-inset-top,0px)] backdrop-blur-md transition-transform duration-500 ease-in-out ${
+      <header id="menu-top" className={`fixed top-0 left-0 right-0 z-50 w-full border-b bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] pt-[env(safe-area-inset-top,0px)] backdrop-blur-md transition-transform duration-500 ease-in-out ${
         headerVisible ? "translate-y-0" : "-translate-y-16"
       }`}>
         <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4">
@@ -612,21 +620,13 @@ export default function RoomMenu() {
           </div>
         </div>
 
-        {/* Menu & Category Navigation */}
-        <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center gap-3 px-4 py-2">
-          <div className="shrink-0">
-            <PublicMenuSelector
-              menus={menu.menus}
-              activeCategoryId={activeCategoryId}
-              onSelectCategory={setActiveCategoryId}
-            />
-          </div>
-          <div className="min-w-0 flex-1 border-l pl-3">
+        {/* Category rail */}
+        <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
+          <div className="w-full">
             <MenuBrowserRail
               visibleCategories={visibleCategories}
               activeCategoryId={activeCategoryId}
               onSelectCategory={setActiveCategoryId}
-              hideAllButton={true} // We'll hide the 'All' button in the rail since the dropdown handles it
             />
           </div>
         </div>
@@ -637,6 +637,7 @@ export default function RoomMenu() {
 
       {/* Item grid */}
       <main
+        id="menu-list"
         className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 flex-1 touch-pan-y space-y-6 overflow-x-hidden px-4 py-4"
         {...menuSwipeHandlers}
       >
@@ -662,21 +663,91 @@ export default function RoomMenu() {
         )}
       </main>
 
-      {/* Cart FAB for mobile */}
-      {(cart?.item_count ?? 0) > 0 && !cartOpen && !placedOrder && (
-        <div className="fixed bottom-4 left-0 right-0 z-30 box-border w-full max-w-full px-3 min-[360px]:px-4">
+      {/* Footer Navigation */}
+      <div className="fixed inset-x-0 bottom-0 z-30 box-border w-full max-w-full overflow-hidden border-t border-white/70 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
+        <div className="mx-auto grid w-full max-w-[min(42rem,100%)] min-w-0 grid-cols-4 items-end gap-1 min-[360px]:gap-2">
           <button
-            onClick={() => setCartOpen(true)}
-            className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] items-center justify-between bg-orange-500
-                       text-white px-5 py-3 rounded-2xl shadow-lg hover:bg-orange-600 transition-colors"
+            type="button"
+            onClick={() => setMenuDropdownOpen(true)}
+            className={`flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold transition-all duration-300 min-[360px]:rounded-2xl min-[360px]:text-[11px] ${
+              menuDropdownOpen 
+              ? "bg-orange-500 text-white shadow-md scale-105" 
+              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+            }`}
           >
-            <span className="font-semibold">
-              {cart!.item_count} item{cart!.item_count !== 1 ? "s" : ""} in cart
-            </span>
-            <span className="font-bold">${cart!.total.toFixed(2)}</span>
+            <MenuIcon className="h-5 w-5" />
+            <span className="max-w-full truncate">Menu</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleScrollTo("menu-top")}
+            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
+          >
+            <Search className="h-5 w-5" />
+            <span className="max-w-full truncate">Search</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCartOpen(true)}
+            className="relative flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
+          >
+            <div className="relative">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                />
+              </svg>
+              {(cart?.item_count ?? 0) > 0 && (
+                <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-orange-500 px-1 text-[8px] font-bold text-white ring-1 ring-white">
+                  {cart!.item_count}
+                </span>
+              )}
+            </div>
+            <span className="max-w-full truncate">Cart</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!restaurantId || !roomNumber) return;
+              const target = qrAccessKey
+                ? `/menu/${restaurantId}/room/${roomNumber}/orders?k=${encodeURIComponent(qrAccessKey)}`
+                : `/menu/${restaurantId}/room/${roomNumber}/orders`;
+              navigate(target);
+            }}
+            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
+          >
+            <Bell className="h-5 w-5" />
+            <span className="max-w-full truncate">Orders</span>
           </button>
         </div>
-      )}
+      </div>
+
+      <PublicMenuDropdown
+        menu={menu}
+        activeCategoryId={activeCategoryId}
+        onSelectCategory={(id) => {
+          setActiveCategoryId(id);
+          if (id === null) {
+            handleScrollTo("menu-top");
+          } else {
+            handleScrollTo("menu-list");
+          }
+        }}
+        isOpen={menuDropdownOpen}
+        onClose={() => setMenuDropdownOpen(false)}
+      />
 
       {/* Room cart drawer */}
       <RoomCartDrawer
