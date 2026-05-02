@@ -353,8 +353,8 @@ export default function RoomMenu() {
 
   // 3. Scroll visibility logic
   useEffect(() => {
-    const topRevealOffset = 16;
-    const scrollDeltaThreshold = 8;
+    const topRevealOffset = 40;
+    const scrollDeltaThreshold = 15;
 
     lastMenuScrollYRef.current = window.scrollY;
 
@@ -363,9 +363,18 @@ export default function RoomMenu() {
       const lastScrollY = lastMenuScrollYRef.current;
       const scrollDelta = currentScrollY - lastScrollY;
 
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+
       if (currentScrollY <= topRevealOffset) {
         setHeaderVisible(true);
         lastMenuScrollYRef.current = currentScrollY;
+        menuScrollFrameRef.current = null;
+        return;
+      }
+
+      // Prevent header jitter at the bottom
+      if (currentScrollY + windowHeight >= documentHeight - 50) {
         menuScrollFrameRef.current = null;
         return;
       }

@@ -143,8 +143,8 @@ export default function TableMenu() {
   }, [featuredBannerPaths.length]);
 
   useEffect(() => {
-    const topRevealOffset = 16;
-    const scrollDeltaThreshold = 8;
+    const topRevealOffset = 40;
+    const scrollDeltaThreshold = 15; // Increased for better stability
 
     lastMenuScrollYRef.current = window.scrollY;
 
@@ -158,9 +158,19 @@ export default function TableMenu() {
       const lastScrollY = lastMenuScrollYRef.current;
       const scrollDelta = currentScrollY - lastScrollY;
 
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+
+      // Senior Engineer Approach: Prevent jittering when reaching the top or bottom
       if (currentScrollY <= topRevealOffset) {
         setHeaderVisible(true);
         lastMenuScrollYRef.current = currentScrollY;
+        menuScrollFrameRef.current = null;
+        return;
+      }
+
+      // Prevent header flip-flopping at the very bottom of the page
+      if (currentScrollY + windowHeight >= documentHeight - 50) {
         menuScrollFrameRef.current = null;
         return;
       }
