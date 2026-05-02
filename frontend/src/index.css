@@ -62,9 +62,8 @@
     min-height: 100dvh;
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
-    /* Prevent rubber-banding on iOS while keeping it smooth */
-    overscroll-behavior-y: none;
+    /* Allow standard pull-to-refresh and smooth scrolling */
+    overscroll-behavior-y: auto;
   }
 
   /* Senior Engineer Approach: Custom Sleek Scrollbar */
