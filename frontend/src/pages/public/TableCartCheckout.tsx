@@ -217,7 +217,7 @@ export default function TableCartCheckout() {
     if (!restaurantId || !tableNumber || itemCount <= 0) return;
     setPlaceError(null);
     try {
-      const result = await placeOrder(
+      await placeOrder(
         appliedCoupon ? { promo_code: appliedCoupon.code } : {},
       );
       // Senior Engineer Approach: Redirect to the unified "My Orders" list instead of a single order page
