@@ -220,7 +220,8 @@ export default function TableCartCheckout() {
       const result = await placeOrder(
         appliedCoupon ? { promo_code: appliedCoupon.code } : {},
       );
-      const base = `/menu/${restaurantId}/table/${tableNumber}/order/${result.order.id}`;
+      // Senior Engineer Approach: Redirect to the unified "My Orders" list instead of a single order page
+      const base = `/orders/my/${restaurantId}/${tableNumber}`;
       navigate(qrAccessKey ? `${base}?k=${encodeURIComponent(qrAccessKey)}` : base);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to place order.";

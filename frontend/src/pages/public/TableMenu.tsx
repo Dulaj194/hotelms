@@ -85,6 +85,7 @@ export default function TableMenu() {
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
+  const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<number | null>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
@@ -345,6 +346,9 @@ export default function TableMenu() {
       setAddingItemId(itemId);
       try {
         await addItem(itemId, 1);
+        // Senior Engineer Approach: Show a brief success state
+        setRecentlyAddedItemId(itemId);
+        setTimeout(() => setRecentlyAddedItemId(null), 1500);
       } finally {
         setAddingItemId(null);
       }
@@ -586,10 +590,25 @@ export default function TableMenu() {
               <button
                 disabled={isAdding || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className="box-border inline-flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className={`box-border inline-flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition-all duration-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  recentlyAddedItemId === item.id
+                    ? "bg-emerald-500 text-white"
+                    : "bg-orange-500 text-white hover:bg-orange-600 shadow-[0_4px_12px_rgba(249,115,22,0.2)]"
+                }`}
               >
-                {isAdding ? "Adding..." : "Add to Cart"}
-                {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
+                {isAdding ? (
+                  "Adding..."
+                ) : recentlyAddedItemId === item.id ? (
+                  <span className="flex items-center gap-1.5 animate-in zoom-in-50 duration-300">
+                    <Check className="h-3.5 w-3.5" />
+                    Added!
+                  </span>
+                ) : (
+                  <>
+                    Add to Cart
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </>
+                )}
               </button>
             )}
           </div>
