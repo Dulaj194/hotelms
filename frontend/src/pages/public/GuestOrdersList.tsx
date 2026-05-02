@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle,
   Receipt,
+  RotateCcw,
 } from "lucide-react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -37,7 +38,7 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = 5_000;
 
 export default function GuestOrdersList() {
   const [searchParams] = useSearchParams();
@@ -53,6 +54,7 @@ export default function GuestOrdersList() {
   const [orders, setOrders] = useState<OrderHeaderResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [requestingBill, setRequestingBill] = useState(false);
   const [billRequested, setBillRequested] = useState(false);
   const [activeTab, setActiveTab] = useState<OrdersFilterTab>("active");
@@ -102,8 +104,14 @@ export default function GuestOrdersList() {
       setError(err instanceof Error ? err.message : "Could not load orders.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [restoreGuestSession]);
+
+  const handleManualRefresh = useCallback(() => {
+    setRefreshing(true);
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (getGuestToken()) {
@@ -264,6 +272,15 @@ export default function GuestOrdersList() {
             <span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">
               {orders.length}
             </span>
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              disabled={loading || refreshing}
+              className="grid h-8 w-8 place-items-center rounded-lg bg-white shadow-sm ring-1 ring-slate-200 transition active:scale-90"
+              aria-label="Refresh orders"
+            >
+              <RotateCcw className={`h-4 w-4 text-slate-600 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-rose-100 bg-white p-1.5 shadow-sm">

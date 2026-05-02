@@ -217,16 +217,26 @@ export default function TableCartCheckout() {
 
   const handlePlaceOrder = useCallback(async () => {
     if (!restaurantId || !tableNumber || itemCount <= 0) return;
-    setPlaceError(null);
+    const targetRestaurantId = restaurantId;
+    const targetTableNumber = tableNumber;
+
     try {
       await placeOrder(
         appliedCoupon ? { promo_code: appliedCoupon.code } : {},
       );
-      // Senior Engineer Approach: Show a brief success state before redirection
+      
       setShowSuccess(true);
+      
       setTimeout(() => {
-        const base = `/orders/my/${restaurantId}/${tableNumber}`;
-        navigate(qrAccessKey ? `${base}?k=${encodeURIComponent(qrAccessKey)}` : base);
+        if (!targetRestaurantId || !targetTableNumber) {
+          navigate("/");
+          return;
+        }
+        const base = `/orders/my/${targetRestaurantId}/${targetTableNumber}`;
+        const finalPath = effectiveQrAccessKey 
+          ? `${base}?k=${encodeURIComponent(effectiveQrAccessKey)}` 
+          : base;
+        navigate(finalPath);
       }, 1200);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to place order.";
