@@ -93,11 +93,15 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
         category for section in menu_sections for category in section.categories
     ]
 
+    uncategorized_list: list[PublicCategoryResponse] = [
+        _build_category(cat) for cat in categories if cat.menu_id is None
+    ]
+
     return PublicMenuResponse(
         restaurant=restaurant_info,
         menus=menu_sections,
-        uncategorized_categories=[],
-        categories=flat_categories,
+        uncategorized_categories=uncategorized_list,
+        categories=flat_categories + uncategorized_list,
     )
 
 

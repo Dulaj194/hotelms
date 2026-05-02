@@ -54,7 +54,7 @@ function FloatingCartButton({ itemCount, onOpenCart }: FloatingCartButtonProps) 
     >
       <ShoppingCart className="h-6 w-6 min-[360px]:h-7 min-[360px]:w-7" />
       {itemCount > 0 && (
-        <span className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-slate-900 px-1.5 text-[11px] font-bold text-white ring-2 ring-white">
+        <span key={itemCount} className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-slate-900 px-1.5 text-[11px] font-bold text-white ring-2 ring-white animate-pop-in">
           {itemCount}
         </span>
       )}

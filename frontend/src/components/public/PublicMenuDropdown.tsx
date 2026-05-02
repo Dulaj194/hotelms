@@ -111,9 +111,9 @@ export default function PublicMenuDropdown({
             ))}
 
             {/* Uncategorized Categories (if any) */}
-            {menu.uncategorized_categories.length > 0 && (
-                <div className="space-y-2">
-                    <h3 className="px-4 py-2 text-xs font-bold uppercase tracking-widest text-slate-400">Other Categories</h3>
+            {menu.uncategorized_categories && menu.uncategorized_categories.length > 0 && (
+                <div className="space-y-2 pt-4 border-t border-slate-100">
+                    <h3 className="px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Other Categories</h3>
                     <div className="grid grid-cols-2 gap-2 p-2">
                         {menu.uncategorized_categories.map((category) => (
                             <button
@@ -128,7 +128,7 @@ export default function PublicMenuDropdown({
                                     : "border-slate-100 bg-white text-slate-600 hover:border-orange-200 hover:bg-orange-50/30"
                                 }`}
                             >
-                                <div className={`w-2 h-2 rounded-full shrink-0 ${activeCategoryId === category.id ? "bg-orange-500 animate-pulse" : "bg-slate-200"}`} />
+                                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${activeCategoryId === category.id ? "bg-orange-500 animate-pulse" : "bg-slate-200"}`} />
                                 <span className="font-bold text-sm truncate">{category.name}</span>
                             </button>
                         ))}

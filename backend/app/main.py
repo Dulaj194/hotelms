@@ -299,10 +299,7 @@ async def hotelms_exception_handler(request: Request, exc: HotelMSException):
     )
 
 
-# Serve uploaded files (logos, etc.) at /uploads
-# In production replace with CDN/S3 pre-signed URL flow.
-app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
-
+# The /uploads mount is already handled above line 198.
 app.include_router(router)
 
 

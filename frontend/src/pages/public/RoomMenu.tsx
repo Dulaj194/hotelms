@@ -12,7 +12,7 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, ChevronRight, Menu as MenuIcon, Search } from "lucide-react";
+import { Bell, ChevronRight, Menu as MenuIcon, Search, ShoppingCart } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
@@ -24,7 +24,23 @@ import { publicGet } from "@/lib/publicApi";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
 import type { RoomOrderDetailResponse } from "@/types/roomSession";
 
-// Sub-component: Cart Drawer (inline, room-specific)
+function FloatingCartButton({ itemCount, onOpenCart }: { itemCount: number; onOpenCart: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpenCart}
+      className="relative -mt-6 mx-auto grid h-14 w-14 place-items-center rounded-full bg-orange-500 text-white shadow-[0_20px_40px_rgba(249,115,22,0.35)] transition hover:bg-orange-600 min-[360px]:-mt-7 min-[360px]:h-16 min-[360px]:w-16"
+      aria-label={itemCount > 0 ? `Open cart, ${itemCount} items` : "Open cart"}
+    >
+      <ShoppingCart className="h-6 w-6 min-[360px]:h-7 min-[360px]:w-7" />
+      {itemCount > 0 && (
+        <span key={itemCount} className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-slate-900 px-1.5 text-[11px] font-bold text-white ring-2 ring-white animate-pop-in">
+          {itemCount}
+        </span>
+      )}
+    </button>
+  );
+}
 
 interface RoomCartDrawerProps {
   open: boolean;
@@ -663,9 +679,8 @@ export default function RoomMenu() {
         )}
       </main>
 
-      {/* Footer Navigation */}
       <div className="fixed inset-x-0 bottom-0 z-30 box-border w-full max-w-full overflow-hidden border-t border-white/70 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
-        <div className="mx-auto grid w-full max-w-[min(42rem,100%)] min-w-0 grid-cols-4 items-end gap-1 min-[360px]:gap-2">
+        <div className="mx-auto grid w-full max-w-[min(42rem,100%)] min-w-0 grid-cols-5 items-end gap-1 min-[360px]:gap-2">
           <button
             type="button"
             onClick={() => setMenuDropdownOpen(true)}
@@ -688,34 +703,10 @@ export default function RoomMenu() {
             <span className="max-w-full truncate">Search</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setCartOpen(true)}
-            className="relative flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
-          >
-            <div className="relative">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              {(cart?.item_count ?? 0) > 0 && (
-                <span className="absolute -right-2 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-orange-500 px-1 text-[8px] font-bold text-white ring-1 ring-white">
-                  {cart!.item_count}
-                </span>
-              )}
-            </div>
-            <span className="max-w-full truncate">Cart</span>
-          </button>
+          <FloatingCartButton 
+            itemCount={cart?.item_count ?? 0} 
+            onOpenCart={() => setCartOpen(true)} 
+          />
 
           <button
             type="button"
@@ -730,6 +721,24 @@ export default function RoomMenu() {
           >
             <Bell className="h-5 w-5" />
             <span className="max-w-full truncate">Orders</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              // Service request flow
+              if (!restaurantId || !roomNumber) return;
+              const target = qrAccessKey
+                ? `/menu/${restaurantId}/room/${roomNumber}/service-request?k=${encodeURIComponent(qrAccessKey)}`
+                : `/menu/${restaurantId}/room/${roomNumber}/service-request`;
+              navigate(target);
+            }}
+            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span className="max-w-full truncate">Request</span>
           </button>
         </div>
       </div>
