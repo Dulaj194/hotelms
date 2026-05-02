@@ -11,7 +11,7 @@
  * 5. Guest places the order with X-Room-Key or X-Room-Session.
  * 6. Confirmation shown with order number.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
@@ -296,6 +296,9 @@ export default function RoomMenu() {
   const [cartOpen, setCartOpen] = useState(false);
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [placedOrder, setPlacedOrder] = useState<RoomOrderDetailResponse | null>(null);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const lastMenuScrollYRef = useRef(0);
+  const menuScrollFrameRef = useRef<number | null>(null);
 
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing } =
     useLocalRoomCart({
@@ -347,6 +350,48 @@ export default function RoomMenu() {
 
     void fetchMenu();
   }, [restaurantId]);
+
+  // 3. Scroll visibility logic
+  useEffect(() => {
+    const topRevealOffset = 16;
+    const scrollDeltaThreshold = 8;
+
+    lastMenuScrollYRef.current = window.scrollY;
+
+    const updateHeaderVisibility = () => {
+      const currentScrollY = window.scrollY;
+      const lastScrollY = lastMenuScrollYRef.current;
+      const scrollDelta = currentScrollY - lastScrollY;
+
+      if (currentScrollY <= topRevealOffset) {
+        setHeaderVisible(true);
+        lastMenuScrollYRef.current = currentScrollY;
+        menuScrollFrameRef.current = null;
+        return;
+      }
+
+      if (Math.abs(scrollDelta) >= scrollDeltaThreshold) {
+        setHeaderVisible(scrollDelta < 0);
+        lastMenuScrollYRef.current = currentScrollY;
+      }
+
+      menuScrollFrameRef.current = null;
+    };
+
+    const handleWindowScroll = () => {
+      if (menuScrollFrameRef.current !== null) return;
+      menuScrollFrameRef.current = window.requestAnimationFrame(updateHeaderVisibility);
+    };
+
+    window.addEventListener("scroll", handleWindowScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleWindowScroll);
+      if (menuScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(menuScrollFrameRef.current);
+      }
+    };
+  }, []);
 
   const handleAddToCart = useCallback(
     async (itemId: number) => {
@@ -488,8 +533,10 @@ export default function RoomMenu() {
   return (
     <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50 pb-[env(safe-area-inset-bottom,0px)]">
       {/* Top bar */}
-      <header className="w-full max-w-full overflow-x-hidden border-b bg-white shadow-sm">
-        <div className="mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <header className="sticky top-0 z-30 w-full max-w-full overflow-x-hidden border-b bg-white/95 shadow-sm pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
+        <div className={`mx-auto box-border flex w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4 transition-all duration-300 ease-in-out ${
+          headerVisible ? "max-h-24 py-3 opacity-100" : "max-h-0 py-0 opacity-0 pointer-events-none -translate-y-4"
+        }`}>
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
               <img
@@ -554,18 +601,16 @@ export default function RoomMenu() {
           </button>
           </div>
         </div>
-      </header>
 
-      {/* Category tabs - Sticky */}
-      <div className="sticky top-0 z-30 w-full border-b bg-white/95 shadow-sm backdrop-blur-xl">
-        <div className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 px-4 py-2">
+        {/* Category tabs */}
+        <div className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 px-4 pb-2">
           <MenuBrowserRail
             visibleCategories={visibleCategories}
             activeCategoryId={activeCategoryId}
             onSelectCategory={setActiveCategoryId}
           />
         </div>
-      </div>
+      </header>
 
       {/* Item grid */}
       <main
