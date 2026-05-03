@@ -386,6 +386,16 @@ export default function TableCartCheckout() {
             </div>
             <h2 className="text-2xl font-black text-slate-900">Order Confirmed!</h2>
             <p className="mt-4 text-slate-500">Your order has been placed successfully.</p>
+            <button
+              type="button"
+              onClick={() => {
+                const path = `/orders/my/${restaurantId}/${tableNumber}`;
+                navigate(qrAccessKey ? `${path}?k=${encodeURIComponent(qrAccessKey)}` : path);
+              }}
+              className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-blue-600 px-8 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 active:scale-95"
+            >
+              Okay
+            </button>
           </div>
         </div>
       )}
