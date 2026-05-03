@@ -18,7 +18,6 @@ import {
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
-import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import {
   clearGuestSession,
@@ -81,15 +80,15 @@ export default function TableMenu() {
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
+  const [guestNameInput, setGuestNameInput] = useState("");
+  const [guestName, setGuestName] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<number | null>(null);
-  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
   const categoryRailShellRef = useRef<HTMLDivElement>(null);
@@ -111,10 +110,7 @@ export default function TableMenu() {
   const {
     activeCategoryId,
     setActiveCategoryId,
-    selectNextCategory,
-    selectPreviousCategory,
     visibleCategories,
-    selectedCategory,
   } = usePublicMenuBrowser(menu);
 
   const navigationItems = useMemo(() => [null, ...visibleCategories], [visibleCategories]);
