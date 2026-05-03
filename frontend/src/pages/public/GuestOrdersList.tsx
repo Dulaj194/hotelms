@@ -341,7 +341,7 @@ export default function GuestOrdersList() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-lg pb-28">
+      <main className="mx-auto w-full max-w-lg pb-32">
         {orders.length === 0 ? (
           <div className="px-4 pt-4 sm:px-5 sm:pt-5">
             <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
@@ -368,7 +368,7 @@ export default function GuestOrdersList() {
           >
             {(["active", "completed", "canceled"] as OrdersFilterTab[]).map((tab) => (
               <div key={tab} className="w-full shrink-0 snap-start px-4 sm:px-5">
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 pb-8">
                   {groupedOrders[tab].length === 0 ? (
                     <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
                       <p className="text-sm font-medium text-slate-500">{emptyTabMessage[tab]}</p>
@@ -472,13 +472,15 @@ export default function GuestOrdersList() {
 
       {/* Senior Engineer Billing Dashboard - Sticky Footer */}
       {orders.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/95 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/95 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl">
           {tabCounts.completed === 0 && (
-            <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.05em] text-slate-400/80">
-              Wait for order to be served to request bill
-            </p>
+            <div className="bg-slate-900 py-2.5 px-4">
+              <p className="text-center text-[10px] font-black uppercase tracking-[0.12em] text-white">
+                Wait for order to be served to request bill
+              </p>
+            </div>
           )}
-          <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4">
+          <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                 Running Bill
