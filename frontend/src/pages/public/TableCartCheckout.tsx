@@ -87,6 +87,7 @@ export default function TableCartCheckout() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [requestingBill, setRequestingBill] = useState(false);
   const [billRequested, setBillRequested] = useState(false);
+  const [requestBillError, setRequestBillError] = useState<string | null>(null);
 
   const customerName =
     restaurantContextId && tableNumber
@@ -242,6 +243,8 @@ export default function TableCartCheckout() {
 
   const handleRequestBill = useCallback(async () => {
     setRequestingBill(true);
+    setRequestBillError(null);
+
     try {
       await fetchGuestSessionJson("/table-sessions/my/request-bill", {
         method: "POST",
@@ -249,7 +252,11 @@ export default function TableCartCheckout() {
       setBillRequested(true);
     } catch (err) {
       console.error("Failed to request bill:", err);
-      // For now, don't show error to user, just log
+      setRequestBillError(
+        err instanceof Error
+          ? err.message
+          : "Failed to request the bill. Please try again."
+      );
     } finally {
       setRequestingBill(false);
     }
@@ -436,6 +443,18 @@ export default function TableCartCheckout() {
                   </>
                 )}
               </button>
+
+              {billRequested && (
+                <p className="mt-2 text-center text-sm font-semibold text-emerald-700">
+                  Your bill request has been sent to staff.
+                </p>
+              )}
+
+              {requestBillError && (
+                <p className="mt-2 text-center text-sm font-semibold text-red-600">
+                  {requestBillError}
+                </p>
+              )}
               
               <button
                 type="button"
