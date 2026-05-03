@@ -444,10 +444,29 @@ export default function TableCartCheckout() {
                 )}
               </button>
 
-              {billRequested && (
-                <p className="mt-2 text-center text-sm font-semibold text-emerald-700">
+              {billRequested ? (
+                <p className="mt-4 text-center text-sm font-semibold text-emerald-700">
                   Your bill request has been sent to staff.
                 </p>
+              ) : (
+                <button
+                  type="button"
+                  disabled={requestingBill}
+                  onClick={handleRequestBill}
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 text-sm font-black text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {requestingBill ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Processing...
+                    </span>
+                  ) : (
+                    <>
+                      <Receipt className="h-4 w-4" />
+                      Request Bill
+                    </>
+                  )}
+                </button>
               )}
 
               {requestBillError && (
@@ -455,24 +474,6 @@ export default function TableCartCheckout() {
                   {requestBillError}
                 </p>
               )}
-              
-              <button
-                type="button"
-                onClick={() => {
-                  if (!restaurantId || !tableNumber) {
-                    navigate("/");
-                    return;
-                  }
-                  const base = `/orders/my/${restaurantId}/${tableNumber}`;
-                  const finalPath = effectiveQrAccessKey 
-                    ? `${base}?k=${encodeURIComponent(effectiveQrAccessKey)}` 
-                    : base;
-                  navigate(finalPath);
-                }}
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-orange-500 px-6 text-sm font-black text-white shadow-[0_14px_28px_rgba(249,115,22,0.28)] transition hover:bg-orange-600 active:scale-95"
-              >
-                View My Orders
-              </button>
             </div>
           </div>
         </div>
