@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   ArrowLeft,
   CheckCircle,
@@ -59,6 +59,8 @@ export default function GuestOrdersList() {
   const [requestingBill, setRequestingBill] = useState(false);
   const [billRequested, setBillRequested] = useState(false);
   const [activeTab, setActiveTab] = useState<OrdersFilterTab>("active");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   const restoreGuestSession = useCallback(async (): Promise<boolean> => {
     const restored = await restoreTableGuestSession({
@@ -187,13 +189,43 @@ export default function GuestOrdersList() {
     };
   }, [sortedOrders]);
 
-  const filteredOrders = useMemo(
-    () =>
-      sortedOrders.filter((order) => {
-        return TAB_TO_STATUSES[activeTab].includes(order.status);
-      }),
-    [activeTab, sortedOrders],
-  );
+  const groupedOrders = useMemo(() => {
+    return {
+      active: sortedOrders.filter((order) => TAB_TO_STATUSES.active.includes(order.status)),
+      completed: sortedOrders.filter((order) => TAB_TO_STATUSES.completed.includes(order.status)),
+      canceled: sortedOrders.filter((order) => TAB_TO_STATUSES.canceled.includes(order.status)),
+    };
+  }, [sortedOrders]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isScrollingRef.current) return;
+    const scrollLeft = e.currentTarget.scrollLeft;
+    const width = e.currentTarget.clientWidth;
+    if (width === 0) return;
+    const index = Math.round(scrollLeft / width);
+    const tabs: OrdersFilterTab[] = ["active", "completed", "canceled"];
+    if (tabs[index] && tabs[index] !== activeTab) {
+      setActiveTab(tabs[index]);
+    }
+  };
+
+  const handleTabClick = (tab: OrdersFilterTab) => {
+    setActiveTab(tab);
+    const tabs: OrdersFilterTab[] = ["active", "completed", "canceled"];
+    const index = tabs.indexOf(tab);
+    if (scrollRef.current) {
+      isScrollingRef.current = true;
+      const width = scrollRef.current.clientWidth;
+      scrollRef.current.scrollTo({
+        left: width * index,
+        behavior: "smooth",
+      });
+      // Reset the flag after animation
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 500);
+    }
+  };
 
   const emptyTabMessage: Record<OrdersFilterTab, string> = {
     active: "No active orders right now",
@@ -295,7 +327,7 @@ export default function GuestOrdersList() {
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => handleTabClick(tab)}
                   className={`rounded-xl px-2 py-2 text-xs font-bold transition sm:text-sm ${isActive
                       ? "bg-rose-500 text-white shadow-sm"
                       : "text-slate-600 hover:bg-rose-50 hover:text-rose-600"
@@ -309,115 +341,131 @@ export default function GuestOrdersList() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-lg flex-col gap-3 px-4 pb-28 pt-4 sm:px-5 sm:pt-5">
+      <main className="mx-auto w-full max-w-lg pb-28">
         {orders.length === 0 ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <p className="mb-4 text-sm text-slate-500">No orders yet</p>
-            {restaurantId && tableNumber && (
-              <Link
-                to={
-                  effectiveQrAccessKey
-                    ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
-                    : `/menu/${restaurantId}/table/${tableNumber}`
-                }
-                className="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-500 px-4 text-sm font-semibold text-white transition hover:bg-rose-600"
-              >
-                Place an order
-              </Link>
-            )}
-          </div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <p className="text-sm font-medium text-slate-500">{emptyTabMessage[activeTab]}</p>
+          <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+            <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+              <p className="mb-4 text-sm text-slate-500">No orders yet</p>
+              {restaurantId && tableNumber && (
+                <Link
+                  to={
+                    effectiveQrAccessKey
+                      ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
+                      : `/menu/${restaurantId}/table/${tableNumber}`
+                  }
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-500 px-4 text-sm font-semibold text-white transition hover:bg-rose-600"
+                >
+                  Place an order
+                </Link>
+              )}
+            </div>
           </div>
         ) : (
-          filteredOrders.map((order) => {
-            const primaryPreview = order.item_previews?.[0];
-            const itemCount = order.item_previews?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
-
-            return (
-              <Link
-                key={order.id}
-                to={
-                  effectiveQrAccessKey
-                    ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(effectiveQrAccessKey)}`
-                    : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
-                }
-                className="rounded-3xl border border-rose-100 bg-white p-4 shadow-sm transition hover:border-rose-200 hover:shadow-md"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="shrink-0">
-                    {primaryPreview?.item_image_snapshot ? (
-                      <img
-                        src={getItemImageUrl(primaryPreview.item_image_snapshot) ?? undefined}
-                        alt={formatOrderItemTitle(order)}
-                        className="h-16 w-16 rounded-2xl object-cover ring-1 ring-rose-100"
-                        onError={(e) => {
-                          const img = e.currentTarget;
-                          img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3C/svg%3E";
-                        }}
-                      />
-                    ) : (
-                      <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-[11px] font-semibold text-slate-400">
-                        No img
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-2 text-sm font-bold text-slate-900 sm:text-[15px]">
-                        {formatOrderItemTitle(order)}
-                      </p>
-                      <p className="shrink-0 text-sm font-extrabold text-rose-600">
-                        ${order.total_amount.toFixed(2)}
-                      </p>
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="no-scrollbar flex overflow-x-auto snap-x snap-mandatory pt-4 sm:pt-5"
+          >
+            {(["active", "completed", "canceled"] as OrdersFilterTab[]).map((tab) => (
+              <div key={tab} className="w-full shrink-0 snap-start px-4 sm:px-5">
+                <div className="flex flex-col gap-3">
+                  {groupedOrders[tab].length === 0 ? (
+                    <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                      <p className="text-sm font-medium text-slate-500">{emptyTabMessage[tab]}</p>
                     </div>
+                  ) : (
+                    groupedOrders[tab].map((order) => {
+                      const primaryPreview = order.item_previews?.[0];
+                      const itemCount = order.item_previews?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
 
-                    <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
-                      <span>{formatPlacedAt(order.placed_at)}</span>
-                      <span>x{itemCount || 1}</span>
-                    </div>
+                      return (
+                        <Link
+                          key={order.id}
+                          to={
+                            effectiveQrAccessKey
+                              ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(effectiveQrAccessKey)}`
+                              : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
+                          }
+                          className="rounded-3xl border border-rose-100 bg-white p-4 shadow-sm transition hover:border-rose-200 hover:shadow-md"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="shrink-0">
+                              {primaryPreview?.item_image_snapshot ? (
+                                <img
+                                  src={getItemImageUrl(primaryPreview.item_image_snapshot) ?? undefined}
+                                  alt={formatOrderItemTitle(order)}
+                                  className="h-16 w-16 rounded-2xl object-cover ring-1 ring-rose-100"
+                                  onError={(e) => {
+                                    const img = e.currentTarget;
+                                    img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3C/svg%3E";
+                                  }}
+                                />
+                              ) : (
+                                <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-[11px] font-semibold text-slate-400">
+                                  No img
+                                </div>
+                              )}
+                            </div>
 
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${ORDER_STATUS_COLOR[order.status]
-                          }`}
-                      >
-                        {ORDER_STATUS_LABEL[order.status]}
-                      </span>
-                      <span className="truncate text-[11px] text-slate-500">{formatBreakdownText(order)}</span>
-                    </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="line-clamp-2 text-sm font-bold text-slate-900 sm:text-[15px]">
+                                  {formatOrderItemTitle(order)}
+                                </p>
+                                <p className="shrink-0 text-sm font-extrabold text-rose-600">
+                                  ${order.total_amount.toFixed(2)}
+                                </p>
+                              </div>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {activeTab === "active" && (
-                        <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
-                          Track order
-                        </span>
-                      )}
-                      {activeTab === "completed" && (
-                        <>
-                          <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
-                            Leave a review
-                          </span>
-                          {restaurantId && tableNumber && (
-                            <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
-                              Order again
-                            </span>
-                          )}
-                        </>
-                      )}
-                      {activeTab === "canceled" && (
-                        <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold text-rose-600">
-                          Order canceled
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+                                <span>{formatPlacedAt(order.placed_at)}</span>
+                                <span>x{itemCount || 1}</span>
+                              </div>
+
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${ORDER_STATUS_COLOR[order.status]
+                                    }`}
+                                >
+                                  {ORDER_STATUS_LABEL[order.status]}
+                                </span>
+                                <span className="truncate text-[11px] text-slate-500">{formatBreakdownText(order)}</span>
+                              </div>
+
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {tab === "active" && (
+                                  <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
+                                    Track order
+                                  </span>
+                                )}
+                                {tab === "completed" && (
+                                  <>
+                                    <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
+                                      Leave a review
+                                    </span>
+                                    {restaurantId && tableNumber && (
+                                      <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
+                                        Order again
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                                {tab === "canceled" && (
+                                  <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold text-rose-600">
+                                    Order canceled
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })
+                  )}
                 </div>
-              </Link>
-            );
-          })
+              </div>
+            ))}
+          </div>
         )}
       </main>
 
@@ -425,6 +473,11 @@ export default function GuestOrdersList() {
       {/* Senior Engineer Billing Dashboard - Sticky Footer */}
       {orders.length > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/95 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl">
+          {tabCounts.completed === 0 && (
+            <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.05em] text-slate-400/80">
+              Wait for order to be served to request bill
+            </p>
+          )}
           <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
