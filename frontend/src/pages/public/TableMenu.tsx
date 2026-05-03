@@ -77,8 +77,10 @@ export default function TableMenu() {
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
-  const [guestNameInput, setGuestNameInput] = useState("");
-  const [guestName, setGuestName] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
@@ -115,10 +117,35 @@ export default function TableMenu() {
     selectedCategory,
   } = usePublicMenuBrowser(menu);
 
-  const menuSwipeHandlers = useSwipeNavigation<HTMLDivElement>({
-    onSwipeLeft: selectNextCategory,
-    onSwipeRight: selectPreviousCategory,
-  });
+  const navigationItems = useMemo(() => [null, ...visibleCategories], [visibleCategories]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isScrollingRef.current || searchPanelOpen || searchQuery) return;
+    const scrollLeft = e.currentTarget.scrollLeft;
+    const width = e.currentTarget.clientWidth;
+    if (width === 0) return;
+    const index = Math.round(scrollLeft / width);
+    const targetId = navigationItems[index]?.id ?? null;
+    if (targetId !== activeCategoryId) {
+      setActiveCategoryId(targetId);
+    }
+  };
+
+  const handleCategorySelect = (categoryId: number | null) => {
+    setActiveCategoryId(categoryId);
+    const index = navigationItems.findIndex((item) => (item?.id ?? null) === categoryId);
+    if (scrollRef.current && index !== -1) {
+      isScrollingRef.current = true;
+      const width = scrollRef.current.clientWidth;
+      scrollRef.current.scrollTo({
+        left: width * index,
+        behavior: "smooth",
+      });
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 500);
+    }
+  };
 
   const flattenedTiles = useMemo<MenuTile[]>(() => {
     if (!menu) return [];
@@ -741,7 +768,7 @@ export default function TableMenu() {
             <MenuBrowserRail
               visibleCategories={visibleCategories}
               activeCategoryId={activeCategoryId}
-              onSelectCategory={setActiveCategoryId}
+              onSelectCategory={handleCategorySelect}
             />
           </div>
         </div>
@@ -752,81 +779,140 @@ export default function TableMenu() {
 
       <main
         id="menu-content"
-        className="mx-auto box-border flex w-full max-w-[min(72rem,100%)] min-w-0 touch-pan-y flex-1 flex-col gap-3 overflow-x-hidden px-4 py-3 pb-28 sm:px-5 lg:px-6"
-        {...menuSwipeHandlers}
+        className="mx-auto box-border flex w-full max-w-full flex-1 flex-col overflow-hidden"
       >
-        <section className="box-border w-full max-w-full min-w-0">
-          <div className="relative box-border min-h-[12.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13.5rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
-            {featuredBannerPaths.length > 0 && (
-              <SafeMenuAsset
-                path={featuredBannerPaths[activeBannerIndex]}
-                alt="Featured menu banner"
-                loading="eager"
-                className="absolute inset-0 h-full w-full object-cover"
-                fallbackClassName="absolute inset-0 bg-slate-950"
-                fallback={null}
-              />
-            )}
-            <div className="absolute inset-0 bg-slate-950/65" />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.1)_0%,rgba(15,23,42,0.55)_100%)]" />
-            <div className="relative z-10 flex h-full min-h-[calc(12.75rem-2.5rem)] flex-col justify-between gap-4 sm:min-h-[calc(13.5rem-3rem)] sm:gap-5 lg:min-h-[calc(15rem-3rem)]">
-              <div className="min-w-0">
-                <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 sm:text-xs">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Featured picks
-                </p>
-                <h2 className="mt-4 max-w-full break-words text-[1.65rem] font-black leading-tight tracking-tight sm:max-w-xl sm:text-3xl">
-                  Order faster from your table.
-                </h2>
-                <p className="mt-2 max-w-full break-words text-sm leading-6 text-white/80 sm:max-w-2xl">
-                  Choose favorites, update quantities, and place your order without leaving the menu.
-                </p>
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className={`no-scrollbar flex h-full w-full overflow-x-auto overflow-y-hidden ${
+            searchQuery ? "pointer-events-none opacity-0" : "snap-x snap-mandatory"
+          }`}
+        >
+          {navigationItems.map((navItem) => {
+            const catId = navItem?.id ?? null;
+            const categoryTiles =
+              catId === null
+                ? visibleCategories.flatMap((c) =>
+                    c.items.map((item) => ({
+                      item,
+                      categoryId: c.id,
+                      categoryName: c.name,
+                    })),
+                  )
+                : visibleCategories
+                    .filter((c) => c.id === catId)
+                    .flatMap((c) =>
+                      c.items.map((item) => ({
+                        item,
+                        categoryId: c.id,
+                        categoryName: c.name,
+                      })),
+                    );
+
+            return (
+              <div
+                key={catId ?? "all"}
+                className="box-border h-full w-full shrink-0 snap-start overflow-y-auto px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6"
+              >
+                <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
+                  {/* Banner Only on All or First Category */}
+                  {(catId === null || (visibleCategories.length > 0 && visibleCategories[0].id === catId)) && (
+                    <section className="box-border w-full max-w-full min-w-0">
+                      <div className="relative box-border min-h-[12.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13.5rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
+                        {featuredBannerPaths.length > 0 && (
+                          <SafeMenuAsset
+                            path={featuredBannerPaths[activeBannerIndex]}
+                            alt="Featured menu banner"
+                            loading="eager"
+                            className="absolute inset-0 h-full w-full object-cover"
+                            fallbackClassName="absolute inset-0 bg-slate-950"
+                            fallback={null}
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-slate-950/65" />
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.1)_0%,rgba(15,23,42,0.55)_100%)]" />
+                        <div className="relative z-10 flex h-full min-h-[calc(12.75rem-2.5rem)] flex-col justify-between gap-4 sm:min-h-[calc(13.5rem-3rem)] sm:gap-5 lg:min-h-[calc(15rem-3rem)]">
+                          <div className="min-w-0">
+                            <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 sm:text-xs">
+                              <Sparkles className="h-3.5 w-3.5" />
+                              Featured picks
+                            </p>
+                            <h2 className="mt-4 max-w-full break-words text-[1.65rem] font-black leading-tight tracking-tight sm:max-w-xl sm:text-3xl">
+                              Order faster from your table.
+                            </h2>
+                            <p className="mt-2 max-w-full break-words text-sm leading-6 text-white/80 sm:max-w-2xl">
+                              Choose favorites, update quantities, and place your order without leaving the menu.
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-white/80 sm:text-xs">
+                            <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add</span>
+                            <span className="rounded-full bg-white/10 px-3 py-1.5">Table session</span>
+                            <span className="rounded-full bg-white/10 px-3 py-1.5">Live cart</span>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+
+                  <section className="box-border w-full max-w-full min-w-0 space-y-3">
+                    <div className="flex min-w-0 items-end justify-between gap-2">
+                      <div className="min-w-0">
+                        <h2 className="text-xl font-black tracking-tight text-slate-900">
+                          {catId === null ? "All items" : navItem?.name}
+                        </h2>
+                        {catId !== null && navItem?.description && (
+                          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                            {navItem.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {categoryTiles.length === 0 ? (
+                      <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
+                        No items in this category.
+                      </div>
+                    ) : (
+                      <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                        {categoryTiles.map(renderItemCard)}
+                      </div>
+                    )}
+                  </section>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Search Results Overlay (Only when searching) */}
+        {searchQuery && (
+          <div className="absolute inset-x-0 bottom-0 top-0 z-20 overflow-y-auto bg-slate-50 px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6">
+            <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-black tracking-tight text-slate-900">Search results</h2>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Clear
+                </button>
               </div>
 
-              <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-white/80 sm:text-xs">
-                <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add</span>
-                <span className="rounded-full bg-white/10 px-3 py-1.5">Table session</span>
-                <span className="rounded-full bg-white/10 px-3 py-1.5">Live cart</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="menu-list" className="box-border w-full max-w-full min-w-0 space-y-3">
-          <div className="flex min-w-0 items-end justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="text-xl font-black tracking-tight text-slate-900">
-                {searchQuery ? "Search results" : selectedCategory?.name ?? "All items"}
-              </h2>
-              {selectedCategory?.description && !searchQuery && (
-                <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-                  {selectedCategory.description}
-                </p>
+              {visibleTiles.length === 0 ? (
+                <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
+                  No matches for "{searchQuery}"
+                </div>
+              ) : (
+                <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                  {visibleTiles.map(renderItemCard)}
+                </div>
               )}
             </div>
-
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-              >
-                <X className="h-3.5 w-3.5" />
-                Clear
-              </button>
-            )}
           </div>
-
-          {visibleTiles.length === 0 ? (
-            <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
-              No items match the current filter.
-            </div>
-          ) : (
-            <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-              {visibleTiles.map(renderItemCard)}
-            </div>
-          )}
-        </section>
+        )}
       </main>
 
       <div className="fixed inset-x-0 bottom-0 z-30 box-border w-full max-w-full overflow-hidden border-t border-white/70 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
