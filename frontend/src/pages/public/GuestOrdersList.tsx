@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle,
+  Plus,
   Receipt,
 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -284,10 +285,8 @@ export default function GuestOrdersList() {
                 </div>
               </div>
             </div>
-            <span className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-bold text-white">
-              {orders.length}
-            </span>
           </div>
+
 
           <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-rose-100 bg-white p-1.5 shadow-sm">
             {(["active", "completed", "canceled"] as OrdersFilterTab[]).map((tab) => {
@@ -437,32 +436,48 @@ export default function GuestOrdersList() {
               </div>
             </div>
 
-            <button
-              type="button"
-              disabled={requestingBill || billRequested}
-              onClick={handleRequestBill}
-              className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black transition-all duration-300 active:scale-95 ${billRequested
-                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                  : "bg-slate-900 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] hover:bg-slate-800"
-                }`}
-            >
-              {requestingBill ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Processing...
-                </span>
-              ) : billRequested ? (
-                <>
-                  <CheckCircle className="h-4 w-4" />
-                  Bill Requested
-                </>
-              ) : (
-                <>
-                  <Receipt className="h-4 w-4" />
-                  Request Bill
-                </>
-              )}
-            </button>
+            {tabCounts.completed > 0 ? (
+              <button
+                type="button"
+                disabled={requestingBill || billRequested}
+                onClick={handleRequestBill}
+                className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black transition-all duration-300 active:scale-95 ${billRequested
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                    : "bg-slate-900 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] hover:bg-slate-800"
+                  }`}
+              >
+                {requestingBill ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Processing...
+                  </span>
+                ) : billRequested ? (
+                  <>
+                    <CheckCircle className="h-4 w-4" />
+                    Bill Requested
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="h-4 w-4" />
+                    Request Bill
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  const menuPath = effectiveQrAccessKey
+                    ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
+                    : `/menu/${restaurantId}/table/${tableNumber}`;
+                  navigate(menuPath);
+                }}
+                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-6 text-sm font-black text-white shadow-[0_14px_28px_rgba(249,115,22,0.2)] transition hover:bg-orange-600 active:scale-95"
+              >
+                <Plus className="h-4 w-4" />
+                Add Items
+              </button>
+            )}
           </div>
         </div>
       ) : (
