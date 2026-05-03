@@ -385,9 +385,16 @@ export default function TableMenu() {
     }
   }, []);
 
-  const handleFocusSearch = useCallback(() => {
-    setSearchPanelOpen(true);
-    searchInputRef.current?.focus();
+  const handleToggleSearch = useCallback(() => {
+    setSearchPanelOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      } else {
+        setSearchQuery("");
+      }
+      return next;
+    });
   }, []);
 
   const handleCloseSearch = useCallback(() => {
@@ -523,6 +530,7 @@ export default function TableMenu() {
     return (
       <div
         key={item.id}
+        id={`item-${item.id}`}
         className={`group box-border flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)] ${
           !item.is_available ? "opacity-55" : ""
         }`}
@@ -666,8 +674,8 @@ export default function TableMenu() {
           searchPanelOpen ? "pb-2" : "pb-0"
         }`}>
           <div
-            className={`overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all duration-300 ${
-              searchPanelOpen ? "max-h-24 opacity-100" : "max-h-0 border-transparent opacity-0"
+            className={`overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl transition-all duration-300 ${
+              searchPanelOpen ? "max-h-[80dvh] opacity-100" : "max-h-0 border-transparent opacity-0"
             }`}
           >
             <div className="p-3 sm:p-4">
@@ -678,7 +686,7 @@ export default function TableMenu() {
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Search dishes, ingredients, or category"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-sm outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-base outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
                 />
                 <button
                   type="button"
@@ -689,6 +697,38 @@ export default function TableMenu() {
                   <X className="h-4 w-4" />
                 </button>
               </div>
+
+              {searchQuery.length > 0 && (
+                <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <p className="px-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                    Quick Suggestions
+                  </p>
+                  <div className="max-h-60 overflow-y-auto no-scrollbar pb-1">
+                    {visibleTiles.slice(0, 6).map((tile) => (
+                      <button
+                        key={tile.item.id}
+                        onClick={() => {
+                          setSearchQuery(tile.item.name);
+                          setTimeout(() => handleScrollTo(`item-${tile.item.id}`), 100);
+                        }}
+                        className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm transition hover:bg-slate-50 active:bg-slate-100"
+                      >
+                        <span className="font-semibold text-slate-700">{tile.item.name}</span>
+                        {tile.categoryName && (
+                          <span className="rounded-md bg-orange-50 px-2 py-1 text-[9px] font-black uppercase text-orange-500 ring-1 ring-orange-100">
+                            {tile.categoryName}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                    {visibleTiles.length === 0 && (
+                      <p className="py-6 text-center text-xs font-medium italic text-slate-400">
+                        No matches for "{searchQuery}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -806,7 +846,7 @@ export default function TableMenu() {
 
           <button
             type="button"
-            onClick={handleFocusSearch}
+            onClick={handleToggleSearch}
             className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Search className="h-5 w-5" />
@@ -928,7 +968,7 @@ export default function TableMenu() {
                   className="flex min-h-12 w-full items-center justify-between px-5 py-3 text-left text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-6"
                   onClick={() => {
                     setProfileDrawerOpen(false);
-                    handleFocusSearch();
+                    handleToggleSearch();
                   }}
                 >
                   <span>Search menu</span>
