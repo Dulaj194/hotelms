@@ -8,6 +8,7 @@ import {
   Minus,
   Pencil,
   Plus,
+  Receipt,
   ShoppingBag,
   Sparkles,
   Tag,
@@ -20,6 +21,9 @@ import {
   getGuestQrAccessKey,
   setGuestQrAccessKey,
 } from "@/hooks/useGuestSession";
+import {
+  fetchGuestSessionJson,
+} from "@/features/public/tableSession";
 import { useLocalTableCart } from "@/hooks/useLocalMenuCart";
 import { toAssetUrl } from "@/lib/assets";
 import { publicGet } from "@/lib/publicApi";
@@ -81,6 +85,8 @@ export default function TableCartCheckout() {
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [requestingBill, setRequestingBill] = useState(false);
+  const [billRequested, setBillRequested] = useState(false);
 
   const customerName =
     restaurantContextId && tableNumber
@@ -217,8 +223,6 @@ export default function TableCartCheckout() {
 
   const handlePlaceOrder = useCallback(async () => {
     if (!restaurantId || !tableNumber || itemCount <= 0) return;
-    const targetRestaurantId = restaurantId;
-    const targetTableNumber = tableNumber;
 
     try {
       await placeOrder(
@@ -226,18 +230,6 @@ export default function TableCartCheckout() {
       );
       
       setShowSuccess(true);
-      
-      setTimeout(() => {
-        if (!targetRestaurantId || !targetTableNumber) {
-          navigate("/");
-          return;
-        }
-        const base = `/orders/my/${targetRestaurantId}/${targetTableNumber}`;
-        const finalPath = effectiveQrAccessKey 
-          ? `${base}?k=${encodeURIComponent(effectiveQrAccessKey)}` 
-          : base;
-        navigate(finalPath);
-      }, 1200);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to place order.";
       if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
@@ -246,7 +238,22 @@ export default function TableCartCheckout() {
         setPlaceError(msg);
       }
     }
-  }, [appliedCoupon, itemCount, navigate, placeOrder, qrAccessKey, restaurantId, tableNumber]);
+  }, [appliedCoupon, itemCount, placeOrder, restaurantId, tableNumber]);
+
+  const handleRequestBill = useCallback(async () => {
+    setRequestingBill(true);
+    try {
+      await fetchGuestSessionJson("/table-sessions/my/request-bill", {
+        method: "POST",
+      });
+      setBillRequested(true);
+    } catch (err) {
+      console.error("Failed to request bill:", err);
+      // For now, don't show error to user, just log
+    } finally {
+      setRequestingBill(false);
+    }
+  }, []);
 
   const renderImage = (item: MenuItemWithCategory | undefined, name: string) => {
     const imageUrl = getItemImage(item);
@@ -394,12 +401,60 @@ export default function TableCartCheckout() {
       {/* Success Overlay */}
       {showSuccess && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white/90 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="text-center animate-in zoom-in-95 duration-500">
+          <div className="mx-auto w-full max-w-sm px-4 text-center animate-in zoom-in-95 duration-500">
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
               <Check className="h-10 w-10 stroke-[3]" />
             </div>
             <h2 className="text-2xl font-black text-slate-900">Order Confirmed!</h2>
-            <p className="mt-2 text-slate-500">Sending you to your order list...</p>
+            <p className="mt-2 text-slate-500">Your order has been placed successfully.</p>
+            
+            <div className="mt-6 space-y-3">
+              <button
+                type="button"
+                disabled={requestingBill || billRequested}
+                onClick={handleRequestBill}
+                className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black transition-all duration-300 active:scale-95 ${
+                  billRequested
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                    : "bg-slate-900 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] hover:bg-slate-800"
+                }`}
+              >
+                {requestingBill ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Processing...
+                  </span>
+                ) : billRequested ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Bill Requested
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="h-4 w-4" />
+                    Request Bill
+                  </>
+                )}
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  if (!restaurantId || !tableNumber) {
+                    navigate("/");
+                    return;
+                  }
+                  const base = `/orders/my/${restaurantId}/${tableNumber}`;
+                  const finalPath = effectiveQrAccessKey 
+                    ? `${base}?k=${encodeURIComponent(effectiveQrAccessKey)}` 
+                    : base;
+                  navigate(finalPath);
+                }}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-orange-500 px-6 text-sm font-black text-white shadow-[0_14px_28px_rgba(249,115,22,0.28)] transition hover:bg-orange-600 active:scale-95"
+              >
+                View My Orders
+              </button>
+            </div>
           </div>
         </div>
       )}
