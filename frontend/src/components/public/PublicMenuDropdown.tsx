@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronRight, Menu as MenuIcon, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Menu as MenuIcon, X, Tag } from "lucide-react";
+import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import type { PublicMenuResponse } from "@/types/publicMenu";
 
 interface PublicMenuDropdownProps {
@@ -46,13 +47,14 @@ export default function PublicMenuDropdown({
     if (!isDragging.current) return;
     const deltaY = e.touches[0].clientY - startY.current;
     if (deltaY > 0) {
-      setDragY(deltaY);
+      // Add resistance to make it feel more deliberate (less "fast")
+      setDragY(deltaY * 0.6);
     }
   };
 
   const handleTouchEnd = () => {
     isDragging.current = false;
-    if (dragY > 100) {
+    if (dragY > 180) { // Increased threshold for a more deliberate swipe
       onClose();
     } else {
       setDragY(0);
@@ -102,17 +104,17 @@ export default function PublicMenuDropdown({
                 onSelectCategory(null);
                 onClose();
               }}
-              className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-300 ${
+              className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ${
                 activeCategoryId === null 
                 ? "border-orange-500 bg-orange-50 text-orange-600 shadow-sm ring-1 ring-orange-500/20" 
                 : "border-slate-100 bg-slate-50 text-slate-700 hover:border-slate-200"
               }`}
             >
-              <div className="flex items-center gap-3.5">
-                <div className={`p-2.5 rounded-xl ${activeCategoryId === null ? "bg-orange-500 text-white" : "bg-white text-slate-400 border border-slate-100 shadow-sm"}`}>
+              <div className="flex items-center gap-3">
+                <div className={`grid h-10 w-10 place-items-center rounded-xl ${activeCategoryId === null ? "bg-orange-500 text-white" : "bg-white text-slate-400 border border-slate-100 shadow-sm"}`}>
                   <MenuIcon className="w-4.5 h-4.5" />
                 </div>
-                <span className="font-bold text-[15px]">All Categories</span>
+                <span className="font-bold text-[14px]">All Categories</span>
               </div>
               <ChevronRight className={`w-4 h-4 transition-transform ${activeCategoryId === null ? "translate-x-1" : "text-slate-300"}`} />
             </button>
@@ -137,7 +139,7 @@ export default function PublicMenuDropdown({
                 </button>
 
                 {expandedMenuId === menuSection.id && (
-                  <div className="grid grid-cols-2 gap-2 p-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex flex-col gap-1.5 p-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
                     {menuSection.categories.map((category) => (
                       <button
                         key={category.id}
@@ -145,14 +147,28 @@ export default function PublicMenuDropdown({
                           onSelectCategory(category.id);
                           onClose();
                         }}
-                        className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-300 text-left ${
+                        className={`flex items-center gap-3.5 p-3 rounded-xl border transition-all duration-300 text-left ${
                           activeCategoryId === category.id
                           ? "border-orange-500 bg-orange-50 text-orange-600 shadow-sm ring-1 ring-orange-500/10"
                           : "border-slate-100 bg-white text-slate-600 hover:border-orange-200 hover:bg-orange-50/20"
                         }`}
                       >
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${activeCategoryId === category.id ? "bg-orange-500 animate-pulse" : "bg-slate-200"}`} />
-                        <span className="font-bold text-[13px] truncate">{category.name}</span>
+                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-100">
+                          <SafeMenuAsset
+                            path={category.image_path}
+                            alt={category.name}
+                            className="h-full w-full object-cover"
+                            fallbackClassName="flex h-full w-full items-center justify-center bg-slate-50 text-slate-300"
+                            fallback={<Tag className="h-4 w-4" />}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="block font-bold text-[14px] leading-tight text-slate-700 truncate">{category.name}</span>
+                          <span className="block mt-0.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                            {category.items?.length ?? 0} items
+                          </span>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-300" />
                       </button>
                     ))}
                   </div>
@@ -164,7 +180,7 @@ export default function PublicMenuDropdown({
             {menu.uncategorized_categories && menu.uncategorized_categories.length > 0 && (
                 <div className="space-y-2 pt-3 border-t border-slate-100">
                     <h3 className="px-2 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Other Categories</h3>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-col gap-1.5">
                         {menu.uncategorized_categories.map((category) => (
                             <button
                                 key={category.id}
@@ -172,14 +188,28 @@ export default function PublicMenuDropdown({
                                     onSelectCategory(category.id);
                                     onClose();
                                 }}
-                                className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-300 text-left ${
+                                className={`flex items-center gap-3.5 p-3 rounded-xl border transition-all duration-300 text-left ${
                                     activeCategoryId === category.id
                                     ? "border-orange-500 bg-orange-50 text-orange-600 shadow-sm ring-1 ring-orange-500/10"
                                     : "border-slate-100 bg-white text-slate-600 hover:border-orange-200 hover:bg-orange-50/20"
                                 }`}
                             >
-                                <div className={`w-2 h-2 rounded-full shrink-0 ${activeCategoryId === category.id ? "bg-orange-500 animate-pulse" : "bg-slate-200"}`} />
-                                <span className="font-bold text-[13px] truncate">{category.name}</span>
+                                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-slate-50 ring-1 ring-slate-100">
+                                  <SafeMenuAsset
+                                    path={category.image_path}
+                                    alt={category.name}
+                                    className="h-full w-full object-cover"
+                                    fallbackClassName="flex h-full w-full items-center justify-center bg-slate-50 text-slate-300"
+                                    fallback={<Tag className="h-4 w-4" />}
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <span className="block font-bold text-[14px] leading-tight text-slate-700 truncate">{category.name}</span>
+                                  <span className="block mt-0.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                                    {category.items?.length ?? 0} items
+                                  </span>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-slate-300" />
                             </button>
                         ))}
                     </div>
