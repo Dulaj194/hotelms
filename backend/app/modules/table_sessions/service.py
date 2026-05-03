@@ -150,3 +150,9 @@ def request_bill(
     except SQLAlchemyError:
         db.rollback()
         raise
+def list_bill_requests(
+    db: Session,
+    restaurant_id: int,
+) -> list[TableSession]:
+    """Return all active sessions with status BILL_REQUESTED."""
+    return repository.list_bill_requests_for_restaurant(db, restaurant_id)

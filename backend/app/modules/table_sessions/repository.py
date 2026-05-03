@@ -190,3 +190,20 @@ def close_session_by_id(
         session.session_status = TableSessionStatus.CLOSED
         db.flush()
     return session
+def list_bill_requests_for_restaurant(
+    db: Session,
+    restaurant_id: int,
+) -> list[TableSession]:
+    """Return all active sessions that have requested a bill."""
+    now = datetime.now(UTC)
+    return (
+        db.query(TableSession)
+        .filter(
+            TableSession.restaurant_id == restaurant_id,
+            TableSession.is_active.is_(True),
+            TableSession.session_status == TableSessionStatus.BILL_REQUESTED,
+            TableSession.expires_at > now,
+        )
+        .order_by(TableSession.updated_at.desc())
+        .all()
+    )

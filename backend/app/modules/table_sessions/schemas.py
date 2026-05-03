@@ -45,3 +45,16 @@ class GuestSessionInfoResponse(BaseModel):
     table_number: str
     expires_at: datetime
     is_active: bool
+
+
+class BillRequestResponse(BaseModel):
+    session_id: str
+    table_number: str
+    customer_name: str | None
+    requested_at: datetime = Field(alias="updated_at")
+
+    model_config = {"from_attributes": True, "populate_by_name": True}
+
+
+class BillRequestListResponse(BaseModel):
+    requests: list[BillRequestResponse]

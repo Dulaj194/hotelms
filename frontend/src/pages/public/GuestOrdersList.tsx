@@ -38,7 +38,7 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
-const POLL_INTERVAL_MS = 3_000;
+const POLL_INTERVAL_MS = 5_000;
 
 export default function GuestOrdersList() {
   const navigate = useNavigate();
@@ -297,11 +297,10 @@ export default function GuestOrdersList() {
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
-                  className={`rounded-xl px-2 py-2 text-xs font-bold transition sm:text-sm ${
-                    isActive
+                  className={`rounded-xl px-2 py-2 text-xs font-bold transition sm:text-sm ${isActive
                       ? "bg-rose-500 text-white shadow-sm"
                       : "text-slate-600 hover:bg-rose-50 hover:text-rose-600"
-                  }`}
+                    }`}
                 >
                   {TAB_LABEL[tab]} ({tabCounts[tab]})
                 </button>
@@ -383,9 +382,8 @@ export default function GuestOrdersList() {
 
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                          ORDER_STATUS_COLOR[order.status]
-                        }`}
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${ORDER_STATUS_COLOR[order.status]
+                          }`}
                       >
                         {ORDER_STATUS_LABEL[order.status]}
                       </span>
@@ -425,7 +423,7 @@ export default function GuestOrdersList() {
       </main>
 
 
-    {/* Senior Engineer Billing Dashboard - Sticky Footer */}
+      {/* Senior Engineer Billing Dashboard - Sticky Footer */}
       {orders.length > 0 ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/95 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-12px_30px_rgba(15,23,42,0.10)] backdrop-blur-xl">
           <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4">
@@ -443,11 +441,10 @@ export default function GuestOrdersList() {
               type="button"
               disabled={requestingBill || billRequested}
               onClick={handleRequestBill}
-              className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black transition-all duration-300 active:scale-95 ${
-                billRequested
+              className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black transition-all duration-300 active:scale-95 ${billRequested
                   ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
                   : "bg-slate-900 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] hover:bg-slate-800"
-              }`}
+                }`}
             >
               {requestingBill ? (
                 <span className="flex items-center gap-2">
