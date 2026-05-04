@@ -25,20 +25,20 @@ type ServiceAction = {
 
 const SERVICE_ACTIONS: ServiceAction[] = [
   {
+    id: "BILL",
+    label: "Request Bill",
+    icon: <Receipt className="h-6 w-6" />,
+    color: "text-white",
+    bgColor: "bg-orange-500",
+    description: "Ready to pay and checkout",
+  },
+  {
     id: "WATER",
     label: "Request Water",
     icon: <Droplets className="h-6 w-6" />,
     color: "text-blue-600",
     bgColor: "bg-blue-50",
     description: "Cold or normal water for the table",
-  },
-  {
-    id: "BILL",
-    label: "Request Bill",
-    icon: <Receipt className="h-6 w-6" />,
-    color: "text-emerald-600",
-    bgColor: "bg-emerald-50",
-    description: "Ready to pay and checkout",
   },
   {
     id: "STEWARD",
@@ -97,7 +97,25 @@ export default function QuickServiceDrawer({
   isSubmitting,
   lastRequestedType,
 }: QuickServiceDrawerProps) {
+  const touchStartRef = React.useRef<number | null>(null);
+
   if (!isOpen) return null;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = e.targetTouches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartRef.current === null) return;
+    const touchEnd = e.changedTouches[0].clientY;
+    const diff = touchEnd - touchStartRef.current;
+
+    // If swiped down more than 100px, close the drawer
+    if (diff > 100) {
+      onClose();
+    }
+    touchStartRef.current = null;
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col justify-end overflow-hidden">
@@ -108,7 +126,11 @@ export default function QuickServiceDrawer({
       />
 
       {/* Drawer Panel */}
-      <div className="relative z-10 flex max-h-[85dvh] w-full flex-col rounded-t-[2.5rem] bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.2)] transition-transform animate-in slide-in-from-bottom-full duration-500 ease-out">
+      <div 
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="relative z-10 flex max-h-[85dvh] w-full flex-col rounded-t-[2.5rem] bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.2)] transition-transform animate-in slide-in-from-bottom-full duration-500 ease-out"
+      >
         {/* Handle */}
         <div className="flex w-full justify-center py-4">
           <div className="h-1.5 w-12 rounded-full bg-slate-200" />
@@ -139,6 +161,7 @@ export default function QuickServiceDrawer({
             {SERVICE_ACTIONS.map((action) => {
               const isProcessing = isSubmitting && lastRequestedType === action.id;
               const isSuccess = !isSubmitting && lastRequestedType === action.id;
+              const isBill = action.id === "BILL";
 
               return (
                 <button
@@ -148,19 +171,25 @@ export default function QuickServiceDrawer({
                   className={`group relative flex w-full items-center gap-4 rounded-2xl border-2 p-4 transition-all duration-300 active:scale-[0.98] ${
                     isSuccess
                       ? "border-emerald-500 bg-emerald-50/50"
-                      : "border-slate-50 bg-white hover:border-orange-100 hover:bg-orange-50/30"
+                      : isBill 
+                        ? "border-orange-200 bg-orange-50/30 hover:border-orange-300 hover:bg-orange-50/50 shadow-sm"
+                        : "border-slate-50 bg-white hover:border-orange-100 hover:bg-orange-50/30"
                   }`}
                 >
                   <div
-                    className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl transition-transform duration-300 group-hover:scale-110 ${action.bgColor} ${action.color}`}
+                    className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl transition-transform duration-300 group-hover:scale-110 shadow-sm ${action.bgColor} ${action.color}`}
                   >
                     {action.icon}
                   </div>
                   <div className="flex-1 text-left">
-                    <p className="text-[15px] font-bold text-slate-900">{action.label}</p>
-                    <p className="text-xs font-medium text-slate-500">{action.description}</p>
+                    <p className={`text-[15px] font-bold ${isBill ? "text-orange-700" : "text-slate-900"}`}>
+                      {action.label}
+                    </p>
+                    <p className={`text-xs font-medium ${isBill ? "text-orange-600/70" : "text-slate-500"}`}>
+                      {action.description}
+                    </p>
                   </div>
-                  <div className="shrink-0 text-slate-300 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-orange-400">
+                  <div className={`shrink-0 transition-transform duration-300 group-hover:translate-x-1 ${isBill ? "text-orange-400" : "text-slate-300"}`}>
                     {isProcessing ? (
                       <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
                     ) : isSuccess ? (
