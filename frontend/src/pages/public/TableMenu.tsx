@@ -99,7 +99,6 @@ export default function TableMenu() {
   const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);
   const [isRequestingService, setIsRequestingService] = useState(false);
   const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
-  const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
   const categoryRailShellRef = useRef<HTMLDivElement>(null);
   const lastMenuScrollYRef = useRef(0);
   const menuScrollFrameRef = useRef<number | null>(null);
@@ -179,12 +178,11 @@ export default function TableMenu() {
   }, [featuredBannerPaths.length]);
 
   useEffect(() => {
-    const topRevealOffset = 40;
-    const scrollDeltaThreshold = 15; // Increased for better stability
+    const scrollDeltaThreshold = 15;
 
     lastMenuScrollYRef.current = window.scrollY;
 
-    if (!categoryRailAutoHideEnabled || searchPanelOpen) {
+    if (searchPanelOpen) {
       setHeaderVisible(true);
       return;
     }
@@ -194,25 +192,15 @@ export default function TableMenu() {
       const lastScrollY = lastMenuScrollYRef.current;
       const scrollDelta = currentScrollY - lastScrollY;
 
-      const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
-
-      // Senior Engineer Approach: Prevent jittering when reaching the top or bottom
-      if (currentScrollY <= topRevealOffset) {
-        setHeaderVisible(true);
-        lastMenuScrollYRef.current = currentScrollY;
-        menuScrollFrameRef.current = null;
-        return;
-      }
-
-      // Prevent header flip-flopping at the very bottom of the page
-      if (currentScrollY + windowHeight >= documentHeight - 50) {
-        menuScrollFrameRef.current = null;
-        return;
-      }
-
+      // Only toggle if we've scrolled more than the threshold
       if (Math.abs(scrollDelta) >= scrollDeltaThreshold) {
-        setHeaderVisible(scrollDelta < 0);
+        // scrollDelta > 0 means scrolling down the page (content moves up)
+        // In this state, we want to HIDE the header.
+        if (scrollDelta > 0 && currentScrollY > 100) {
+          setHeaderVisible(false);
+        } else if (scrollDelta < 0) {
+          setHeaderVisible(true);
+        }
         lastMenuScrollYRef.current = currentScrollY;
       }
 
@@ -232,7 +220,7 @@ export default function TableMenu() {
         window.cancelAnimationFrame(menuScrollFrameRef.current);
       }
     };
-  }, [categoryRailAutoHideEnabled, searchPanelOpen]);
+  }, [searchPanelOpen]);
 
   useEffect(() => {
     if (featuredBannerPaths.length <= 1) {
@@ -259,70 +247,7 @@ export default function TableMenu() {
     });
   }, [flattenedTiles, searchQuery]);
 
-  useEffect(() => {
-    const scrollableContentBuffer = 24;
-    let frameId: number | null = null;
 
-    const updateCategoryRailMode = () => {
-      const menuContent = document.getElementById("menu-content");
-      const header = document.getElementById("menu-top");
-      const railHeight = categoryRailShellRef.current?.offsetHeight ?? 0;
-      const headerHeightWithoutRail = Math.max(0, (header?.offsetHeight ?? 0) - railHeight);
-      const menuContentHeight = menuContent?.scrollHeight ?? document.documentElement.scrollHeight;
-      const menuContentStyle = menuContent ? window.getComputedStyle(menuContent) : null;
-      const menuBottomPadding = menuContentStyle
-        ? Number.parseFloat(menuContentStyle.paddingBottom || "0")
-        : 0;
-      const usableContentHeight =
-        headerHeightWithoutRail + Math.max(0, menuContentHeight - menuBottomPadding);
-      const canAutoHide = usableContentHeight > window.innerHeight + scrollableContentBuffer;
-
-      setCategoryRailAutoHideEnabled(canAutoHide);
-      if (!canAutoHide) {
-        setHeaderVisible(true);
-      }
-
-      frameId = null;
-    };
-
-    const scheduleCategoryRailModeUpdate = () => {
-      if (frameId !== null) return;
-      frameId = window.requestAnimationFrame(updateCategoryRailMode);
-    };
-
-    scheduleCategoryRailModeUpdate();
-    window.addEventListener("resize", scheduleCategoryRailModeUpdate);
-    window.addEventListener("orientationchange", scheduleCategoryRailModeUpdate);
-
-    const resizeObserver =
-      typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(scheduleCategoryRailModeUpdate)
-        : null;
-
-    const menuContent = document.getElementById("menu-content");
-    if (resizeObserver) {
-      resizeObserver.observe(document.body);
-      if (menuContent) {
-        resizeObserver.observe(menuContent);
-      }
-    }
-
-    return () => {
-      window.removeEventListener("resize", scheduleCategoryRailModeUpdate);
-      window.removeEventListener("orientationchange", scheduleCategoryRailModeUpdate);
-      resizeObserver?.disconnect();
-      if (frameId !== null) {
-        window.cancelAnimationFrame(frameId);
-      }
-    };
-  }, [
-    activeCategoryId,
-    featuredBannerPaths.length,
-    searchPanelOpen,
-    searchQuery,
-    visibleCategories.length,
-    visibleTiles.length,
-  ]);
 
   useEffect(() => {
     if (!restaurantId || !tableNumber) return;
@@ -421,7 +346,6 @@ export default function TableMenu() {
     setSearchPanelOpen((prev) => {
       const next = !prev;
       if (next) {
-        setHeaderVisible(true);
         setTimeout(() => searchInputRef.current?.focus(), 50);
       } else {
         setSearchQuery("");
@@ -742,138 +666,114 @@ export default function TableMenu() {
 
   return (
     <div className="box-border min-h-dvh w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900 pb-[env(safe-area-inset-bottom,0px)]">
-      <header id="menu-top" className={`fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top,0px)] transition-transform duration-500 ease-in-out ${
-        headerVisible ? "translate-y-0" : "-translate-y-16"
-      }`}>
-        <div className="mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 sm:px-5 lg:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <SafeMenuAsset
-              path={menu.restaurant.logo_url}
-              alt={menu.restaurant.name}
-              className="h-11 w-11 rounded-2xl object-cover ring-1 ring-slate-200"
-              fallbackClassName="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-slate-900 text-white"
-              fallback={
-                <Store className="h-5 w-5" />
-              }
-            />
-
-            <div className="min-w-0">
-              <p className="truncate text-lg font-black leading-tight text-slate-900">
-                {menu.restaurant.name}
-              </p>
-              {(guestName || displayTableNumber) && (
-                <div className="mt-0.5 flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-500">
-                  {guestName && <span className="min-w-0 truncate">{guestName}</span>}
-                  {displayTableNumber && (
-                    <span className="shrink-0 text-slate-400">Table {displayTableNumber}</span>
-                  )}
-                </div>
-              )}
+      <header id="menu-top" className="fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-lg backdrop-blur-md transition-all duration-300 ease-in-out">
+        {/* Top Bar */}
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          headerVisible ? "h-16 opacity-100" : "h-0 opacity-0"
+        }`}>
+          <div className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center justify-between gap-3 px-4 sm:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <SafeMenuAsset
+                path={menu.restaurant.logo_url}
+                alt={menu.restaurant.name}
+                className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200"
+                fallback={<Store className="h-5 w-5" />}
+              />
+              <div className="min-w-0">
+                <p className="truncate text-base font-black text-slate-900">{menu.restaurant.name}</p>
+                <p className="text-[10px] font-bold text-slate-500">Table {displayTableNumber}</p>
+              </div>
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
             <button
               onClick={() => setProfileDrawerOpen(true)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-900 transition hover:bg-slate-200"
-              aria-label="Open profile menu"
+              className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200"
             >
               <UserRound className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        <div className={`mx-auto box-border w-full max-w-[min(72rem,100%)] min-w-0 px-4 transition-all duration-300 sm:px-5 lg:px-6 ${
-          searchPanelOpen ? "pb-2" : "pb-0"
+        {/* Search Panel - Drops down and pushes content */}
+        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          searchPanelOpen ? "max-h-[80dvh] opacity-100" : "max-h-0 opacity-0"
         }`}>
-          <div
-            className={`overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl transition-all duration-300 ${
-              searchPanelOpen ? "max-h-[80dvh] opacity-100" : "max-h-0 border-transparent opacity-0"
-            }`}
-          >
-            <div className="p-3 sm:p-4">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  ref={searchInputRef}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      searchInputRef.current?.blur();
-                    }
-                  }}
-                  placeholder="Search dishes, ingredients, or category"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-base outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
-                />
-                <button
-                  type="button"
-                  onClick={handleCloseSearch}
-                  className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                  aria-label="Close search"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {searchQuery.length > 0 && (
-                <div className="mt-4 max-h-[calc(70dvh-100px)] overflow-y-auto no-scrollbar pb-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="mb-3 flex items-center justify-between px-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                      Search Results ({visibleTiles.length})
-                    </p>
-                    <button 
-                      onClick={() => setSearchQuery("")}
-                      className="text-[10px] font-bold uppercase text-orange-500 hover:text-orange-600"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                  
-                  {visibleTiles.length === 0 ? (
-                    <div className="py-12 text-center">
-                      <p className="text-sm font-medium text-slate-400">No matches for "{searchQuery}"</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {visibleTiles.map((tile) => (
-                        <button
-                          key={tile.item.id}
-                          onClick={() => {
-                            handleCloseSearch();
-                            setTimeout(() => handleScrollTo(`item-${tile.item.id}`), 150);
-                          }}
-                          className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-2 text-left transition hover:border-orange-200 hover:bg-white hover:shadow-md"
-                        >
-                          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl">
-                            <SafeMenuAsset
-                              path={tile.item.image_path}
-                              alt={tile.item.name}
-                              className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
-                              fallback={<UtensilsCrossed className="h-6 w-6 text-slate-300" />}
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-bold text-slate-900">{tile.item.name}</p>
-                            <div className="mt-0.5 flex items-center gap-2">
-                              <span className="text-xs font-black text-orange-600">${tile.item.price.toFixed(2)}</span>
-                              <span className="truncate text-[10px] font-medium text-slate-400">{tile.categoryName}</span>
-                            </div>
-                          </div>
-                          <ChevronRight className="mr-1 h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-orange-500" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+          <div className="mx-auto w-full max-w-[min(72rem,100%)] px-4 py-3 sm:px-6">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && searchInputRef.current?.blur()}
+                placeholder="Search dishes, ingredients, or category"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
+              />
+              <button
+                onClick={handleCloseSearch}
+                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
+
+            {searchQuery.length > 0 && (
+              <div className="mt-4 max-h-[calc(70dvh-100px)] overflow-y-auto no-scrollbar pb-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                    Search Results ({visibleTiles.length})
+                  </p>
+                  <button 
+                    onClick={() => setSearchQuery("")}
+                    className="text-[10px] font-bold uppercase text-orange-500 hover:text-orange-600"
+                  >
+                    Clear
+                  </button>
+                </div>
+                
+                {visibleTiles.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <p className="text-sm font-medium text-slate-400">No matches for "{searchQuery}"</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {visibleTiles.map((tile) => (
+                      <button
+                        key={tile.item.id}
+                        onClick={() => {
+                          handleCloseSearch();
+                          setTimeout(() => handleScrollTo(`item-${tile.item.id}`), 150);
+                        }}
+                        className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-2 text-left transition hover:border-orange-200 hover:bg-white hover:shadow-md"
+                      >
+                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl">
+                          <SafeMenuAsset
+                            path={tile.item.image_path}
+                            alt={tile.item.name}
+                            className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
+                            fallback={<UtensilsCrossed className="h-6 w-6 text-slate-300" />}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-slate-900">{tile.item.name}</p>
+                          <div className="mt-0.5 flex items-center gap-2">
+                            <span className="text-xs font-black text-orange-600">${tile.item.price.toFixed(2)}</span>
+                            <span className="truncate text-[10px] font-medium text-slate-400">{tile.categoryName}</span>
+                          </div>
+                        </div>
+                        <ChevronRight className="mr-1 h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-orange-500" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
+        {/* Category Bar */}
         <div
           ref={categoryRailShellRef}
-          className="mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center px-4 py-2 sm:px-5 lg:px-6"
+          className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center px-4 sm:px-6"
         >
           <div className="w-full">
             <MenuBrowserRail
@@ -1019,11 +919,7 @@ export default function TableMenu() {
           <button
             type="button"
             onClick={handleToggleSearch}
-            className={`flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold transition-all duration-300 min-[360px]:rounded-2xl min-[360px]:text-[11px] ${
-              searchPanelOpen 
-              ? "bg-orange-500 text-white shadow-md scale-105" 
-              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-            }`}
+            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition-all duration-300 active:scale-90 hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Search className="h-5 w-5" />
             <span className="max-w-full truncate">Search</span>
@@ -1058,20 +954,22 @@ export default function TableMenu() {
         </div>
       </div>
 
-      <PublicMenuDropdown
-        menu={menu}
-        activeCategoryId={activeCategoryId}
-        onSelectCategory={(id) => {
-          setActiveCategoryId(id);
-          if (id === null) {
-            handleScrollTo("menu-top");
-          } else {
-            handleScrollTo("menu-list");
-          }
-        }}
-        isOpen={menuDropdownOpen}
-        onClose={() => setMenuDropdownOpen(false)}
-      />
+      {menu && (
+        <PublicMenuDropdown
+          menu={menu}
+          activeCategoryId={activeCategoryId}
+          onSelectCategory={(id) => {
+            setActiveCategoryId(id);
+            if (id === null) {
+              handleScrollTo("menu-top");
+            } else {
+              handleScrollTo("menu-list");
+            }
+          }}
+          isOpen={menuDropdownOpen}
+          onClose={() => setMenuDropdownOpen(false)}
+        />
+      )}
 
       <QuickServiceDrawer
         isOpen={serviceDrawerOpen}
