@@ -822,12 +822,12 @@ export default function TableMenu() {
 
       <main
         id="menu-content"
-        className="mx-auto box-border flex w-full max-w-full flex-1 flex-col overflow-hidden"
+        className="mx-auto box-border flex w-full max-w-full flex-col"
       >
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className={`no-scrollbar flex h-full w-full overflow-x-auto overflow-y-hidden ${
+          className={`no-scrollbar flex w-full overflow-x-auto overflow-y-hidden ${
             searchQuery ? "pointer-events-none opacity-0" : "snap-x snap-mandatory"
           }`}
         >
@@ -855,7 +855,7 @@ export default function TableMenu() {
             return (
               <div
                 key={catId ?? "all"}
-                className="box-border h-full w-full shrink-0 snap-start overflow-y-auto px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6"
+                className="box-border w-full shrink-0 snap-start px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6"
               >
                 <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
                   {/* Banner Only on "All" View */}
@@ -930,7 +930,7 @@ export default function TableMenu() {
 
         {/* Search Results Overlay (Only when searching) */}
         {searchQuery && (
-          <div className="absolute inset-x-0 bottom-0 top-0 z-20 overflow-y-auto bg-slate-50 px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6">
+          <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-50 px-4 py-3 pb-32 pt-24 no-scrollbar sm:px-5 lg:px-6">
             <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-black tracking-tight text-slate-900">Search results</h2>
