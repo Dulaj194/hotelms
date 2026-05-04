@@ -81,8 +81,6 @@ export default function TableMenu() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isScrollingRef = useRef(false);
   const [guestNameInput, setGuestNameInput] = useState("");
   const [guestName, setGuestName] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -119,19 +117,7 @@ export default function TableMenu() {
     visibleCategories,
   } = usePublicMenuBrowser(menu);
 
-  const navigationItems = useMemo(() => [null, ...visibleCategories], [visibleCategories]);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (isScrollingRef.current || searchPanelOpen || searchQuery) return;
-    const scrollLeft = e.currentTarget.scrollLeft;
-    const width = e.currentTarget.clientWidth;
-    if (width === 0) return;
-    const index = Math.round(scrollLeft / width);
-    const targetId = navigationItems[index]?.id ?? null;
-    if (targetId !== activeCategoryId) {
-      setActiveCategoryId(targetId);
-    }
-  };
 
   const handleCategorySelect = (categoryId: number | null) => {
     setActiveCategoryId(categoryId);
