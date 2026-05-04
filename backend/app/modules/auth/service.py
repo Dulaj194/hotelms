@@ -200,6 +200,19 @@ def _revoke_presented_refresh_session(
         return
 
 
+def _get_access_token_expire_minutes(role: str) -> int:
+    """Return custom access token expiry based on role.
+    
+    Group A (Admin/Finance): 1 hour (60 mins)
+    Group B (Operations): 5 hours (300 mins)
+    """
+    if role in {UserRole.super_admin, UserRole.admin, UserRole.accountant, UserRole.cashier, UserRole.owner}:
+        return 60
+    if role in {UserRole.housekeeper, UserRole.steward}:
+        return 300
+    return settings.access_token_expire_minutes
+
+
 def _build_access_payload(
     user_id: int,
     role: str,
@@ -702,7 +715,8 @@ def login(
 
     session_id = str(uuid.uuid4())
     access_token = create_access_token(
-        _build_access_payload(user.id, user.role.value, user.restaurant_id, user.must_change_password)
+        _build_access_payload(user.id, user.role.value, user.restaurant_id, user.must_change_password),
+        expire_minutes=_get_access_token_expire_minutes(user.role)
     )
     refresh_token_value = create_refresh_token(user.id, session_id)
 
@@ -901,7 +915,8 @@ def refresh(
     _set_refresh_cookie(response, new_refresh_token)
 
     new_access_token = create_access_token(
-        _build_access_payload(user.id, user.role.value, user.restaurant_id, user.must_change_password)
+        _build_access_payload(user.id, user.role.value, user.restaurant_id, user.must_change_password),
+        expire_minutes=_get_access_token_expire_minutes(user.role)
     )
 
     write_audit_log(

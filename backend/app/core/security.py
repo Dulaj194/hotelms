@@ -26,11 +26,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 # ─── JWT helpers ──────────────────────────────────────────────────────────────
 
-def create_access_token(payload: dict) -> str:
+def create_access_token(payload: dict, expire_minutes: int | None = None) -> str:
     """Create a short-lived JWT access token."""
     data = payload.copy()
     data["exp"] = datetime.now(UTC) + timedelta(
-        minutes=settings.access_token_expire_minutes
+        minutes=expire_minutes if expire_minutes is not None else settings.access_token_expire_minutes
     )
     data["type"] = "access"
     return jwt.encode(data, settings.secret_key, algorithm=settings.algorithm)
