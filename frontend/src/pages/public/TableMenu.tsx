@@ -811,8 +811,8 @@ export default function TableMenu() {
                 className="box-border h-full w-full shrink-0 snap-start overflow-y-auto px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6"
               >
                 <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
-                  {/* Banner Only on All or First Category */}
-                  {(catId === null || (visibleCategories.length > 0 && visibleCategories[0].id === catId)) && (
+                  {/* Banner Only on "All" View */}
+                  {catId === null && (
                     <section className="box-border w-full max-w-full min-w-0">
                       <div className="relative box-border min-h-[12.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13.5rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
                         {featuredBannerPaths.length > 0 && (
