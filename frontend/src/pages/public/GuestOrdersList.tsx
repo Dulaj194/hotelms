@@ -197,22 +197,26 @@ export default function GuestOrdersList() {
     };
   }, [sortedOrders]);
 
+  const tabs: OrdersFilterTab[] = ["active", "completed", "canceled"];
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (isScrollingRef.current) return;
-    const scrollLeft = e.currentTarget.scrollLeft;
-    const width = e.currentTarget.clientWidth;
-    if (width === 0) return;
-    const index = Math.round(scrollLeft / width);
-    const tabs: OrdersFilterTab[] = ["active", "completed", "canceled"];
-    if (tabs[index] && tabs[index] !== activeTab) {
-      setActiveTab(tabs[index]);
+    const { scrollLeft, clientWidth } = e.currentTarget;
+    if (clientWidth <= 0) return;
+
+    const index = Math.round(scrollLeft / clientWidth);
+    const targetTab = tabs[index];
+    if (targetTab && targetTab !== activeTab) {
+      setActiveTab(targetTab);
     }
   };
 
   const handleTabClick = (tab: OrdersFilterTab) => {
-    setActiveTab(tab);
-    const tabs: OrdersFilterTab[] = ["active", "completed", "canceled"];
     const index = tabs.indexOf(tab);
+    if (index === -1) return;
+
+    setActiveTab(tab);
+
     if (scrollRef.current) {
       isScrollingRef.current = true;
       const width = scrollRef.current.clientWidth;
@@ -220,10 +224,11 @@ export default function GuestOrdersList() {
         left: width * index,
         behavior: "smooth",
       });
-      // Reset the flag after animation
+
+      // Use a slightly longer timeout to ensure smooth scroll finishes
       setTimeout(() => {
         isScrollingRef.current = false;
-      }, 500);
+      }, 600);
     }
   };
 
@@ -321,7 +326,7 @@ export default function GuestOrdersList() {
 
 
           <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-rose-100 bg-white p-1.5 shadow-sm">
-            {(["active", "completed", "canceled"] as OrdersFilterTab[]).map((tab) => {
+            {tabs.map((tab) => {
               const isActive = tab === activeTab;
               return (
                 <button
@@ -342,131 +347,125 @@ export default function GuestOrdersList() {
       </header>
 
       <main className="mx-auto w-full max-w-lg pb-32">
-        {orders.length === 0 ? (
-          <div className="px-4 pt-4 sm:px-5 sm:pt-5">
-            <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-              <p className="mb-4 text-sm text-slate-500">No orders yet</p>
-              {restaurantId && tableNumber && (
-                <Link
-                  to={
-                    effectiveQrAccessKey
-                      ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
-                      : `/menu/${restaurantId}/table/${tableNumber}`
-                  }
-                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-500 px-4 text-sm font-semibold text-white transition hover:bg-rose-600"
-                >
-                  Place an order
-                </Link>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div
-            ref={scrollRef}
-            onScroll={handleScroll}
-            className="no-scrollbar flex overflow-x-auto snap-x snap-mandatory pt-4 sm:pt-5"
-          >
-            {(["active", "completed", "canceled"] as OrdersFilterTab[]).map((tab) => (
-              <div key={tab} className="w-full shrink-0 snap-start px-4 sm:px-5">
-                <div className="flex flex-col gap-3 pb-12 min-h-[60dvh]">
-                  {groupedOrders[tab].length === 0 ? (
-                    <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-                      <p className="text-sm font-medium text-slate-500">{emptyTabMessage[tab]}</p>
-                    </div>
-                  ) : (
-                    groupedOrders[tab].map((order) => {
-                      const primaryPreview = order.item_previews?.[0];
-                      const itemCount = order.item_previews?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="no-scrollbar flex overflow-x-auto snap-x snap-mandatory pt-4 sm:pt-5"
+        >
+          {tabs.map((tab) => (
+            <div key={tab} className="w-full shrink-0 snap-start px-4 sm:px-5">
+              <div className="flex flex-col gap-3 pb-12 min-h-[60dvh]">
+                {groupedOrders[tab].length === 0 ? (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                    <p className={`text-sm font-medium text-slate-500 ${tab === 'active' && orders.length === 0 ? 'mb-4' : ''}`}>
+                      {tab === 'active' && orders.length === 0 ? "No orders yet" : emptyTabMessage[tab]}
+                    </p>
+                    {tab === 'active' && orders.length === 0 && restaurantId && tableNumber && (
+                      <Link
+                        to={
+                          effectiveQrAccessKey
+                            ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
+                            : `/menu/${restaurantId}/table/${tableNumber}`
+                        }
+                        className="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-500 px-4 text-sm font-semibold text-white transition hover:bg-rose-600"
+                      >
+                        Place an order
+                      </Link>
+                    )}
+                  </div>
+                ) : (
+                  groupedOrders[tab].map((order) => {
+                    const primaryPreview = order.item_previews?.[0];
+                    const itemCount = order.item_previews?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
 
-                      return (
-                        <Link
-                          key={order.id}
-                          to={
-                            effectiveQrAccessKey
-                              ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(effectiveQrAccessKey)}`
-                              : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
-                          }
-                          className="rounded-3xl border border-rose-100 bg-white p-4 shadow-sm transition hover:border-rose-200 hover:shadow-md"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="shrink-0">
-                              {primaryPreview?.item_image_snapshot ? (
-                                <img
-                                  src={getItemImageUrl(primaryPreview.item_image_snapshot) ?? undefined}
-                                  alt={formatOrderItemTitle(order)}
-                                  className="h-16 w-16 rounded-2xl object-cover ring-1 ring-rose-100"
-                                  onError={(e) => {
-                                    const img = e.currentTarget;
-                                    img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3C/svg%3E";
-                                  }}
-                                />
-                              ) : (
-                                <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-[11px] font-semibold text-slate-400">
-                                  No img
-                                </div>
+                    return (
+                      <Link
+                        key={order.id}
+                        to={
+                          effectiveQrAccessKey
+                            ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(effectiveQrAccessKey)}`
+                            : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
+                        }
+                        className="rounded-3xl border border-rose-100 bg-white p-4 shadow-sm transition hover:border-rose-200 hover:shadow-md"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="shrink-0">
+                            {primaryPreview?.item_image_snapshot ? (
+                              <img
+                                src={getItemImageUrl(primaryPreview.item_image_snapshot) ?? undefined}
+                                alt={formatOrderItemTitle(order)}
+                                className="h-16 w-16 rounded-2xl object-cover ring-1 ring-rose-100"
+                                onError={(e) => {
+                                  const img = e.currentTarget;
+                                  img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3C/svg%3E";
+                                }}
+                              />
+                            ) : (
+                              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-[11px] font-semibold text-slate-400">
+                                No img
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="line-clamp-2 text-sm font-bold text-slate-900 sm:text-[15px]">
+                                {formatOrderItemTitle(order)}
+                              </p>
+                              <p className="shrink-0 text-sm font-extrabold text-rose-600">
+                                ${order.total_amount.toFixed(2)}
+                              </p>
+                            </div>
+
+                            <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+                              <span>{formatPlacedAt(order.placed_at)}</span>
+                              <span>x{itemCount || 1}</span>
+                            </div>
+
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${ORDER_STATUS_COLOR[order.status]
+                                  }`}
+                              >
+                                {ORDER_STATUS_LABEL[order.status]}
+                              </span>
+                              <span className="truncate text-[11px] text-slate-500">{formatBreakdownText(order)}</span>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {tab === "active" && (
+                                <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
+                                  Track order
+                                </span>
+                              )}
+                              {tab === "completed" && (
+                                <>
+                                  <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
+                                    Leave a review
+                                  </span>
+                                  {restaurantId && tableNumber && (
+                                    <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
+                                      Order again
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                              {tab === "canceled" && (
+                                <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold text-rose-600">
+                                  Order canceled
+                                </span>
                               )}
                             </div>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="line-clamp-2 text-sm font-bold text-slate-900 sm:text-[15px]">
-                                  {formatOrderItemTitle(order)}
-                                </p>
-                                <p className="shrink-0 text-sm font-extrabold text-rose-600">
-                                  ${order.total_amount.toFixed(2)}
-                                </p>
-                              </div>
-
-                              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
-                                <span>{formatPlacedAt(order.placed_at)}</span>
-                                <span>x{itemCount || 1}</span>
-                              </div>
-
-                              <div className="mt-2 flex items-center justify-between gap-2">
-                                <span
-                                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${ORDER_STATUS_COLOR[order.status]
-                                    }`}
-                                >
-                                  {ORDER_STATUS_LABEL[order.status]}
-                                </span>
-                                <span className="truncate text-[11px] text-slate-500">{formatBreakdownText(order)}</span>
-                              </div>
-
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {tab === "active" && (
-                                  <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
-                                    Track order
-                                  </span>
-                                )}
-                                {tab === "completed" && (
-                                  <>
-                                    <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
-                                      Leave a review
-                                    </span>
-                                    {restaurantId && tableNumber && (
-                                      <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
-                                        Order again
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                                {tab === "canceled" && (
-                                  <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold text-rose-600">
-                                    Order canceled
-                                  </span>
-                                )}
-                              </div>
-                            </div>
                           </div>
-                        </Link>
-                      );
-                    })
-                  )}
-                </div>
+                        </div>
+                      </Link>
+                    );
+                  })
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </main>
 
 
