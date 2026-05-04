@@ -1,5 +1,5 @@
-import { Check, X, Droplets, User, FileText, Wifi, Star, Sparkles, MessageSquare, Coffee } from "lucide-react";
-import { useState } from "react";
+import { Check, X, Droplets, User, FileText, Wifi, Star, Sparkles, MessageSquare } from "lucide-react";
+
 
 interface QuickServiceDrawerProps {
   isOpen: boolean;
