@@ -46,44 +46,33 @@ export default function PublicMenuDropdown({
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging.current) return;
     const deltaY = e.touches[0].clientY - startY.current;
-    
-    // Only allow dragging downwards
     if (deltaY > 0) {
-      // Apply a non-linear resistance for a premium feel
-      const resistance = 0.85;
-      setDragY(deltaY * resistance);
-    } else {
-      // Slight resistance for upward drag to prevent jerky movement
-      setDragY(deltaY * 0.1);
+      // Add resistance to make it feel more deliberate (less "fast")
+      setDragY(deltaY * 0.6);
     }
   };
 
   const handleTouchEnd = () => {
     isDragging.current = false;
-    // Lower threshold for a more responsive feel
-    if (dragY > 120) { 
+    if (dragY > 180) { // Increased threshold for a more deliberate swipe
       onClose();
     } else {
       setDragY(0);
     }
   };
 
-  // Calculate backdrop opacity based on drag distance
-  const backdropOpacity = Math.max(0.1, 0.5 - (dragY / 1000));
-
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col justify-end overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex flex-col justify-end bg-black/50 backdrop-blur-[2px] transition-opacity duration-300">
       <div 
-        className="absolute inset-0 bg-black transition-opacity duration-300"
-        style={{ opacity: backdropOpacity }}
+        className="absolute inset-0" 
         onClick={onClose} 
       />
       
       <div 
-        className="relative w-full max-w-xl mx-auto bg-white rounded-t-[2.5rem] shadow-[0_-20px_60px_rgba(0,0,0,0.25)] overflow-hidden"
+        className="relative w-full max-w-xl mx-auto bg-white rounded-t-[2rem] shadow-2xl overflow-hidden animate-slide-up"
         style={{ 
-          transform: `translateY(${dragY > 0 ? dragY : 0}px)`, 
-          transition: isDragging.current ? 'none' : 'transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1)' 
+          transform: `translateY(${dragY}px)`, 
+          transition: isDragging.current ? 'none' : 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)' 
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}

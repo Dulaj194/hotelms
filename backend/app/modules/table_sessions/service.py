@@ -174,3 +174,4 @@ def request_service(
         service_type=service_type,
         customer_name=session.customer_name,
     )
+

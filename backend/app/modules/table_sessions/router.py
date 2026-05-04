@@ -64,7 +64,6 @@ def list_bill_requests(
     sessions = service.list_bill_requests(db, restaurant_id)
     return {"requests": sessions}
 
-
 @router.post("/my/request-service")
 def request_service(
     payload: TableServiceRequest,
@@ -75,3 +74,4 @@ def request_service(
     """Request a specific service (Water, Steward, etc.) at the table."""
     service.request_service(db, r, session, payload.service_type, payload.message)
     return {"message": f"Request for {payload.service_type} sent to staff."}
+

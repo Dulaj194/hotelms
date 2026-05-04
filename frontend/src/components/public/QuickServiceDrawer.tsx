@@ -1,94 +1,44 @@
-import React from "react";
-import {
-  X,
-  Droplets,
-  Receipt,
-  UserRound,
-  Utensils,
-  Eraser,
-  MessageSquareHeart,
-  Wifi,
-  Sparkles,
-  ChevronRight,
-  Loader2,
-  CheckCircle2,
-} from "lucide-react";
+import { Check, X, Droplets, User, FileText, Wifi, Star, Sparkles, MessageSquare, Coffee } from "lucide-react";
+import { useState } from "react";
 
-type ServiceAction = {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  color: string;
-  bgColor: string;
-  description: string;
-};
-
-const SERVICE_ACTIONS: ServiceAction[] = [
-  {
-    id: "BILL",
-    label: "Request Bill",
-    icon: <Receipt className="h-6 w-6" />,
-    color: "text-white",
-    bgColor: "bg-orange-500",
-    description: "Ready to pay and checkout",
-  },
-  {
-    id: "WATER",
-    label: "Request Water",
-    icon: <Droplets className="h-6 w-6" />,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-    description: "Cold or normal water for the table",
-  },
-  {
-    id: "STEWARD",
-    label: "Call Steward",
-    icon: <UserRound className="h-6 w-6" />,
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
-    description: "Talk to a waiter for assistance",
-  },
-  {
-    id: "CUTLERY",
-    label: "Extra Cutlery",
-    icon: <Utensils className="h-6 w-6" />,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-    description: "Spoons, forks, or napkins",
-  },
-  {
-    id: "CLEANING",
-    label: "Clean Table",
-    icon: <Eraser className="h-6 w-6" />,
-    color: "text-slate-600",
-    bgColor: "bg-slate-50",
-    description: "Clear dishes or clean spills",
-  },
-  {
-    id: "WIFI",
-    label: "Wifi Password",
-    icon: <Wifi className="h-6 w-6" />,
-    color: "text-sky-600",
-    bgColor: "bg-sky-50",
-    description: "Access guest internet",
-  },
-  {
-    id: "FEEDBACK",
-    label: "Give Feedback",
-    icon: <MessageSquareHeart className="h-6 w-6" />,
-    color: "text-rose-600",
-    bgColor: "bg-rose-50",
-    description: "Tell us about your experience",
-  },
-];
-
-type QuickServiceDrawerProps = {
+interface QuickServiceDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onRequestService: (type: string) => Promise<void>;
   isSubmitting: boolean;
   lastRequestedType: string | null;
-};
+}
+
+const SERVICES = [
+  { id: "WATER", name: "Water", icon: Droplets, color: "bg-blue-50 text-blue-600 border-blue-100" },
+  { id: "BILL", name: "Bill", icon: FileText, color: "bg-rose-50 text-rose-600 border-rose-100" },
+  { id: "STEWARD", name: "Steward", icon: User, color: "bg-amber-50 text-amber-600 border-amber-100" },
+  { id: "CUTLERY", name: "Cutlery", icon: UtensilsIcon, color: "bg-slate-50 text-slate-600 border-slate-100" },
+  { id: "CLEANING", name: "Cleaning", icon: Sparkles, color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+  { id: "WIFI", name: "Wifi", icon: Wifi, color: "bg-indigo-50 text-indigo-600 border-indigo-100" },
+  { id: "FEEDBACK", name: "Feedback", icon: Star, color: "bg-purple-50 text-purple-600 border-purple-100" },
+];
+
+function UtensilsIcon(props: any) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
+      <path d="M7 2v20" />
+      <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
+    </svg>
+  );
+}
 
 export default function QuickServiceDrawer({
   isOpen,
@@ -97,116 +47,84 @@ export default function QuickServiceDrawer({
   isSubmitting,
   lastRequestedType,
 }: QuickServiceDrawerProps) {
-  const touchStartRef = React.useRef<number | null>(null);
-
-  if (!isOpen) return null;
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartRef.current = e.targetTouches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartRef.current === null) return;
-    const touchEnd = e.changedTouches[0].clientY;
-    const diff = touchEnd - touchStartRef.current;
-
-    // If swiped down more than 100px, close the drawer
-    if (diff > 100) {
-      onClose();
-    }
-    touchStartRef.current = null;
-  };
-
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col justify-end overflow-hidden">
+    <div className={`fixed inset-0 z-[100] overflow-hidden transition-all duration-300 ${isOpen ? "visible" : "invisible"}`}>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity animate-in fade-in-0 duration-300"
+        className={`absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 ${
+          isOpen ? "opacity-100" : "opacity-0"
+        }`}
         onClick={onClose}
       />
 
-      {/* Drawer Panel */}
-      <div 
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        className="relative z-10 flex max-h-[85dvh] w-full flex-col rounded-t-[2.5rem] bg-white shadow-[0_-20px_50px_rgba(0,0,0,0.2)] transition-transform animate-in slide-in-from-bottom-full duration-500 ease-out"
+      {/* Drawer */}
+      <div
+        className={`absolute inset-x-0 bottom-0 z-10 w-full rounded-t-[2.5rem] bg-white px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 shadow-2xl transition-transform duration-500 ease-out ${
+          isOpen ? "translate-y-0" : "translate-y-full"
+        }`}
       >
         {/* Handle */}
-        <div className="flex w-full justify-center py-4">
-          <div className="h-1.5 w-12 rounded-full bg-slate-200" />
-        </div>
+        <div className="absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-slate-200" />
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 pb-6">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-600">
-                <Sparkles className="h-3.5 w-3.5" />
-              </span>
-              <h2 className="text-xl font-black tracking-tight text-slate-900">Table Services</h2>
-            </div>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-slate-900">Table Service</h2>
             <p className="mt-1 text-sm font-medium text-slate-500">How can we help you today?</p>
           </div>
           <button
             onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-full bg-slate-50 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900"
+            className="grid h-10 w-10 place-items-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Actions Grid */}
-        <div className="flex-1 overflow-y-auto px-6 pb-12 no-scrollbar">
-          <div className="grid grid-cols-1 gap-3">
-            {SERVICE_ACTIONS.map((action) => {
-              const isProcessing = isSubmitting && lastRequestedType === action.id;
-              const isSuccess = !isSubmitting && lastRequestedType === action.id;
-              const isBill = action.id === "BILL";
+        <div className="grid grid-cols-3 gap-4 min-[400px]:grid-cols-4">
+          {SERVICES.map((service) => {
+            const isSelected = lastRequestedType === service.id;
+            const Icon = service.icon;
 
-              return (
-                <button
-                  key={action.id}
-                  disabled={isSubmitting}
-                  onClick={() => onRequestService(action.id)}
-                  className={`group relative flex w-full items-center gap-4 rounded-2xl border-2 p-4 transition-all duration-300 active:scale-[0.98] ${
-                    isSuccess
-                      ? "border-emerald-500 bg-emerald-50/50"
-                      : isBill 
-                        ? "border-orange-200 bg-orange-50/30 hover:border-orange-300 hover:bg-orange-50/50 shadow-sm"
-                        : "border-slate-50 bg-white hover:border-orange-100 hover:bg-orange-50/30"
+            return (
+              <button
+                key={service.id}
+                disabled={isSubmitting && !isSelected}
+                onClick={() => onRequestService(service.id)}
+                className="group flex flex-col items-center gap-3 outline-none"
+              >
+                <div
+                  className={`relative grid h-16 w-16 place-items-center rounded-3xl border-2 transition-all duration-300 ${
+                    isSelected
+                      ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-200"
+                      : `${service.color} border-transparent group-hover:scale-105 group-active:scale-95`
+                  } ${isSubmitting && !isSelected ? "opacity-40" : "opacity-100"}`}
+                >
+                  {isSelected && isSubmitting ? (
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : isSelected && !isSubmitting ? (
+                    <Check className="h-8 w-8 animate-in zoom-in-50" />
+                  ) : (
+                    <Icon className="h-7 w-7" />
+                  )}
+                </div>
+                <span
+                  className={`text-[11px] font-bold uppercase tracking-wider transition-colors ${
+                    isSelected ? "text-orange-600" : "text-slate-500"
                   }`}
                 >
-                  <div
-                    className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl transition-transform duration-300 group-hover:scale-110 shadow-sm ${action.bgColor} ${action.color}`}
-                  >
-                    {action.icon}
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className={`text-[15px] font-bold ${isBill ? "text-orange-700" : "text-slate-900"}`}>
-                      {action.label}
-                    </p>
-                    <p className={`text-xs font-medium ${isBill ? "text-orange-600/70" : "text-slate-500"}`}>
-                      {action.description}
-                    </p>
-                  </div>
-                  <div className={`shrink-0 transition-transform duration-300 group-hover:translate-x-1 ${isBill ? "text-orange-400" : "text-slate-300"}`}>
-                    {isProcessing ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
-                    ) : isSuccess ? (
-                      <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5" />
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                  {service.name}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-          <div className="mt-8 flex items-center justify-center gap-3 rounded-2xl bg-slate-50 p-4">
-            <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
-              Staff will be alerted instantly
+        <div className="mt-8 rounded-2xl bg-slate-50 p-4">
+          <div className="flex gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white shadow-sm">
+              <MessageSquare className="h-5 w-5 text-orange-500" />
+            </div>
+            <p className="text-xs leading-relaxed text-slate-600">
+              Tap any service above to notify our staff. We'll be with you shortly!
             </p>
           </div>
         </div>

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  AlertCircle,
   Bell,
   Check,
+  ChefHat,
   ChevronRight,
   LogOut,
   Menu as MenuIcon,
   MessageCircle,
+  RefreshCcw,
   Search,
   ShoppingCart,
   Sparkles,
@@ -52,12 +55,12 @@ function FloatingCartButton({ itemCount, onOpenCart }: FloatingCartButtonProps) 
     <button
       type="button"
       onClick={onOpenCart}
-      className="relative -mt-6 mx-auto grid h-14 w-14 place-items-center rounded-full bg-orange-500 text-white shadow-[0_20px_40px_rgba(249,115,22,0.35)] transition hover:bg-orange-600 min-[360px]:-mt-7 min-[360px]:h-16 min-[360px]:w-16"
+      className="relative -mt-6 mx-auto grid h-14 w-14 place-items-center rounded-full bg-orange-500 text-white shadow-[0_20px_40px_rgba(249,115,22,0.35)] transition hover:bg-orange-600 active:scale-95 min-[360px]:-mt-7 min-[360px]:h-16 min-[360px]:w-16"
       aria-label={itemCount > 0 ? `Open cart, ${itemCount} items` : "Open cart"}
     >
       <ShoppingCart className="h-6 w-6 min-[360px]:h-7 min-[360px]:w-7" />
       {itemCount > 0 && (
-        <span key={itemCount} className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-slate-900 px-1.5 text-[11px] font-bold text-white ring-2 ring-white animate-pop-in">
+        <span key={itemCount} className="absolute -right-1 -top-1 grid h-6 min-w-6 place-items-center rounded-full bg-slate-900 px-1.5 text-[11px] font-bold text-white ring-2 ring-white animate-in zoom-in-50 duration-300">
           {itemCount}
         </span>
       )}
@@ -97,8 +100,6 @@ export default function TableMenu() {
   const [isRequestingService, setIsRequestingService] = useState(false);
   const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
   const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
-  const [headerTotalHeight, setHeaderTotalHeight] = useState(0);
-  const [headerMainHeight, setHeaderMainHeight] = useState(0);
   const categoryRailShellRef = useRef<HTMLDivElement>(null);
   const lastMenuScrollYRef = useRef(0);
   const menuScrollFrameRef = useRef<number | null>(null);
@@ -183,7 +184,7 @@ export default function TableMenu() {
 
     lastMenuScrollYRef.current = window.scrollY;
 
-    if (!categoryRailAutoHideEnabled) {
+    if (!categoryRailAutoHideEnabled || searchPanelOpen) {
       setHeaderVisible(true);
       return;
     }
@@ -266,13 +267,7 @@ export default function TableMenu() {
       const menuContent = document.getElementById("menu-content");
       const header = document.getElementById("menu-top");
       const railHeight = categoryRailShellRef.current?.offsetHeight ?? 0;
-      const totalHeight = header?.offsetHeight ?? 0;
-      const mainHeight = Math.max(0, totalHeight - railHeight);
-      
-      setHeaderTotalHeight(totalHeight);
-      setHeaderMainHeight(mainHeight);
-
-      const headerHeightWithoutRail = mainHeight;
+      const headerHeightWithoutRail = Math.max(0, (header?.offsetHeight ?? 0) - railHeight);
       const menuContentHeight = menuContent?.scrollHeight ?? document.documentElement.scrollHeight;
       const menuContentStyle = menuContent ? window.getComputedStyle(menuContent) : null;
       const menuBottomPadding = menuContentStyle
@@ -426,6 +421,7 @@ export default function TableMenu() {
     setSearchPanelOpen((prev) => {
       const next = !prev;
       if (next) {
+        setHeaderVisible(true);
         setTimeout(() => searchInputRef.current?.focus(), 50);
       } else {
         setSearchQuery("");
@@ -499,16 +495,65 @@ export default function TableMenu() {
 
   if (pageError) {
     return (
-      <div className="min-h-dvh flex items-center justify-center p-6">
-        <p className="text-red-600 text-center max-w-sm">{pageError}</p>
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-6 text-center">
+        <div className="mb-6 grid h-20 w-20 place-items-center rounded-[2rem] bg-red-50 text-red-500 shadow-sm">
+          <AlertCircle className="h-10 w-10" />
+        </div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900">Something went wrong</h1>
+        <p className="mt-2 max-w-xs text-sm font-medium leading-relaxed text-slate-500">
+          {pageError}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-8 flex items-center gap-2 rounded-2xl bg-slate-900 px-8 py-4 text-sm font-bold text-white shadow-xl transition hover:bg-slate-800 active:scale-95"
+        >
+          <RefreshCcw className="h-4 w-4" />
+          Try again
+        </button>
       </div>
     );
   }
 
   if (!menu) {
     return (
-      <div className="min-h-dvh flex items-center justify-center">
-        <p className="text-gray-400 animate-pulse">Loading menu...</p>
+      <div className="min-h-dvh w-full bg-slate-50 pt-[env(safe-area-inset-top,24px)]">
+        {/* Skeleton Header */}
+        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 animate-pulse rounded-2xl bg-slate-200" />
+            <div className="space-y-2">
+              <div className="h-4 w-32 animate-pulse rounded-full bg-slate-200" />
+              <div className="h-3 w-20 animate-pulse rounded-full bg-slate-200/60" />
+            </div>
+          </div>
+          <div className="h-10 w-10 animate-pulse rounded-xl bg-slate-200" />
+        </div>
+
+        {/* Skeleton Banner */}
+        <div className="mx-4 mt-6 h-48 animate-pulse rounded-[2rem] bg-slate-200" />
+
+        {/* Skeleton Categories */}
+        <div className="mt-8 flex gap-3 overflow-hidden px-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-10 w-24 shrink-0 animate-pulse rounded-full bg-slate-200" />
+          ))}
+        </div>
+
+        {/* Skeleton Grid */}
+        <div className="mt-8 grid grid-cols-1 gap-4 px-4 min-[380px]:grid-cols-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="space-y-4 rounded-3xl border border-slate-100 bg-white p-3 shadow-sm">
+              <div className="aspect-[4/3] w-full animate-pulse rounded-2xl bg-slate-100" />
+              <div className="space-y-3 p-1">
+                <div className="h-4 w-3/4 animate-pulse rounded-full bg-slate-200" />
+                <div className="flex justify-between">
+                  <div className="h-4 w-16 animate-pulse rounded-full bg-slate-200" />
+                  <div className="h-4 w-12 animate-pulse rounded-full bg-slate-200" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -528,17 +573,18 @@ export default function TableMenu() {
                     {menu?.restaurant.name ?? "Luminous Hotel"}
                   </h1>
                 </div>
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20 shadow-inner backdrop-blur-md ring-1 ring-white/30">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20 shadow-inner backdrop-blur-md ring-1 ring-white/30 animate-bounce [animation-duration:3s]">
                   <Store className="h-7 w-7 text-white" />
                 </div>
               </div>
 
               <div className="mt-8 flex flex-wrap gap-2">
-                <span className="rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
+                <div className="flex items-center gap-1.5 rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   Table {tableNumber}
-                </span>
+                </div>
                 <span className="rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
-                  QR Menu
+                  QR Verified
                 </span>
                 <span className="rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-[11px] font-bold text-emerald-100 backdrop-blur-md ring-1 ring-emerald-500/30">
                   Fast ordering
@@ -609,96 +655,85 @@ export default function TableMenu() {
       <div
         key={item.id}
         id={`item-${item.id}`}
-        className={`group box-border flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_8px_22px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)] ${
-          !item.is_available ? "opacity-55" : ""
+        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white p-1.5 transition-all duration-300 hover:border-orange-200 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)] ${
+          !item.is_available ? "opacity-60 grayscale-[0.5]" : ""
         }`}
       >
-        <SafeMenuAsset
-          path={item.image_path}
-          alt={item.name}
-          className="block aspect-[4/3] w-full max-w-full object-cover transition duration-300 group-hover:scale-[1.03]"
-          fallbackClassName="flex aspect-[4/3] w-full max-w-full shrink-0 items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 text-orange-300"
-          fallback={
-            <UtensilsCrossed className="h-9 w-9" />
-          }
-        />
-          <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
-            <div className="flex min-w-0 items-start justify-between gap-2">
-              <p className="min-w-0 break-words text-sm font-bold leading-tight text-slate-900 line-clamp-2">
-                {item.name}
-              </p>
-              {metaLabel && (
-                <span className="min-w-0 max-w-[45%] truncate text-right text-[11px] text-slate-400">
-                  {metaLabel}
-                </span>
-              )}
-            </div>
-
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-              <span className="min-w-0 text-sm font-black text-orange-600">
-                ${item.price.toFixed(2)}
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.65rem]">
+          <SafeMenuAsset
+            path={item.image_path}
+            alt={item.name}
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            fallback={<UtensilsCrossed className="h-8 w-8 text-slate-200" />}
+          />
+          {!item.is_available && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]">
+              <span className="rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-900 shadow-xl">
+                Sold Out
               </span>
-              {item.is_available ? (
-                <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
-                  Available
-                </span>
-              ) : (
-                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                  Sold out
-                </span>
-              )}
             </div>
+          )}
+        </div>
 
+        <div className="flex flex-1 flex-col gap-3 p-3.5 pt-4">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="min-w-0 flex-1 break-words text-base font-bold leading-tight text-slate-900 line-clamp-2">
+              {item.name}
+            </h3>
+            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              {metaLabel}
+            </span>
+          </div>
+
+          <p className="text-[11px] leading-relaxed text-slate-500 line-clamp-2">
+            {item.description || "Freshly prepared with premium ingredients."}
+          </p>
+
+          <div className="mt-auto flex items-center justify-between pt-2">
+            <span className="text-lg font-black text-slate-900">
+              ${item.price.toFixed(2)}
+            </span>
+            
             {qtyInCart > 0 ? (
-              <div className="box-border flex min-h-10 w-full max-w-full items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
+              <div className="flex items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-lg">
                 <button
-                  onClick={() =>
-                    qtyInCart > 1
-                      ? updateItem(item.id, qtyInCart - 1)
-                      : removeItem(item.id)
-                  }
-                  className="grid h-9 w-9 place-items-center rounded-full text-sm font-bold text-slate-600 transition hover:bg-white"
-                  aria-label="Decrease"
+                  onClick={() => qtyInCart > 1 ? updateItem(item.id, qtyInCart - 1) : removeItem(item.id)}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90"
                 >
                   -
                 </button>
-                <span className="min-w-6 text-center text-sm font-semibold text-slate-900">
-                  {qtyInCart}
-                </span>
+                <span className="min-w-[1ch] text-xs font-black">{qtyInCart}</span>
                 <button
                   onClick={() => updateItem(item.id, qtyInCart + 1)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-sm font-bold text-white transition hover:bg-orange-600"
-                  aria-label="Increase"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 transition hover:bg-orange-600 active:scale-90"
                 >
                   +
                 </button>
               </div>
             ) : (
               <button
-                disabled={isAdding || !sessionReady}
+                disabled={isAdding || !item.is_available || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className={`box-border inline-flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition-all duration-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`relative flex h-10 items-center justify-center gap-2 rounded-full px-5 transition-all duration-300 active:scale-95 disabled:opacity-50 ${
                   recentlyAddedItemId === item.id
                     ? "bg-emerald-500 text-white"
-                    : "bg-orange-500 text-white hover:bg-orange-600 shadow-[0_4px_12px_rgba(249,115,22,0.2)]"
+                    : "bg-slate-100 text-slate-900 hover:bg-orange-500 hover:text-white"
                 }`}
               >
                 {isAdding ? (
-                  "Adding..."
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 ) : recentlyAddedItemId === item.id ? (
-                  <span className="flex items-center gap-1.5 animate-in zoom-in-50 duration-300">
-                    <Check className="h-3.5 w-3.5" />
-                    Added!
-                  </span>
+                  <Check className="h-4 w-4 animate-in zoom-in-50" />
                 ) : (
                   <>
-                    Add to Cart
-                    <ChevronRight className="h-3.5 w-3.5" />
+                    <span className="text-xs font-bold">Add</span>
+                    <ShoppingCart className="h-3.5 w-3.5" />
                   </>
                 )}
               </button>
             )}
           </div>
+        </div>
       </div>
     );
   };
@@ -707,13 +742,9 @@ export default function TableMenu() {
 
   return (
     <div className="box-border min-h-dvh w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900 pb-[env(safe-area-inset-bottom,0px)]">
-      <header
-        id="menu-top"
-        style={{
-          transform: headerVisible || !categoryRailAutoHideEnabled ? "translateY(0)" : `translateY(-${headerMainHeight}px)`,
-        }}
-        className="fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top,0px)] transition-transform duration-500 ease-in-out"
-      >
+      <header id="menu-top" className={`fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top,0px)] transition-transform duration-500 ease-in-out ${
+        headerVisible ? "translate-y-0" : "-translate-y-16"
+      }`}>
         <div className="mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 sm:px-5 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <SafeMenuAsset
@@ -767,6 +798,11 @@ export default function TableMenu() {
                   ref={searchInputRef}
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      searchInputRef.current?.blur();
+                    }
+                  }}
                   placeholder="Search dishes, ingredients, or category"
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-base outline-none transition placeholder:text-slate-400 focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
                 />
@@ -781,34 +817,54 @@ export default function TableMenu() {
               </div>
 
               {searchQuery.length > 0 && (
-                <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <p className="px-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                    Quick Suggestions
-                  </p>
-                  <div className="max-h-60 overflow-y-auto no-scrollbar pb-1">
-                    {visibleTiles.slice(0, 6).map((tile) => (
-                      <button
-                        key={tile.item.id}
-                        onClick={() => {
-                          setSearchQuery(tile.item.name);
-                          setTimeout(() => handleScrollTo(`item-${tile.item.id}`), 100);
-                        }}
-                        className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm transition hover:bg-slate-50 active:bg-slate-100"
-                      >
-                        <span className="font-semibold text-slate-700">{tile.item.name}</span>
-                        {tile.categoryName && (
-                          <span className="rounded-md bg-orange-50 px-2 py-1 text-[9px] font-black uppercase text-orange-500 ring-1 ring-orange-100">
-                            {tile.categoryName}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                    {visibleTiles.length === 0 && (
-                      <p className="py-6 text-center text-xs font-medium italic text-slate-400">
-                        No matches for "{searchQuery}"
-                      </p>
-                    )}
+                <div className="mt-4 max-h-[calc(70dvh-100px)] overflow-y-auto no-scrollbar pb-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="mb-3 flex items-center justify-between px-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                      Search Results ({visibleTiles.length})
+                    </p>
+                    <button 
+                      onClick={() => setSearchQuery("")}
+                      className="text-[10px] font-bold uppercase text-orange-500 hover:text-orange-600"
+                    >
+                      Clear
+                    </button>
                   </div>
+                  
+                  {visibleTiles.length === 0 ? (
+                    <div className="py-12 text-center">
+                      <p className="text-sm font-medium text-slate-400">No matches for "{searchQuery}"</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {visibleTiles.map((tile) => (
+                        <button
+                          key={tile.item.id}
+                          onClick={() => {
+                            handleCloseSearch();
+                            setTimeout(() => handleScrollTo(`item-${tile.item.id}`), 150);
+                          }}
+                          className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-2 text-left transition hover:border-orange-200 hover:bg-white hover:shadow-md"
+                        >
+                          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl">
+                            <SafeMenuAsset
+                              path={tile.item.image_path}
+                              alt={tile.item.name}
+                              className="h-full w-full object-cover transition duration-300 group-hover:scale-110"
+                              fallback={<UtensilsCrossed className="h-6 w-6 text-slate-300" />}
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-bold text-slate-900">{tile.item.name}</p>
+                            <div className="mt-0.5 flex items-center gap-2">
+                              <span className="text-xs font-black text-orange-600">${tile.item.price.toFixed(2)}</span>
+                              <span className="truncate text-[10px] font-medium text-slate-400">{tile.categoryName}</span>
+                            </div>
+                          </div>
+                          <ChevronRight className="mr-1 h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-orange-500" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -817,9 +873,7 @@ export default function TableMenu() {
 
         <div
           ref={categoryRailShellRef}
-          className={`mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center px-4 py-2 transition-shadow duration-500 sm:px-5 lg:px-6 ${
-            !headerVisible && categoryRailAutoHideEnabled ? "shadow-[0_4px_12px_rgba(0,0,0,0.05)]" : ""
-          }`}
+          className="mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center px-4 py-2 sm:px-5 lg:px-6"
         >
           <div className="w-full">
             <MenuBrowserRail
@@ -832,7 +886,7 @@ export default function TableMenu() {
       </header>
 
       {/* Fixed-height Spacer: Prevents jittering by never changing its layout height */}
-      <div style={{ height: headerTotalHeight || '8rem' }} />
+      <div className="h-[calc(4rem+4rem+env(safe-area-inset-top,0px))]" />
 
       <main
         id="menu-content"
@@ -927,11 +981,15 @@ export default function TableMenu() {
                     </div>
 
                     {categoryTiles.length === 0 ? (
-                      <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
-                        No items in this category.
+                      <div className="flex flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-white px-6 py-16 text-center">
+                        <div className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-slate-50 text-slate-300">
+                          <ChefHat className="h-8 w-8" />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-900">No items found</h3>
+                        <p className="mt-1 text-xs font-medium text-slate-400">This category is currently being updated. Check back soon!</p>
                       </div>
                     ) : (
-                      <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                      <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-4 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                         {categoryTiles.map(renderItemCard)}
                       </div>
                     )}
@@ -941,35 +999,6 @@ export default function TableMenu() {
             );
           })}
         </div>
-
-        {/* Search Results Overlay (Only when searching) */}
-        {searchQuery && (
-          <div className="absolute inset-x-0 bottom-0 top-0 z-20 overflow-y-auto bg-slate-50 px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6">
-            <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-black tracking-tight text-slate-900">Search results</h2>
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Clear
-                </button>
-              </div>
-
-              {visibleTiles.length === 0 ? (
-                <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
-                  No matches for "{searchQuery}"
-                </div>
-              ) : (
-                <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                  {visibleTiles.map(renderItemCard)}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </main>
 
       <div className="fixed inset-x-0 bottom-0 z-30 box-border w-full max-w-full overflow-hidden border-t border-white/70 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
@@ -990,7 +1019,11 @@ export default function TableMenu() {
           <button
             type="button"
             onClick={handleToggleSearch}
-            className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
+            className={`flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold transition-all duration-300 min-[360px]:rounded-2xl min-[360px]:text-[11px] ${
+              searchPanelOpen 
+              ? "bg-orange-500 text-white shadow-md scale-105" 
+              : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+            }`}
           >
             <Search className="h-5 w-5" />
             <span className="max-w-full truncate">Search</span>
@@ -1050,6 +1083,7 @@ export default function TableMenu() {
         isSubmitting={isRequestingService}
         lastRequestedType={lastRequestedService}
       />
+
 
       {/* Profile drawer */}
       {profileDrawerOpen && (
