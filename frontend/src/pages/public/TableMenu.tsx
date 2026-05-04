@@ -90,6 +90,7 @@ export default function TableMenu() {
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
+  const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<number | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);

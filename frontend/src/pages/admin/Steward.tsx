@@ -355,6 +355,24 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     [loadData]
   );
 
+  const handleBillRequested = useCallback(
+    (event: BillRequestedEvent) => {
+      const { table_number, customer_name, session_id, requested_at } = event.data;
+      showAlert(
+        `Table ${table_number} (${customer_name || "Guest"}) is requesting the bill!`,
+        true
+      );
+      
+      setBillRequests((prev) => {
+        const next = new Map(prev);
+        next.set(session_id, {
+          session_id,
+          table_number,
+          customer_name,
+          requested_at,
+        });
+        return next;
+      });
     },
     [showAlert]
   );

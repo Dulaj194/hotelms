@@ -47,6 +47,7 @@ export function useKitchenSocket({
   onNewOrder,
   onStatusUpdate,
   onBillRequested,
+  onServiceRequested,
 }: UseKitchenSocketOptions): UseKitchenSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
