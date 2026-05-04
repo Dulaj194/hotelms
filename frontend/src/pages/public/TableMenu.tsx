@@ -81,6 +81,8 @@ export default function TableMenu() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
   const [guestNameInput, setGuestNameInput] = useState("");
   const [guestName, setGuestName] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -95,6 +97,8 @@ export default function TableMenu() {
   const [isRequestingService, setIsRequestingService] = useState(false);
   const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
   const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
+  const [headerTotalHeight, setHeaderTotalHeight] = useState(0);
+  const [headerMainHeight, setHeaderMainHeight] = useState(0);
   const categoryRailShellRef = useRef<HTMLDivElement>(null);
   const lastMenuScrollYRef = useRef(0);
   const menuScrollFrameRef = useRef<number | null>(null);
@@ -117,22 +121,33 @@ export default function TableMenu() {
     visibleCategories,
   } = usePublicMenuBrowser(menu);
 
+  const navigationItems = useMemo(() => [null, ...visibleCategories], [visibleCategories]);
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (isScrollingRef.current || searchPanelOpen || searchQuery) return;
+    const scrollLeft = e.currentTarget.scrollLeft;
+    const width = e.currentTarget.clientWidth;
+    if (width === 0) return;
+    const index = Math.round(scrollLeft / width);
+    const targetId = navigationItems[index]?.id ?? null;
+    if (targetId !== activeCategoryId) {
+      setActiveCategoryId(targetId);
+    }
+  };
 
   const handleCategorySelect = (categoryId: number | null) => {
     setActiveCategoryId(categoryId);
-    const targetId = categoryId === null ? "menu-top" : `category-${categoryId}`;
-    const element = document.getElementById(targetId);
-    if (element) {
-      const header = document.getElementById("menu-top-header");
-      const headerHeight = header?.offsetHeight ?? 0;
-      const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - headerHeight - 10;
-
-      window.scrollTo({
-        top: offsetPosition,
+    const index = navigationItems.findIndex((item) => (item?.id ?? null) === categoryId);
+    if (scrollRef.current && index !== -1) {
+      isScrollingRef.current = true;
+      const width = scrollRef.current.clientWidth;
+      scrollRef.current.scrollTo({
+        left: width * index,
         behavior: "smooth",
       });
+      setTimeout(() => {
+        isScrollingRef.current = false;
+      }, 500);
     }
   };
 
@@ -205,37 +220,7 @@ export default function TableMenu() {
 
     const handleWindowScroll = () => {
       if (menuScrollFrameRef.current !== null) return;
-      
-      menuScrollFrameRef.current = window.requestAnimationFrame(() => {
-        updateHeaderVisibility();
-        
-        // Update active category based on vertical scroll
-        if (!searchQuery && visibleCategories.length > 0) {
-          const header = document.getElementById("menu-top-header");
-          const headerHeight = header?.offsetHeight ?? 120;
-          const scrollPosition = window.scrollY + headerHeight + 50;
-
-          // Find the category section currently in view
-          let currentActiveId: number | null = null;
-          
-          for (const category of visibleCategories) {
-            const element = document.getElementById(`category-${category.id}`);
-            if (element) {
-              if (element.offsetTop <= scrollPosition) {
-                currentActiveId = category.id;
-              } else {
-                break;
-              }
-            }
-          }
-          
-          if (currentActiveId !== activeCategoryId) {
-            setActiveCategoryId(currentActiveId);
-          }
-        }
-        
-        menuScrollFrameRef.current = null;
-      });
+      menuScrollFrameRef.current = window.requestAnimationFrame(updateHeaderVisibility);
     };
 
     window.addEventListener("scroll", handleWindowScroll, { passive: true });
@@ -281,7 +266,13 @@ export default function TableMenu() {
       const menuContent = document.getElementById("menu-content");
       const header = document.getElementById("menu-top");
       const railHeight = categoryRailShellRef.current?.offsetHeight ?? 0;
-      const headerHeightWithoutRail = Math.max(0, (header?.offsetHeight ?? 0) - railHeight);
+      const totalHeight = header?.offsetHeight ?? 0;
+      const mainHeight = Math.max(0, totalHeight - railHeight);
+      
+      setHeaderTotalHeight(totalHeight);
+      setHeaderMainHeight(mainHeight);
+
+      const headerHeightWithoutRail = mainHeight;
       const menuContentHeight = menuContent?.scrollHeight ?? document.documentElement.scrollHeight;
       const menuContentStyle = menuContent ? window.getComputedStyle(menuContent) : null;
       const menuBottomPadding = menuContentStyle
@@ -716,9 +707,13 @@ export default function TableMenu() {
 
   return (
     <div className="box-border min-h-dvh w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900 pb-[env(safe-area-inset-bottom,0px)]">
-      <header id="menu-top-header" className={`fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top,0px)] transition-transform duration-500 ease-in-out ${
-        headerVisible ? "translate-y-0" : "-translate-y-16"
-      }`}>
+      <header
+        id="menu-top"
+        style={{
+          transform: headerVisible || !categoryRailAutoHideEnabled ? "translateY(0)" : `translateY(-${headerMainHeight}px)`,
+        }}
+        className="fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] backdrop-blur-md pt-[env(safe-area-inset-top,0px)] transition-transform duration-500 ease-in-out"
+      >
         <div className="mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center justify-between gap-3 px-4 sm:px-5 lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <SafeMenuAsset
@@ -822,7 +817,9 @@ export default function TableMenu() {
 
         <div
           ref={categoryRailShellRef}
-          className="mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center px-4 py-2 sm:px-5 lg:px-6"
+          className={`mx-auto box-border flex h-16 w-full max-w-[min(72rem,100%)] min-w-0 items-center px-4 py-2 transition-shadow duration-500 sm:px-5 lg:px-6 ${
+            !headerVisible && categoryRailAutoHideEnabled ? "shadow-[0_4px_12px_rgba(0,0,0,0.05)]" : ""
+          }`}
         >
           <div className="w-full">
             <MenuBrowserRail
@@ -835,90 +832,119 @@ export default function TableMenu() {
       </header>
 
       {/* Fixed-height Spacer: Prevents jittering by never changing its layout height */}
-      <div className="h-[calc(4rem+4rem+env(safe-area-inset-top,0px))]" />
+      <div style={{ height: headerTotalHeight || '8rem' }} />
 
       <main
         id="menu-content"
-        className="mx-auto box-border flex w-full max-w-full flex-col px-4 sm:px-5 lg:px-6"
+        className="mx-auto box-border flex w-full max-w-full flex-1 flex-col overflow-hidden"
       >
-        <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-10 pt-6 pb-32">
-          {/* Banner pick section - only at the top */}
-          <section id="menu-top" className="box-border w-full max-w-full min-w-0">
-            <div className="relative box-border min-h-[12.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13.5rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
-              {featuredBannerPaths.length > 0 && (
-                <SafeMenuAsset
-                  path={featuredBannerPaths[activeBannerIndex]}
-                  alt="Featured menu banner"
-                  loading="eager"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  fallbackClassName="absolute inset-0 bg-slate-950"
-                  fallback={null}
-                />
-              )}
-              <div className="absolute inset-0 bg-slate-950/65" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.1)_0%,rgba(15,23,42,0.55)_100%)]" />
-              <div className="relative z-10 flex h-full min-h-[calc(12.75rem-2.5rem)] flex-col justify-between gap-4 sm:min-h-[calc(13.5rem-3rem)] sm:gap-5 lg:min-h-[calc(15rem-3rem)]">
-                <div className="min-w-0">
-                  <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 sm:text-xs">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Featured picks
-                  </p>
-                  <h2 className="mt-4 max-w-full break-words text-[1.65rem] font-black leading-tight tracking-tight sm:max-w-xl sm:text-3xl">
-                    Order faster from your table.
-                  </h2>
-                  <p className="mt-2 max-w-full break-words text-sm leading-6 text-white/80 sm:max-w-2xl">
-                    Choose favorites, update quantities, and place your order without leaving the menu.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-white/80 sm:text-xs">
-                  <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add</span>
-                  <span className="rounded-full bg-white/10 px-3 py-1.5">Table session</span>
-                  <span className="rounded-full bg-white/10 px-3 py-1.5">Live cart</span>
-                </div>
-              </div>
-            </div>
-          </section>
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className={`no-scrollbar flex h-full w-full overflow-x-auto overflow-y-hidden ${
+            searchQuery ? "pointer-events-none opacity-0" : "snap-x snap-mandatory"
+          }`}
+        >
+          {navigationItems.map((navItem) => {
+            const catId = navItem?.id ?? null;
+            const categoryTiles =
+              catId === null
+                ? visibleCategories.flatMap((c) =>
+                    c.items.map((item) => ({
+                      item,
+                      categoryId: c.id,
+                      categoryName: c.name,
+                    })),
+                  )
+                : visibleCategories
+                    .filter((c) => c.id === catId)
+                    .flatMap((c) =>
+                      c.items.map((item) => ({
+                        item,
+                        categoryId: c.id,
+                        categoryName: c.name,
+                      })),
+                    );
 
-          {/* Render all categories one by one */}
-          {visibleCategories.map((category) => (
-            <section
-              key={category.id}
-              id={`category-${category.id}`}
-              className="box-border w-full max-w-full min-w-0 space-y-4 scroll-mt-24"
-            >
-              <div className="flex min-w-0 items-end justify-between gap-2 border-b border-slate-100 pb-2">
-                <div className="min-w-0">
-                  <h2 className="text-xl font-black tracking-tight text-slate-900">
-                    {category.name}
-                  </h2>
-                  {category.description && (
-                    <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-                      {category.description}
-                    </p>
+            return (
+              <div
+                key={catId ?? "all"}
+                className="box-border h-full w-full shrink-0 snap-start overflow-y-auto px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6"
+              >
+                <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
+                  {/* Banner Only on "All" View */}
+                  {catId === null && (
+                    <section className="box-border w-full max-w-full min-w-0">
+                      <div className="relative box-border min-h-[12.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13.5rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
+                        {featuredBannerPaths.length > 0 && (
+                          <SafeMenuAsset
+                            path={featuredBannerPaths[activeBannerIndex]}
+                            alt="Featured menu banner"
+                            loading="eager"
+                            className="absolute inset-0 h-full w-full object-cover"
+                            fallbackClassName="absolute inset-0 bg-slate-950"
+                            fallback={null}
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-slate-950/65" />
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.1)_0%,rgba(15,23,42,0.55)_100%)]" />
+                        <div className="relative z-10 flex h-full min-h-[calc(12.75rem-2.5rem)] flex-col justify-between gap-4 sm:min-h-[calc(13.5rem-3rem)] sm:gap-5 lg:min-h-[calc(15rem-3rem)]">
+                          <div className="min-w-0">
+                            <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 sm:text-xs">
+                              <Sparkles className="h-3.5 w-3.5" />
+                              Featured picks
+                            </p>
+                            <h2 className="mt-4 max-w-full break-words text-[1.65rem] font-black leading-tight tracking-tight sm:max-w-xl sm:text-3xl">
+                              Order faster from your table.
+                            </h2>
+                            <p className="mt-2 max-w-full break-words text-sm leading-6 text-white/80 sm:max-w-2xl">
+                              Choose favorites, update quantities, and place your order without leaving the menu.
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-white/80 sm:text-xs">
+                            <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add</span>
+                            <span className="rounded-full bg-white/10 px-3 py-1.5">Table session</span>
+                            <span className="rounded-full bg-white/10 px-3 py-1.5">Live cart</span>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
                   )}
+
+                  <section className="box-border w-full max-w-full min-w-0 space-y-3">
+                    <div className="flex min-w-0 items-end justify-between gap-2">
+                      <div className="min-w-0">
+                        <h2 className="text-xl font-black tracking-tight text-slate-900">
+                          {catId === null ? "All items" : navItem?.name}
+                        </h2>
+                        {catId !== null && navItem?.description && (
+                          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                            {navItem.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {categoryTiles.length === 0 ? (
+                      <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
+                        No items in this category.
+                      </div>
+                    ) : (
+                      <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                        {categoryTiles.map(renderItemCard)}
+                      </div>
+                    )}
+                  </section>
                 </div>
               </div>
-
-              {category.items.length === 0 ? (
-                <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-sm text-slate-500">
-                  No items in this category.
-                </div>
-              ) : (
-                <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-4 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                  {category.items.map((item) => renderItemCard({
-                    item,
-                    categoryId: category.id,
-                    categoryName: category.name
-                  }))}
-                </div>
-              )}
-            </section>
-          ))}
+            );
+          })}
         </div>
 
         {/* Search Results Overlay (Only when searching) */}
         {searchQuery && (
-          <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-50 px-4 py-3 pb-32 pt-24 no-scrollbar sm:px-5 lg:px-6">
+          <div className="absolute inset-x-0 bottom-0 top-0 z-20 overflow-y-auto bg-slate-50 px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6">
             <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-black tracking-tight text-slate-900">Search results</h2>
