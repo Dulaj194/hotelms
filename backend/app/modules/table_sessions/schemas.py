@@ -58,3 +58,8 @@ class BillRequestResponse(BaseModel):
 
 class BillRequestListResponse(BaseModel):
     requests: list[BillRequestResponse]
+
+
+class TableServiceRequest(BaseModel):
+    service_type: str = Field(..., description="Type of service: WATER, STEWARD, CLEANING, etc.")
+    message: str | None = Field(None, max_length=500)

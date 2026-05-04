@@ -156,3 +156,21 @@ def list_bill_requests(
 ) -> list[TableSession]:
     """Return all active sessions with status BILL_REQUESTED."""
     return repository.list_bill_requests_for_restaurant(db, restaurant_id)
+
+
+def request_service(
+    db: Session,
+    r: redis_lib.Redis,
+    session: TableSession,
+    service_type: str,
+    message: str | None = None,
+) -> None:
+    """Publish a real-time service request from a guest table."""
+    realtime_service.publish_service_requested(
+        r,
+        restaurant_id=session.restaurant_id,
+        table_number=session.table_number,
+        session_id=session.session_id,
+        service_type=service_type,
+        customer_name=session.customer_name,
+    )

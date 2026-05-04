@@ -20,6 +20,7 @@ import type {
   KitchenEvent,
   NewOrderEvent,
   OrderStatusUpdatedEvent,
+  ServiceRequestedEvent,
 } from "@/types/realtime";
 
 // Reconnect delay schedule (ms) — exponential back-off capped at 15s
@@ -33,6 +34,7 @@ interface UseKitchenSocketOptions {
   onNewOrder?: (event: NewOrderEvent) => void;
   onStatusUpdate?: (event: OrderStatusUpdatedEvent) => void;
   onBillRequested?: (event: BillRequestedEvent) => void;
+  onServiceRequested?: (event: ServiceRequestedEvent) => void;
 }
 
 export interface UseKitchenSocketReturn {
@@ -58,9 +60,11 @@ export function useKitchenSocket({
   const onNewOrderRef = useRef(onNewOrder);
   const onStatusUpdateRef = useRef(onStatusUpdate);
   const onBillRequestedRef = useRef(onBillRequested);
+  const onServiceRequestedRef = useRef(onServiceRequested);
   onNewOrderRef.current = onNewOrder;
   onStatusUpdateRef.current = onStatusUpdate;
   onBillRequestedRef.current = onBillRequested;
+  onServiceRequestedRef.current = onServiceRequested;
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -103,6 +107,8 @@ export function useKitchenSocket({
             onStatusUpdateRef.current?.(data as OrderStatusUpdatedEvent);
           } else if (data.event === "bill_requested") {
             onBillRequestedRef.current?.(data as BillRequestedEvent);
+          } else if (data.event === "service_requested") {
+            onServiceRequestedRef.current?.(data as ServiceRequestedEvent);
           }
         } catch {
           // ignore malformed messages

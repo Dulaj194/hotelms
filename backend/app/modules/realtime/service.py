@@ -166,3 +166,30 @@ def publish_bill_requested(
         },
     }
     realtime_repo.publish_event(r, restaurant_id, event)
+
+
+def publish_service_requested(
+    r: redis_lib.Redis,
+    *,
+    restaurant_id: int,
+    table_number: str,
+    session_id: str,
+    service_type: str,
+    customer_name: str | None = None,
+) -> None:
+    """Publish a service_requested event to the staff channel.
+
+    Alerts connected staff/waiters that a table needs a specific service (Water, etc.).
+    """
+    event = {
+        "event": "service_requested",
+        "restaurant_id": restaurant_id,
+        "data": {
+            "table_number": table_number,
+            "session_id": session_id,
+            "service_type": service_type,
+            "customer_name": customer_name,
+            "requested_at": datetime.now(UTC),
+        },
+    }
+    realtime_repo.publish_event(r, restaurant_id, event)

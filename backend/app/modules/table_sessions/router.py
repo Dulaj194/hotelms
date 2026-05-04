@@ -16,6 +16,7 @@ from app.modules.table_sessions.schemas import (
     BillRequestListResponse,
     TableSessionStartRequest,
     TableSessionStartResponse,
+    TableServiceRequest,
 )
 
 router = APIRouter()
@@ -62,3 +63,15 @@ def list_bill_requests(
     """
     sessions = service.list_bill_requests(db, restaurant_id)
     return {"requests": sessions}
+
+
+@router.post("/my/request-service")
+def request_service(
+    payload: TableServiceRequest,
+    session: TableSession = Depends(get_current_guest_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+):
+    """Request a specific service (Water, Steward, etc.) at the table."""
+    service.request_service(db, r, session, payload.service_type, payload.message)
+    return {"message": f"Request for {payload.service_type} sent to staff."}

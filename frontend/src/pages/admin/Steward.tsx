@@ -10,6 +10,7 @@ import type {
   BillRequestedEvent,
   NewOrderEvent, 
   OrderStatusUpdatedEvent, 
+  ServiceRequestedEvent,
 } from "@/types/realtime";
 import type {
   KitchenOrderCard,
@@ -21,8 +22,16 @@ const STEWARD_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
 const POLL_INTERVAL_MS = 3000;
 const SERVED_STORAGE_TTL_MS = 12 * 60 * 60 * 1000;
 
-type StewardTab = "awaiting" | "ready" | "bills";
+type StewardTab = "awaiting" | "ready" | "requests";
 type SourceFilter = "all" | "table" | "room";
+
+interface ServiceRequest {
+  session_id: string;
+  table_number: string;
+  customer_name: string | null;
+  service_type: string;
+  requested_at: string;
+}
 
 interface BillRequest {
   session_id: string;
@@ -175,6 +184,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   const [pendingOrders, setPendingOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
   const [readyOrders, setReadyOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
   const [billRequests, setBillRequests] = useState<Map<string, BillRequest>>(new Map());
+  const [serviceRequests, setServiceRequests] = useState<Map<string, ServiceRequest>>(new Map());
   const [servedOrderIds, setServedOrderIds] = useState<Set<number>>(() => loadServedOrderIds(servedStorageKey));
 
   const [activeTab, setActiveTab] = useState<StewardTab>("awaiting");
@@ -345,20 +355,27 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     [loadData]
   );
 
-  const handleBillRequested = useCallback(
-    (event: BillRequestedEvent) => {
-      const { table_number, customer_name, session_id, requested_at } = event.data;
+    },
+    [showAlert]
+  );
+
+  const handleServiceRequested = useCallback(
+    (event: ServiceRequestedEvent) => {
+      const { table_number, customer_name, session_id, service_type, requested_at } = event.data;
       showAlert(
-        `Table ${table_number} (${customer_name || "Guest"}) is requesting the bill!`,
+        `Table ${table_number} (${customer_name || "Guest"}) is requesting ${service_type}!`,
         true
       );
       
-      setBillRequests((prev) => {
+      setServiceRequests((prev) => {
         const next = new Map(prev);
-        next.set(session_id, {
+        // Use composite key to allow multiple requests per session
+        const key = `${session_id}:${service_type}`;
+        next.set(key, {
           session_id,
           table_number,
           customer_name,
+          service_type,
           requested_at,
         });
         return next;
@@ -372,6 +389,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     onNewOrder: handleNewOrder,
     onStatusUpdate: handleStatusUpdate,
     onBillRequested: handleBillRequested,
+    onServiceRequested: handleServiceRequested,
   });
 
   const handlePendingAction = useCallback(async (orderId: number, newStatus: string) => {
@@ -477,9 +495,9 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           </span>
           <span className="text-slate-500">Awaiting: {pendingOrders.size}</span>
           <span className="text-slate-500">Ready to Serve: {readyOrders.size}</span>
-          {billRequests.size > 0 && (
+          {(billRequests.size > 0 || serviceRequests.size > 0) && (
             <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 font-bold text-rose-700 animate-pulse">
-              Bill Requests: {billRequests.size}
+              Active Requests: {billRequests.size + serviceRequests.size}
             </span>
           )}
         </div>
@@ -529,14 +547,14 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("bills")}
+            onClick={() => setActiveTab("requests")}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === "bills"
+              activeTab === "requests"
                 ? "bg-rose-600 text-white shadow-md"
                 : "border border-slate-200 text-slate-700 hover:bg-slate-50"
             }`}
           >
-            Bill Requests ({billRequests.size})
+            Service Requests ({billRequests.size + serviceRequests.size})
           </button>
         </div>
 
@@ -567,59 +585,73 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
         </div>
       ) : loadError ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{loadError}</div>
-      ) : activeTab === "bills" ? (
+      ) : activeTab === "requests" ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from(billRequests.values()).length === 0 ? (
+          {billRequests.size === 0 && serviceRequests.size === 0 ? (
             <div className="col-span-full rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-              No active bill requests.
+              No active service or bill requests.
             </div>
           ) : (
-            Array.from(billRequests.values())
-              .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())
-              .map((req) => (
-                <div
-                  key={req.session_id}
-                  className="overflow-hidden rounded-2xl border-2 border-rose-100 bg-white shadow-sm transition-all hover:border-rose-200 hover:shadow-md"
-                >
-                  <div className="bg-rose-500 px-4 py-3 text-white">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider opacity-90">
-                        Bill Request
-                      </span>
-                      <span className="text-[10px] font-medium opacity-80">
-                        {new Date(req.requested_at).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
+            <>
+              {/* Combine and sort all requests by time */}
+              {[
+                ...Array.from(billRequests.values()).map(r => ({ ...r, type: 'BILL' })),
+                ...Array.from(serviceRequests.values()).map(r => ({ ...r, type: r.service_type }))
+              ]
+                .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())
+                .map((req) => (
+                  <div
+                    key={`${req.session_id}:${req.type}`}
+                    className={`overflow-hidden rounded-2xl border-2 bg-white shadow-sm transition-all hover:shadow-md ${
+                      req.type === 'BILL' ? 'border-rose-100 hover:border-rose-200' : 'border-indigo-100 hover:border-indigo-200'
+                    }`}
+                  >
+                    <div className={`px-4 py-3 text-white ${req.type === 'BILL' ? 'bg-rose-500' : 'bg-indigo-500'}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider opacity-90">
+                          {req.type === 'BILL' ? 'Bill Request' : `Service: ${req.type}`}
+                        </span>
+                        <span className="text-[10px] font-medium opacity-80">
+                          {new Date(req.requested_at).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xl font-black">Table {req.table_number}</p>
                     </div>
-                    <p className="mt-1 text-xl font-black">Table {req.table_number}</p>
-                  </div>
-                  <div className="p-4">
-                    <p className="text-sm font-semibold text-slate-600">
-                      Guest: <span className="text-slate-900">{req.customer_name || "Unknown"}</span>
-                    </p>
-                    <div className="mt-4 flex flex-col gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // In a real app, this might navigate to a billing/settlement screen
-                          // For now, let's just allow local dismissal as "Acknowledged"
-                          setBillRequests((prev) => {
-                            const next = new Map(prev);
-                            next.delete(req.session_id);
-                            return next;
-                          });
-                          showAlert(`Acknowledged bill request for Table ${req.table_number}`);
-                        }}
-                        className="w-full rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800"
-                      >
-                        Acknowledge Request
-                      </button>
+                    <div className="p-4">
+                      <p className="text-sm font-semibold text-slate-600">
+                        Guest: <span className="text-slate-900">{req.customer_name || "Unknown"}</span>
+                      </p>
+                      <div className="mt-4 flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (req.type === 'BILL') {
+                              setBillRequests((prev) => {
+                                const next = new Map(prev);
+                                next.delete(req.session_id);
+                                return next;
+                              });
+                            } else {
+                              setServiceRequests((prev) => {
+                                const next = new Map(prev);
+                                next.delete(`${req.session_id}:${req.type}`);
+                                return next;
+                              });
+                            }
+                            showAlert(`Acknowledged ${req.type} for Table ${req.table_number}`);
+                          }}
+                          className="w-full rounded-xl bg-slate-900 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800"
+                        >
+                          Acknowledge
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                ))}
+            </>
           )}
         </div>
       ) : activeTab === "awaiting" ? (

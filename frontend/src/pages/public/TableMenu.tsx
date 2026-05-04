@@ -17,8 +17,11 @@ import {
 } from "lucide-react";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
+import QuickServiceDrawer from "@/components/public/QuickServiceDrawer";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
+import { getGuestToken } from "@/hooks/useGuestSession";
+import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import {
   clearGuestSession,
   getGuestDisplayName,
@@ -87,9 +90,11 @@ export default function TableMenu() {
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
   const [searchPanelOpen, setSearchPanelOpen] = useState(false);
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
-  const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<number | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
+  const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);
+  const [isRequestingService, setIsRequestingService] = useState(false);
+  const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
   const [categoryRailAutoHideEnabled, setCategoryRailAutoHideEnabled] = useState(false);
   const categoryRailShellRef = useRef<HTMLDivElement>(null);
   const lastMenuScrollYRef = useRef(0);
@@ -431,16 +436,57 @@ export default function TableMenu() {
     window.location.replace("/");
   }, []);
 
-  const handleContactStaff = useCallback(() => {
-    const phoneNumber = menu?.restaurant.phone?.trim();
-    const callablePhone = phoneNumber?.replace(/[^\d+]/g, "");
-    if (callablePhone) {
-      window.location.href = `tel:${callablePhone}`;
-      return;
-    }
+  const handleRequestService = useCallback(async (serviceType: string) => {
+    if (!restaurantId || !tableNumber) return;
+    
+    const isBill = serviceType === "BILL";
+    const endpoint = isBill ? "/table-sessions/my/request-bill" : "/table-sessions/my/request-service";
+    const body = isBill ? {} : { service_type: serviceType };
 
-    setProfileDrawerOpen(true);
-  }, [menu?.restaurant.phone]);
+    setIsRequestingService(true);
+    setLastRequestedService(serviceType);
+
+    try {
+      const guestToken = getGuestToken();
+      if (!guestToken) {
+        setPageError("Session expired. Please scan the QR code again.");
+        return;
+      }
+
+      const response = await fetch(`${RESOLVED_API_BASE_URL}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Guest-Session": guestToken,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) throw new Error("Service request failed");
+      
+      // Show success state briefly then reset
+      setTimeout(() => {
+        setIsRequestingService(false);
+        if (isBill) {
+          setServiceDrawerOpen(false);
+          // Small delay before resetting the success icon state so it's visible
+          setTimeout(() => setLastRequestedService(null), 500);
+        } else {
+          // For other services, keep it open but reset after a bit
+          setTimeout(() => setLastRequestedService(null), 1500);
+        }
+      }, 1500);
+
+    } catch (error) {
+      console.error("Service request error:", error);
+      setIsRequestingService(false);
+      setLastRequestedService(null);
+    }
+  }, [restaurantId, tableNumber]);
+
+  const handleContactStaff = useCallback(() => {
+    setServiceDrawerOpen(true);
+  }, []);
 
   if (pageError) {
     return (
@@ -977,6 +1023,17 @@ export default function TableMenu() {
         }}
         isOpen={menuDropdownOpen}
         onClose={() => setMenuDropdownOpen(false)}
+      />
+
+      <QuickServiceDrawer
+        isOpen={serviceDrawerOpen}
+        onClose={() => {
+          setServiceDrawerOpen(false);
+          setLastRequestedService(null);
+        }}
+        onRequestService={handleRequestService}
+        isSubmitting={isRequestingService}
+        lastRequestedType={lastRequestedService}
       />
 
       {/* Profile drawer */}
