@@ -232,7 +232,7 @@ export default function TableMenu() {
         window.cancelAnimationFrame(menuScrollFrameRef.current);
       }
     };
-  }, [categoryRailAutoHideEnabled]);
+  }, [categoryRailAutoHideEnabled, searchPanelOpen]);
 
   useEffect(() => {
     if (featuredBannerPaths.length <= 1) {

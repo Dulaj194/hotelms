@@ -377,10 +377,6 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     [showAlert]
   );
 
-    onBillRequested: handleBillRequested,
-    onServiceRequested: handleServiceRequested,
-  });
-
   const handleServiceRequested = useCallback(
     (event: ServiceRequestedEvent) => {
       const { table_number, customer_name, session_id, service_type, requested_at } = event.data;
@@ -405,6 +401,16 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     },
     [showAlert]
   );
+
+  const { isConnected, connectionError } = useKitchenSocket({
+    restaurantId,
+    onNewOrder: handleNewOrder,
+    onStatusUpdate: handleStatusUpdate,
+    onBillRequested: handleBillRequested,
+    onServiceRequested: handleServiceRequested,
+  });
+
+
 
   const handlePendingAction = useCallback(async (orderId: number, newStatus: string) => {
     setActionLoadingId(orderId);
