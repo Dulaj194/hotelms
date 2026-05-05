@@ -81,6 +81,8 @@ services:
       - "80:80"
     env_file:
       - ./frontend/.env
+    volumes:
+      - backend_uploads:/usr/share/nginx/html/uploads:ro
     depends_on:
       - backend
     restart: unless-stopped

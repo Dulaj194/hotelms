@@ -391,6 +391,11 @@ export default function TableMenu() {
         body: JSON.stringify(body),
       });
 
+      if (response.status === 401) {
+        clearGuestSession();
+        setPageError("Your session has expired. Please scan the QR code again to continue.");
+        return;
+      }
       if (!response.ok) throw new Error("Service request failed");
       
       // Show success state briefly then reset
