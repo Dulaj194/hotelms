@@ -22,6 +22,20 @@ const STEWARD_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
 const POLL_INTERVAL_MS = 3000;
 const SERVED_STORAGE_TTL_MS = 12 * 60 * 60 * 1000;
 
+const SERVICE_TYPE_LABELS: Record<string, string> = {
+  WATER: "Water",
+  BILL: "Bill Request",
+  STEWARD: "Call Steward",
+  CUTLERY: "Extra Cutlery",
+  NAPKINS: "Napkins / Tissues",
+  CLEANING: "Table Cleaning",
+  ORDER_UPDATE: "Order Help",
+  CONDIMENTS: "Sauces / Spices",
+  REFRESHMENTS: "Toothpicks / Mouth Freshener",
+  WIFI: "Wifi Password",
+  FEEDBACK: "Feedback",
+};
+
 type StewardTab = "awaiting" | "ready" | "requests";
 type SourceFilter = "all" | "table" | "room";
 
@@ -382,8 +396,9 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   const handleServiceRequested = useCallback(
     (event: ServiceRequestedEvent) => {
       const { table_number, customer_name, session_id, service_type, message, requested_at } = event.data;
+      const label = SERVICE_TYPE_LABELS[service_type] || service_type;
       showAlert(
-        `Table ${table_number} (${customer_name || "Guest"}) is requesting ${service_type}!`,
+        `Table ${table_number} (${customer_name || "Guest"}) is requesting ${label}!`,
         true
       );
       
@@ -632,7 +647,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
                     <div className={`px-4 py-3 text-white ${req.type === 'BILL' ? 'bg-rose-500' : 'bg-indigo-500'}`}>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold uppercase tracking-wider opacity-90">
-                          {req.type === 'BILL' ? 'Bill Request' : `Service: ${req.type}`}
+                          {SERVICE_TYPE_LABELS[req.type] || req.type}
                         </span>
                         <span className="text-[10px] font-medium opacity-80">
                           {new Date(req.requested_at).toLocaleTimeString([], {
