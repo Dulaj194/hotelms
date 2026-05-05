@@ -51,9 +51,18 @@ jobs:
           git stash
           git pull https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
           
-          # Clean up unused images and build cache to free up space before pulling
-          docker image prune -af || true
+          # Stop current containers to release image references
+          docker compose -f docker-compose.prod.yml down || true
           
+          # Comprehensive cleanup
+          docker system prune -af || true
+          docker builder prune -af || true
+          sudo journalctl --vacuum-time=1d || true
+          
+          echo "Disk space after cleanup:"
+          df -h
+          
+          # Pull and start new versions
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d
           
