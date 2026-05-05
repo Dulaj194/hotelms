@@ -439,7 +439,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
 
   const handleServiceRequested = useCallback(
     (event: ServiceRequestedEvent) => {
-      const { table_number, customer_name, session_id, service_type, message, requested_at } = event.data;
+      const { request_id, table_number, customer_name, session_id, service_type, message, requested_at } = event.data;
       const config = SERVICE_CONFIG[service_type];
       showAlert(
         `Table ${table_number} (${customer_name || "Guest"}) is requesting ${config?.label || service_type}!`,

@@ -57,6 +57,7 @@ export interface OrderStatusUpdatedEvent {
 // ── bill_requested event ──────────────────────────────────────────────────────
 
 export interface BillRequestedEventData {
+  request_id?: string;
   table_number: string;
   session_id: string;
   customer_name: string | null;
@@ -72,6 +73,7 @@ export interface BillRequestedEvent {
 // ── service_requested event ──────────────────────────────────────────────────
 
 export interface ServiceRequestedEventData {
+  request_id?: number;
   table_number: string;
   session_id: string;
   service_type: string;

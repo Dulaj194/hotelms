@@ -159,6 +159,7 @@ def publish_bill_requested(
         "event": "bill_requested",
         "restaurant_id": restaurant_id,
         "data": {
+            "request_id": session_id, # Use session_id as ID for bill requests
             "table_number": table_number,
             "session_id": session_id,
             "customer_name": customer_name,
