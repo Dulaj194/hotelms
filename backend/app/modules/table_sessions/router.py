@@ -75,3 +75,29 @@ def request_service(
     service.request_service(db, r, session, payload.service_type, payload.message)
     return {"message": f"Request for {payload.service_type} sent to staff."}
 
+@router.get("/service-requests")
+def list_service_requests(
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+):
+    """List all active table service requests (Water, etc.).
+    
+    STAFF ONLY endpoint.
+    """
+    requests = service.list_service_requests(db, restaurant_id)
+    return {"requests": requests}
+
+
+@router.delete("/service-requests/{request_id}")
+def resolve_service_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+):
+    """Mark a service request as resolved/completed."""
+    success = service.resolve_service_request(db, request_id, restaurant_id)
+    if not success:
+        return {"error": "Request not found"}, 404
+    return {"message": "Request marked as resolved."}

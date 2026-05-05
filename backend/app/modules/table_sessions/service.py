@@ -11,11 +11,7 @@ from app.core.security import create_guest_session_token, decode_table_qr_access
 from app.modules.realtime import service as realtime_service
 from app.modules.restaurants.repository import get_by_id as get_restaurant
 from app.modules.table_sessions import repository
-from app.modules.table_sessions.model import TableSession, TableSessionStatus
-from app.modules.table_sessions.schemas import (
-    TableSessionStartRequest,
-    TableSessionStartResponse,
-)
+from app.modules.table_sessions.model import TableSession, TableSessionStatus, TableServiceRequest
 
 
 def start_table_session(
@@ -150,6 +146,8 @@ def request_bill(
     except SQLAlchemyError:
         db.rollback()
         raise
+
+
 def list_bill_requests(
     db: Session,
     restaurant_id: int,
@@ -166,13 +164,54 @@ def request_service(
     message: str | None = None,
 ) -> None:
     """Publish a real-time service request from a guest table."""
-    realtime_service.publish_service_requested(
-        r,
-        restaurant_id=session.restaurant_id,
-        table_number=session.table_number,
-        session_id=session.session_id,
-        service_type=service_type,
-        customer_name=session.customer_name,
-        message=message,
-    )
+    try:
+        # 1. Persist the request to the database
+        new_request = repository.create_service_request(
+            db,
+            restaurant_id=session.restaurant_id,
+            session_id=session.session_id,
+            table_number=session.table_number,
+            customer_name=session.customer_name,
+            service_type=service_type,
+            message=message,
+        )
+        db.commit()
+        
+        # 2. Broadcast the real-time event to connected staff
+        realtime_service.publish_service_requested(
+            r,
+            restaurant_id=session.restaurant_id,
+            table_number=session.table_number,
+            session_id=session.session_id,
+            service_type=service_type,
+            request_id=new_request.id,
+            customer_name=session.customer_name,
+            message=message,
+        )
+    except Exception:
+        db.rollback()
+        raise
 
+
+def list_service_requests(
+    db: Session,
+    restaurant_id: int,
+) -> list[TableServiceRequest]:
+    """Return all active service requests for the restaurant."""
+    return repository.list_active_service_requests(db, restaurant_id)
+
+
+def resolve_service_request(
+    db: Session,
+    request_id: int,
+    restaurant_id: int,
+) -> bool:
+    """Complete a service request."""
+    try:
+        success = repository.complete_service_request(db, request_id, restaurant_id)
+        if success:
+            db.commit()
+        return success
+    except Exception:
+        db.rollback()
+        raise

@@ -56,6 +56,7 @@ type StewardTab = "awaiting" | "ready" | "requests";
 type SourceFilter = "all" | "table" | "room";
 
 interface ServiceRequest {
+  id: number;
   session_id: string;
   table_number: string;
   customer_name: string | null;
@@ -288,10 +289,11 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
       setLoadError(null);
 
       try {
-        const [pendingRes, completedRes, billsRes] = await Promise.all([
+        const [pendingRes, completedRes, billsRes, serviceRes] = await Promise.all([
           api.get<KitchenOrderListResponse>("/orders/pending"),
           api.get<KitchenOrderListResponse>("/orders/completed"),
           api.get<{ requests: BillRequest[] }>("/table-sessions/bill-requests"),
+          api.get<{ requests: ServiceRequest[] }>("/table-sessions/service-requests"),
         ]);
 
         const nextPending = new Map<number, KitchenOrderCard>();
@@ -311,9 +313,17 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           nextBills.set(req.session_id, req);
         }
 
+        const nextService = new Map<string, ServiceRequest>();
+        for (const req of serviceRes.requests) {
+          // Use id if available, fallback to composite key for older sessions
+          const key = String(req.id || `${req.session_id}:${req.service_type}`);
+          nextService.set(key, req);
+        }
+
         setPendingOrders(nextPending);
         setReadyOrders(nextReady);
         setBillRequests(nextBills);
+        setServiceRequests(nextService);
 
         if (
           notifyIfIncreased &&
@@ -438,9 +448,10 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
       
       setServiceRequests((prev) => {
         const next = new Map(prev);
-        // Use composite key to allow multiple requests per session
-        const key = `${session_id}:${service_type}`;
+        // Use request_id if available, fallback to composite key
+        const key = String(request_id || `${session_id}:${service_type}`);
         next.set(key, {
+          id: request_id || 0,
           session_id,
           table_number,
           customer_name,

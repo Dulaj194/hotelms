@@ -72,3 +72,33 @@ class TableSession(Base):
     )
 
     restaurant: Mapped[Restaurant] = relationship("Restaurant")
+
+
+class TableServiceRequest(Base):
+    """Stores a specific service request from a guest at a table.
+    
+    Requests are persisted so that staff can see them even after a page refresh
+    or if they were offline when the request was first made.
+    """
+    __tablename__ = "table_service_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    
+    restaurant_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    
+    # Linked to a session but we duplicate table/customer for fast lookup without joins
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    table_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    customer_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    
+    service_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    
+    is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

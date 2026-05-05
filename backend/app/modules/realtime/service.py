@@ -175,6 +175,7 @@ def publish_service_requested(
     table_number: str,
     session_id: str,
     service_type: str,
+    request_id: int | None = None,
     customer_name: str | None = None,
     message: str | None = None,
 ) -> None:
@@ -186,6 +187,7 @@ def publish_service_requested(
         "event": "service_requested",
         "restaurant_id": restaurant_id,
         "data": {
+            "request_id": request_id,
             "table_number": table_number,
             "session_id": session_id,
             "service_type": service_type,

@@ -207,3 +207,71 @@ def list_bill_requests_for_restaurant(
         .order_by(TableSession.updated_at.desc())
         .all()
     )
+
+
+def create_service_request(
+    db: Session,
+    restaurant_id: int,
+    session_id: str,
+    table_number: str,
+    customer_name: str | None,
+    service_type: str,
+    message: str | None = None,
+) -> TableServiceRequest:
+    """Create and persist a new guest service request."""
+    from app.modules.table_sessions.model import TableServiceRequest
+    
+    request = TableServiceRequest(
+        restaurant_id=restaurant_id,
+        session_id=session_id,
+        table_number=table_number,
+        customer_name=customer_name,
+        service_type=service_type,
+        message=message,
+    )
+    db.add(request)
+    db.flush()
+    db.refresh(request)
+    return request
+
+
+def list_active_service_requests(
+    db: Session,
+    restaurant_id: int,
+) -> list[TableServiceRequest]:
+    """Return all non-completed service requests for a restaurant."""
+    from app.modules.table_sessions.model import TableServiceRequest
+    
+    return (
+        db.query(TableServiceRequest)
+        .filter(
+            TableServiceRequest.restaurant_id == restaurant_id,
+            TableServiceRequest.is_completed.is_(False),
+        )
+        .order_by(TableServiceRequest.requested_at.desc())
+        .all()
+    )
+
+
+def complete_service_request(
+    db: Session,
+    request_id: int,
+    restaurant_id: int,
+) -> bool:
+    """Mark a service request as completed/resolved."""
+    from app.modules.table_sessions.model import TableServiceRequest
+    
+    request = (
+        db.query(TableServiceRequest)
+        .filter(
+            TableServiceRequest.id == request_id,
+            TableServiceRequest.restaurant_id == restaurant_id,
+        )
+        .first()
+    )
+    if request:
+        request.is_completed = True
+        request.completed_at = datetime.now(UTC)
+        db.flush()
+        return True
+    return False
