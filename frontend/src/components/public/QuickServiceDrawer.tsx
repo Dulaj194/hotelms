@@ -150,10 +150,10 @@ export default function QuickServiceDrawer({
                 disabled={isSubmitting && !isSelected}
                 onClick={() => handleServiceClick(service.id)}
                 className={`w-full group flex items-center gap-4 p-3.5 rounded-2xl border-2 transition-all duration-300 active:scale-[0.98] ${isSelected
-                    ? "border-orange-500 bg-orange-50 text-orange-900 shadow-md"
-                    : service.isPrimary
-                      ? "bg-slate-200 border-slate-900 text-white shadow-lg shadow-slate-200"
-                      : "bg-white border-slate-100 text-slate-900 hover:border-orange-200 hover:bg-orange-50/30"
+                  ? "border-orange-500 bg-orange-50 text-orange-900 shadow-md"
+                  : service.isPrimary
+                    ? "bg-slate-900 border-slate-900 text-white shadow-lg shadow-slate-200"
+                    : "bg-white border-slate-100 text-slate-900 hover:border-orange-200 hover:bg-orange-50/30"
                   } ${isSubmitting && !isSelected ? "opacity-40" : "opacity-100"}`}
               >
                 <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${service.isPrimary ? "bg-white/20" : isSelected ? "bg-orange-500 text-white" : service.color
@@ -219,8 +219,8 @@ export default function QuickServiceDrawer({
             </div>
 
             <div className={`rounded-2xl transition-all duration-500 ${lastRequestedType && !isSubmitting
-                ? "bg-emerald-50 border-emerald-100 shadow-sm shadow-emerald-50"
-                : "bg-orange-50/50 border-orange-100/50"
+              ? "bg-emerald-50 border-emerald-100 shadow-sm shadow-emerald-50"
+              : "bg-orange-50/50 border-orange-100/50"
               } p-4 border`}>
               {lastRequestedType && !isSubmitting ? (
                 <div className="flex items-center justify-center gap-2 text-emerald-700 animate-in fade-in slide-in-from-bottom-1">
