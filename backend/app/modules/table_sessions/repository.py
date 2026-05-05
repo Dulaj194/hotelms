@@ -245,6 +245,7 @@ def list_active_service_requests(
             .filter(
                 TableServiceRequest.restaurant_id == restaurant_id,
                 TableServiceRequest.is_completed.is_(False),
+                TableServiceRequest.acknowledged_by.is_(None),
             )
             .order_by(TableServiceRequest.requested_at.desc())
             .all()

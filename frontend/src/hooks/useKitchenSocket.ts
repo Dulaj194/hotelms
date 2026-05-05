@@ -21,6 +21,8 @@ import type {
   NewOrderEvent,
   OrderStatusUpdatedEvent,
   ServiceRequestedEvent,
+  ServiceAcknowledgedEvent,
+  BillAcknowledgedEvent,
 } from "@/types/realtime";
 
 // Reconnect delay schedule (ms) — exponential back-off capped at 15s
@@ -35,6 +37,8 @@ interface UseKitchenSocketOptions {
   onStatusUpdate?: (event: OrderStatusUpdatedEvent) => void;
   onBillRequested?: (event: BillRequestedEvent) => void;
   onServiceRequested?: (event: ServiceRequestedEvent) => void;
+  onServiceAcknowledged?: (event: ServiceAcknowledgedEvent) => void;
+  onBillAcknowledged?: (event: BillAcknowledgedEvent) => void;
 }
 
 export interface UseKitchenSocketReturn {
@@ -48,6 +52,8 @@ export function useKitchenSocket({
   onStatusUpdate,
   onBillRequested,
   onServiceRequested,
+  onServiceAcknowledged,
+  onBillAcknowledged,
 }: UseKitchenSocketOptions): UseKitchenSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -62,10 +68,14 @@ export function useKitchenSocket({
   const onStatusUpdateRef = useRef(onStatusUpdate);
   const onBillRequestedRef = useRef(onBillRequested);
   const onServiceRequestedRef = useRef(onServiceRequested);
+  const onServiceAcknowledgedRef = useRef(onServiceAcknowledged);
+  const onBillAcknowledgedRef = useRef(onBillAcknowledged);
   onNewOrderRef.current = onNewOrder;
   onStatusUpdateRef.current = onStatusUpdate;
   onBillRequestedRef.current = onBillRequested;
   onServiceRequestedRef.current = onServiceRequested;
+  onServiceAcknowledgedRef.current = onServiceAcknowledged;
+  onBillAcknowledgedRef.current = onBillAcknowledged;
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -110,6 +120,10 @@ export function useKitchenSocket({
             onBillRequestedRef.current?.(data as BillRequestedEvent);
           } else if (data.event === "service_requested") {
             onServiceRequestedRef.current?.(data as ServiceRequestedEvent);
+          } else if (data.event === "service_acknowledged") {
+            onServiceAcknowledgedRef.current?.(data as ServiceAcknowledgedEvent);
+          } else if (data.event === "bill_acknowledged") {
+            onBillAcknowledgedRef.current?.(data as BillAcknowledgedEvent);
           }
         } catch {
           // ignore malformed messages

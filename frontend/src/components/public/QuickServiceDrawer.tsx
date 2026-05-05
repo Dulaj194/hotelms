@@ -127,7 +127,7 @@ export default function QuickServiceDrawer({
 
         <div className="px-6 mb-4 flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-2xl font-black tracking-tight text-slate-900">Table Service</h2>
+            <h2 className="text-2xl font-black tracking-tight text-slate-900">Quick Services</h2>
             <p className="mt-1 text-sm font-medium text-slate-500">How can we help you today?</p>
           </div>
           <button

@@ -963,7 +963,7 @@ export default function TableMenu() {
             aria-label="Contact staff"
           >
             <MessageCircle className="h-5 w-5" />
-            <span className="max-w-full truncate">Chat</span>
+            <span className="max-w-full truncate">Service</span>
           </button>
         </div>
       </div>

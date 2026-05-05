@@ -224,16 +224,53 @@ def resolve_service_request(
 
 def acknowledge_service_request(
     db: Session,
+    r: redis_lib.Redis,
     request_id: int,
     restaurant_id: int,
     user_id: int,
 ) -> bool:
-    """Mark a service request as acknowledged by a staff member."""
+    """Mark a service request as acknowledged by a staff member and broadcast."""
     try:
         success = repository.acknowledge_service_request(db, request_id, restaurant_id, user_id)
         if success:
             db.commit()
+            # Broadcast the acknowledgement so other dashboards can remove it
+            realtime_service.publish_service_acknowledged(
+                r,
+                restaurant_id=restaurant_id,
+                request_id=request_id,
+                acknowledged_by=user_id,
+            )
         return success
+    except Exception:
+        db.rollback()
+        raise
+
+
+def acknowledge_bill(
+    db: Session,
+    r: redis_lib.Redis,
+    session_id: str,
+    restaurant_id: int,
+    user_id: int,
+) -> bool:
+    """Mark a bill request as acknowledged and broadcast."""
+    try:
+        session = repository.get_session_by_id_and_restaurant(db, session_id, restaurant_id)
+        if session and session.session_status == TableSessionStatus.BILL_REQUESTED:
+            session.session_status = TableSessionStatus.BILL_ACKNOWLEDGED
+            session.updated_at = datetime.now(UTC)
+            db.commit()
+            
+            # Broadcast the acknowledgement
+            realtime_service.publish_bill_acknowledged(
+                r,
+                restaurant_id=restaurant_id,
+                session_id=session_id,
+                acknowledged_by=user_id,
+            )
+            return True
+        return False
     except Exception:
         db.rollback()
         raise

@@ -96,14 +96,30 @@ def list_service_requests(
 def acknowledge_service_request(
     request_id: int,
     db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
     restaurant_id: int = Depends(get_current_restaurant_id),
     current_user=Depends(require_roles(*_STAFF_ROLES)),
 ):
     """Mark a service request as acknowledged by the current staff member."""
-    success = service.acknowledge_service_request(db, request_id, restaurant_id, current_user.id)
+    success = service.acknowledge_service_request(db, r, request_id, restaurant_id, current_user.id)
     if not success:
         return {"error": "Request not found"}, 404
     return {"message": "Service request acknowledged."}
+
+
+@router.patch("/bill-requests/{session_id}/acknowledge")
+def acknowledge_bill(
+    session_id: str,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_STAFF_ROLES)),
+):
+    """Mark a bill request as acknowledged."""
+    success = service.acknowledge_bill(db, r, session_id, restaurant_id, current_user.id)
+    if not success:
+        return {"error": "Bill request not found or already acknowledged"}, 404
+    return {"message": "Bill request acknowledged."}
 
 
 @router.delete("/service-requests/{request_id}")

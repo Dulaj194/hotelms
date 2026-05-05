@@ -88,10 +88,40 @@ export interface ServiceRequestedEvent {
   data: ServiceRequestedEventData;
 }
 
+// ── service_acknowledged event ────────────────────────────────────────────────
+
+export interface ServiceAcknowledgedEventData {
+  request_id: number;
+  acknowledged_by: number;
+  acknowledged_at: string;
+}
+
+export interface ServiceAcknowledgedEvent {
+  event: "service_acknowledged";
+  restaurant_id: number;
+  data: ServiceAcknowledgedEventData;
+}
+
+// ── bill_acknowledged event ───────────────────────────────────────────────────
+
+export interface BillAcknowledgedEventData {
+  session_id: string;
+  acknowledged_by: number;
+  acknowledged_at: string;
+}
+
+export interface BillAcknowledgedEvent {
+  event: "bill_acknowledged";
+  restaurant_id: number;
+  data: BillAcknowledgedEventData;
+}
+
 // ── Union type for all kitchen events ─────────────────────────────────────────
 
 export type KitchenEvent =
   | NewOrderEvent
   | OrderStatusUpdatedEvent
   | BillRequestedEvent
-  | ServiceRequestedEvent;
+  | ServiceRequestedEvent
+  | ServiceAcknowledgedEvent
+  | BillAcknowledgedEvent;

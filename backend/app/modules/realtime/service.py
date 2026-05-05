@@ -169,6 +169,26 @@ def publish_bill_requested(
     realtime_repo.publish_event(r, restaurant_id, event)
 
 
+def publish_bill_acknowledged(
+    r: redis_lib.Redis,
+    *,
+    restaurant_id: int,
+    session_id: str,
+    acknowledged_by: int,
+) -> None:
+    """Publish a bill_acknowledged event."""
+    event = {
+        "event": "bill_acknowledged",
+        "restaurant_id": restaurant_id,
+        "data": {
+            "session_id": session_id,
+            "acknowledged_by": acknowledged_by,
+            "acknowledged_at": datetime.now(UTC),
+        },
+    }
+    realtime_repo.publish_event(r, restaurant_id, event)
+
+
 def publish_service_requested(
     r: redis_lib.Redis,
     *,
@@ -195,6 +215,29 @@ def publish_service_requested(
             "customer_name": customer_name,
             "message": message,
             "requested_at": datetime.now(UTC),
+        },
+    }
+    realtime_repo.publish_event(r, restaurant_id, event)
+
+
+def publish_service_acknowledged(
+    r: redis_lib.Redis,
+    *,
+    restaurant_id: int,
+    request_id: int,
+    acknowledged_by: int,
+) -> None:
+    """Publish a service_acknowledged event.
+
+    Allows other steward dashboards to remove this request from their view in real-time.
+    """
+    event = {
+        "event": "service_acknowledged",
+        "restaurant_id": restaurant_id,
+        "data": {
+            "request_id": request_id,
+            "acknowledged_by": acknowledged_by,
+            "acknowledged_at": datetime.now(UTC),
         },
     }
     realtime_repo.publish_event(r, restaurant_id, event)

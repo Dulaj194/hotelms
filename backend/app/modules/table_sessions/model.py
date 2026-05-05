@@ -19,6 +19,7 @@ class TableSessionStatus(str, enum.Enum):
     OPEN = "OPEN"
     CLOSED = "CLOSED"
     BILL_REQUESTED = "BILL_REQUESTED"
+    BILL_ACKNOWLEDGED = "BILL_ACKNOWLEDGED"
 
 
 class TableSession(Base):
