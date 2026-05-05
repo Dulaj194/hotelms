@@ -30,6 +30,7 @@ interface ServiceRequest {
   table_number: string;
   customer_name: string | null;
   service_type: string;
+  message: string | null;
   requested_at: string;
 }
 
@@ -379,7 +380,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
 
   const handleServiceRequested = useCallback(
     (event: ServiceRequestedEvent) => {
-      const { table_number, customer_name, session_id, service_type, requested_at } = event.data;
+      const { table_number, customer_name, session_id, service_type, message, requested_at } = event.data;
       showAlert(
         `Table ${table_number} (${customer_name || "Guest"}) is requesting ${service_type}!`,
         true
@@ -394,6 +395,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           table_number,
           customer_name,
           service_type,
+          message,
           requested_at,
         });
         return next;
@@ -644,6 +646,14 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
                       <p className="text-sm font-semibold text-slate-600">
                         Guest: <span className="text-slate-900">{req.customer_name || "Unknown"}</span>
                       </p>
+                      {req.message && (
+                        <div className="mt-3 rounded-xl bg-slate-50 p-3 border border-slate-100">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Message</p>
+                          <p className="text-xs font-medium text-slate-700 leading-relaxed italic">
+                            "{req.message}"
+                          </p>
+                        </div>
+                      )}
                       <div className="mt-4 flex flex-col gap-2">
                         <button
                           type="button"

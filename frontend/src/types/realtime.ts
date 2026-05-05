@@ -76,6 +76,7 @@ export interface ServiceRequestedEventData {
   session_id: string;
   service_type: string;
   customer_name: string | null;
+  message: string | null;
   requested_at: string;
 }
 

@@ -50,6 +50,12 @@ jobs:
           cd $HOME/hotelms
           git stash
           git pull https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git main
+          
+          # Clean up unused images and build cache to free up space before pulling
+          docker image prune -af || true
+          
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d
+          
+          # Final cleanup of dangling images
           docker image prune -f

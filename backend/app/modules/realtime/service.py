@@ -176,6 +176,7 @@ def publish_service_requested(
     session_id: str,
     service_type: str,
     customer_name: str | None = None,
+    message: str | None = None,
 ) -> None:
     """Publish a service_requested event to the staff channel.
 
@@ -189,6 +190,7 @@ def publish_service_requested(
             "session_id": session_id,
             "service_type": service_type,
             "customer_name": customer_name,
+            "message": message,
             "requested_at": datetime.now(UTC),
         },
     }

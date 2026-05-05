@@ -173,5 +173,6 @@ def request_service(
         session_id=session.session_id,
         service_type=service_type,
         customer_name=session.customer_name,
+        message=message,
     )
 
