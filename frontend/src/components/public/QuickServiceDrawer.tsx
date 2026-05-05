@@ -1,10 +1,11 @@
+import { useState, useEffect } from "react";
 import { Check, X, Droplets, User, FileText, Wifi, Star, Sparkles, MessageSquare } from "lucide-react";
 
 
 interface QuickServiceDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  onRequestService: (type: string) => Promise<void>;
+  onRequestService: (type: string, message?: string) => Promise<void>;
   isSubmitting: boolean;
   lastRequestedType: string | null;
 }
@@ -47,6 +48,21 @@ export default function QuickServiceDrawer({
   isSubmitting,
   lastRequestedType,
 }: QuickServiceDrawerProps) {
+  const [customMessage, setCustomMessage] = useState("");
+
+  // Clear message when drawer closes or after successful request
+  useEffect(() => {
+    if (!isOpen) {
+      setCustomMessage("");
+    }
+  }, [isOpen]);
+
+  const handleServiceClick = (serviceId: string) => {
+    void onRequestService(serviceId, customMessage);
+    // Note: We don't clear it immediately in case of failure, 
+    // but the useEffect above clears it when the drawer is closed after success
+  };
+
   return (
     <div className={`fixed inset-0 z-[100] overflow-hidden transition-all duration-300 ${isOpen ? "visible" : "invisible"}`}>
       {/* Backdrop */}
@@ -88,7 +104,7 @@ export default function QuickServiceDrawer({
               <button
                 key={service.id}
                 disabled={isSubmitting && !isSelected}
-                onClick={() => onRequestService(service.id)}
+                onClick={() => handleServiceClick(service.id)}
                 className="group flex flex-col items-center gap-3 outline-none"
               >
                 <div
@@ -118,12 +134,41 @@ export default function QuickServiceDrawer({
           })}
         </div>
 
-        <div className="mt-8 rounded-2xl bg-slate-50 p-4">
-          <div className="flex gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white shadow-sm">
-              <MessageSquare className="h-5 w-5 text-orange-500" />
+        <div className="mt-8 space-y-4">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                Add a message (Optional)
+              </label>
+              <div className="flex items-center gap-3">
+                {customMessage && (
+                  <button 
+                    onClick={() => setCustomMessage("")}
+                    className="text-[10px] font-bold uppercase text-orange-500 hover:text-orange-600 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+                <span className={`text-[10px] font-bold ${customMessage.length > 450 ? 'text-red-500' : 'text-slate-300'}`}>
+                  {customMessage.length}/500
+                </span>
+              </div>
             </div>
-            <p className="text-xs leading-relaxed text-slate-600">
+            <div className="relative">
+              <textarea
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value.slice(0, 500))}
+                placeholder="e.g. Extra ice, with lemon, or baby chair please..."
+                className="w-full min-h-[95px] rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none transition-all placeholder:text-slate-300 focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/10 resize-none"
+              />
+              <div className="absolute right-4 bottom-3 pointer-events-none">
+                <MessageSquare className="h-4 w-4 text-slate-200" />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-orange-50/50 p-4 border border-orange-100/50">
+            <p className="text-[10px] font-medium text-center text-orange-700/70 leading-relaxed">
               Tap any service above to notify our staff. We'll be with you shortly!
             </p>
           </div>
@@ -132,3 +177,4 @@ export default function QuickServiceDrawer({
     </div>
   );
 }
+

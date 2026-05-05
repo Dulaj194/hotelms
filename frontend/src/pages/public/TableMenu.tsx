@@ -365,12 +365,12 @@ export default function TableMenu() {
     window.location.replace("/");
   }, []);
 
-  const handleRequestService = useCallback(async (serviceType: string) => {
+  const handleRequestService = useCallback(async (serviceType: string, message?: string) => {
     if (!restaurantId || !tableNumber) return;
     
     const isBill = serviceType === "BILL";
     const endpoint = isBill ? "/table-sessions/my/request-bill" : "/table-sessions/my/request-service";
-    const body = isBill ? {} : { service_type: serviceType };
+    const body = isBill ? {} : { service_type: serviceType, message: message?.trim() || undefined };
 
     setIsRequestingService(true);
     setLastRequestedService(serviceType);
