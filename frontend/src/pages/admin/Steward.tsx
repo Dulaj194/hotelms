@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { 
   Droplets, 
   FileText, 
@@ -212,15 +213,33 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     [restaurantId]
   );
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [pendingOrders, setPendingOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
   const [readyOrders, setReadyOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
   const [billRequests, setBillRequests] = useState<Map<string, BillRequest>>(new Map());
   const [serviceRequests, setServiceRequests] = useState<Map<string, ServiceRequest>>(new Map());
   const [servedOrderIds, setServedOrderIds] = useState<Set<number>>(() => loadServedOrderIds(servedStorageKey));
 
-  const [activeTab, setActiveTab] = useState<StewardTab>("awaiting");
+  const [activeTab, setActiveTab] = useState<StewardTab>(() => {
+    const tab = searchParams.get("tab") as StewardTab;
+    return (tab === "awaiting" || tab === "ready" || tab === "requests") ? tab : "awaiting";
+  });
+  
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [locationFilter, setLocationFilter] = useState("");
+
+  // Sync state if URL changes (e.g. sidebar link click)
+  useEffect(() => {
+    const tab = searchParams.get("tab") as StewardTab;
+    if (tab && (tab === "awaiting" || tab === "ready" || tab === "requests") && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams, activeTab]);
+
+  const handleTabChange = (tab: StewardTab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab }, { replace: true });
+  };
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -578,7 +597,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setActiveTab("awaiting")}
+            onClick={() => handleTabChange("awaiting")}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               activeTab === "awaiting"
                 ? "bg-blue-600 text-white"
@@ -589,7 +608,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("ready")}
+            onClick={() => handleTabChange("ready")}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               activeTab === "ready"
                 ? "bg-emerald-600 text-white"
@@ -600,7 +619,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("requests")}
+            onClick={() => handleTabChange("requests")}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               activeTab === "requests"
                 ? "bg-rose-600 text-white shadow-md"
