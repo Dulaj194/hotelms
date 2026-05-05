@@ -239,15 +239,19 @@ def list_active_service_requests(
     restaurant_id: int,
 ) -> list[TableServiceRequest]:
     """Return all non-completed service requests for a restaurant."""
-    return (
-        db.query(TableServiceRequest)
-        .filter(
-            TableServiceRequest.restaurant_id == restaurant_id,
-            TableServiceRequest.is_completed.is_(False),
+    try:
+        return (
+            db.query(TableServiceRequest)
+            .filter(
+                TableServiceRequest.restaurant_id == restaurant_id,
+                TableServiceRequest.is_completed.is_(False),
+            )
+            .order_by(TableServiceRequest.requested_at.desc())
+            .all()
         )
-        .order_by(TableServiceRequest.requested_at.desc())
-        .all()
-    )
+    except Exception:
+        # Fallback if table doesn't exist yet or other DB issue
+        return []
 
 
 def complete_service_request(

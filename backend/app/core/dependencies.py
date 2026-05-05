@@ -392,7 +392,7 @@ def resolve_guest_session_token(x_guest_session: str, db: Session):
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Guest session context mismatch (restaurant/table)",
+            detail="Invalid or expired guest session.",
             headers={"WWW-Authenticate": "X-Guest-Session"},
         )
 
