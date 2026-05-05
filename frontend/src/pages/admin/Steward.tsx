@@ -38,6 +38,7 @@ interface BillRequest {
   session_id: string;
   table_number: string;
   customer_name: string | null;
+  message?: string | null;
   requested_at: string;
 }
 
@@ -617,7 +618,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
             <>
               {/* Combine and sort all requests by time */}
               {[
-                ...Array.from(billRequests.values()).map(r => ({ ...r, type: 'BILL' })),
+                ...Array.from(billRequests.values()).map(r => ({ ...r, type: 'BILL', message: null })),
                 ...Array.from(serviceRequests.values()).map(r => ({ ...r, type: r.service_type }))
               ]
                 .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())
