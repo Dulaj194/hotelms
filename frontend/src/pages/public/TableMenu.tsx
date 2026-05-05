@@ -396,7 +396,12 @@ export default function TableMenu() {
         setPageError("Your session has expired. Please scan the QR code again to continue.");
         return;
       }
-      if (!response.ok) throw new Error("Service request failed");
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Backend Error Detail:", errorData);
+        throw new Error(errorData.detail || "Service request failed");
+      }
       
       // Show success state briefly then reset
       setTimeout(() => {

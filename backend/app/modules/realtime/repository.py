@@ -40,15 +40,19 @@ def publish_event(r: redis_lib.Redis, restaurant_id: int, event: dict) -> None:
     handlers. The async subscription (WebSocket side) receives this message
     via its own async Redis client.
     """
+    if r is None:
+        return
     channel = get_order_channel(restaurant_id)
     payload = json.dumps(event, default=_json_default)
     r.publish(channel, payload)
 
 
 def publish_global_event(
-    r: redis_lib.Redis,
+    r: redis_lib.Redis | None,
     channel: str,
     event: dict,
 ) -> None:
+    if r is None:
+        return
     payload = json.dumps(event, default=_json_default)
     r.publish(channel, payload)
