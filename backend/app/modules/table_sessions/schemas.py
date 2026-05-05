@@ -60,9 +60,25 @@ class BillRequestListResponse(BaseModel):
     requests: list[BillRequestResponse]
 
 
-class TableServiceRequest(BaseModel):
+class TableServiceRequestPayload(BaseModel):
     service_type: str = Field(..., description="Type of service: WATER, STEWARD, CLEANING, etc.")
     message: str | None = Field(None, max_length=500)
+
+
+class ServiceRequestResponse(BaseModel):
+    id: int
+    session_id: str
+    table_number: str
+    customer_name: str | None
+    service_type: str
+    message: str | None
+    requested_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ServiceRequestListResponse(BaseModel):
+    requests: list[ServiceRequestResponse]
 
 
 

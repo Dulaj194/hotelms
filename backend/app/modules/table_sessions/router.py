@@ -6,6 +6,14 @@ from app.core.dependencies import (
     get_current_guest_session,
     get_current_restaurant_id,
     get_db,
+import redis as redis_lib
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.core.dependencies import (
+    get_current_guest_session,
+    get_current_restaurant_id,
+    get_db,
     get_redis,
     require_roles,
 )
@@ -16,7 +24,8 @@ from app.modules.table_sessions.schemas import (
     BillRequestListResponse,
     TableSessionStartRequest,
     TableSessionStartResponse,
-    TableServiceRequest,
+    TableServiceRequestPayload,
+    ServiceRequestListResponse,
 )
 
 router = APIRouter()
@@ -64,9 +73,10 @@ def list_bill_requests(
     sessions = service.list_bill_requests(db, restaurant_id)
     return {"requests": sessions}
 
+
 @router.post("/my/request-service")
 def request_service(
-    payload: TableServiceRequest,
+    payload: TableServiceRequestPayload,
     session: TableSession = Depends(get_current_guest_session),
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
@@ -75,7 +85,8 @@ def request_service(
     service.request_service(db, r, session, payload.service_type, payload.message)
     return {"message": f"Request for {payload.service_type} sent to staff."}
 
-@router.get("/service-requests")
+
+@router.get("/service-requests", response_model=ServiceRequestListResponse)
 def list_service_requests(
     db: Session = Depends(get_db),
     restaurant_id: int = Depends(get_current_restaurant_id),
