@@ -146,7 +146,7 @@ app.add_middleware(
     allow_origin_regex=settings.cors_allowed_origin_regex,
     allow_credentials=True,  # Only safe because allow_origins is explicitly curated
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],  # Explicit methods
-    allow_headers=["Content-Type", "Authorization", "Accept"],  # Explicit headers
+    allow_headers=["Content-Type", "Authorization", "Accept", "X-Guest-Session", "Idempotency-Key"],  # Explicit headers
     max_age=3600,  # Cache CORS preflight for 1 hour
 )
 
