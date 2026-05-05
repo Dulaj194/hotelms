@@ -12,8 +12,7 @@ import {
   Wifi, 
   Star,
   Check,
-  Bell,
-  Clock
+  Bell
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
