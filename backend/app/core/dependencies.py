@@ -388,9 +388,13 @@ def resolve_guest_session_token(x_guest_session: str, db: Session):
 
     if (
         token_restaurant_id != session.restaurant_id
-        or token_table_number != session.table_number
+        or str(token_table_number).strip() != str(session.table_number).strip()
     ):
-        raise credentials_exception
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Guest session context mismatch (restaurant/table)",
+            headers={"WWW-Authenticate": "X-Guest-Session"},
+        )
 
     return session
 

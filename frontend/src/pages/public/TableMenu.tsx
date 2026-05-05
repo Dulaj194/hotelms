@@ -411,8 +411,12 @@ export default function TableMenu() {
         }
       }, 1500);
 
-    } catch (error) {
-      console.error("Service request error:", error);
+    } catch (error: any) {
+      console.error("Service request error details:", {
+        error: error.message,
+        service: serviceType,
+        endpoint: endpoint
+      });
       setIsRequestingService(false);
       setLastRequestedService(null);
     }
