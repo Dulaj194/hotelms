@@ -13,6 +13,10 @@ from app.modules.realtime import service as realtime_service
 from app.modules.restaurants.repository import get_by_id as get_restaurant
 from app.modules.table_sessions import repository
 from app.modules.table_sessions.model import TableSession, TableSessionStatus, TableServiceRequest
+from app.modules.table_sessions.schemas import (
+    TableSessionStartRequest,
+    TableSessionStartResponse,
+)
 
 
 def start_table_session(

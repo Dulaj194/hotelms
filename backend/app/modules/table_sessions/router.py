@@ -6,14 +6,6 @@ from app.core.dependencies import (
     get_current_guest_session,
     get_current_restaurant_id,
     get_db,
-import redis as redis_lib
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-
-from app.core.dependencies import (
-    get_current_guest_session,
-    get_current_restaurant_id,
-    get_db,
     get_redis,
     require_roles,
 )
