@@ -79,6 +79,12 @@ class TableServiceRequest(Base):
     
     Requests are persisted so that staff can see them even after a page refresh
     or if they were offline when the request was first made.
+    
+    Lifecycle:
+    - Created when guest taps Quick Services button
+    - Real-time event broadcast to steward dashboard
+    - Staff can acknowledge it (acknowledged_by + acknowledged_at)
+    - Staff can mark as completed (is_completed + completed_at)
     """
     __tablename__ = "table_service_requests"
 
@@ -96,6 +102,13 @@ class TableServiceRequest(Base):
     service_type: Mapped[str] = mapped_column(String(50), nullable=False)
     message: Mapped[str | None] = mapped_column(String(500), nullable=True)
     
+    # Acknowledgement tracking (staff member who acknowledged)
+    acknowledged_by: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Completion tracking
     is_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     
     requested_at: Mapped[datetime] = mapped_column(

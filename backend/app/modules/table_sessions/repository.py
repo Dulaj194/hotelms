@@ -274,3 +274,26 @@ def complete_service_request(
         db.flush()
         return True
     return False
+
+
+def acknowledge_service_request(
+    db: Session,
+    request_id: int,
+    restaurant_id: int,
+    user_id: int,
+) -> bool:
+    """Mark a service request as acknowledged by a staff member."""
+    request = (
+        db.query(TableServiceRequest)
+        .filter(
+            TableServiceRequest.id == request_id,
+            TableServiceRequest.restaurant_id == restaurant_id,
+        )
+        .first()
+    )
+    if request:
+        request.acknowledged_by = user_id
+        request.acknowledged_at = datetime.now(UTC)
+        db.flush()
+        return True
+    return False

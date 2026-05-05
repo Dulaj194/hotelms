@@ -92,6 +92,20 @@ def list_service_requests(
     return {"requests": requests}
 
 
+@router.patch("/service-requests/{request_id}/acknowledge")
+def acknowledge_service_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    current_user=Depends(require_roles(*_STAFF_ROLES)),
+):
+    """Mark a service request as acknowledged by the current staff member."""
+    success = service.acknowledge_service_request(db, request_id, restaurant_id, current_user.id)
+    if not success:
+        return {"error": "Request not found"}, 404
+    return {"message": "Service request acknowledged."}
+
+
 @router.delete("/service-requests/{request_id}")
 def resolve_service_request(
     request_id: int,

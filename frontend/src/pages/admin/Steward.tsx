@@ -473,6 +473,41 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     onServiceRequested: handleServiceRequested,
   });
 
+  const handleAcknowledgeRequest = useCallback(
+    async (req: ServiceRequest | BillRequest | { type: string; session_id: string; id?: number; table_number: string }) => {
+      const isServiceReq = (req as ServiceRequest).id !== undefined;
+      const requestId = isServiceReq ? (req as ServiceRequest).id : undefined;
+
+      if (!requestId) return; // Bill requests don't have API acknowledgement yet
+
+      setActionLoadingId(requestId);
+      setActionError(null);
+
+      try {
+        await api.patch(`/table-sessions/service-requests/${requestId}/acknowledge`);
+
+        setServiceRequests((prev) => {
+          const next = new Map(prev);
+          // Remove from display after acknowledging
+          const key = String(requestId);
+          next.delete(key);
+          return next;
+        });
+
+        showAlert(`Acknowledged request for Table ${req.table_number}`);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setActionError(err.detail || "Failed to acknowledge request.");
+        } else {
+          setActionError("Failed to acknowledge request.");
+        }
+      } finally {
+        setActionLoadingId(null);
+      }
+    },
+    [showAlert]
+  );
+
 
 
   const handlePendingAction = useCallback(async (orderId: number, newStatus: string) => {
@@ -738,28 +773,18 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
 
                         <button
                           type="button"
-                          onClick={() => {
-                            if (req.type === 'BILL') {
-                              setBillRequests((prev) => {
-                                const next = new Map(prev);
-                                next.delete(req.session_id);
-                                return next;
-                              });
-                            } else {
-                              setServiceRequests((prev) => {
-                                const next = new Map(prev);
-                                next.delete(`${req.session_id}:${req.type}`);
-                                return next;
-                              });
-                            }
-                            showAlert(`Acknowledged ${config.label} for Table ${req.table_number}`);
-                          }}
-                          className={`w-full group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl py-3 text-sm font-black transition-all active:scale-[0.98] ${
+                          disabled={req.type !== 'BILL' && actionLoadingId === (req as any).id}
+                          onClick={() => void handleAcknowledgeRequest(req)}
+                          className={`w-full group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl py-3 text-sm font-black transition-all active:scale-[0.98] disabled:opacity-60 ${
                             req.type === 'BILL' ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-slate-900 text-white hover:bg-slate-800'
                           }`}
                         >
-                          <Check className="h-4 w-4 transition-transform group-hover:scale-110" />
-                          <span>Acknowledge Request</span>
+                          {req.type !== 'BILL' && actionLoadingId === (req as any).id ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          ) : (
+                            <Check className="h-4 w-4 transition-transform group-hover:scale-110" />
+                          )}
+                          <span>{req.type === 'BILL' ? 'Acknowledge' : 'Acknowledged'}</span>
                         </button>
                       </div>
                     </div>

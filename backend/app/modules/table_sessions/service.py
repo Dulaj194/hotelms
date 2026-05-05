@@ -220,3 +220,20 @@ def resolve_service_request(
     except Exception:
         db.rollback()
         raise
+
+
+def acknowledge_service_request(
+    db: Session,
+    request_id: int,
+    restaurant_id: int,
+    user_id: int,
+) -> bool:
+    """Mark a service request as acknowledged by a staff member."""
+    try:
+        success = repository.acknowledge_service_request(db, request_id, restaurant_id, user_id)
+        if success:
+            db.commit()
+        return success
+    except Exception:
+        db.rollback()
+        raise
