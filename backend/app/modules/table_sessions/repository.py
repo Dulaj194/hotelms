@@ -1,8 +1,9 @@
+from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.modules.table_sessions.model import TableSession, TableSessionStatus
+from app.modules.table_sessions.model import TableSession, TableSessionStatus, TableServiceRequest
 
 
 def create_session(
@@ -219,8 +220,6 @@ def create_service_request(
     message: str | None = None,
 ) -> TableServiceRequest:
     """Create and persist a new guest service request."""
-    from app.modules.table_sessions.model import TableServiceRequest
-    
     request = TableServiceRequest(
         restaurant_id=restaurant_id,
         session_id=session_id,
@@ -240,8 +239,6 @@ def list_active_service_requests(
     restaurant_id: int,
 ) -> list[TableServiceRequest]:
     """Return all non-completed service requests for a restaurant."""
-    from app.modules.table_sessions.model import TableServiceRequest
-    
     return (
         db.query(TableServiceRequest)
         .filter(
@@ -259,8 +256,6 @@ def complete_service_request(
     restaurant_id: int,
 ) -> bool:
     """Mark a service request as completed/resolved."""
-    from app.modules.table_sessions.model import TableServiceRequest
-    
     request = (
         db.query(TableServiceRequest)
         .filter(
