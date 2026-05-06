@@ -28,8 +28,6 @@ from app.modules.orders.model import OrderStatus
 from app.modules.orders.schemas import (
     ActiveOrderListResponse,
     KitchenOrderCard,
-)
-from app.modules.table_sessions import repository as ts_repo
     KitchenOrderItemSummary,
     KitchenOrderListResponse,
     OrderDetailResponse,
@@ -40,6 +38,7 @@ from app.modules.table_sessions import repository as ts_repo
     PlaceOrderRequest,
     PlaceOrderResponse,
 )
+from app.modules.table_sessions import repository as ts_repo
 from app.modules.payments import repository as payment_repo
 from app.modules.payments.schemas import PaymentResponse
 from app.modules.promo_codes import repository as promo_repo
