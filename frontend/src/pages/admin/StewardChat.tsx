@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { 
-  Droplets, 
-  FileText, 
-  User, 
-  Utensils, 
-  Layers, 
-  Sparkles, 
-  RotateCcw, 
-  Salad, 
-  Smile, 
-  Wifi, 
+import {
+  Droplets,
+  FileText,
+  User,
+  Utensils,
+  Layers,
+  Sparkles,
+  RotateCcw,
+  Salad,
+  Smile,
+  Wifi,
   Star,
   Check,
   Bell
@@ -20,7 +20,7 @@ import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
-import type { 
+import type {
   BillRequestedEvent,
   ServiceRequestedEvent,
   ServiceAcknowledgedEvent,
@@ -121,7 +121,7 @@ function StewardChat({ restaurantId }: StewardChatProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<number | string | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
-  const [sourceFilter, setSourceFilter] = useState<"all" | "table" | "room">("all");
+  const [sourceFilter, setSourceFilter] = useState<"table" | "room">("table");
 
   const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -180,17 +180,16 @@ function StewardChat({ restaurantId }: StewardChatProps) {
     [canAccessChat, restaurantId]
   );
 
-  const filteredBillRequests = useMemo(() => {
-    const list = Array.from(billRequests.values());
-    if (sourceFilter === "all") return list;
-    return list.filter((r) => r.order_source === sourceFilter);
-  }, [billRequests, sourceFilter]);
-
-  const filteredServiceRequests = useMemo(() => {
-    const list = Array.from(serviceRequests.values());
-    if (sourceFilter === "all") return list;
-    return list.filter((r) => r.order_source === sourceFilter);
-  }, [serviceRequests, sourceFilter]);
+  const { tableCount, roomCount } = useMemo(() => {
+    const list = [
+      ...Array.from(billRequests.values()),
+      ...Array.from(serviceRequests.values()),
+    ];
+    return {
+      tableCount: list.filter(r => r.order_source !== "room").length,
+      roomCount: list.filter(r => r.order_source === "room").length,
+    };
+  }, [billRequests, serviceRequests]);
 
   useEffect(() => {
     void loadData();
@@ -204,6 +203,7 @@ function StewardChat({ restaurantId }: StewardChatProps) {
     return () => clearInterval(interval);
   }, [canAccessChat, loadData]);
 
+  const handleBillRequested = useCallback(
     (event: BillRequestedEvent) => {
       const { table_number, customer_name, session_id, requested_at, order_source } = event.data;
       const sourceLabel = order_source === "room" ? `Room ${table_number}` : `Table ${table_number}`;
@@ -211,7 +211,7 @@ function StewardChat({ restaurantId }: StewardChatProps) {
         `${sourceLabel} (${customer_name || "Guest"}) is requesting the bill!`,
         true
       );
-      
+
       setBillRequests((prev) => {
         const next = new Map(prev);
         next.set(session_id, {
@@ -227,6 +227,7 @@ function StewardChat({ restaurantId }: StewardChatProps) {
     [showAlert]
   );
 
+  const handleServiceRequested = useCallback(
     (event: ServiceRequestedEvent) => {
       const { request_id, table_number, customer_name, session_id, service_type, message, requested_at, order_source } = event.data;
       const config = SERVICE_CONFIG[service_type];
@@ -235,7 +236,7 @@ function StewardChat({ restaurantId }: StewardChatProps) {
         `${sourceLabel} (${customer_name || "Guest"}) is requesting ${config?.label || service_type}!`,
         true
       );
-      
+
       setServiceRequests((prev) => {
         const next = new Map(prev);
         const key = String(request_id || `${session_id}:${service_type}`);
@@ -254,7 +255,7 @@ function StewardChat({ restaurantId }: StewardChatProps) {
     },
     [showAlert]
   );
-  
+
   const handleServiceAcknowledged = useCallback(
     (event: ServiceAcknowledgedEvent) => {
       const { request_id } = event.data;
@@ -294,11 +295,11 @@ function StewardChat({ restaurantId }: StewardChatProps) {
 
       if (!requestId) return;
 
-      setActionLoadingId(requestId); 
+      setActionLoadingId(requestId);
       setActionError(null);
 
       try {
-        const endpoint = isBill 
+        const endpoint = isBill
           ? `/table-sessions/bill-requests/${requestId}/acknowledge`
           : `/table-sessions/service-requests/${requestId}/acknowledge`;
 
@@ -337,10 +338,8 @@ function StewardChat({ restaurantId }: StewardChatProps) {
       ...Array.from(billRequests.values()).map(r => ({ ...r, type: 'BILL' as const, message: null })),
       ...Array.from(serviceRequests.values()).map(r => ({ ...r, type: r.service_type }))
     ];
-    
-    const filtered = sourceFilter === "all" 
-      ? list 
-      : list.filter(r => r.order_source === sourceFilter);
+
+    const filtered = list.filter(r => r.order_source === sourceFilter);
 
     return filtered.sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime());
   }, [billRequests, serviceRequests, sourceFilter]);
@@ -366,17 +365,23 @@ function StewardChat({ restaurantId }: StewardChatProps) {
 
           <div className="flex items-center gap-3">
             <div className="flex p-1.5 gap-1.5 bg-slate-100 rounded-3xl w-fit">
-              {(["all", "table", "room"] as const).map((source) => (
+              {(["table", "room"] as const).map((source) => (
                 <button
                   key={source}
                   onClick={() => setSourceFilter(source)}
-                  className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${
-                    sourceFilter === source
+                  className={`relative flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${sourceFilter === source
                       ? "bg-white text-slate-900 shadow-lg scale-[1.03]"
                       : "text-slate-500 hover:text-slate-900 hover:bg-white/50"
-                  }`}
+                    }`}
                 >
-                  {source === "all" ? "All" : `${source}s`}
+                  <span>{source}s</span>
+                  {(source === "table" ? tableCount : roomCount) > 0 && (
+                    <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-black ${
+                      sourceFilter === source ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-600"
+                    }`}>
+                      {source === "table" ? tableCount : roomCount}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -434,7 +439,7 @@ function StewardChat({ restaurantId }: StewardChatProps) {
             const config = SERVICE_CONFIG[req.type] || { label: req.type, icon: Bell, color: "bg-slate-500", textColor: "text-slate-500" };
             const Icon = config.icon;
             const requestId = req.type === 'BILL' ? req.session_id : (req as any).id;
-            
+
             return (
               <div
                 key={`${req.session_id}:${req.type}`}
@@ -470,7 +475,7 @@ function StewardChat({ restaurantId }: StewardChatProps) {
                     <div className="flex h-2 w-2 rounded-full bg-white animate-pulse" />
                   </div>
                 </div>
-                
+
                 <div className="p-5">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="h-10 w-10 shrink-0 rounded-full bg-slate-100 grid place-items-center">
@@ -497,11 +502,10 @@ function StewardChat({ restaurantId }: StewardChatProps) {
                     type="button"
                     disabled={actionLoadingId === requestId}
                     onClick={() => void handleAcknowledgeRequest(req)}
-                    className={`w-full group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl py-3.5 text-sm font-black transition-all active:scale-[0.98] disabled:opacity-60 shadow-lg ${
-                      req.type === 'BILL' 
-                        ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-200' 
+                    className={`w-full group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl py-3.5 text-sm font-black transition-all active:scale-[0.98] disabled:opacity-60 shadow-lg ${req.type === 'BILL'
+                        ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-200'
                         : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200'
-                    }`}
+                      }`}
                   >
                     {actionLoadingId === requestId ? (
                       <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
