@@ -453,22 +453,31 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex p-2 gap-2 bg-slate-100 rounded-[2rem] shadow-inner">
+            <div className="relative flex p-1.5 bg-slate-100 rounded-[2rem] shadow-inner overflow-hidden min-w-[320px]">
+              {/* Sliding Background Pill */}
+              <div 
+                className="absolute top-1.5 bottom-1.5 rounded-[1.5rem] bg-white shadow-xl transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
+                style={{
+                  left: sourceFilter === "table" ? "6px" : "calc(50% + 3px)",
+                  width: "calc(50% - 9px)",
+                }}
+              />
+
               {(["table", "room"] as const).map((source) => (
                 <button
                   key={source}
                   onClick={() => setSourceFilter(source)}
-                  className={`relative flex items-center gap-3 px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${
-                    sourceFilter === source
-                      ? "bg-white text-slate-900 shadow-xl scale-[1.05]"
-                      : "text-slate-500 hover:text-slate-900"
+                  className={`relative z-10 flex-1 flex items-center justify-center gap-3 py-3.5 text-[11px] font-black uppercase tracking-widest transition-colors duration-500 ${
+                    sourceFilter === source ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
                   }`}
                 >
-                  <MapPin className={`h-3.5 w-3.5 ${sourceFilter === source ? "text-slate-900" : "text-slate-400"}`} />
+                  <MapPin className={`h-3.5 w-3.5 transition-colors duration-500 ${
+                    sourceFilter === source ? "text-slate-900" : "text-slate-400"
+                  }`} />
                   <span>{source}s</span>
                   {counts[source] > 0 && (
-                    <span className={`flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-[10px] font-black transition-colors ${
-                      sourceFilter === source ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-600"
+                    <span className={`flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-[10px] font-black transition-all duration-500 ${
+                      sourceFilter === source ? "bg-slate-900 text-white scale-110" : "bg-slate-200 text-slate-500"
                     }`}>
                       {counts[source]}
                     </span>
