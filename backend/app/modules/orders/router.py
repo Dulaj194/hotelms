@@ -158,13 +158,25 @@ def list_active_orders(
 
 @router.get("/history", response_model=ActiveOrderListResponse)
 def list_history_orders(
+    status: OrderStatus | None = None,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
 ) -> ActiveOrderListResponse:
     """List completed / paid / rejected orders for the restaurant."""
-    return service.list_history_orders(db, restaurant_id)
+    return service.list_history_orders(db, restaurant_id, status=status)
+
+
+@router.get("/history/stats")
+def get_history_stats(
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("kds")),
+) -> dict[str, int]:
+    """Return counts for history order statuses."""
+    return service.get_history_stats(db, restaurant_id)
 
 
 @router.get("/{order_id}", response_model=OrderDetailResponse)

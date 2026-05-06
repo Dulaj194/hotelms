@@ -650,13 +650,22 @@ def list_active_orders(
 
 
 def list_history_orders(
-    db: Session, restaurant_id: int
+    db: Session, 
+    restaurant_id: int,
+    status: OrderStatus | None = None,
 ) -> ActiveOrderListResponse:
-    orders = order_repo.list_history_orders_by_restaurant(db, restaurant_id)
+    orders = order_repo.list_history_orders_by_restaurant(db, restaurant_id, status=status)
     return ActiveOrderListResponse(
         orders=[_build_order_header(o) for o in orders],
         total=len(orders),
     )
+
+
+def get_history_stats(
+    db: Session,
+    restaurant_id: int,
+) -> dict[str, int]:
+    return order_repo.count_history_orders_by_restaurant(db, restaurant_id)
 
 
 def list_processing_orders(

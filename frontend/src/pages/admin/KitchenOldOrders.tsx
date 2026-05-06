@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
@@ -24,15 +25,31 @@ function sourceLabel(order: OrderHeaderResponse): string {
 }
 
 export default function KitchenOldOrders() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState<OrderHeaderResponse[]>([]);
+  const [stats, setStats] = useState<Record<string, number>>({ completed: 0, paid: 0, rejected: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
+  const statusFilter = (searchParams.get("status") || "all") as "all" | OrderStatus;
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [searchText, setSearchText] = useState("");
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isInternalScrollRef = useRef(false);
+
+  const statusList: ("all" | OrderStatus)[] = ["all", "completed", "paid", "rejected"];
+  const activeIndex = useMemo(() => statusList.indexOf(statusFilter), [statusFilter]);
+
+  const handleStatusChange = useCallback((status: "all" | OrderStatus) => {
+    setSearchParams(prev => {
+      if (status === "all") prev.delete("status");
+      else prev.set("status", status);
+      return prev;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const loadOrders = useCallback(async (silent = false) => {
     if (silent) {
@@ -43,8 +60,14 @@ export default function KitchenOldOrders() {
     setError(null);
 
     try {
-      const response = await api.get<ActiveOrderListResponse>("/orders/history");
-      setOrders(response.orders);
+      // Load orders and stats in parallel
+      const [ordersRes, statsRes] = await Promise.all([
+        api.get<ActiveOrderListResponse>("/orders/history"),
+        api.get<Record<string, number>>("/orders/history/stats")
+      ]);
+      
+      setOrders(ordersRes.orders);
+      setStats(statsRes);
       setLastUpdated(new Date());
     } catch (err) {
       if (err instanceof ApiError) {
@@ -57,6 +80,34 @@ export default function KitchenOldOrders() {
       setRefreshing(false);
     }
   }, []);
+
+  // Handle programmatic tab changes
+  useEffect(() => {
+    if (scrollRef.current && !isInternalScrollRef.current) {
+      const container = scrollRef.current;
+      const width = container.clientWidth;
+      container.scrollTo({
+        left: width * activeIndex,
+        behavior: "smooth",
+      });
+    }
+    isInternalScrollRef.current = false;
+  }, [activeIndex]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const scrollLeft = container.scrollLeft;
+    const width = container.clientWidth;
+    if (width <= 0) return;
+
+    const index = Math.round(scrollLeft / width);
+    const targetStatus = statusList[index];
+
+    if (targetStatus && targetStatus !== statusFilter) {
+      isInternalScrollRef.current = true;
+      handleStatusChange(targetStatus);
+    }
+  };
 
   useEffect(() => {
     void loadOrders();
@@ -97,22 +148,7 @@ export default function KitchenOldOrders() {
     });
   }, [orders, searchText, sourceFilter, statusFilter]);
 
-  const statusCounts = useMemo(() => {
-    return KITCHEN_HISTORY_STATUSES.reduce<Record<OrderStatus, number>>(
-      (acc, status) => {
-        acc[status] = orders.filter((order) => order.status === status).length;
-        return acc;
-      },
-      {
-        pending: 0,
-        confirmed: 0,
-        processing: 0,
-        completed: 0,
-        paid: 0,
-        rejected: 0,
-      }
-    );
-  }, [orders]);
+
 
   return (
     <DashboardLayout>
@@ -141,20 +177,67 @@ export default function KitchenOldOrders() {
           )}
         </div>
 
-        <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-3">
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Completed: <span className="font-semibold">{statusCounts.completed}</span>
-          </div>
-          <div className="rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm text-cyan-800">
-            Paid: <span className="font-semibold">{statusCounts.paid}</span>
-          </div>
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-            Rejected: <span className="font-semibold">{statusCounts.rejected}</span>
-          </div>
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => handleStatusChange("all")}
+            className={`flex flex-1 min-w-[120px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
+              statusFilter === "all"
+                ? "bg-slate-900 text-white shadow-lg shadow-slate-200"
+                : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <span>All Orders</span>
+            <span className={`rounded-md px-2 py-0.5 text-xs ${statusFilter === "all" ? "bg-white/20" : "bg-slate-200"}`}>
+              {orders.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStatusChange("completed")}
+            className={`flex flex-1 min-w-[120px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
+              statusFilter === "completed"
+                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-100"
+                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100/50"
+            }`}
+          >
+            <span>Completed</span>
+            <span className={`rounded-md px-2 py-0.5 text-xs ${statusFilter === "completed" ? "bg-white/20" : "bg-emerald-200/50"}`}>
+              {stats.completed}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStatusChange("paid")}
+            className={`flex flex-1 min-w-[120px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
+              statusFilter === "paid"
+                ? "bg-cyan-600 text-white shadow-lg shadow-cyan-100"
+                : "bg-cyan-50 text-cyan-700 hover:bg-cyan-100/50"
+            }`}
+          >
+            <span>Paid</span>
+            <span className={`rounded-md px-2 py-0.5 text-xs ${statusFilter === "paid" ? "bg-white/20" : "bg-cyan-200/50"}`}>
+              {stats.paid}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStatusChange("rejected")}
+            className={`flex flex-1 min-w-[120px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
+              statusFilter === "rejected"
+                ? "bg-rose-600 text-white shadow-lg shadow-rose-100"
+                : "bg-rose-50 text-rose-700 hover:bg-rose-100/50"
+            }`}
+          >
+            <span>Rejected</span>
+            <span className={`rounded-md px-2 py-0.5 text-xs ${statusFilter === "rejected" ? "bg-white/20" : "bg-rose-200/50"}`}>
+              {stats.rejected}
+            </span>
+          </button>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2">
             <input
               type="text"
               value={searchText}
@@ -162,17 +245,6 @@ export default function KitchenOldOrders() {
               placeholder="Search order number / customer / table / room"
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
             />
-
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as "all" | OrderStatus)}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="all">All Statuses</option>
-              <option value="completed">Completed</option>
-              <option value="paid">Paid</option>
-              <option value="rejected">Rejected</option>
-            </select>
 
             <select
               value={sourceFilter}
@@ -186,79 +258,116 @@ export default function KitchenOldOrders() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          {loading ? (
-            <div className="p-8 text-center text-sm text-slate-500">Loading old orders...</div>
-          ) : error ? (
-            <div className="p-8 text-center text-sm text-rose-700">{error}</div>
-          ) : filteredOrders.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">No old orders found for current filters.</div>
-          ) : (
-            <>
-              <div className="space-y-3 p-4 md:hidden">
-                {filteredOrders.map((order) => (
-                  <article key={order.id} className="rounded-lg border border-slate-200 p-4 text-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold text-slate-900">{order.order_number}</p>
-                        {order.customer_name && <p className="text-xs text-slate-500">{order.customer_name}</p>}
-                      </div>
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          ORDER_STATUS_COLOR[order.status]
-                        }`}
-                      >
-                        {ORDER_STATUS_LABEL[order.status]}
-                      </span>
-                    </div>
-                    <div className="mt-2 space-y-1 text-xs text-slate-600">
-                      <p>Source: {sourceLabel(order)}</p>
-                      <p>Placed At: {formatDateTime(order.placed_at)}</p>
-                      <p>Total: {order.total_amount.toFixed(2)}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
+        <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div 
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {statusList.map((status) => {
+              const ordersForStatus = status === "all" 
+                ? filteredOrders 
+                : filteredOrders.filter(o => o.status === status);
 
-              <div className="app-table-scroll hidden md:block">
-                <table className="min-w-[720px] w-full divide-y divide-slate-200 text-sm">
-                  <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    <tr>
-                      <th className="px-4 py-3">Order</th>
-                      <th className="px-4 py-3">Source</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Placed At</th>
-                      <th className="px-4 py-3 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredOrders.map((order) => (
-                      <tr key={order.id} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-900">{order.order_number}</div>
-                          {order.customer_name && <div className="text-xs text-slate-500">{order.customer_name}</div>}
-                        </td>
-                        <td className="px-4 py-3 text-slate-700">{sourceLabel(order)}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              ORDER_STATUS_COLOR[order.status]
-                            }`}
-                          >
-                            {ORDER_STATUS_LABEL[order.status]}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{formatDateTime(order.placed_at)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                          {order.total_amount.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
+              return (
+                <div key={status} className="w-full shrink-0 snap-start">
+                  {loading ? (
+                    <div className="p-12 flex flex-col items-center justify-center gap-4">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" />
+                      <p className="text-sm text-slate-500 font-medium tracking-wide animate-pulse">
+                        Synchronizing order history...
+                      </p>
+                    </div>
+                  ) : error ? (
+                    <div className="p-8 text-center text-sm text-rose-700">{error}</div>
+                  ) : ordersForStatus.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <div className="mx-auto w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
+                        <span className="text-2xl">📋</span>
+                      </div>
+                      <p className="text-sm text-slate-500 font-medium">No {status} orders found.</p>
+                      <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or search text.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-3 p-4 md:hidden">
+                        {ordersForStatus.map((order) => (
+                          <article key={order.id} className="group rounded-2xl border border-slate-100 p-4 text-sm transition-all hover:border-slate-300 hover:shadow-md">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="font-black text-slate-900 tracking-tight">{order.order_number}</p>
+                                {order.customer_name && <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">{order.customer_name}</p>}
+                              </div>
+                              <span
+                                className={`inline-flex rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                                  ORDER_STATUS_COLOR[order.status]
+                                }`}
+                              >
+                                {ORDER_STATUS_LABEL[order.status]}
+                              </span>
+                            </div>
+                            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-50 pt-4">
+                              <div>
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Source</p>
+                                <p className="text-xs font-bold text-slate-700">{sourceLabel(order)}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Total</p>
+                                <p className="text-xs font-black text-slate-900">{order.total_amount.toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+
+                      <div className="app-table-scroll hidden md:block">
+                        <table className="min-w-[720px] w-full divide-y divide-slate-200 text-sm">
+                          <thead className="bg-slate-50/50 text-left text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                            <tr>
+                              <th className="px-6 py-4">Order Details</th>
+                              <th className="px-6 py-4">Source</th>
+                              <th className="px-6 py-4">Status</th>
+                              <th className="px-6 py-4">Timestamp</th>
+                              <th className="px-6 py-4 text-right">Total Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {ordersForStatus.map((order) => (
+                              <tr key={order.id} className="group hover:bg-slate-50/50 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="font-bold text-slate-900">{order.order_number}</div>
+                                  {order.customer_name && <div className="text-[10px] font-medium text-slate-400">{order.customer_name}</div>}
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm font-medium text-slate-700">{sourceLabel(order)}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span
+                                    className={`inline-flex rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${
+                                      ORDER_STATUS_COLOR[order.status]
+                                    }`}
+                                  >
+                                    {ORDER_STATUS_LABEL[order.status]}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-xs font-medium text-slate-500">{formatDateTime(order.placed_at)}</div>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="text-sm font-black text-slate-900">{order.total_amount.toFixed(2)}</div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </DashboardLayout>

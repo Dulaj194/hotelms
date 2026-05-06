@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import OrderCard from "@/components/shared/OrderCard";
@@ -68,6 +69,7 @@ interface KitchenDashboardProps {
 
 function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
   const canAccessKitchen = Boolean(restaurantId);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [orders, setOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -77,6 +79,48 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
   const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const activeTab = searchParams.get("tab") || "table";
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isInternalScrollRef = useRef(false);
+
+  const tabList = ["table", "room"];
+  const activeIndex = useMemo(() => tabList.indexOf(activeTab), [activeTab]);
+
+  const handleTabChange = useCallback((tab: string) => {
+    setSearchParams(prev => {
+      prev.set("tab", tab);
+      return prev;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  // Handle programmatic tab changes
+  useEffect(() => {
+    if (scrollRef.current && !isInternalScrollRef.current) {
+      const container = scrollRef.current;
+      const width = container.clientWidth;
+      container.scrollTo({
+        left: width * (activeIndex === -1 ? 0 : activeIndex),
+        behavior: "smooth",
+      });
+    }
+    isInternalScrollRef.current = false;
+  }, [activeIndex]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const scrollLeft = container.scrollLeft;
+    const width = container.clientWidth;
+    if (width <= 0) return;
+
+    const index = Math.round(scrollLeft / width);
+    const targetTab = tabList[index];
+
+    if (targetTab && targetTab !== activeTab) {
+      isInternalScrollRef.current = true;
+      handleTabChange(targetTab);
+    }
+  };
 
   const loadOrders = useCallback(
     async (silent = false) => {
@@ -262,26 +306,56 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs">
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold ${
-                isConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
-              }`}
-            >
-              <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
-              {isConnected ? "Live" : "Connecting"}
-            </span>
-            <button
-              type="button"
-              onClick={() => void loadOrders(true)}
-              disabled={refreshing || loading}
-              className="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {refreshing ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <button
+          type="button"
+          onClick={() => handleTabChange("table")}
+          className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
+            activeTab === "table"
+              ? "bg-slate-900 text-white shadow-lg shadow-slate-100"
+              : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+          }`}
+        >
+          <span>Table Orders</span>
+          <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "table" ? "bg-white/20" : "bg-slate-200"}`}>
+            {tableOrders.length}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange("room")}
+          className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
+            activeTab === "room"
+              ? "bg-teal-600 text-white shadow-lg shadow-teal-100"
+              : "bg-teal-50 text-teal-700 hover:bg-teal-100/50"
+          }`}
+        >
+          <span>Room Orders</span>
+          <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "room" ? "bg-white/20" : "bg-teal-200/50"}`}>
+            {roomOrders.length}
+          </span>
+        </button>
+        
+        <div className="flex items-center gap-2 ml-auto">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wider ${
+              isConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
+            {isConnected ? "Live" : "Connecting"}
+          </span>
+          <button
+            type="button"
+            onClick={() => void loadOrders(true)}
+            disabled={refreshing || loading}
+            className="rounded-md border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+            title="Refresh"
+          >
+            <svg className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -310,47 +384,66 @@ function KitchenDashboard({ restaurantId }: KitchenDashboardProps) {
       ) : loadError ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{loadError}</div>
       ) : (
-        <div className="space-y-6">
-          <section className="space-y-3">
-            <h2 className="text-4xl font-semibold tracking-tight text-slate-900">Table Orders</h2>
-            {tableOrders.length === 0 ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-100 px-5 py-4 text-2xl text-amber-900">
-                No orders found.
+      <div className="relative overflow-hidden">
+        <div 
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {/* Table Orders Section */}
+          <div className="w-full shrink-0 snap-start">
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black tracking-tight text-slate-900 uppercase">Table Queue</h2>
+                <div className="h-px flex-1 bg-slate-100" />
               </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3">
-                {tableOrders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onAction={handleAction}
-                    actionLoading={actionLoadingId === order.id}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+              {tableOrders.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl border-2 border-dashed border-slate-100">
+                  <p className="text-sm font-medium text-slate-400">No active table orders.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {tableOrders.map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      onAction={handleAction}
+                      actionLoading={actionLoadingId === order.id}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
 
-          <section className="space-y-3">
-            <h2 className="text-4xl font-semibold tracking-tight text-slate-900">Room Orders</h2>
-            {roomOrders.length === 0 ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-100 px-5 py-4 text-2xl text-amber-900">
-                No room orders found.
+          {/* Room Orders Section */}
+          <div className="w-full shrink-0 snap-start">
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black tracking-tight text-slate-900 uppercase">Room Queue</h2>
+                <div className="h-px flex-1 bg-slate-100" />
               </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3">
-                {roomOrders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onAction={handleAction}
-                    actionLoading={actionLoadingId === order.id}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+              {roomOrders.length === 0 ? (
+                <div className="p-12 text-center rounded-2xl border-2 border-dashed border-slate-100">
+                  <p className="text-sm font-medium text-slate-400">No active room orders.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {roomOrders.map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      onAction={handleAction}
+                      actionLoading={actionLoadingId === order.id}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         </div>
+      </div>
       )}
     </div>
   );

@@ -186,21 +186,52 @@ def list_active_orders_by_restaurant(
 
 
 def list_history_orders_by_restaurant(
-    db: Session, restaurant_id: int, limit: int = 100
+    db: Session, 
+    restaurant_id: int, 
+    status: OrderStatus | None = None,
+    limit: int = 100
 ) -> list[OrderHeader]:
     """Return completed, paid, and rejected orders for a restaurant."""
     history_statuses = {OrderStatus.completed, OrderStatus.paid, OrderStatus.rejected}
-    return (
+    query = (
         db.query(OrderHeader)
         .options(joinedload(OrderHeader.items))
+        .filter(OrderHeader.restaurant_id == restaurant_id)
+    )
+    
+    if status:
+        query = query.filter(OrderHeader.status == status)
+    else:
+        query = query.filter(OrderHeader.status.in_(history_statuses))
+        
+    return query.order_by(OrderHeader.placed_at.desc()).limit(limit).all()
+
+
+def count_history_orders_by_restaurant(
+    db: Session, 
+    restaurant_id: int
+) -> dict[str, int]:
+    """Return counts for completed, paid, and rejected orders."""
+    history_statuses = {OrderStatus.completed, OrderStatus.paid, OrderStatus.rejected}
+    
+    from sqlalchemy import func
+    results = (
+        db.query(OrderHeader.status, func.count(OrderHeader.id))
         .filter(
             OrderHeader.restaurant_id == restaurant_id,
-            OrderHeader.status.in_(history_statuses),
+            OrderHeader.status.in_(history_statuses)
         )
-        .order_by(OrderHeader.placed_at.desc())
-        .limit(limit)
+        .group_by(OrderHeader.status)
         .all()
     )
+    
+    # Initialize with 0s
+    counts = {"completed": 0, "paid": 0, "rejected": 0}
+    for status_val, count in results:
+        if status_val.value in counts:
+            counts[status_val.value] = count
+            
+    return counts
 
 
 # ── Kitchen-specific queries (include items for dashboard display) ─────────────
