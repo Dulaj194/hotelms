@@ -212,32 +212,44 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
   const [actionId, setActionId] = useState<string | number | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<"table" | "room">("table");
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
 
   // Minimum distance for a swipe to be recognized (in pixels)
-  const minSwipeDistance = 70;
+  const minSwipeDistance = 50;
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null); // Reset
-    setTouchStart(e.targetTouches[0].clientX);
+    setTouchEnd(null);
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
   };
 
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
     
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    
+    // Only trigger if horizontal swipe is stronger than vertical scroll
+    const isHorizontalSwipe = Math.abs(distanceX) > Math.abs(distanceY);
+    const isLeftSwipe = distanceX > minSwipeDistance;
+    const isRightSwipe = distanceX < -minSwipeDistance;
 
-    if (isLeftSwipe && sourceFilter === "table") {
-      setSourceFilter("room");
-    } else if (isRightSwipe && sourceFilter === "room") {
-      setSourceFilter("table");
+    if (isHorizontalSwipe) {
+      if (isLeftSwipe && sourceFilter === "table") {
+        setSourceFilter("room");
+      } else if (isRightSwipe && sourceFilter === "room") {
+        setSourceFilter("table");
+      }
     }
   };
 
@@ -412,7 +424,7 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
 
   return (
     <div 
-      className="max-w-[1600px] mx-auto space-y-10 pb-20 touch-pan-y overflow-x-hidden"
+      className="max-w-[1600px] mx-auto space-y-10 pb-20 touch-pan-y overflow-x-hidden select-none"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
