@@ -16,6 +16,7 @@ def create_session(
     table_number: str,
     customer_name: str,
     expires_at: datetime,
+    order_source: str = "table",
 ) -> TableSession:
     """Persist a new table session record."""
     session = TableSession(
@@ -23,6 +24,7 @@ def create_session(
         restaurant_id=restaurant_id,
         table_number=table_number,
         customer_name=customer_name,
+        order_source=order_source,
         expires_at=expires_at,
         is_active=True,
         session_status=TableSessionStatus.OPEN,
@@ -221,6 +223,7 @@ def create_service_request(
     customer_name: str | None,
     service_type: str,
     message: str | None = None,
+    order_source: str = "table",
 ) -> TableServiceRequest:
     """Create and persist a new guest service request."""
     request = TableServiceRequest(
@@ -228,6 +231,7 @@ def create_service_request(
         session_id=session_id,
         table_number=table_number,
         customer_name=customer_name,
+        order_source=order_source,
         service_type=service_type,
         message=message,
     )

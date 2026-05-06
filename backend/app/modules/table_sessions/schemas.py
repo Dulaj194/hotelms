@@ -16,6 +16,7 @@ class TableSessionStartRequest(BaseModel):
     table_number: str = Field(..., min_length=1, max_length=50)
     customer_name: str = Field(..., min_length=1, max_length=120)
     qr_access_key: str = Field(..., min_length=16, max_length=2000)
+    order_source: str = Field("table", pattern="^(table|room)$")
 
 
 class TableSessionStartResponse(BaseModel):
@@ -31,6 +32,7 @@ class TableSessionStartResponse(BaseModel):
     restaurant_id: int
     table_number: str
     customer_name: str
+    order_source: str
     session_status: str
     expires_at: datetime
 
@@ -43,6 +45,7 @@ class GuestSessionInfoResponse(BaseModel):
     session_id: str
     restaurant_id: int
     table_number: str
+    order_source: str
     expires_at: datetime
     is_active: bool
 
@@ -51,6 +54,7 @@ class BillRequestResponse(BaseModel):
     session_id: str
     table_number: str
     customer_name: str | None
+    order_source: str = "table"
     requested_at: datetime = Field(alias="updated_at")
 
     model_config = {"from_attributes": True, "populate_by_name": True}
@@ -70,6 +74,7 @@ class ServiceRequestResponse(BaseModel):
     session_id: str
     table_number: str
     customer_name: str | None
+    order_source: str
     service_type: str
     message: str | None
     requested_at: datetime

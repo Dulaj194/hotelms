@@ -61,6 +61,7 @@ export interface BillRequestedEventData {
   table_number: string;
   session_id: string;
   customer_name: string | null;
+  order_source: string;
   requested_at: string;
 }
 
@@ -79,6 +80,7 @@ export interface ServiceRequestedEventData {
   service_type: string;
   customer_name: string | null;
   message: string | null;
+  order_source: string;
   requested_at: string;
 }
 

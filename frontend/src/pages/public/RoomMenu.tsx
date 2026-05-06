@@ -20,7 +20,9 @@ import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { useLocalRoomCart } from "@/hooks/useLocalMenuCart";
 import { toAssetUrl } from "@/lib/assets";
-import { publicGet } from "@/lib/publicApi";
+import { publicGet, publicPost } from "@/lib/publicApi";
+import QuickServiceDrawer from "@/components/public/QuickServiceDrawer";
+import { getRoomToken } from "@/hooks/useRoomSession";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
 import type { RoomOrderDetailResponse } from "@/types/roomSession";
 
@@ -317,6 +319,10 @@ export default function RoomMenu() {
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
   const lastMenuScrollYRef = useRef(0);
   const menuScrollFrameRef = useRef<number | null>(null);
+  
+  const [isRequestingService, setIsRequestingService] = useState(false);
+  const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
+  const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);
 
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing } =
     useLocalRoomCart({
@@ -458,6 +464,33 @@ export default function RoomMenu() {
       element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, []);
+
+  const handleRequestService = useCallback(
+    async (type: string, message?: string) => {
+      if (!restaurantId || !roomNumber) return;
+      setIsRequestingService(true);
+      try {
+        const path = type === "BILL" ? "/room-orders/request-bill" : "/room-orders/request-service";
+        const payload = type === "BILL" ? {} : { service_type: type, message };
+
+        const token = getRoomToken();
+        await publicPost(path, payload, {
+          headers: { "X-Room-Session": token || "" },
+        });
+
+        setLastRequestedService(type);
+        setTimeout(() => {
+          setServiceDrawerOpen(false);
+          setLastRequestedService(null);
+        }, 2000);
+      } catch (err) {
+        console.error("Failed to request service:", err);
+      } finally {
+        setIsRequestingService(false);
+      }
+    },
+    [restaurantId, roomNumber],
+  );
 
   // Render
 
@@ -726,12 +759,7 @@ export default function RoomMenu() {
           <button
             type="button"
             onClick={() => {
-              // Service request flow
-              if (!restaurantId || !roomNumber) return;
-              const target = qrAccessKey
-                ? `/menu/${restaurantId}/room/${roomNumber}/service-request?k=${encodeURIComponent(qrAccessKey)}`
-                : `/menu/${restaurantId}/room/${roomNumber}/service-request`;
-              navigate(target);
+              setServiceDrawerOpen(true);
             }}
             className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
@@ -756,6 +784,17 @@ export default function RoomMenu() {
         }}
         isOpen={menuDropdownOpen}
         onClose={() => setMenuDropdownOpen(false)}
+      />
+
+      <QuickServiceDrawer
+        isOpen={serviceDrawerOpen}
+        onClose={() => {
+          setServiceDrawerOpen(false);
+          setLastRequestedService(null);
+        }}
+        onRequestService={handleRequestService}
+        isSubmitting={isRequestingService}
+        lastRequestedType={lastRequestedService}
       />
 
       {/* Room cart drawer */}

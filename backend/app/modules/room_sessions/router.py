@@ -19,6 +19,7 @@ from app.core.dependencies import (
     get_redis,
     resolve_room_session_token,
 )
+from app.modules.table_sessions.schemas import TableServiceRequestPayload
 from app.modules.room_sessions import service
 from app.modules.room_sessions.model import RoomSession
 from app.modules.room_sessions.schemas import (
@@ -183,3 +184,46 @@ def cancel_room_order(
 ) -> GenericMessageResponse:
     """Cancel a guest room order within the 5-second grace window."""
     return service.cancel_room_order_for_guest(db, r, order_id, session)
+
+
+@orders_router.post("/request-service", response_model=GenericMessageResponse)
+def request_room_service(
+    payload: TableServiceRequestPayload,
+    session: RoomSession = Depends(get_current_room_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+) -> GenericMessageResponse:
+    """Create a service request (Water, Steward, etc.) for a room."""
+    from app.modules.table_sessions import service as table_session_service
+    
+    table_session_service.request_service(
+        db, 
+        r, 
+        session_id=session.session_id,
+        restaurant_id=session.restaurant_id,
+        table_number=session.room_number_snapshot,
+        customer_name=session.guest_name,
+        service_type=payload.service_type,
+        message=payload.message,
+        order_source="room"
+    )
+    return GenericMessageResponse(message="Request sent to staff.")
+
+
+@orders_router.post("/request-bill", response_model=GenericMessageResponse)
+def request_room_bill(
+    session: RoomSession = Depends(get_current_room_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+) -> GenericMessageResponse:
+    """Request the bill for a room session."""
+    from app.modules.table_sessions import service as table_session_service
+    
+    table_session_service.request_service(
+        db,
+        r,
+        session=session,
+        service_type="BILL",
+        order_source="room"
+    )
+    return GenericMessageResponse(message="Bill request sent to staff.")

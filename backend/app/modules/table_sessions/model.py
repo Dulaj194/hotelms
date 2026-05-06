@@ -13,6 +13,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.modules.restaurants.model import Restaurant
+    from app.modules.orders.model import OrderSource
 
 
 class TableSessionStatus(str, enum.Enum):
@@ -44,6 +45,15 @@ class TableSession(Base):
     )
 
     table_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    
+    # Source: table (default) or room
+    order_source: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="table",
+        server_default="table",
+    )
+
     customer_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     started_at: Mapped[datetime] = mapped_column(
@@ -98,6 +108,15 @@ class TableServiceRequest(Base):
     # Linked to a session but we duplicate table/customer for fast lookup without joins
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     table_number: Mapped[str] = mapped_column(String(50), nullable=False)
+    
+    # Source: table (default) or room
+    order_source: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="table",
+        server_default="table",
+    )
+
     customer_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     
     service_type: Mapped[str] = mapped_column(String(50), nullable=False)

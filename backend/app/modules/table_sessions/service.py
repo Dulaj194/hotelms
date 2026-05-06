@@ -104,6 +104,7 @@ def start_table_session(
             table_number=table_number,
             customer_name=customer_name,
             expires_at=expires_at,
+            order_source=data.order_source,
         )
 
         db.commit()
@@ -125,6 +126,7 @@ def start_table_session(
         restaurant_id=data.restaurant_id,
         table_number=table_number,
         customer_name=customer_name,
+        order_source=data.order_source,
         session_status="OPEN",
         expires_at=expires_at,
     )
@@ -134,8 +136,10 @@ def request_bill(
     db: Session,
     r: redis_lib.Redis,
     session: TableSession,
+    order_source: str | None = None,
 ) -> TableSession:
     """Mark the table session as requesting the bill and alert staff."""
+    source = order_source or getattr(session, "order_source", "table")
     try:
         session.session_status = TableSessionStatus.BILL_REQUESTED
         session.updated_at = datetime.now(UTC)
@@ -149,6 +153,7 @@ def request_bill(
             table_number=session.table_number,
             session_id=session.session_id,
             customer_name=session.customer_name,
+            order_source=source,
         )
         
         return session
@@ -168,21 +173,28 @@ def list_bill_requests(
 def request_service(
     db: Session,
     r: redis_lib.Redis,
-    session: TableSession,
+    session: TableSession | object, # Accept anything with these attrs
     service_type: str,
     message: str | None = None,
+    order_source: str | None = None,
 ) -> None:
-    """Publish a real-time service request from a guest table."""
+    """Publish a real-time service request from a guest table or room."""
+    source = order_source or getattr(session, "order_source", "table")
+    # For room sessions, we use room_number_snapshot as table_number
+    table_num = getattr(session, "table_number", None) or getattr(session, "room_number_snapshot", "Unknown")
+    cust_name = getattr(session, "customer_name", None) or getattr(session, "guest_name", "Guest")
+
     try:
         # 1. Persist the request to the database
         new_request = repository.create_service_request(
             db,
             restaurant_id=session.restaurant_id,
             session_id=session.session_id,
-            table_number=session.table_number,
-            customer_name=session.customer_name,
+            table_number=table_num,
+            customer_name=cust_name,
             service_type=service_type,
             message=message,
+            order_source=source,
         )
         db.commit()
         
@@ -190,12 +202,13 @@ def request_service(
         realtime_service.publish_service_requested(
             r,
             restaurant_id=session.restaurant_id,
-            table_number=session.table_number,
+            table_number=table_num,
             session_id=session.session_id,
             service_type=service_type,
             request_id=new_request.id,
-            customer_name=session.customer_name,
+            customer_name=cust_name,
             message=message,
+            order_source=source,
         )
     except Exception as exc:
         logger.error("Failed to process service request: %s", str(exc), exc_info=True)
