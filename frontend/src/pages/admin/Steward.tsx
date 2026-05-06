@@ -502,9 +502,9 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   });
 
   const handleAcknowledgeRequest = useCallback(
-    async (req: ServiceRequest | BillRequest | { type: string; session_id: string; id?: number; table_number: string }) => {
-      const isBill = req.type === 'BILL';
-      const requestId = isBill ? req.session_id : (req as ServiceRequest).id;
+    async (req: any) => {
+      const isBill = req.type === 'BILL' || !('service_type' in req);
+      const requestId = isBill ? req.session_id : req.id;
 
       if (!requestId) return;
 
@@ -516,7 +516,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           ? `/table-sessions/bill-requests/${requestId}/acknowledge`
           : `/table-sessions/service-requests/${requestId}/acknowledge`;
 
-        await api.patch(endpoint);
+        await api.patch(endpoint, {});
 
         if (isBill) {
           setBillRequests((prev) => {
@@ -841,7 +841,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
             headerColor="bg-indigo-600"
             emptyMessage="No pending table orders"
             onAction={handlePendingAction}
-            actionLoadingId={actionLoadingId}
+            actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
           />
           <KitchenOrderSection
             title="Room Orders"
@@ -849,7 +849,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
             headerColor="bg-teal-600"
             emptyMessage="No pending room orders"
             onAction={handlePendingAction}
-            actionLoadingId={actionLoadingId}
+            actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
           />
         </div>
       ) : (
@@ -860,7 +860,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
             headerColor="bg-emerald-600"
             emptyMessage="No ready table orders"
             onAction={handlePendingAction}
-            actionLoadingId={actionLoadingId}
+            actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
             renderActions={(order) => (
               <button
                 type="button"
@@ -877,7 +877,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
             headerColor="bg-cyan-600"
             emptyMessage="No ready room orders"
             onAction={handlePendingAction}
-            actionLoadingId={actionLoadingId}
+            actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
             renderActions={(order) => (
               <button
                 type="button"
