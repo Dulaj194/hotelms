@@ -12,7 +12,9 @@ import {
   Wifi,
   Star,
   Check,
-  Bell
+  Bell,
+  Clock,
+  MapPin,
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
@@ -27,46 +29,41 @@ import type {
   BillAcknowledgedEvent,
 } from "@/types/realtime";
 
-const STEWARD_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
-const POLL_INTERVAL_MS = 6000;
+// --- Constants & Types ---
 
-const SERVICE_CONFIG: Record<string, { label: string; icon: any; color: string; textColor: string }> = {
-  WATER: { label: "Water", icon: Droplets, color: "bg-blue-500", textColor: "text-blue-500" },
-  BILL: { label: "Bill Request", icon: FileText, color: "bg-slate-900", textColor: "text-slate-900" },
-  STEWARD: { label: "Call Steward", icon: User, color: "bg-amber-500", textColor: "text-amber-500" },
-  CUTLERY: { label: "Extra Cutlery", icon: Utensils, color: "bg-slate-600", textColor: "text-slate-600" },
-  NAPKINS: { label: "Napkins / Tissues", icon: Layers, color: "bg-pink-500", textColor: "text-pink-500" },
-  CLEANING: { label: "Table Cleaning", icon: Sparkles, color: "bg-emerald-500", textColor: "text-emerald-500" },
-  ORDER_UPDATE: { label: "Order Help", icon: RotateCcw, color: "bg-cyan-500", textColor: "text-cyan-500" },
-  CONDIMENTS: { label: "Sauces / Spices", icon: Salad, color: "bg-orange-500", textColor: "text-orange-500" },
-  REFRESHMENTS: { label: "Toothpicks", icon: Smile, color: "bg-teal-500", textColor: "text-teal-500" },
-  WIFI: { label: "Wifi Password", icon: Wifi, color: "bg-indigo-500", textColor: "text-indigo-500" },
-  FEEDBACK: { label: "Feedback", icon: Star, color: "bg-purple-500", textColor: "text-purple-500" },
+const STEWARD_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
+const POLL_INTERVAL_MS = 10000; // Increased to 10s as we have sockets
+
+const SERVICE_CONFIG: Record<string, { label: string; icon: any; color: string; textColor: string; lightColor: string }> = {
+  WATER: { label: "Water", icon: Droplets, color: "bg-blue-600", textColor: "text-blue-600", lightColor: "bg-blue-50" },
+  BILL: { label: "Bill Request", icon: FileText, color: "bg-rose-600", textColor: "text-rose-600", lightColor: "bg-rose-50" },
+  STEWARD: { label: "Call Steward", icon: User, color: "bg-amber-600", textColor: "text-amber-600", lightColor: "bg-amber-50" },
+  CUTLERY: { label: "Extra Cutlery", icon: Utensils, color: "bg-slate-600", textColor: "text-slate-600", lightColor: "bg-slate-50" },
+  NAPKINS: { label: "Napkins / Tissues", icon: Layers, color: "bg-pink-600", textColor: "text-pink-600", lightColor: "bg-pink-50" },
+  CLEANING: { label: "Table Cleaning", icon: Sparkles, color: "bg-emerald-600", textColor: "text-emerald-600", lightColor: "bg-emerald-50" },
+  ORDER_UPDATE: { label: "Order Help", icon: RotateCcw, color: "bg-cyan-600", textColor: "text-cyan-600", lightColor: "bg-cyan-50" },
+  CONDIMENTS: { label: "Sauces / Spices", icon: Salad, color: "bg-orange-600", textColor: "text-orange-600", lightColor: "bg-orange-50" },
+  REFRESHMENTS: { label: "Toothpicks", icon: Smile, color: "bg-teal-600", textColor: "text-teal-600", lightColor: "bg-teal-50" },
+  WIFI: { label: "Wifi Password", icon: Wifi, color: "bg-indigo-600", textColor: "text-indigo-600", lightColor: "bg-indigo-50" },
+  FEEDBACK: { label: "Feedback", icon: Star, color: "bg-purple-600", textColor: "text-purple-600", lightColor: "bg-purple-50" },
 };
 
-interface ServiceRequest {
-  id: number;
+interface UnifiedRequest {
+  id: string | number;
   session_id: string;
   table_number: string;
   customer_name: string | null;
-  service_type: string;
+  type: string; // 'BILL' or service type
   message: string | null;
   order_source: string;
   requested_at: string;
 }
 
-interface BillRequest {
-  session_id: string;
-  table_number: string;
-  customer_name: string | null;
-  message?: string | null;
-  order_source: string;
-  requested_at: string;
-}
+// --- Utils ---
 
 function playNotificationTone() {
   try {
-    const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
 
     const audioContext = new AudioCtx();
@@ -91,6 +88,107 @@ function playNotificationTone() {
   }
 }
 
+// --- Components ---
+
+interface RequestCardProps {
+  request: UnifiedRequest;
+  isProcessing: boolean;
+  onAcknowledge: (req: UnifiedRequest) => void;
+}
+
+function RequestCard({ request, isProcessing, onAcknowledge }: RequestCardProps) {
+  const config = SERVICE_CONFIG[request.type] || {
+    label: request.type,
+    icon: Bell,
+    color: "bg-slate-600",
+    textColor: "text-slate-600",
+    lightColor: "bg-slate-50",
+  };
+  const Icon = config.icon;
+  const time = new Date(request.requested_at).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return (
+    <div className="group overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white shadow-xl shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-slate-300/50">
+      <div className={`px-8 py-6 flex items-center justify-between text-white ${config.color} transition-colors`}>
+        <div className="flex items-center gap-4">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
+            <Icon className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">
+                {config.label}
+              </span>
+              <span className="h-1 w-1 rounded-full bg-white/40" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-100">
+                {request.order_source === "room" ? "ROOM" : "TABLE"}
+              </span>
+            </div>
+            <p className="text-2xl font-black leading-tight">
+              {request.order_source === "room" ? "Room" : "Table"} {request.table_number}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 backdrop-blur-md">
+            <Clock className="h-3 w-3" />
+            <span className="text-[11px] font-bold">{time}</span>
+          </div>
+          <div className="flex h-2.5 w-2.5 rounded-full bg-white animate-pulse shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+        </div>
+      </div>
+
+      <div className="p-8">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="h-12 w-12 shrink-0 rounded-2xl bg-slate-50 border border-slate-100 grid place-items-center">
+            <User className="h-6 w-6 text-slate-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">Guest Name</p>
+            <p className="truncate text-base font-black text-slate-900">{request.customer_name || "Anonymous Guest"}</p>
+          </div>
+        </div>
+
+        {request.message && (
+          <div className={`mb-8 rounded-3xl ${config.lightColor} p-5 border border-white relative`}>
+            <div className="absolute -top-3 left-6 px-3 py-0.5 bg-white rounded-full border border-slate-100 shadow-sm">
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Message</span>
+            </div>
+            <p className={`text-sm font-bold ${config.textColor} leading-relaxed italic pt-1`}>
+              "{request.message}"
+            </p>
+          </div>
+        )}
+
+        <button
+          type="button"
+          disabled={isProcessing}
+          onClick={() => onAcknowledge(request)}
+          className={`w-full group relative flex items-center justify-center gap-3 overflow-hidden rounded-[1.5rem] py-4 text-sm font-black transition-all active:scale-[0.97] disabled:opacity-60 shadow-lg ${
+            request.type === 'BILL'
+              ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-200'
+              : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-300'
+          }`}
+        >
+          {isProcessing ? (
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          ) : (
+            <>
+              <Check className="h-5 w-5 transition-transform group-hover:scale-125" />
+              <span>Acknowledge Request</span>
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- Main Component ---
+
 export default function StewardChatPage() {
   const user = getUser();
   const role = user?.role ?? "";
@@ -106,20 +204,12 @@ export default function StewardChatPage() {
   );
 }
 
-interface StewardChatProps {
-  restaurantId: number | null;
-}
-
-function StewardChat({ restaurantId }: StewardChatProps) {
-  const canAccessChat = Boolean(restaurantId);
-
-  const [billRequests, setBillRequests] = useState<Map<string, BillRequest>>(new Map());
-  const [serviceRequests, setServiceRequests] = useState<Map<string, ServiceRequest>>(new Map());
+function StewardChat({ restaurantId }: { restaurantId: number | null }) {
+  const [requests, setRequests] = useState<Map<string, UnifiedRequest>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionLoadingId, setActionLoadingId] = useState<number | string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [actionId, setActionId] = useState<string | number | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<"table" | "room">("table");
 
@@ -132,155 +222,117 @@ function StewardChat({ restaurantId }: StewardChatProps) {
     if (withSound) playNotificationTone();
   }, []);
 
-  const loadData = useCallback(
-    async (silent = false) => {
-      if (!restaurantId || !canAccessChat) {
-        setLoading(false);
-        return;
-      }
+  const loadData = useCallback(async (silent = false) => {
+    if (!restaurantId) return;
+    
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+    
+    setError(null);
 
-      if (silent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
+    try {
+      const [billsRes, serviceRes] = await Promise.all([
+        api.get<{ requests: any[] }>("/table-sessions/bill-requests"),
+        api.get<{ requests: any[] }>("/table-sessions/service-requests"),
+      ]);
 
-      setLoadError(null);
+      const nextRequests = new Map<string, UnifiedRequest>();
 
-      try {
-        const [billsRes, serviceRes] = await Promise.all([
-          api.get<{ requests: BillRequest[] }>("/table-sessions/bill-requests"),
-          api.get<{ requests: ServiceRequest[] }>("/table-sessions/service-requests"),
-        ]);
+      billsRes.requests.forEach(req => {
+        nextRequests.set(`BILL:${req.session_id}`, {
+          ...req,
+          id: req.session_id,
+          type: 'BILL',
+          message: req.message || null
+        });
+      });
 
-        const nextBills = new Map<string, BillRequest>();
-        for (const req of billsRes.requests) {
-          nextBills.set(req.session_id, req);
-        }
+      serviceRes.requests.forEach(req => {
+        nextRequests.set(`SERVICE:${req.id}`, {
+          ...req,
+          type: req.service_type
+        });
+      });
 
-        const nextService = new Map<string, ServiceRequest>();
-        for (const req of serviceRes.requests) {
-          const key = String(req.id || `${req.session_id}:${req.service_type}`);
-          nextService.set(key, req);
-        }
-
-        setBillRequests(nextBills);
-        setServiceRequests(nextService);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setLoadError(err.detail || "Failed to load service requests.");
-        } else {
-          setLoadError("Failed to load service requests.");
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [canAccessChat, restaurantId]
-  );
-
-  const { tableCount, roomCount } = useMemo(() => {
-    const list = [
-      ...Array.from(billRequests.values()),
-      ...Array.from(serviceRequests.values()),
-    ];
-    return {
-      tableCount: list.filter(r => r.order_source !== "room").length,
-      roomCount: list.filter(r => r.order_source === "room").length,
-    };
-  }, [billRequests, serviceRequests]);
+      setRequests(nextRequests);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.detail : "Failed to sync requests");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [restaurantId]);
 
   useEffect(() => {
     void loadData();
+    const interval = setInterval(() => void loadData(true), POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
   }, [loadData]);
 
-  useEffect(() => {
-    if (!canAccessChat) return;
-    const interval = setInterval(() => {
-      void loadData(true);
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [canAccessChat, loadData]);
+  // --- Real-time Handlers ---
 
-  const handleBillRequested = useCallback(
-    (event: BillRequestedEvent) => {
-      const { table_number, customer_name, session_id, requested_at, order_source } = event.data;
-      const sourceLabel = order_source === "room" ? `Room ${table_number}` : `Table ${table_number}`;
-      showAlert(
-        `${sourceLabel} (${customer_name || "Guest"}) is requesting the bill!`,
-        true
-      );
-
-      setBillRequests((prev) => {
-        const next = new Map(prev);
-        next.set(session_id, {
-          session_id,
-          table_number,
-          customer_name,
-          order_source,
-          requested_at,
-        });
-        return next;
+  const handleBillRequested = useCallback((event: BillRequestedEvent) => {
+    const { table_number, customer_name, session_id, requested_at, order_source } = event.data;
+    const label = order_source === "room" ? `Room ${table_number}` : `Table ${table_number}`;
+    
+    showAlert(`${label} (${customer_name || "Guest"}) is requesting the bill!`, true);
+    
+    setRequests(prev => {
+      const next = new Map(prev);
+      next.set(`BILL:${session_id}`, {
+        id: session_id,
+        session_id,
+        table_number,
+        customer_name,
+        type: 'BILL',
+        message: null,
+        order_source,
+        requested_at
       });
-    },
-    [showAlert]
-  );
+      return next;
+    });
+  }, [showAlert]);
 
-  const handleServiceRequested = useCallback(
-    (event: ServiceRequestedEvent) => {
-      const { request_id, table_number, customer_name, session_id, service_type, message, requested_at, order_source } = event.data;
-      const config = SERVICE_CONFIG[service_type];
-      const sourceLabel = order_source === "room" ? `Room ${table_number}` : `Table ${table_number}`;
-      showAlert(
-        `${sourceLabel} (${customer_name || "Guest"}) is requesting ${config?.label || service_type}!`,
-        true
-      );
+  const handleServiceRequested = useCallback((event: ServiceRequestedEvent) => {
+    const { request_id, table_number, customer_name, session_id, service_type, message, requested_at, order_source } = event.data;
+    const config = SERVICE_CONFIG[service_type];
+    const label = order_source === "room" ? `Room ${table_number}` : `Table ${table_number}`;
+    
+    showAlert(`${label} (${customer_name || "Guest"}) is requesting ${config?.label || service_type}!`, true);
 
-      setServiceRequests((prev) => {
-        const next = new Map(prev);
-        const key = String(request_id || `${session_id}:${service_type}`);
-        next.set(key, {
-          id: request_id || 0,
-          session_id,
-          table_number,
-          customer_name,
-          service_type,
-          message,
-          order_source,
-          requested_at,
-        });
-        return next;
+    setRequests(prev => {
+      const next = new Map(prev);
+      next.set(`SERVICE:${request_id}`, {
+        id: request_id || 0,
+        session_id,
+        table_number,
+        customer_name,
+        type: service_type,
+        message,
+        order_source,
+        requested_at
       });
-    },
-    [showAlert]
-  );
+      return next;
+    });
+  }, [showAlert]);
 
-  const handleServiceAcknowledged = useCallback(
-    (event: ServiceAcknowledgedEvent) => {
-      const { request_id } = event.data;
-      setServiceRequests((prev) => {
-        const next = new Map(prev);
-        next.delete(String(request_id));
-        return next;
-      });
-    },
-    []
-  );
+  const handleServiceAcknowledged = useCallback((event: ServiceAcknowledgedEvent) => {
+    setRequests(prev => {
+      const next = new Map(prev);
+      next.delete(`SERVICE:${event.data.request_id}`);
+      return next;
+    });
+  }, []);
 
-  const handleBillAcknowledged = useCallback(
-    (event: BillAcknowledgedEvent) => {
-      const { session_id } = event.data;
-      setBillRequests((prev) => {
-        const next = new Map(prev);
-        next.delete(session_id);
-        return next;
-      });
-    },
-    []
-  );
+  const handleBillAcknowledged = useCallback((event: BillAcknowledgedEvent) => {
+    setRequests(prev => {
+      const next = new Map(prev);
+      next.delete(`BILL:${event.data.session_id}`);
+      return next;
+    });
+  }, []);
 
-  const { isConnected, connectionError } = useKitchenSocket({
+  const { isConnected } = useKitchenSocket({
     restaurantId,
     onBillRequested: handleBillRequested,
     onServiceRequested: handleServiceRequested,
@@ -288,98 +340,87 @@ function StewardChat({ restaurantId }: StewardChatProps) {
     onBillAcknowledged: handleBillAcknowledged,
   });
 
-  const handleAcknowledgeRequest = useCallback(
-    async (req: any) => {
-      const isBill = req.type === 'BILL' || !('service_type' in req);
-      const requestId = isBill ? req.session_id : req.id;
+  const handleAcknowledge = useCallback(async (req: UnifiedRequest) => {
+    setActionId(req.id);
+    try {
+      const endpoint = req.type === 'BILL' 
+        ? `/table-sessions/bill-requests/${req.id}/acknowledge`
+        : `/table-sessions/service-requests/${req.id}/acknowledge`;
+      
+      await api.patch(endpoint, {});
+      
+      setRequests(prev => {
+        const next = new Map(prev);
+        next.delete(req.type === 'BILL' ? `BILL:${req.id}` : `SERVICE:${req.id}`);
+        return next;
+      });
+      
+      showAlert(`Acknowledged request for ${req.order_source === 'room' ? 'Room' : 'Table'} ${req.table_number}`);
+    } catch (err) {
+      showAlert(err instanceof ApiError ? err.detail : "Failed to acknowledge request");
+    } finally {
+      setActionId(null);
+    }
+  }, [showAlert]);
 
-      if (!requestId) return;
+  const filteredAndSorted = useMemo(() => {
+    return Array.from(requests.values())
+      .filter(r => r.order_source === sourceFilter)
+      .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime());
+  }, [requests, sourceFilter]);
 
-      setActionLoadingId(requestId);
-      setActionError(null);
-
-      try {
-        const endpoint = isBill
-          ? `/table-sessions/bill-requests/${requestId}/acknowledge`
-          : `/table-sessions/service-requests/${requestId}/acknowledge`;
-
-        await api.patch(endpoint, {});
-
-        if (isBill) {
-          setBillRequests((prev) => {
-            const next = new Map(prev);
-            next.delete(req.session_id);
-            return next;
-          });
-        } else {
-          setServiceRequests((prev) => {
-            const next = new Map(prev);
-            next.delete(String(requestId));
-            return next;
-          });
-        }
-
-        showAlert(`Acknowledged ${isBill ? 'bill' : 'service'} request for Table ${req.table_number}`);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setActionError(err.detail || "Failed to acknowledge request.");
-        } else {
-          setActionError("Failed to acknowledge request.");
-        }
-      } finally {
-        setActionLoadingId(null);
-      }
-    },
-    [showAlert]
-  );
-
-  const sortedRequests = useMemo(() => {
-    const list = [
-      ...Array.from(billRequests.values()).map(r => ({ ...r, type: 'BILL' as const, message: null })),
-      ...Array.from(serviceRequests.values()).map(r => ({ ...r, type: r.service_type }))
-    ];
-
-    const filtered = list.filter(r => r.order_source === sourceFilter);
-
-    return filtered.sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime());
-  }, [billRequests, serviceRequests, sourceFilter]);
+  const counts = useMemo(() => {
+    const list = Array.from(requests.values());
+    return {
+      table: list.filter(r => r.order_source !== "room").length,
+      room: list.filter(r => r.order_source === "room").length,
+    };
+  }, [requests]);
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-5">
-            <div className="flex h-16 w-16 items-center justify-center rounded-[2rem] bg-slate-900 text-white shadow-xl shadow-slate-200">
-              <Bell className="h-8 w-8" />
+    <div className="max-w-[1600px] mx-auto space-y-10 pb-20">
+      {/* Header Section */}
+      <div className="rounded-[3rem] border border-slate-100 bg-white/80 backdrop-blur-xl p-8 shadow-2xl shadow-slate-200/50">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <div className="flex h-20 w-20 items-center justify-center rounded-[2.5rem] bg-slate-900 text-white shadow-2xl shadow-slate-400 ring-4 ring-white">
+                <Bell className="h-10 w-10" />
+              </div>
+              {isConnected && (
+                <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 border-4 border-white animate-pulse" />
+              )}
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tight text-slate-900">Service Requests</h1>
-              <div className="mt-1 flex items-center gap-2">
-                <div className={`h-2.5 w-2.5 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                  {isConnected ? "Real-time stream active" : "Reconnecting..."}
+              <h1 className="text-4xl font-black tracking-tight text-slate-900">Service Stream</h1>
+              <div className="mt-2 flex items-center gap-3">
+                <div className={`h-2.5 w-2.5 rounded-full ${isConnected ? "bg-emerald-500" : "bg-rose-500"}`} />
+                <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">
+                  {isConnected ? "Live Connection Established" : "Attempting Reconnection..."}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex p-1.5 gap-1.5 bg-slate-100 rounded-3xl w-fit">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex p-2 gap-2 bg-slate-100 rounded-[2rem] shadow-inner">
               {(["table", "room"] as const).map((source) => (
                 <button
                   key={source}
                   onClick={() => setSourceFilter(source)}
-                  className={`relative flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all duration-300 ${sourceFilter === source
-                      ? "bg-white text-slate-900 shadow-lg scale-[1.03]"
-                      : "text-slate-500 hover:text-slate-900 hover:bg-white/50"
-                    }`}
+                  className={`relative flex items-center gap-3 px-8 py-3.5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-widest transition-all duration-500 ${
+                    sourceFilter === source
+                      ? "bg-white text-slate-900 shadow-xl scale-[1.05]"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
                 >
+                  <MapPin className={`h-3.5 w-3.5 ${sourceFilter === source ? "text-slate-900" : "text-slate-400"}`} />
                   <span>{source}s</span>
-                  {(source === "table" ? tableCount : roomCount) > 0 && (
-                    <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1 text-[10px] font-black ${
+                  {counts[source] > 0 && (
+                    <span className={`flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-[10px] font-black transition-colors ${
                       sourceFilter === source ? "bg-slate-900 text-white" : "bg-slate-200 text-slate-600"
                     }`}>
-                      {source === "table" ? tableCount : roomCount}
+                      {counts[source]}
                     </span>
                   )}
                 </button>
@@ -390,134 +431,73 @@ function StewardChat({ restaurantId }: StewardChatProps) {
               type="button"
               onClick={() => void loadData(true)}
               disabled={loading || refreshing}
-              className="group flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-slate-100 bg-white text-slate-900 transition-all hover:border-slate-900 active:scale-95 disabled:opacity-50"
-              title="Refresh requests"
+              className="group flex h-14 w-14 items-center justify-center rounded-[1.75rem] bg-white border-2 border-slate-100 text-slate-900 transition-all hover:border-slate-900 hover:shadow-lg active:scale-90 disabled:opacity-50"
+              title="Manual Refresh"
             >
-              <RotateCcw className={`h-5 w-5 ${refreshing ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`} />
+              <RotateCcw className={`h-6 w-6 ${refreshing ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-700"}`} />
             </button>
           </div>
         </div>
       </div>
 
+      {/* Alert Banner */}
       {alert && (
-        <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-800 animate-in fade-in slide-in-from-top-2">
-          {alert}
-        </div>
-      )}
-
-      {connectionError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {connectionError}
-        </div>
-      )}
-
-      {loadError && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{loadError}</div>
-      )}
-
-      {actionError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {actionError}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {loading ? (
-          <div className="col-span-full py-20 text-center text-sm text-slate-500">
-            Loading requests...
-          </div>
-        ) : sortedRequests.length === 0 ? (
-          <div className="col-span-full py-20 flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-100 shadow-sm">
-            <div className="h-20 w-20 rounded-full bg-rose-50 flex items-center justify-center mb-6">
-              <span className="text-4xl opacity-50">🔔</span>
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 animate-in slide-in-from-top-4 duration-500">
+          <div className="rounded-[2rem] bg-slate-900 text-white p-5 shadow-2xl flex items-center gap-4 border border-white/10 backdrop-blur-md">
+            <div className="h-10 w-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <Check className="h-5 w-5" />
             </div>
-            <p className="text-lg font-black text-slate-900 tracking-tight">No active requests</p>
-            <p className="text-sm text-slate-400 mt-1 font-medium">Guest service and bill requests will appear here</p>
+            <p className="text-sm font-bold tracking-wide flex-1">{alert}</p>
+            <button onClick={() => setAlert(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <Check className="h-4 w-4 opacity-50" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sync Error Banner */}
+      {error && (
+        <div className="rounded-[2.5rem] bg-rose-50 border border-rose-100 p-6 flex items-center gap-4 animate-in fade-in slide-in-from-top-4">
+          <div className="h-12 w-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-200">
+            <RotateCcw className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-1">Sync Issue Detected</p>
+            <p className="text-sm font-bold text-rose-900">{error}</p>
+          </div>
+          <button 
+            onClick={() => void loadData()}
+            className="px-6 py-2 bg-white rounded-xl border border-rose-200 text-xs font-black uppercase tracking-widest text-rose-600 hover:bg-rose-100 transition-colors"
+          >
+            Retry Sync
+          </button>
+        </div>
+      )}
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
+        {loading ? (
+          <div className="col-span-full py-40 flex flex-col items-center justify-center space-y-4">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+            <p className="text-sm font-black uppercase tracking-widest text-slate-400">Syncing Stream...</p>
+          </div>
+        ) : filteredAndSorted.length === 0 ? (
+          <div className="col-span-full py-40 flex flex-col items-center justify-center bg-white rounded-[4rem] border-2 border-dashed border-slate-100 shadow-sm">
+            <div className="h-24 w-24 rounded-[2.5rem] bg-slate-50 flex items-center justify-center mb-8">
+              <Bell className="h-10 w-10 text-slate-200" />
+            </div>
+            <p className="text-2xl font-black text-slate-900 tracking-tight">Quiet on the floor</p>
+            <p className="text-sm text-slate-400 mt-2 font-medium">New requests will appear instantly when guests need help</p>
           </div>
         ) : (
-          sortedRequests.map((req) => {
-            const config = SERVICE_CONFIG[req.type] || { label: req.type, icon: Bell, color: "bg-slate-500", textColor: "text-slate-500" };
-            const Icon = config.icon;
-            const requestId = req.type === 'BILL' ? req.session_id : (req as any).id;
-
-            return (
-              <div
-                key={`${req.session_id}:${req.type}`}
-                className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
-              >
-                <div className={`px-5 py-4 flex items-center justify-between text-white ${config.color}`}>
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">
-                          {config.label}
-                        </span>
-                        <span className="h-1 w-1 rounded-full bg-white/40" />
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-100">
-                          {req.order_source === "room" ? "ROOM" : "TABLE"}
-                        </span>
-                      </div>
-                      <p className="text-xl font-black leading-tight">
-                        {req.order_source === "room" ? "Room" : "Table"} {req.table_number}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-[10px] font-bold opacity-80">
-                      {new Date(req.requested_at).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    <div className="flex h-2 w-2 rounded-full bg-white animate-pulse" />
-                  </div>
-                </div>
-
-                <div className="p-5">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="h-10 w-10 shrink-0 rounded-full bg-slate-100 grid place-items-center">
-                      <User className="h-5 w-5 text-slate-400" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Guest Name</p>
-                      <p className="truncate text-sm font-bold text-slate-900">{req.customer_name || "Guest"}</p>
-                    </div>
-                  </div>
-
-                  {req.message && (
-                    <div className="mb-5 rounded-2xl bg-slate-50 p-4 border border-slate-100 relative">
-                      <div className="absolute -top-2 left-4 px-2 bg-white rounded-full border border-slate-100">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Note</span>
-                      </div>
-                      <p className="text-xs font-medium text-slate-700 leading-relaxed italic pt-1">
-                        "{req.message}"
-                      </p>
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    disabled={actionLoadingId === requestId}
-                    onClick={() => void handleAcknowledgeRequest(req)}
-                    className={`w-full group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl py-3.5 text-sm font-black transition-all active:scale-[0.98] disabled:opacity-60 shadow-lg ${req.type === 'BILL'
-                        ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-200'
-                        : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200'
-                      }`}
-                  >
-                    {actionLoadingId === requestId ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    ) : (
-                      <Check className="h-4 w-4 transition-transform group-hover:scale-110" />
-                    )}
-                    <span>Acknowledge Request</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })
+          filteredAndSorted.map((req) => (
+            <RequestCard
+              key={`${req.type}:${req.id}`}
+              request={req}
+              isProcessing={actionId === req.id}
+              onAcknowledge={handleAcknowledge}
+            />
+          ))
         )}
       </div>
     </div>
