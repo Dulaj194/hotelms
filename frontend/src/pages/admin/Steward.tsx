@@ -717,56 +717,59 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <button
-          type="button"
-          onClick={() => handleTabChange("awaiting")}
-          className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-            activeTab === "awaiting"
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-100"
-              : "bg-blue-50 text-blue-700 hover:bg-blue-100/50"
-          }`}
-        >
-          <span>Awaiting</span>
-          <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "awaiting" ? "bg-white/20" : "bg-blue-200/50"}`}>
-            {pendingOrders.size}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleTabChange("ready")}
-          className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-            activeTab === "ready"
-              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-100"
-              : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100/50"
-          }`}
-        >
-          <span>Ready</span>
-          <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "ready" ? "bg-white/20" : "bg-emerald-200/50"}`}>
-            {readyOrders.size}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleTabChange("requests")}
-          className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-            activeTab === "requests"
-              ? "bg-rose-600 text-white shadow-lg shadow-rose-100"
-              : "bg-rose-50 text-rose-700 hover:bg-rose-100/50"
-          }`}
-        >
-          <span>Requests</span>
-          <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "requests" ? "bg-white/20" : "bg-rose-200/50"}`}>
-            {billRequests.size + serviceRequests.size}
-          </span>
-        </button>
-      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleTabChange("awaiting")}
+            className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
+              activeTab === "awaiting"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-100"
+                : "bg-blue-50 text-blue-700 hover:bg-blue-100/50"
+            }`}
+          >
+            <span>Awaiting</span>
+            <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "awaiting" ? "bg-white/20" : "bg-blue-200/50"}`}>
+              {pendingOrders.size}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("ready")}
+            className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
+              activeTab === "ready"
+                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-100"
+                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100/50"
+            }`}
+          >
+            <span>Ready</span>
+            <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "ready" ? "bg-white/20" : "bg-emerald-200/50"}`}>
+              {readyOrders.size}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("requests")}
+            className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
+              activeTab === "requests"
+                ? "bg-rose-600 text-white shadow-lg shadow-rose-100"
+                : "bg-rose-50 text-rose-700 hover:bg-rose-100/50"
+            }`}
+          >
+            <span>Requests</span>
+            <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "requests" ? "bg-white/20" : "bg-rose-200/50"}`}>
+              {billRequests.size + serviceRequests.size}
+            </span>
+          </button>
+        </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="h-px bg-slate-100 mx-1" />
+
+        <div className="grid gap-3 md:grid-cols-2">
           <select
             value={sourceFilter}
             onChange={(event) => setSourceFilter(event.target.value as SourceFilter)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-slate-50/50"
           >
             <option value="all">All Sources</option>
             <option value="table">Table Orders</option>
@@ -777,10 +780,11 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
             type="text"
             value={locationFilter}
             onChange={(event) => setLocationFilter(event.target.value)}
-            placeholder="Filter by order no / table / room / customer"
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            placeholder="Search by order no / table / room / guest"
+            className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-slate-50/50"
           />
         </div>
+      </div>
 
       {loading && (
         <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
@@ -865,8 +869,12 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           <div className="w-full shrink-0 snap-start px-0.5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {billRequests.size === 0 && serviceRequests.size === 0 ? (
-                <div className="col-span-full rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-                  No active service or bill requests.
+                <div className="col-span-full py-20 flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-100 shadow-sm">
+                  <div className="h-20 w-20 rounded-full bg-rose-50 flex items-center justify-center mb-6">
+                    <span className="text-4xl opacity-50">🔔</span>
+                  </div>
+                  <p className="text-lg font-black text-slate-900 tracking-tight">No active requests</p>
+                  <p className="text-sm text-slate-400 mt-1 font-medium">Guest service and bill requests will appear here</p>
                 </div>
               ) : (
                 <>

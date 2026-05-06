@@ -179,6 +179,16 @@ def get_history_stats(
     return service.get_history_stats(db, restaurant_id)
 
 
+@router.get("/badge-counts")
+def get_badge_counts(
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_STAFF_ROLES)),
+) -> dict[str, int]:
+    """Return counts for sidebar notification badges."""
+    return service.get_badge_counts(db, restaurant_id)
+
+
 @router.get("/{order_id}", response_model=OrderDetailResponse)
 def get_order_detail(
     order_id: int,

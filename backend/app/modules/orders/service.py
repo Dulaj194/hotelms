@@ -28,6 +28,8 @@ from app.modules.orders.model import OrderStatus
 from app.modules.orders.schemas import (
     ActiveOrderListResponse,
     KitchenOrderCard,
+)
+from app.modules.table_sessions import repository as ts_repo
     KitchenOrderItemSummary,
     KitchenOrderListResponse,
     OrderDetailResponse,
@@ -748,3 +750,14 @@ def update_order_status(
         status=updated.status,
         updated_at=updated.updated_at,
     )
+
+
+def get_badge_counts(db: Session, restaurant_id: int) -> dict[str, int]:
+    """Return counts for sidebar notification badges."""
+    awaiting_count = order_repo.count_active_steward_stats(db, restaurant_id)
+    requests_count = ts_repo.count_active_requests_stats(db, restaurant_id)
+    
+    return {
+        "awaiting": awaiting_count,
+        "requests": requests_count,
+    }

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
+import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 import { getBillingHomePath } from "@/features/billing/helpers";
 import {
@@ -167,6 +168,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [housekeepingPendingCount, setHousekeepingPendingCount] = useState(0);
+  const [badgeCounts, setBadgeCounts] = useState({ awaiting: 0, requests: 0 });
   const sidebarNavRef = useRef<HTMLElement | null>(null);
 
   const { menusOpen, kitchenOpen, qrOpen, housekeepingOpen, offersOpen } = groupState;
@@ -205,9 +207,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         moduleKey: "steward_ops",
       },
       {
-        path: "/admin/kitchen/orders",
+        path: "/admin/steward?tab=awaiting",
         label: "Orders",
         icon: ClipboardList,
+        privilege: "QR_MENU",
+        moduleKey: "steward_ops",
+      },
+      {
+        path: "/admin/kitchen/orders",
+        label: "Kitchen Display",
+        icon: CookingPot,
         privilege: "QR_MENU",
         moduleKey: "kds",
       },
@@ -519,6 +528,36 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     };
   }, [housekeepingTasksEnabled, isHousekeepingGroupVisible, privilegesLoading]);
 
+  // Real-time Badge Counts (Steward Orders & Requests)
+  const fetchBadgeCounts = useCallback(async () => {
+    if (!user?.restaurant_id) return;
+    try {
+      const data = await api.get<Record<string, number>>("/orders/badge-counts");
+      setBadgeCounts({
+        awaiting: data.awaiting || 0,
+        requests: data.requests || 0,
+      });
+    } catch {
+      // Silent fail
+    }
+  }, [user?.restaurant_id]);
+
+  useKitchenSocket({
+    restaurantId: user?.restaurant_id,
+    onNewOrder: () => void fetchBadgeCounts(),
+    onStatusUpdate: () => void fetchBadgeCounts(),
+    onBillRequested: () => void fetchBadgeCounts(),
+    onServiceRequested: () => void fetchBadgeCounts(),
+    onServiceAcknowledged: () => void fetchBadgeCounts(),
+    onBillAcknowledged: () => void fetchBadgeCounts(),
+  });
+
+  useEffect(() => {
+    void fetchBadgeCounts();
+    const timer = setInterval(() => void fetchBadgeCounts(), 30000); // 30s fallback
+    return () => clearInterval(timer);
+  }, [fetchBadgeCounts]);
+
   function handleLogout() {
     clearInAppNavigationHistory();
     clearAuth();
@@ -644,14 +683,24 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         key={subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
-                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors relative ${
                           subActive
                             ? "bg-blue-950 text-white"
                             : "text-gray-300 hover:bg-gray-800 hover:text-white"
                         }`}
                       >
                         <SubIcon className="h-4 w-4 mr-2 shrink-0" />
-                        {subItem.label}
+                        <span>{subItem.label}</span>
+                        {subItem.label === "Chat" && badgeCounts.requests > 0 && (
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white shadow-sm animate-pulse">
+                            {badgeCounts.requests}
+                          </span>
+                        )}
+                        {subItem.label === "Orders" && badgeCounts.awaiting > 0 && (
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-black text-white shadow-sm animate-pulse">
+                            {badgeCounts.awaiting}
+                          </span>
+                        )}
                       </Link>
                     );
                   })}

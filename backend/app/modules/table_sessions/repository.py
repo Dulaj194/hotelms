@@ -302,3 +302,30 @@ def acknowledge_service_request(
         db.flush()
         return True
     return False
+
+
+def count_active_requests_stats(db: Session, restaurant_id: int) -> int:
+    """Return the combined count of active bill requests and service requests."""
+    now = datetime.now(UTC)
+    bill_count = (
+        db.query(TableSession)
+        .filter(
+            TableSession.restaurant_id == restaurant_id,
+            TableSession.is_active.is_(True),
+            TableSession.session_status == TableSessionStatus.BILL_REQUESTED,
+            TableSession.expires_at > now,
+        )
+        .count()
+    )
+    
+    service_count = (
+        db.query(TableServiceRequest)
+        .filter(
+            TableServiceRequest.restaurant_id == restaurant_id,
+            TableServiceRequest.is_completed.is_(False),
+            TableServiceRequest.acknowledged_by.is_(None),
+        )
+        .count()
+    )
+    
+    return bill_count + service_count

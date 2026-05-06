@@ -234,6 +234,18 @@ def count_history_orders_by_restaurant(
     return counts
 
 
+def count_active_steward_stats(db: Session, restaurant_id: int) -> int:
+    """Return the count of pending orders (Awaiting confirmation)."""
+    return (
+        db.query(OrderHeader)
+        .filter(
+            OrderHeader.restaurant_id == restaurant_id,
+            OrderHeader.status == OrderStatus.pending,
+        )
+        .count()
+    )
+
+
 # ── Kitchen-specific queries (include items for dashboard display) ─────────────
 
 def list_processing_orders_by_restaurant(

@@ -42,8 +42,9 @@ export default function KitchenOrderSection({
       {/* Order list */}
       <div className="flex-1 bg-gray-50 border border-t-0 border-gray-200 rounded-b-lg p-3 flex flex-col gap-3 min-h-[200px]">
         {orders.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
-            <p className="text-sm text-gray-400 italic">{emptyMessage}</p>
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white/50 rounded-xl border border-dashed border-slate-200">
+            <div className="text-2xl mb-2 opacity-20">📋</div>
+            <p className="text-xs font-medium text-slate-400">{emptyMessage}</p>
           </div>
         ) : (
           orders.map((order) => (
