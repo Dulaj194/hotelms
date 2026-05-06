@@ -247,8 +247,8 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     if (!touchStartX || !touchEndX) return;
     
     const distance = touchStartX - touchEndX;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
+    const isLeftSwipe = distance > 70; // Increased threshold for more intentional swipes
+    const isRightSwipe = distance < -70;
 
     if (isLeftSwipe) {
       if (activeTab === "awaiting") handleTabChange("ready");
@@ -258,6 +258,12 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
       else if (activeTab === "ready") handleTabChange("awaiting");
     }
   };
+
+  const tabIndex = useMemo(() => {
+    if (activeTab === "awaiting") return 0;
+    if (activeTab === "ready") return 1;
+    return 2;
+  }, [activeTab]);
 
   // Sync state if URL changes (e.g. sidebar link click)
   useEffect(() => {
@@ -768,161 +774,179 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
         </div>
       </div>
 
-      {loading ? (
+      {loading && (
         <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
           Loading steward orders...
         </div>
-      ) : loadError ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{loadError}</div>
-      ) : activeTab === "requests" ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {billRequests.size === 0 && serviceRequests.size === 0 ? (
-            <div className="col-span-full rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-              No active service or bill requests.
-            </div>
-          ) : (
-            <>
-              {/* Combine and sort all requests by time */}
-              {[
-                ...Array.from(billRequests.values()).map(r => ({ ...r, type: 'BILL', message: null })),
-                ...Array.from(serviceRequests.values()).map(r => ({ ...r, type: r.service_type }))
-              ]
-                .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())
-                .map((req) => {
-                  const config = SERVICE_CONFIG[req.type] || { label: req.type, icon: Bell, color: "bg-slate-500", textColor: "text-slate-500" };
-                  const Icon = config.icon;
-                  
-                  return (
-                    <div
-                      key={`${req.session_id}:${req.type}`}
-                      className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
-                    >
-                      <div className={`px-5 py-4 flex items-center justify-between text-white ${config.color}`}>
-                        <div className="flex items-center gap-3">
-                          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">
-                              {config.label}
-                            </span>
-                            <p className="text-xl font-black leading-tight">Table {req.table_number}</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="text-[10px] font-bold opacity-80">
-                            {new Date(req.requested_at).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                          <div className="flex h-2 w-2 rounded-full bg-white animate-pulse" />
-                        </div>
-                      </div>
-                      
-                      <div className="p-5">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="h-10 w-10 shrink-0 rounded-full bg-slate-100 grid place-items-center">
-                            <User className="h-5 w-5 text-slate-400" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Guest Name</p>
-                            <p className="truncate text-sm font-bold text-slate-900">{req.customer_name || "Guest"}</p>
-                          </div>
-                        </div>
-
-                        {req.message && (
-                          <div className="mb-5 rounded-2xl bg-slate-50 p-4 border border-slate-100 relative">
-                            <div className="absolute -top-2 left-4 px-2 bg-white rounded-full border border-slate-100">
-                              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Note</span>
-                            </div>
-                            <p className="text-xs font-medium text-slate-700 leading-relaxed italic pt-1">
-                              "{req.message}"
-                            </p>
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          disabled={actionLoadingId === (req.type === 'BILL' ? req.session_id : (req as any).id)}
-                          onClick={() => void handleAcknowledgeRequest(req)}
-                          className={`w-full group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl py-3.5 text-sm font-black transition-all active:scale-[0.98] disabled:opacity-60 shadow-lg ${
-                            req.type === 'BILL' 
-                              ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-200' 
-                              : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200'
-                          }`}
-                        >
-                          {actionLoadingId === (req.type === 'BILL' ? req.session_id : (req as any).id) ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                          ) : (
-                            <Check className="h-4 w-4 transition-transform group-hover:scale-110" />
-                          )}
-                          <span>Acknowledge Request</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-            </>
-          )}
-        </div>
-      ) : activeTab === "awaiting" ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <KitchenOrderSection
-            title="Table Orders"
-            orders={awaitingTableOrders}
-            headerColor="bg-indigo-600"
-            emptyMessage="No pending table orders"
-            onAction={handlePendingAction}
-            actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
-          />
-          <KitchenOrderSection
-            title="Room Orders"
-            orders={awaitingRoomOrders}
-            headerColor="bg-teal-600"
-            emptyMessage="No pending room orders"
-            onAction={handlePendingAction}
-            actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <KitchenOrderSection
-            title="Ready Table Orders"
-            orders={readyTableOrders}
-            headerColor="bg-emerald-600"
-            emptyMessage="No ready table orders"
-            onAction={handlePendingAction}
-            actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
-            renderActions={(order) => (
-              <button
-                type="button"
-                onClick={() => handleMarkServed(order.id)}
-                className="w-full rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-              >
-                Mark Served
-              </button>
-            )}
-          />
-          <KitchenOrderSection
-            title="Ready Room Orders"
-            orders={readyRoomOrders}
-            headerColor="bg-cyan-600"
-            emptyMessage="No ready room orders"
-            onAction={handlePendingAction}
-            actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
-            renderActions={(order) => (
-              <button
-                type="button"
-                onClick={() => handleMarkServed(order.id)}
-                className="w-full rounded bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-cyan-700"
-              >
-                Mark Served
-              </button>
-            )}
-          />
-        </div>
       )}
+
+      {loadError && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{loadError}</div>
+      )}
+
+      <div className="relative overflow-hidden">
+        <div 
+          className="flex transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
+          style={{ transform: `translateX(-${tabIndex * 100}%)` }}
+        >
+          {/* Awaiting Tab */}
+          <div className="w-full shrink-0 px-0.5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <KitchenOrderSection
+                title="Table Orders"
+                orders={awaitingTableOrders}
+                headerColor="bg-indigo-600"
+                emptyMessage="No pending table orders"
+                onAction={handlePendingAction}
+                actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
+              />
+              <KitchenOrderSection
+                title="Room Orders"
+                orders={awaitingRoomOrders}
+                headerColor="bg-teal-600"
+                emptyMessage="No pending room orders"
+                onAction={handlePendingAction}
+                actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
+              />
+            </div>
+          </div>
+
+          {/* Ready Tab */}
+          <div className="w-full shrink-0 px-0.5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <KitchenOrderSection
+                title="Ready Table Orders"
+                orders={readyTableOrders}
+                headerColor="bg-emerald-600"
+                emptyMessage="No ready table orders"
+                onAction={handlePendingAction}
+                actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
+                renderActions={(order) => (
+                  <button
+                    type="button"
+                    onClick={() => handleMarkServed(order.id)}
+                    className="w-full rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                  >
+                    Mark Served
+                  </button>
+                )}
+              />
+              <KitchenOrderSection
+                title="Ready Room Orders"
+                orders={readyRoomOrders}
+                headerColor="bg-cyan-600"
+                emptyMessage="No ready room orders"
+                onAction={handlePendingAction}
+                actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
+                renderActions={(order) => (
+                  <button
+                    type="button"
+                    onClick={() => handleMarkServed(order.id)}
+                    className="w-full rounded bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-cyan-700"
+                  >
+                    Mark Served
+                  </button>
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Requests Tab */}
+          <div className="w-full shrink-0 px-0.5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {billRequests.size === 0 && serviceRequests.size === 0 ? (
+                <div className="col-span-full rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+                  No active service or bill requests.
+                </div>
+              ) : (
+                <>
+                  {[
+                    ...Array.from(billRequests.values()).map(r => ({ ...r, type: 'BILL' as const, message: null })),
+                    ...Array.from(serviceRequests.values()).map(r => ({ ...r, type: r.service_type }))
+                  ]
+                    .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())
+                    .map((req) => {
+                      const config = SERVICE_CONFIG[req.type] || { label: req.type, icon: Bell, color: "bg-slate-500", textColor: "text-slate-500" };
+                      const Icon = config.icon;
+                      const requestId = req.type === 'BILL' ? req.session_id : (req as any).id;
+                      
+                      return (
+                        <div
+                          key={`${req.session_id}:${req.type}`}
+                          className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
+                        >
+                          <div className={`px-5 py-4 flex items-center justify-between text-white ${config.color}`}>
+                            <div className="flex items-center gap-3">
+                              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
+                                <Icon className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">
+                                  {config.label}
+                                </span>
+                                <p className="text-xl font-black leading-tight">Table {req.table_number}</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-[10px] font-bold opacity-80">
+                                {new Date(req.requested_at).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                              <div className="flex h-2 w-2 rounded-full bg-white animate-pulse" />
+                            </div>
+                          </div>
+                          
+                          <div className="p-5">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="h-10 w-10 shrink-0 rounded-full bg-slate-100 grid place-items-center">
+                                <User className="h-5 w-5 text-slate-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Guest Name</p>
+                                <p className="truncate text-sm font-bold text-slate-900">{req.customer_name || "Guest"}</p>
+                              </div>
+                            </div>
+
+                            {req.message && (
+                              <div className="mb-5 rounded-2xl bg-slate-50 p-4 border border-slate-100 relative">
+                                <div className="absolute -top-2 left-4 px-2 bg-white rounded-full border border-slate-100">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Note</span>
+                                </div>
+                                <p className="text-xs font-medium text-slate-700 leading-relaxed italic pt-1">
+                                  "{req.message}"
+                                </p>
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              disabled={actionLoadingId === requestId}
+                              onClick={() => void handleAcknowledgeRequest(req)}
+                              className={`w-full group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl py-3.5 text-sm font-black transition-all active:scale-[0.98] disabled:opacity-60 shadow-lg ${
+                                req.type === 'BILL' 
+                                  ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-200' 
+                                  : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200'
+                              }`}
+                            >
+                              {actionLoadingId === requestId ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                              ) : (
+                                <Check className="h-4 w-4 transition-transform group-hover:scale-110" />
+                              )}
+                              <span>Acknowledge Request</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
