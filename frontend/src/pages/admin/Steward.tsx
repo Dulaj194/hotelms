@@ -1,20 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { 
-  Droplets, 
-  FileText, 
-  User, 
-  Utensils, 
-  Layers, 
-  Sparkles, 
-  RotateCcw, 
-  Salad, 
-  Smile, 
-  Wifi, 
-  Star,
-  Check,
-  Bell
-} from "lucide-react";
+
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import KitchenOrderSection from "@/components/shared/KitchenOrderSection";
@@ -23,10 +9,8 @@ import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
 import type { 
-  BillRequestedEvent,
   NewOrderEvent, 
   OrderStatusUpdatedEvent, 
-  ServiceRequestedEvent,
 } from "@/types/realtime";
 import type {
   KitchenOrderCard,
@@ -38,19 +22,7 @@ const STEWARD_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
 const POLL_INTERVAL_MS = 6000;
 const SERVED_STORAGE_TTL_MS = 12 * 60 * 60 * 1000;
 
-const SERVICE_CONFIG: Record<string, { label: string; icon: any; color: string; textColor: string }> = {
-  WATER: { label: "Water", icon: Droplets, color: "bg-blue-500", textColor: "text-blue-500" },
-  BILL: { label: "Bill Request", icon: FileText, color: "bg-slate-900", textColor: "text-slate-900" },
-  STEWARD: { label: "Call Steward", icon: User, color: "bg-amber-500", textColor: "text-amber-500" },
-  CUTLERY: { label: "Extra Cutlery", icon: Utensils, color: "bg-slate-600", textColor: "text-slate-600" },
-  NAPKINS: { label: "Napkins / Tissues", icon: Layers, color: "bg-pink-500", textColor: "text-pink-500" },
-  CLEANING: { label: "Table Cleaning", icon: Sparkles, color: "bg-emerald-500", textColor: "text-emerald-500" },
-  ORDER_UPDATE: { label: "Order Help", icon: RotateCcw, color: "bg-cyan-500", textColor: "text-cyan-500" },
-  CONDIMENTS: { label: "Sauces / Spices", icon: Salad, color: "bg-orange-500", textColor: "text-orange-500" },
-  REFRESHMENTS: { label: "Toothpicks", icon: Smile, color: "bg-teal-500", textColor: "text-teal-500" },
-  WIFI: { label: "Wifi Password", icon: Wifi, color: "bg-indigo-500", textColor: "text-indigo-500" },
-  FEEDBACK: { label: "Feedback", icon: Star, color: "bg-purple-500", textColor: "text-purple-500" },
-};
+
 
 type StewardTab = "awaiting" | "ready";
 type SourceFilter = "all" | "table" | "room";
@@ -685,7 +657,6 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
               />
             </div>
           </div>
-        </div>
         </div>
       </div>
     </div>
