@@ -27,8 +27,6 @@ import type {
   NewOrderEvent, 
   OrderStatusUpdatedEvent, 
   ServiceRequestedEvent,
-  ServiceAcknowledgedEvent,
-  BillAcknowledgedEvent,
 } from "@/types/realtime";
 import type {
   KitchenOrderCard,
@@ -54,26 +52,8 @@ const SERVICE_CONFIG: Record<string, { label: string; icon: any; color: string; 
   FEEDBACK: { label: "Feedback", icon: Star, color: "bg-purple-500", textColor: "text-purple-500" },
 };
 
-type StewardTab = "awaiting" | "ready" | "requests";
+type StewardTab = "awaiting" | "ready";
 type SourceFilter = "all" | "table" | "room";
-
-interface ServiceRequest {
-  id: number;
-  session_id: string;
-  table_number: string;
-  customer_name: string | null;
-  service_type: string;
-  message: string | null;
-  requested_at: string;
-}
-
-interface BillRequest {
-  session_id: string;
-  table_number: string;
-  customer_name: string | null;
-  message?: string | null;
-  requested_at: string;
-}
 
 interface StoredServedState {
   [orderId: string]: number;
@@ -219,13 +199,11 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [pendingOrders, setPendingOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
   const [readyOrders, setReadyOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
-  const [billRequests, setBillRequests] = useState<Map<string, BillRequest>>(new Map());
-  const [serviceRequests, setServiceRequests] = useState<Map<string, ServiceRequest>>(new Map());
   const [servedOrderIds, setServedOrderIds] = useState<Set<number>>(() => loadServedOrderIds(servedStorageKey));
 
   const [activeTab, setActiveTab] = useState<StewardTab>(() => {
     const tab = searchParams.get("tab") as StewardTab;
-    return (tab === "awaiting" || tab === "ready" || tab === "requests") ? tab : "awaiting";
+    return (tab === "awaiting" || tab === "ready") ? tab : "awaiting";
   });
   
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -241,8 +219,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
 
   const tabIndex = useMemo(() => {
     if (activeTab === "awaiting") return 0;
-    if (activeTab === "ready") return 1;
-    return 2;
+    return 1;
   }, [activeTab]);
 
   // Handle programmatic tab changes (button clicks)
@@ -265,7 +242,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     if (width <= 0) return;
 
     const index = Math.round(scrollLeft / width);
-    const tabs: StewardTab[] = ["awaiting", "ready", "requests"];
+    const tabs: StewardTab[] = ["awaiting", "ready"];
     const targetTab = tabs[index];
 
     if (targetTab && targetTab !== activeTab) {
@@ -277,7 +254,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   // Sync state if URL changes (e.g. sidebar link click)
   useEffect(() => {
     const tab = searchParams.get("tab") as StewardTab;
-    if (tab && (tab === "awaiting" || tab === "ready" || tab === "requests") && tab !== activeTab) {
+    if (tab && (tab === "awaiting" || tab === "ready") && tab !== activeTab) {
       setActiveTab(tab);
     }
   }, [searchParams, activeTab]);
@@ -331,11 +308,9 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
       setLoadError(null);
 
       try {
-        const [pendingRes, completedRes, billsRes, serviceRes] = await Promise.all([
+        const [pendingRes, completedRes] = await Promise.all([
           api.get<KitchenOrderListResponse>("/orders/pending"),
           api.get<KitchenOrderListResponse>("/orders/completed"),
-          api.get<{ requests: BillRequest[] }>("/table-sessions/bill-requests"),
-          api.get<{ requests: ServiceRequest[] }>("/table-sessions/service-requests"),
         ]);
 
         const nextPending = new Map<number, KitchenOrderCard>();
@@ -350,22 +325,8 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           }
         }
 
-        const nextBills = new Map<string, BillRequest>();
-        for (const req of billsRes.requests) {
-          nextBills.set(req.session_id, req);
-        }
-
-        const nextService = new Map<string, ServiceRequest>();
-        for (const req of serviceRes.requests) {
-          // Use id if available, fallback to composite key for older sessions
-          const key = String(req.id || `${req.session_id}:${req.service_type}`);
-          nextService.set(key, req);
-        }
-
         setPendingOrders(nextPending);
         setReadyOrders(nextReady);
-        setBillRequests(nextBills);
-        setServiceRequests(nextService);
 
         if (
           notifyIfIncreased &&
@@ -457,134 +418,13 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     [loadData]
   );
 
-  const handleBillRequested = useCallback(
-    (event: BillRequestedEvent) => {
-      const { table_number, customer_name, session_id, requested_at } = event.data;
-      showAlert(
-        `Table ${table_number} (${customer_name || "Guest"}) is requesting the bill!`,
-        true
-      );
-      
-      setBillRequests((prev) => {
-        const next = new Map(prev);
-        next.set(session_id, {
-          session_id,
-          table_number,
-          customer_name,
-          requested_at,
-        });
-        return next;
-      });
-    },
-    [showAlert]
-  );
-
-  const handleServiceRequested = useCallback(
-    (event: ServiceRequestedEvent) => {
-      const { request_id, table_number, customer_name, session_id, service_type, message, requested_at } = event.data;
-      const config = SERVICE_CONFIG[service_type];
-      showAlert(
-        `Table ${table_number} (${customer_name || "Guest"}) is requesting ${config?.label || service_type}!`,
-        true
-      );
-      
-      setServiceRequests((prev) => {
-        const next = new Map(prev);
-        // Use request_id if available, fallback to composite key
-        const key = String(request_id || `${session_id}:${service_type}`);
-        next.set(key, {
-          id: request_id || 0,
-          session_id,
-          table_number,
-          customer_name,
-          service_type,
-          message,
-          requested_at,
-        });
-        return next;
-      });
-    },
-    [showAlert]
-  );
-  
-  const handleServiceAcknowledged = useCallback(
-    (event: ServiceAcknowledgedEvent) => {
-      const { request_id } = event.data;
-      setServiceRequests((prev) => {
-        const next = new Map(prev);
-        next.delete(String(request_id));
-        return next;
-      });
-    },
-    []
-  );
-
-  const handleBillAcknowledged = useCallback(
-    (event: BillAcknowledgedEvent) => {
-      const { session_id } = event.data;
-      setBillRequests((prev) => {
-        const next = new Map(prev);
-        next.delete(session_id);
-        return next;
-      });
-    },
-    []
-  );
-
   const { isConnected, connectionError } = useKitchenSocket({
     restaurantId,
     onNewOrder: handleNewOrder,
     onStatusUpdate: handleStatusUpdate,
-    onBillRequested: handleBillRequested,
-    onServiceRequested: handleServiceRequested,
-    onServiceAcknowledged: handleServiceAcknowledged,
-    onBillAcknowledged: handleBillAcknowledged,
   });
 
-  const handleAcknowledgeRequest = useCallback(
-    async (req: any) => {
-      const isBill = req.type === 'BILL' || !('service_type' in req);
-      const requestId = isBill ? req.session_id : req.id;
 
-      if (!requestId) return;
-
-      setActionLoadingId(requestId); 
-      setActionError(null);
-
-      try {
-        const endpoint = isBill 
-          ? `/table-sessions/bill-requests/${requestId}/acknowledge`
-          : `/table-sessions/service-requests/${requestId}/acknowledge`;
-
-        await api.patch(endpoint, {});
-
-        if (isBill) {
-          setBillRequests((prev) => {
-            const next = new Map(prev);
-            next.delete(req.session_id);
-            return next;
-          });
-        } else {
-          setServiceRequests((prev) => {
-            const next = new Map(prev);
-            next.delete(String(requestId));
-            return next;
-          });
-        }
-
-        showAlert(`Acknowledged ${isBill ? 'bill' : 'service'} request for Table ${req.table_number}`);
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setActionError(err.detail || "Failed to acknowledge request.");
-        } else {
-          setActionError("Failed to acknowledge request.");
-        }
-      } finally {
-        setActionLoadingId(null);
-      }
-    },
-    [showAlert]
-  );
 
 
 
@@ -691,11 +531,6 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           </span>
           <span className="text-slate-500">Awaiting: {pendingOrders.size}</span>
           <span className="text-slate-500">Ready to Serve: {readyOrders.size}</span>
-          {(billRequests.size > 0 || serviceRequests.size > 0) && (
-            <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 font-bold text-rose-700 animate-pulse">
-              Active Requests: {billRequests.size + serviceRequests.size}
-            </span>
-          )}
         </div>
       </div>
 
@@ -745,20 +580,6 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
             <span>Ready</span>
             <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "ready" ? "bg-white/20" : "bg-emerald-200/50"}`}>
               {readyOrders.size}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabChange("requests")}
-            className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-              activeTab === "requests"
-                ? "bg-rose-600 text-white shadow-lg shadow-rose-100"
-                : "bg-rose-50 text-rose-700 hover:bg-rose-100/50"
-            }`}
-          >
-            <span>Requests</span>
-            <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "requests" ? "bg-white/20" : "bg-rose-200/50"}`}>
-              {billRequests.size + serviceRequests.size}
             </span>
           </button>
         </div>
@@ -864,105 +685,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
               />
             </div>
           </div>
-
-          {/* Requests Tab */}
-          <div className="w-full shrink-0 snap-start px-0.5">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {billRequests.size === 0 && serviceRequests.size === 0 ? (
-                <div className="col-span-full py-20 flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-100 shadow-sm">
-                  <div className="h-20 w-20 rounded-full bg-rose-50 flex items-center justify-center mb-6">
-                    <span className="text-4xl opacity-50">🔔</span>
-                  </div>
-                  <p className="text-lg font-black text-slate-900 tracking-tight">No active requests</p>
-                  <p className="text-sm text-slate-400 mt-1 font-medium">Guest service and bill requests will appear here</p>
-                </div>
-              ) : (
-                <>
-                  {[
-                    ...Array.from(billRequests.values()).map(r => ({ ...r, type: 'BILL' as const, message: null })),
-                    ...Array.from(serviceRequests.values()).map(r => ({ ...r, type: r.service_type }))
-                  ]
-                    .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())
-                    .map((req) => {
-                      const config = SERVICE_CONFIG[req.type] || { label: req.type, icon: Bell, color: "bg-slate-500", textColor: "text-slate-500" };
-                      const Icon = config.icon;
-                      const requestId = req.type === 'BILL' ? req.session_id : (req as any).id;
-                      
-                      return (
-                        <div
-                          key={`${req.session_id}:${req.type}`}
-                          className="group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
-                        >
-                          <div className={`px-5 py-4 flex items-center justify-between text-white ${config.color}`}>
-                            <div className="flex items-center gap-3">
-                              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
-                                <Icon className="h-5 w-5" />
-                              </div>
-                              <div>
-                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80">
-                                  {config.label}
-                                </span>
-                                <p className="text-xl font-black leading-tight">Table {req.table_number}</p>
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <span className="text-[10px] font-bold opacity-80">
-                                {new Date(req.requested_at).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </span>
-                              <div className="flex h-2 w-2 rounded-full bg-white animate-pulse" />
-                            </div>
-                          </div>
-                          
-                          <div className="p-5">
-                            <div className="flex items-center gap-3 mb-4">
-                              <div className="h-10 w-10 shrink-0 rounded-full bg-slate-100 grid place-items-center">
-                                <User className="h-5 w-5 text-slate-400" />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Guest Name</p>
-                                <p className="truncate text-sm font-bold text-slate-900">{req.customer_name || "Guest"}</p>
-                              </div>
-                            </div>
-
-                            {req.message && (
-                              <div className="mb-5 rounded-2xl bg-slate-50 p-4 border border-slate-100 relative">
-                                <div className="absolute -top-2 left-4 px-2 bg-white rounded-full border border-slate-100">
-                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Note</span>
-                                </div>
-                                <p className="text-xs font-medium text-slate-700 leading-relaxed italic pt-1">
-                                  "{req.message}"
-                                </p>
-                              </div>
-                            )}
-
-                            <button
-                              type="button"
-                              disabled={actionLoadingId === requestId}
-                              onClick={() => void handleAcknowledgeRequest(req)}
-                              className={`w-full group relative flex items-center justify-center gap-2 overflow-hidden rounded-2xl py-3.5 text-sm font-black transition-all active:scale-[0.98] disabled:opacity-60 shadow-lg ${
-                                req.type === 'BILL' 
-                                  ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-200' 
-                                  : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-200'
-                              }`}
-                            >
-                              {actionLoadingId === requestId ? (
-                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                              ) : (
-                                <Check className="h-4 w-4 transition-transform group-hover:scale-110" />
-                              )}
-                              <span>Acknowledge Request</span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </>
-              )}
-            </div>
-          </div>
+        </div>
         </div>
       </div>
     </div>

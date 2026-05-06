@@ -200,14 +200,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         moduleKey: "steward_ops",
       },
       {
-        path: "/admin/steward?tab=requests",
+        path: "/admin/chat",
         label: "Chat",
         icon: MessageSquare,
         privilege: "QR_MENU",
         moduleKey: "steward_ops",
       },
       {
-        path: "/admin/steward?tab=awaiting",
+        path: "/admin/steward",
         label: "Orders",
         icon: ClipboardList,
         privilege: "QR_MENU",
