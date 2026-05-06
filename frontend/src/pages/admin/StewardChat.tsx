@@ -212,46 +212,63 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
   const [actionId, setActionId] = useState<string | number | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<"table" | "room">("table");
-  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
-  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Minimum distance for a swipe to be recognized (in pixels)
-  const minSwipeDistance = 50;
+  const minSwipeDistance = 60;
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart({
-      x: e.targetTouches[0].clientX,
-      y: e.targetTouches[0].clientY
-    });
+  const handleStart = (x: number, y: number) => {
+    setDragStart({ x, y });
+    setDragOffset(0);
+    setIsDragging(true);
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd({
-      x: e.targetTouches[0].clientX,
-      y: e.targetTouches[0].clientY
-    });
+  const handleMove = (x: number, _y: number) => {
+    if (!isDragging || !dragStart) return;
+    const offset = x - dragStart.x;
+    
+    // Dampen the drag if pushing against the boundaries
+    if ((sourceFilter === "table" && offset > 0) || (sourceFilter === "room" && offset < 0)) {
+      setDragOffset(offset * 0.3);
+    } else {
+      setDragOffset(offset);
+    }
   };
 
-  const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+  const handleEnd = () => {
+    if (!dragStart) {
+      setIsDragging(false);
+      return;
+    }
     
-    const distanceX = touchStart.x - touchEnd.x;
-    const distanceY = touchStart.y - touchEnd.y;
-    
-    // Only trigger if horizontal swipe is stronger than vertical scroll
-    const isHorizontalSwipe = Math.abs(distanceX) > Math.abs(distanceY);
-    const isLeftSwipe = distanceX > minSwipeDistance;
-    const isRightSwipe = distanceX < -minSwipeDistance;
+    const distanceX = dragOffset;
+    const absDistanceX = Math.abs(distanceX);
 
-    if (isHorizontalSwipe) {
-      if (isLeftSwipe && sourceFilter === "table") {
+    if (absDistanceX > minSwipeDistance) {
+      if (distanceX < 0 && sourceFilter === "table") {
         setSourceFilter("room");
-      } else if (isRightSwipe && sourceFilter === "room") {
+      } else if (distanceX > 0 && sourceFilter === "room") {
         setSourceFilter("table");
       }
     }
+
+    setIsDragging(false);
+    setDragOffset(0);
+    setDragStart(null);
   };
+
+  // Touch handlers
+  const onTouchStart = (e: React.TouchEvent) => handleStart(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
+  const onTouchMove = (e: React.TouchEvent) => handleMove(e.targetTouches[0].clientX, e.targetTouches[0].clientY);
+  const onTouchEnd = () => handleEnd();
+
+  // Mouse handlers (for desktop testing/interaction)
+  const onMouseDown = (e: React.MouseEvent) => handleStart(e.clientX, e.clientY);
+  const onMouseMove = (e: React.MouseEvent) => handleMove(e.clientX, e.clientY);
+  const onMouseUp = () => handleEnd();
+  const onMouseLeave = () => { if (isDragging) handleEnd(); };
 
   const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -424,10 +441,16 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
 
   return (
     <div 
-      className="max-w-[1600px] mx-auto space-y-10 pb-20 touch-pan-y overflow-x-hidden select-none"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      className={`max-w-[1600px] mx-auto space-y-10 pb-20 touch-pan-y overflow-x-hidden select-none ${
+        isDragging ? "cursor-grabbing" : "cursor-grab"
+      }`}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseLeave}
     >
       {/* Header Section */}
       <div className="rounded-[3rem] border border-slate-100 bg-white/80 backdrop-blur-xl p-8 shadow-2xl shadow-slate-200/50">
@@ -536,10 +559,11 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
       {/* Main Content Area with Sliding Transition */}
       <div className="relative overflow-hidden -mx-4 px-4 sm:-mx-0 sm:px-0">
         <div 
-          className={`flex transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
-            sourceFilter === "room" ? "-translate-x-1/2" : "translate-x-0"
-          }`}
-          style={{ width: "200%" }}
+          className={`flex ${isDragging ? "transition-none" : "transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"}`}
+          style={{ 
+            width: "200%",
+            transform: `translateX(calc(${sourceFilter === "room" ? "-50%" : "0%"} + ${dragOffset}px))`
+          }}
         >
           {/* Tables Slide */}
           <div className="w-1/2 pr-4 sm:pr-0">
