@@ -6,7 +6,6 @@ import { ApiError, api } from "@/lib/api";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 import type { ActiveOrderListResponse, OrderHeaderResponse, OrderStatus } from "@/types/order";
 
-const KITCHEN_HISTORY_STATUSES: OrderStatus[] = ["completed", "paid", "rejected"];
 const SOURCE_OPTIONS = ["all", "table", "room"] as const;
 
 type SourceFilter = (typeof SOURCE_OPTIONS)[number];
