@@ -212,51 +212,85 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
   const [actionId, setActionId] = useState<string | number | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<"table" | "room">("table");
-  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragState, setDragState] = useState<{
+    startX: number;
+    startY: number;
+    isSwiping: boolean;
+    isScrolling: boolean;
+    hasDetermined: boolean;
+  } | null>(null);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
   // Minimum distance for a swipe to be recognized (in pixels)
-  const minSwipeDistance = 60;
+  const minSwipeDistance = 70;
+  const detectionThreshold = 10;
 
   const handleStart = (x: number, y: number) => {
-    setDragStart({ x, y });
+    setDragState({
+      startX: x,
+      startY: y,
+      isSwiping: false,
+      isScrolling: false,
+      hasDetermined: false
+    });
     setDragOffset(0);
     setIsDragging(true);
   };
 
-  const handleMove = (x: number, _y: number) => {
-    if (!isDragging || !dragStart) return;
-    const offset = x - dragStart.x;
-    
-    // Dampen the drag if pushing against the boundaries
-    if ((sourceFilter === "table" && offset > 0) || (sourceFilter === "room" && offset < 0)) {
-      setDragOffset(offset * 0.3);
-    } else {
-      setDragOffset(offset);
+  const handleMove = (x: number, y: number) => {
+    if (!isDragging || !dragState) return;
+
+    const dX = x - dragState.startX;
+    const dY = y - dragState.startY;
+
+    // Determine intent if not yet known
+    if (!dragState.hasDetermined) {
+      if (Math.abs(dX) > detectionThreshold || Math.abs(dY) > detectionThreshold) {
+        const isSwiping = Math.abs(dX) > Math.abs(dY);
+        setDragState(prev => prev ? {
+          ...prev,
+          isSwiping,
+          isScrolling: !isSwiping,
+          hasDetermined: true
+        } : null);
+      }
+      return;
+    }
+
+    // Only update offset if we are horizontally swiping
+    if (dragState.isSwiping) {
+      // Dampen the drag if pushing against the boundaries
+      if ((sourceFilter === "table" && dX > 0) || (sourceFilter === "room" && dX < 0)) {
+        setDragOffset(dX * 0.3);
+      } else {
+        setDragOffset(dX);
+      }
     }
   };
 
   const handleEnd = () => {
-    if (!dragStart) {
+    if (!dragState) {
       setIsDragging(false);
       return;
     }
     
-    const distanceX = dragOffset;
-    const absDistanceX = Math.abs(distanceX);
+    if (dragState.isSwiping) {
+      const distanceX = dragOffset;
+      const absDistanceX = Math.abs(distanceX);
 
-    if (absDistanceX > minSwipeDistance) {
-      if (distanceX < 0 && sourceFilter === "table") {
-        setSourceFilter("room");
-      } else if (distanceX > 0 && sourceFilter === "room") {
-        setSourceFilter("table");
+      if (absDistanceX > minSwipeDistance) {
+        if (distanceX < 0 && sourceFilter === "table") {
+          setSourceFilter("room");
+        } else if (distanceX > 0 && sourceFilter === "room") {
+          setSourceFilter("table");
+        }
       }
     }
 
     setIsDragging(false);
     setDragOffset(0);
-    setDragStart(null);
+    setDragState(null);
   };
 
   // Touch handlers
