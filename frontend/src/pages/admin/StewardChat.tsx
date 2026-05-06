@@ -391,23 +391,28 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
     }
   }, [showAlert]);
 
-  const filteredAndSorted = useMemo(() => {
-    return Array.from(requests.values())
-      .filter(r => r.order_source === sourceFilter)
-      .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime());
-  }, [requests, sourceFilter]);
+  const tableRequests = useMemo(() => 
+    Array.from(requests.values())
+      .filter(r => r.order_source === "table")
+      .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime()),
+    [requests]
+  );
 
-  const counts = useMemo(() => {
-    const list = Array.from(requests.values());
-    return {
-      table: list.filter(r => r.order_source !== "room").length,
-      room: list.filter(r => r.order_source === "room").length,
-    };
-  }, [requests]);
+  const roomRequests = useMemo(() => 
+    Array.from(requests.values())
+      .filter(r => r.order_source === "room")
+      .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime()),
+    [requests]
+  );
+
+  const counts = {
+    table: tableRequests.length,
+    room: roomRequests.length,
+  };
 
   return (
     <div 
-      className="max-w-[1600px] mx-auto space-y-10 pb-20 touch-pan-y"
+      className="max-w-[1600px] mx-auto space-y-10 pb-20 touch-pan-y overflow-x-hidden"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -507,31 +512,72 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
         </div>
       )}
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
-        {loading ? (
-          <div className="col-span-full py-40 flex flex-col items-center justify-center space-y-4">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
-            <p className="text-sm font-black uppercase tracking-widest text-slate-400">Syncing Stream...</p>
+      {/* Main Content Area with Sliding Transition */}
+      <div className="relative overflow-hidden -mx-4 px-4 sm:-mx-0 sm:px-0">
+        <div 
+          className={`flex transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+            sourceFilter === "room" ? "-translate-x-1/2" : "translate-x-0"
+          }`}
+          style={{ width: "200%" }}
+        >
+          {/* Tables Slide */}
+          <div className="w-1/2 pr-4 sm:pr-0">
+            {loading ? (
+              <div className="py-40 flex flex-col items-center justify-center space-y-4">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Syncing Tables...</p>
+              </div>
+            ) : tableRequests.length === 0 ? (
+              <div className="py-40 flex flex-col items-center justify-center bg-white rounded-[4rem] border-2 border-dashed border-slate-100 shadow-sm mx-4 sm:mx-0">
+                <div className="h-24 w-24 rounded-[2.5rem] bg-slate-50 flex items-center justify-center mb-8">
+                  <Bell className="h-10 w-10 text-slate-200" />
+                </div>
+                <p className="text-2xl font-black text-slate-900 tracking-tight">Table floor is quiet</p>
+                <p className="text-sm text-slate-400 mt-2 font-medium px-6 text-center">New table requests will appear here</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3 p-1">
+                {tableRequests.map((req) => (
+                  <RequestCard
+                    key={`${req.type}:${req.id}`}
+                    request={req}
+                    isProcessing={actionId === req.id}
+                    onAcknowledge={handleAcknowledge}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        ) : filteredAndSorted.length === 0 ? (
-          <div className="col-span-full py-40 flex flex-col items-center justify-center bg-white rounded-[4rem] border-2 border-dashed border-slate-100 shadow-sm">
-            <div className="h-24 w-24 rounded-[2.5rem] bg-slate-50 flex items-center justify-center mb-8">
-              <Bell className="h-10 w-10 text-slate-200" />
-            </div>
-            <p className="text-2xl font-black text-slate-900 tracking-tight">Quiet on the floor</p>
-            <p className="text-sm text-slate-400 mt-2 font-medium">New requests will appear instantly when guests need help</p>
+
+          {/* Rooms Slide */}
+          <div className="w-1/2 pl-4 sm:pl-0">
+            {loading ? (
+              <div className="py-40 flex flex-col items-center justify-center space-y-4">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-slate-900" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Syncing Rooms...</p>
+              </div>
+            ) : roomRequests.length === 0 ? (
+              <div className="py-40 flex flex-col items-center justify-center bg-white rounded-[4rem] border-2 border-dashed border-slate-100 shadow-sm mx-4 sm:mx-0">
+                <div className="h-24 w-24 rounded-[2.5rem] bg-slate-50 flex items-center justify-center mb-8">
+                  <Bell className="h-10 w-10 text-slate-200" />
+                </div>
+                <p className="text-2xl font-black text-slate-900 tracking-tight">Room service is quiet</p>
+                <p className="text-sm text-slate-400 mt-2 font-medium px-6 text-center">New room requests will appear here</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3 p-1">
+                {roomRequests.map((req) => (
+                  <RequestCard
+                    key={`${req.type}:${req.id}`}
+                    request={req}
+                    isProcessing={actionId === req.id}
+                    onAcknowledge={handleAcknowledge}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        ) : (
-          filteredAndSorted.map((req) => (
-            <RequestCard
-              key={`${req.type}:${req.id}`}
-              request={req}
-              isProcessing={actionId === req.id}
-              onAcknowledge={handleAcknowledge}
-            />
-          ))
-        )}
+        </div>
       </div>
     </div>
   );
