@@ -212,6 +212,34 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
   const [actionId, setActionId] = useState<string | number | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<"table" | "room">("table");
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Minimum distance for a swipe to be recognized (in pixels)
+  const minSwipeDistance = 70;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null); // Reset
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && sourceFilter === "table") {
+      setSourceFilter("room");
+    } else if (isRightSwipe && sourceFilter === "room") {
+      setSourceFilter("table");
+    }
+  };
 
   const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -378,7 +406,12 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
   }, [requests]);
 
   return (
-    <div className="max-w-[1600px] mx-auto space-y-10 pb-20">
+    <div 
+      className="max-w-[1600px] mx-auto space-y-10 pb-20 touch-pan-y"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Header Section */}
       <div className="rounded-[3rem] border border-slate-100 bg-white/80 backdrop-blur-xl p-8 shadow-2xl shadow-slate-200/50">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
