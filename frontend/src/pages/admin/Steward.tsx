@@ -231,39 +231,48 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [locationFilter, setLocationFilter] = useState("");
 
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isInternalScrollRef = useRef(false);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEndX(null);
-    setTouchStartX(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEndX(e.targetTouches[0].clientX);
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStartX || !touchEndX) return;
-    
-    const distance = touchStartX - touchEndX;
-    const isLeftSwipe = distance > 70; // Increased threshold for more intentional swipes
-    const isRightSwipe = distance < -70;
-
-    if (isLeftSwipe) {
-      if (activeTab === "awaiting") handleTabChange("ready");
-      else if (activeTab === "ready") handleTabChange("requests");
-    } else if (isRightSwipe) {
-      if (activeTab === "requests") handleTabChange("ready");
-      else if (activeTab === "ready") handleTabChange("awaiting");
-    }
-  };
+  const handleTabChange = useCallback((tab: StewardTab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab }, { replace: true });
+  }, [setSearchParams]);
 
   const tabIndex = useMemo(() => {
     if (activeTab === "awaiting") return 0;
     if (activeTab === "ready") return 1;
     return 2;
   }, [activeTab]);
+
+  // Handle programmatic tab changes (button clicks)
+  useEffect(() => {
+    if (scrollRef.current && !isInternalScrollRef.current) {
+      const container = scrollRef.current;
+      const width = container.clientWidth;
+      container.scrollTo({
+        left: width * tabIndex,
+        behavior: "smooth",
+      });
+    }
+    isInternalScrollRef.current = false;
+  }, [tabIndex]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const scrollLeft = container.scrollLeft;
+    const width = container.clientWidth;
+    if (width <= 0) return;
+
+    const index = Math.round(scrollLeft / width);
+    const tabs: StewardTab[] = ["awaiting", "ready", "requests"];
+    const targetTab = tabs[index];
+
+    if (targetTab && targetTab !== activeTab) {
+      isInternalScrollRef.current = true;
+      handleTabChange(targetTab);
+    }
+  };
 
   // Sync state if URL changes (e.g. sidebar link click)
   useEffect(() => {
@@ -273,10 +282,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     }
   }, [searchParams, activeTab]);
 
-  const handleTabChange = (tab: StewardTab) => {
-    setActiveTab(tab);
-    setSearchParams({ tab }, { replace: true });
-  };
+
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -655,12 +661,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   );
 
   return (
-    <div 
-      className="space-y-6"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div className="space-y-6">
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -786,11 +787,13 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
 
       <div className="relative overflow-hidden">
         <div 
-          className="flex transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]"
-          style={{ transform: `translateX(-${tabIndex * 100}%)` }}
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {/* Awaiting Tab */}
-          <div className="w-full shrink-0 px-0.5">
+          <div className="w-full shrink-0 snap-start px-0.5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <KitchenOrderSection
                 title="Table Orders"
@@ -812,7 +815,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           </div>
 
           {/* Ready Tab */}
-          <div className="w-full shrink-0 px-0.5">
+          <div className="w-full shrink-0 snap-start px-0.5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <KitchenOrderSection
                 title="Ready Table Orders"
@@ -852,7 +855,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           </div>
 
           {/* Requests Tab */}
-          <div className="w-full shrink-0 px-0.5">
+          <div className="w-full shrink-0 snap-start px-0.5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {billRequests.size === 0 && serviceRequests.size === 0 ? (
                 <div className="col-span-full rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
