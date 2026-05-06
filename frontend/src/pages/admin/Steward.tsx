@@ -37,7 +37,7 @@ import type {
 } from "@/types/order";
 
 const STEWARD_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
-const POLL_INTERVAL_MS = 3000;
+const POLL_INTERVAL_MS = 6000;
 const SERVED_STORAGE_TTL_MS = 12 * 60 * 60 * 1000;
 
 const SERVICE_CONFIG: Record<string, { label: string; icon: any; color: string; textColor: string }> = {
@@ -230,6 +230,34 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [locationFilter, setLocationFilter] = useState("");
+
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX || !touchEndX) return;
+    
+    const distance = touchStartX - touchEndX;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe) {
+      if (activeTab === "awaiting") handleTabChange("ready");
+      else if (activeTab === "ready") handleTabChange("requests");
+    } else if (isRightSwipe) {
+      if (activeTab === "requests") handleTabChange("ready");
+      else if (activeTab === "ready") handleTabChange("awaiting");
+    }
+  };
 
   // Sync state if URL changes (e.g. sidebar link click)
   useEffect(() => {
@@ -621,7 +649,12 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   );
 
   return (
-    <div className="space-y-6">
+    <div 
+      className="space-y-6"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
