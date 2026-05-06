@@ -18,6 +18,10 @@ from app.modules.table_sessions.schemas import (
     TableSessionStartResponse,
 )
 
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def start_table_session(
     db: Session,
@@ -193,7 +197,8 @@ def request_service(
             customer_name=session.customer_name,
             message=message,
         )
-    except Exception:
+    except Exception as exc:
+        logger.error("Failed to process service request: %s", str(exc), exc_info=True)
         db.rollback()
         raise
 

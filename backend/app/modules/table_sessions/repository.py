@@ -2,6 +2,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 from app.modules.table_sessions.model import TableSession, TableSessionStatus, TableServiceRequest
 
@@ -250,8 +253,9 @@ def list_active_service_requests(
             .order_by(TableServiceRequest.requested_at.desc())
             .all()
         )
-    except Exception:
+    except Exception as exc:
         # Fallback if table doesn't exist yet or other DB issue
+        logger.error("Failed to list active service requests: %s", str(exc))
         return []
 
 
