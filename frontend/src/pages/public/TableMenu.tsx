@@ -24,7 +24,6 @@ import QuickServiceDrawer from "@/components/public/QuickServiceDrawer";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { getGuestToken } from "@/hooks/useGuestSession";
-import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
 import {
   clearGuestSession,
   getGuestDisplayName,
@@ -33,7 +32,7 @@ import {
   setGuestQrAccessKey,
 } from "@/hooks/useGuestSession";
 import { useLocalTableCart } from "@/hooks/useLocalMenuCart";
-import { publicGet } from "@/lib/publicApi";
+import { publicGet, publicPost } from "@/lib/publicApi";
 import type {
   PublicItemSummaryResponse,
   PublicMenuResponse,
@@ -382,26 +381,9 @@ export default function TableMenu() {
         return;
       }
 
-      const response = await fetch(`${RESOLVED_API_BASE_URL}${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Guest-Session": guestToken,
-        },
-        body: JSON.stringify(body),
+      await publicPost(endpoint, body, {
+        headers: { "X-Guest-Session": guestToken },
       });
-
-      if (response.status === 401) {
-        clearGuestSession();
-        setPageError("Your session has expired. Please scan the QR code again to continue.");
-        return;
-      }
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Backend Error Detail:", errorData);
-        throw new Error(errorData.detail || "Service request failed");
-      }
       
       // Show success state briefly then reset
       setTimeout(() => {
