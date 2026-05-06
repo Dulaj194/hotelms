@@ -781,7 +781,6 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           />
         </div>
-      </div>
 
       {loading && (
         <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
