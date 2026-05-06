@@ -54,7 +54,7 @@ const SERVICE_CONFIG: Record<string, { label: string; icon: any; color: string; 
   FEEDBACK: { label: "Feedback", icon: Star, color: "bg-purple-500", textColor: "text-purple-500" },
 };
 
-type StewardTab = "awaiting" | "ready" | "requests";
+type StewardTab = "awaiting" | "ready" | "completed" | "paid" | "rejected" | "requests";
 type SourceFilter = "all" | "table" | "room";
 
 interface ServiceRequest {
@@ -219,13 +219,17 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [pendingOrders, setPendingOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
   const [readyOrders, setReadyOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
+  const [completedOrders, setCompletedOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
+  const [paidOrders, setPaidOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
+  const [rejectedOrders, setRejectedOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
   const [billRequests, setBillRequests] = useState<Map<string, BillRequest>>(new Map());
   const [serviceRequests, setServiceRequests] = useState<Map<string, ServiceRequest>>(new Map());
   const [servedOrderIds, setServedOrderIds] = useState<Set<number>>(() => loadServedOrderIds(servedStorageKey));
 
   const [activeTab, setActiveTab] = useState<StewardTab>(() => {
     const tab = searchParams.get("tab") as StewardTab;
-    return (tab === "awaiting" || tab === "ready" || tab === "requests") ? tab : "awaiting";
+    const validTabs: StewardTab[] = ["awaiting", "ready", "completed", "paid", "rejected", "requests"];
+    return validTabs.includes(tab) ? tab : "awaiting";
   });
   
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
@@ -240,9 +244,15 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   }, [setSearchParams]);
 
   const tabIndex = useMemo(() => {
-    if (activeTab === "awaiting") return 0;
-    if (activeTab === "ready") return 1;
-    return 2;
+    switch (activeTab) {
+      case "awaiting": return 0;
+      case "ready": return 1;
+      case "completed": return 2;
+      case "paid": return 3;
+      case "rejected": return 4;
+      case "requests": return 5;
+      default: return 0;
+    }
   }, [activeTab]);
 
   // Handle programmatic tab changes (button clicks)
@@ -265,7 +275,7 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
     if (width <= 0) return;
 
     const index = Math.round(scrollLeft / width);
-    const tabs: StewardTab[] = ["awaiting", "ready", "requests"];
+    const tabs: StewardTab[] = ["awaiting", "ready", "completed", "paid", "rejected", "requests"];
     const targetTab = tabs[index];
 
     if (targetTab && targetTab !== activeTab) {
@@ -277,7 +287,8 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
   // Sync state if URL changes (e.g. sidebar link click)
   useEffect(() => {
     const tab = searchParams.get("tab") as StewardTab;
-    if (tab && (tab === "awaiting" || tab === "ready" || tab === "requests") && tab !== activeTab) {
+    const validTabs: StewardTab[] = ["awaiting", "ready", "completed", "paid", "rejected", "requests"];
+    if (tab && validTabs.includes(tab) && tab !== activeTab) {
       setActiveTab(tab);
     }
   }, [searchParams, activeTab]);
@@ -331,9 +342,10 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
       setLoadError(null);
 
       try {
-        const [pendingRes, completedRes, billsRes, serviceRes] = await Promise.all([
+        const [pendingRes, completedRes, historyRes, billsRes, serviceRes] = await Promise.all([
           api.get<KitchenOrderListResponse>("/orders/pending"),
           api.get<KitchenOrderListResponse>("/orders/completed"),
+          api.get<KitchenOrderListResponse>("/orders/history"),
           api.get<{ requests: BillRequest[] }>("/table-sessions/bill-requests"),
           api.get<{ requests: ServiceRequest[] }>("/table-sessions/service-requests"),
         ]);
@@ -350,6 +362,15 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
           }
         }
 
+        const nextCompleted = new Map<number, KitchenOrderCard>();
+        const nextPaid = new Map<number, KitchenOrderCard>();
+        const nextRejected = new Map<number, KitchenOrderCard>();
+        for (const order of historyRes.orders) {
+          if (order.status === "completed") nextCompleted.set(order.id, order);
+          else if (order.status === "paid") nextPaid.set(order.id, order);
+          else if (order.status === "rejected") nextRejected.set(order.id, order);
+        }
+
         const nextBills = new Map<string, BillRequest>();
         for (const req of billsRes.requests) {
           nextBills.set(req.session_id, req);
@@ -364,6 +385,9 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
 
         setPendingOrders(nextPending);
         setReadyOrders(nextReady);
+        setCompletedOrders(nextCompleted);
+        setPaidOrders(nextPaid);
+        setRejectedOrders(nextRejected);
         setBillRequests(nextBills);
         setServiceRequests(nextService);
 
@@ -643,6 +667,27 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
       );
   }, [locationFilter, readyOrders, sourceFilter]);
 
+  const completedHistoryOrders = useMemo(() => {
+    return Array.from(completedOrders.values())
+      .filter((order) => sourceMatches(order, sourceFilter))
+      .filter((order) => locationMatches(order, locationFilter))
+      .sort((a, b) => new Date(b.completed_at ?? b.placed_at).getTime() - new Date(a.completed_at ?? a.placed_at).getTime());
+  }, [completedOrders, locationFilter, sourceFilter]);
+
+  const paidHistoryOrders = useMemo(() => {
+    return Array.from(paidOrders.values())
+      .filter((order) => sourceMatches(order, sourceFilter))
+      .filter((order) => locationMatches(order, locationFilter))
+      .sort((a, b) => new Date(b.placed_at).getTime() - new Date(a.placed_at).getTime());
+  }, [paidOrders, locationFilter, sourceFilter]);
+
+  const rejectedHistoryOrders = useMemo(() => {
+    return Array.from(rejectedOrders.values())
+      .filter((order) => sourceMatches(order, sourceFilter))
+      .filter((order) => locationMatches(order, locationFilter))
+      .sort((a, b) => new Date(b.placed_at).getTime() - new Date(a.placed_at).getTime());
+  }, [rejectedOrders, locationFilter, sourceFilter]);
+
   const awaitingTableOrders = useMemo(
     () => filteredPendingOrders.filter((order) => order.order_source !== "room"),
     [filteredPendingOrders]
@@ -717,40 +762,73 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 min-w-max">
           <button
             type="button"
             onClick={() => handleTabChange("awaiting")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === "awaiting"
-                ? "bg-blue-600 text-white"
+                ? "bg-blue-600 text-white shadow-sm"
                 : "border border-slate-200 text-slate-700 hover:bg-slate-50"
             }`}
           >
-            Awaiting Confirmation ({pendingOrders.size})
+            Awaiting ({pendingOrders.size})
           </button>
           <button
             type="button"
             onClick={() => handleTabChange("ready")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === "ready"
-                ? "bg-emerald-600 text-white"
+                ? "bg-emerald-600 text-white shadow-sm"
                 : "border border-slate-200 text-slate-700 hover:bg-slate-50"
             }`}
           >
-            Ready to Serve ({readyOrders.size})
+            Ready ({readyOrders.size})
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("completed")}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeTab === "completed"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Completed ({completedOrders.size})
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("paid")}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeTab === "paid"
+                ? "bg-cyan-600 text-white shadow-sm"
+                : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Paid ({paidOrders.size})
+          </button>
+          <button
+            type="button"
+            onClick={() => handleTabChange("rejected")}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+              activeTab === "rejected"
+                ? "bg-red-600 text-white shadow-sm"
+                : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            Rejected ({rejectedOrders.size})
           </button>
           <button
             type="button"
             onClick={() => handleTabChange("requests")}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === "requests"
-                ? "bg-rose-600 text-white shadow-md"
+                ? "bg-rose-600 text-white shadow-sm"
                 : "border border-slate-200 text-slate-700 hover:bg-slate-50"
             }`}
           >
-            Service Requests ({billRequests.size + serviceRequests.size})
+            Requests ({billRequests.size + serviceRequests.size})
           </button>
         </div>
 
@@ -852,6 +930,42 @@ function StewardDashboard({ restaurantId }: StewardDashboardProps) {
                 )}
               />
             </div>
+          </div>
+
+          {/* Completed History Tab */}
+          <div className="w-full shrink-0 snap-start px-0.5">
+            <KitchenOrderSection
+              title="Completed Orders History"
+              orders={completedHistoryOrders}
+              headerColor="bg-slate-800"
+              emptyMessage="No completed history found."
+              onAction={handlePendingAction}
+              actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
+            />
+          </div>
+
+          {/* Paid History Tab */}
+          <div className="w-full shrink-0 snap-start px-0.5">
+            <KitchenOrderSection
+              title="Paid Orders History"
+              orders={paidHistoryOrders}
+              headerColor="bg-cyan-700"
+              emptyMessage="No paid orders found."
+              onAction={handlePendingAction}
+              actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
+            />
+          </div>
+
+          {/* Rejected History Tab */}
+          <div className="w-full shrink-0 snap-start px-0.5">
+            <KitchenOrderSection
+              title="Rejected Orders History"
+              orders={rejectedHistoryOrders}
+              headerColor="bg-red-700"
+              emptyMessage="No rejected orders found."
+              onAction={handlePendingAction}
+              actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
+            />
           </div>
 
           {/* Requests Tab */}
