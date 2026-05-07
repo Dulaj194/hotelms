@@ -45,23 +45,37 @@ export const RESOLVED_API_BASE_URL = (function() {
   if (typeof window === "undefined") return API_BASE_URL;
   
   const hostname = window.location.hostname;
+  const origin = window.location.origin;
   const isIP = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
   
-  // If we're accessing via IP, always try port 8000 directly to bypass proxy issues
-  if (isIP) {
-    return `http://${hostname}:8000/api/v1`;
+  // If API_BASE_URL is relative (like /api/v1), always use the current origin.
+  // This allows Vite/Nginx proxies to work seamlessly.
+  if (API_BASE_URL.startsWith("/")) {
+    return `${origin}${API_BASE_URL}`;
   }
 
-  // Fallback for localhost or domain names
-  if (API_BASE_URL.includes("localhost:8000") || API_BASE_URL.includes("127.0.0.1:8000")) {
-    if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+  // If we're accessing via IP and the current URL doesn't match the API_BASE_URL hostname,
+  // we need to decide whether to switch to the current hostname.
+  if (isIP) {
+    const isLocalhostApi = API_BASE_URL.includes("localhost") || API_BASE_URL.includes("127.0.0.1");
+    
+    // If the API is pointed to localhost but we're on a real IP, 
+    // it means we're likely testing on a local network or external IP.
+    if (isLocalhostApi && hostname !== "localhost" && hostname !== "127.0.0.1") {
+      // If we are on port 5173, we should use the same origin to leverage the Vite proxy.
+      // The Vite proxy will then talk to localhost:8000 on the server.
+      if (window.location.port === "5173") {
+        return `${origin}/api/v1`;
+      }
+      
+      // Fallback: If not on 5173, assume we might need to hit 8000 directly 
+      // ONLY if we're not on port 80/443 (which would suggest Nginx).
+      if (window.location.port === "" || window.location.port === "80" || window.location.port === "443") {
+        return `${origin}/api/v1`;
+      }
+
       return `http://${hostname}:8000/api/v1`;
     }
-  }
-  
-  // If API_BASE_URL is relative (like /api/v1), construct absolute URL
-  if (API_BASE_URL.startsWith("/")) {
-    return `${window.location.origin}${API_BASE_URL}`;
   }
 
   return API_BASE_URL;
