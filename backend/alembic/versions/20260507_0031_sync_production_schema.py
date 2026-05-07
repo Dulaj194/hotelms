@@ -54,6 +54,9 @@ def upgrade() -> None:
     if not _column_exists(bind, "order_headers", "customer_phone"):
         op.add_column("order_headers", sa.Column("customer_phone", sa.String(length=50), nullable=True))
 
+    if not _column_exists(bind, "order_headers", "served_at"):
+        op.add_column("order_headers", sa.Column("served_at", sa.DateTime(timezone=True), nullable=True))
+
     # 2. Sync items columns
     for i in range(2, 6):
         col_name = f"image_path_{i}"
