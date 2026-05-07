@@ -310,24 +310,30 @@ def acknowledge_service_request(
 def count_active_requests_stats(db: Session, restaurant_id: int) -> int:
     """Return the combined count of active bill requests and service requests."""
     now = datetime.now(UTC)
-    bill_count = (
-        db.query(TableSession)
-        .filter(
-            TableSession.restaurant_id == restaurant_id,
-            TableSession.is_active.is_(True),
-            TableSession.session_status.in_([TableSessionStatus.BILL_REQUESTED, TableSessionStatus.BILL_ACKNOWLEDGED]),
-            TableSession.expires_at > now,
+    try:
+        bill_count = (
+            db.query(TableSession)
+            .filter(
+                TableSession.restaurant_id == restaurant_id,
+                TableSession.is_active.is_(True),
+                TableSession.session_status.in_(
+                    [TableSessionStatus.BILL_REQUESTED, TableSessionStatus.BILL_ACKNOWLEDGED]
+                ),
+                TableSession.expires_at > now,
+            )
+            .count()
         )
-        .count()
-    )
-    
-    service_count = (
-        db.query(TableServiceRequest)
-        .filter(
-            TableServiceRequest.restaurant_id == restaurant_id,
-            TableServiceRequest.is_completed.is_(False),
+
+        service_count = (
+            db.query(TableServiceRequest)
+            .filter(
+                TableServiceRequest.restaurant_id == restaurant_id,
+                TableServiceRequest.is_completed.is_(False),
+            )
+            .count()
         )
-        .count()
-    )
-    
-    return bill_count + service_count
+
+        return bill_count + service_count
+    except Exception as exc:
+        logger.error("Failed to count active requests stats: %s", str(exc))
+        return 0

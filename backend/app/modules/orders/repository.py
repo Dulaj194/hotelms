@@ -238,14 +238,19 @@ def count_history_orders_by_restaurant(
 
 def count_active_steward_stats(db: Session, restaurant_id: int) -> int:
     """Return the count of pending orders (Awaiting confirmation)."""
-    return (
-        db.query(OrderHeader)
-        .filter(
-            OrderHeader.restaurant_id == restaurant_id,
-            OrderHeader.status == OrderStatus.pending,
+    try:
+        return (
+            db.query(OrderHeader)
+            .filter(
+                OrderHeader.restaurant_id == restaurant_id,
+                OrderHeader.status == OrderStatus.pending,
+            )
+            .count()
         )
-        .count()
-    )
+    except Exception as exc:
+        from app.core.logging import get_logger
+        get_logger(__name__).error("Failed to count active steward stats: %s", str(exc))
+        return 0
 
 
 # ── Kitchen-specific queries (include items for dashboard display) ─────────────

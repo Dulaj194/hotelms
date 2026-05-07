@@ -181,10 +181,12 @@ async def dependency_failure_middleware(request: Request, call_next: Callable) -
         if "redis" in str(exc).lower():
             status_code = 503  # Service Unavailable
             detail = "Redis service temporarily unavailable. Please try again."
-        elif "database" in str(exc).lower() or "connection" in str(exc).lower():
+        elif any(kw in str(exc).lower() for kw in ["database", "connection", "connect", "mysql", "operationalerror", "programmingerror"]):
             status_code = 503
             detail = "Database service temporarily unavailable. Please try again."
         else:
+            # For other unexpected errors, log the full exception to help diagnostics
+            logger.error("Backend service error: %s", str(exc), exc_info=exc)
             status_code = 502  # Bad Gateway
             detail = "Backend service error. Please try again."
         

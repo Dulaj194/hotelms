@@ -51,6 +51,9 @@ def upgrade() -> None:
 
     # 2. Increase length of session_status column in table_sessions to support BILL_ACKNOWLEDGED (17 chars)
     if _table_exists(bind, "table_sessions"):
+        # Fix existing NULL values before enforcing NOT NULL to avoid MySQL 1138 error
+        op.execute("UPDATE table_sessions SET session_status = 'OPEN' WHERE session_status IS NULL")
+        
         op.alter_column(
             "table_sessions",
             "session_status",
