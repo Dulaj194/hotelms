@@ -44,14 +44,26 @@ export const WS_BASE_URL = normalizeBase(getWsBaseUrl());
 export const RESOLVED_API_BASE_URL = (function() {
   if (typeof window === "undefined") return API_BASE_URL;
   
-  // Dynamic resolution trick:
-  // If the hardcoded API is localhost but we are accessing from an IP/domain,
-  // assume the backend is on the same host (typical for single-server Docker setups).
+  const hostname = window.location.hostname;
+  const isIP = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname);
+  
+  // If we're accessing via IP, always try port 8000 directly to bypass proxy issues
+  if (isIP) {
+    return `http://${hostname}:8000/api/v1`;
+  }
+
+  // Fallback for localhost or domain names
   if (API_BASE_URL.includes("localhost:8000") || API_BASE_URL.includes("127.0.0.1:8000")) {
-    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-      return `http://${window.location.hostname}:8000/api/v1`;
+    if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+      return `http://${hostname}:8000/api/v1`;
     }
   }
+  
+  // If API_BASE_URL is relative (like /api/v1), construct absolute URL
+  if (API_BASE_URL.startsWith("/")) {
+    return `${window.location.origin}${API_BASE_URL}`;
+  }
+
   return API_BASE_URL;
 })();
 

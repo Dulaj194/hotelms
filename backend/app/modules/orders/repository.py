@@ -195,18 +195,23 @@ def list_history_orders_by_restaurant(
 ) -> list[OrderHeader]:
     """Return completed, paid, and rejected orders for a restaurant."""
     history_statuses = {OrderStatus.completed, OrderStatus.served, OrderStatus.paid, OrderStatus.rejected}
-    query = (
-        db.query(OrderHeader)
-        .options(joinedload(OrderHeader.items))
-        .filter(OrderHeader.restaurant_id == restaurant_id)
-    )
-    
-    if status:
-        query = query.filter(OrderHeader.status == status)
-    else:
-        query = query.filter(OrderHeader.status.in_(history_statuses))
+    try:
+        query = (
+            db.query(OrderHeader)
+            .options(joinedload(OrderHeader.items))
+            .filter(OrderHeader.restaurant_id == restaurant_id)
+        )
         
-    return query.order_by(OrderHeader.placed_at.desc()).limit(limit).all()
+        if status:
+            query = query.filter(OrderHeader.status == status)
+        else:
+            query = query.filter(OrderHeader.status.in_(history_statuses))
+            
+        return query.order_by(OrderHeader.placed_at.desc()).limit(limit).all()
+    except Exception as exc:
+        from app.core.logging import get_logger
+        get_logger(__name__).error("Failed to list history orders: %s", str(exc), exc_info=True)
+        return []
 
 
 def count_history_orders_by_restaurant(
@@ -216,22 +221,27 @@ def count_history_orders_by_restaurant(
     """Return counts for completed, served, paid, and rejected orders."""
     history_statuses = {OrderStatus.completed, OrderStatus.served, OrderStatus.paid, OrderStatus.rejected}
     
-    from sqlalchemy import func
-    results = (
-        db.query(OrderHeader.status, func.count(OrderHeader.id))
-        .filter(
-            OrderHeader.restaurant_id == restaurant_id,
-            OrderHeader.status.in_(history_statuses)
-        )
-        .group_by(OrderHeader.status)
-        .all()
-    )
-    
     # Initialize with 0s
     counts = {"completed": 0, "served": 0, "paid": 0, "rejected": 0}
-    for status_val, count in results:
-        if status_val in counts:
-            counts[status_val] = count
+    
+    try:
+        from sqlalchemy import func
+        results = (
+            db.query(OrderHeader.status, func.count(OrderHeader.id))
+            .filter(
+                OrderHeader.restaurant_id == restaurant_id,
+                OrderHeader.status.in_(history_statuses)
+            )
+            .group_by(OrderHeader.status)
+            .all()
+        )
+        
+        for status_val, count in results:
+            if status_val in counts:
+                counts[status_val] = count
+    except Exception as exc:
+        from app.core.logging import get_logger
+        get_logger(__name__).error("Failed to count history orders: %s", str(exc), exc_info=True)
             
     return counts
 
