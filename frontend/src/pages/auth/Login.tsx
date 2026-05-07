@@ -1,15 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { 
-  Eye, 
-  EyeOff, 
   Mail, 
   Lock, 
   ChevronRight, 
   ShieldCheck, 
   Sparkles,
-  UserCircle,
-  Building2
+  UserCircle
 } from "lucide-react";
 
 import SeoHead from "@/components/public/SeoHead";
