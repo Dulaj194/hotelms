@@ -30,6 +30,7 @@ class OrderStatus(str, enum.Enum):
     confirmed = "confirmed"
     processing = "processing"
     completed = "completed"
+    served = "served"
     paid = "paid"
     rejected = "rejected"
 
@@ -44,7 +45,8 @@ ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
     OrderStatus.pending: {OrderStatus.confirmed, OrderStatus.rejected},
     OrderStatus.confirmed: {OrderStatus.processing, OrderStatus.rejected},
     OrderStatus.processing: {OrderStatus.completed, OrderStatus.rejected},
-    OrderStatus.completed: {OrderStatus.paid},
+    OrderStatus.completed: {OrderStatus.served, OrderStatus.paid},
+    OrderStatus.served: {OrderStatus.paid},
     OrderStatus.paid: set(),
     OrderStatus.rejected: set(),
 }
@@ -120,6 +122,7 @@ class OrderHeader(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     processing_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    served_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

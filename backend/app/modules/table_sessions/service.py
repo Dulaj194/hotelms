@@ -226,6 +226,7 @@ def list_service_requests(
 
 def resolve_service_request(
     db: Session,
+    r: redis_lib.Redis,
     request_id: int,
     restaurant_id: int,
 ) -> bool:
@@ -234,6 +235,11 @@ def resolve_service_request(
         success = repository.complete_service_request(db, request_id, restaurant_id)
         if success:
             db.commit()
+            realtime_service.publish_service_resolved(
+                r,
+                restaurant_id=restaurant_id,
+                request_id=request_id,
+            )
         return success
     except Exception:
         db.rollback()

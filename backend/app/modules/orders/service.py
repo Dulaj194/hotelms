@@ -77,6 +77,7 @@ def _build_order_detail(order) -> OrderDetailResponse:
         confirmed_at=order.confirmed_at,
         processing_at=order.processing_at,
         completed_at=order.completed_at,
+        served_at=order.served_at,
         rejected_at=order.rejected_at,
         paid_at=order.paid_at,
         notes=order.notes,
@@ -142,6 +143,7 @@ def _build_order_header(order) -> OrderHeaderResponse:
         confirmed_at=order.confirmed_at,
         processing_at=order.processing_at,
         completed_at=order.completed_at,
+        served_at=order.served_at,
         rejected_at=order.rejected_at,
         paid_at=order.paid_at,
         primary_item_name=item_previews[0].item_name_snapshot if item_previews else None,
@@ -166,6 +168,7 @@ def _build_kitchen_order_card(order) -> KitchenOrderCard:
         confirmed_at=order.confirmed_at,
         processing_at=order.processing_at,
         completed_at=order.completed_at,
+        served_at=order.served_at,
         rejected_at=order.rejected_at,
         notes=order.notes,
         items=[

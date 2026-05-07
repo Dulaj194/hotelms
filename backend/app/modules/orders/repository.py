@@ -51,6 +51,8 @@ def create_order_header(
         lifecycle_timestamps["processing_at"] = now
     elif initial_status == OrderStatus.completed:
         lifecycle_timestamps["completed_at"] = now
+    elif initial_status == OrderStatus.served:
+        lifecycle_timestamps["served_at"] = now
     elif initial_status == OrderStatus.rejected:
         lifecycle_timestamps["rejected_at"] = now
     elif initial_status == OrderStatus.paid:
@@ -192,7 +194,7 @@ def list_history_orders_by_restaurant(
     limit: int = 100
 ) -> list[OrderHeader]:
     """Return completed, paid, and rejected orders for a restaurant."""
-    history_statuses = {OrderStatus.completed, OrderStatus.paid, OrderStatus.rejected}
+    history_statuses = {OrderStatus.completed, OrderStatus.served, OrderStatus.paid, OrderStatus.rejected}
     query = (
         db.query(OrderHeader)
         .options(joinedload(OrderHeader.items))
@@ -226,7 +228,7 @@ def count_history_orders_by_restaurant(
     )
     
     # Initialize with 0s
-    counts = {"completed": 0, "paid": 0, "rejected": 0}
+    counts = {"completed": 0, "served": 0, "paid": 0, "rejected": 0}
     for status_val, count in results:
         if status_val.value in counts:
             counts[status_val.value] = count
@@ -274,7 +276,7 @@ def list_kitchen_completed_orders_by_restaurant(
         .options(joinedload(OrderHeader.items))
         .filter(
             OrderHeader.restaurant_id == restaurant_id,
-            OrderHeader.status == OrderStatus.completed,
+            OrderHeader.status.in_({OrderStatus.completed, OrderStatus.served}),
         )
         .order_by(OrderHeader.completed_at.desc())
         .limit(limit)
@@ -297,6 +299,7 @@ def update_order_status(
         OrderStatus.confirmed: "confirmed_at",
         OrderStatus.processing: "processing_at",
         OrderStatus.completed: "completed_at",
+        OrderStatus.served: "served_at",
         OrderStatus.rejected: "rejected_at",
         OrderStatus.paid: "paid_at",
     }
@@ -332,7 +335,7 @@ def list_billable_orders_by_session(
         .filter(
             OrderHeader.session_id == session_id,
             OrderHeader.restaurant_id == restaurant_id,
-            OrderHeader.status == OrderStatus.completed,
+            OrderHeader.status.in_({OrderStatus.completed, OrderStatus.served}),
         )
         .order_by(OrderHeader.placed_at.asc())
         .all()

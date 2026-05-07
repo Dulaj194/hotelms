@@ -245,3 +245,21 @@ def publish_service_acknowledged(
         },
     }
     realtime_repo.publish_event(r, restaurant_id, event)
+
+
+def publish_service_resolved(
+    r: redis_lib.Redis,
+    *,
+    restaurant_id: int,
+    request_id: int,
+) -> None:
+    """Publish a service_resolved event."""
+    event = {
+        "event": "service_resolved",
+        "restaurant_id": restaurant_id,
+        "data": {
+            "request_id": request_id,
+            "resolved_at": datetime.now(UTC),
+        },
+    }
+    realtime_repo.publish_event(r, restaurant_id, event)

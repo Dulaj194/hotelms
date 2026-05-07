@@ -23,6 +23,7 @@ import type {
   ServiceRequestedEvent,
   ServiceAcknowledgedEvent,
   BillAcknowledgedEvent,
+  ServiceResolvedEvent,
 } from "@/types/realtime";
 
 // Reconnect delay schedule (ms) — exponential back-off capped at 15s
@@ -39,6 +40,7 @@ interface UseKitchenSocketOptions {
   onServiceRequested?: (event: ServiceRequestedEvent) => void;
   onServiceAcknowledged?: (event: ServiceAcknowledgedEvent) => void;
   onBillAcknowledged?: (event: BillAcknowledgedEvent) => void;
+  onServiceResolved?: (event: ServiceResolvedEvent) => void;
 }
 
 export interface UseKitchenSocketReturn {
@@ -54,6 +56,7 @@ export function useKitchenSocket({
   onServiceRequested,
   onServiceAcknowledged,
   onBillAcknowledged,
+  onServiceResolved,
 }: UseKitchenSocketOptions): UseKitchenSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -70,12 +73,14 @@ export function useKitchenSocket({
   const onServiceRequestedRef = useRef(onServiceRequested);
   const onServiceAcknowledgedRef = useRef(onServiceAcknowledged);
   const onBillAcknowledgedRef = useRef(onBillAcknowledged);
+  const onServiceResolvedRef = useRef(onServiceResolved);
   onNewOrderRef.current = onNewOrder;
   onStatusUpdateRef.current = onStatusUpdate;
   onBillRequestedRef.current = onBillRequested;
   onServiceRequestedRef.current = onServiceRequested;
   onServiceAcknowledgedRef.current = onServiceAcknowledged;
   onBillAcknowledgedRef.current = onBillAcknowledged;
+  onServiceResolvedRef.current = onServiceResolved;
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -124,6 +129,8 @@ export function useKitchenSocket({
             onServiceAcknowledgedRef.current?.(data as ServiceAcknowledgedEvent);
           } else if (data.event === "bill_acknowledged") {
             onBillAcknowledgedRef.current?.(data as BillAcknowledgedEvent);
+          } else if (data.event === "service_resolved") {
+            onServiceResolvedRef.current?.(data as ServiceResolvedEvent);
           }
         } catch {
           // ignore malformed messages

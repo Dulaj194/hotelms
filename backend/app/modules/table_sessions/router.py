@@ -126,11 +126,12 @@ def acknowledge_bill(
 def resolve_service_request(
     request_id: int,
     db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
     restaurant_id: int = Depends(get_current_restaurant_id),
     _current_user=Depends(require_roles(*_STAFF_ROLES)),
 ):
     """Mark a service request as resolved/completed."""
-    success = service.resolve_service_request(db, request_id, restaurant_id)
+    success = service.resolve_service_request(db, r, request_id, restaurant_id)
     if not success:
         return {"error": "Request not found"}, 404
     return {"message": "Request marked as resolved."}

@@ -118,6 +118,18 @@ export interface BillAcknowledgedEvent {
   data: BillAcknowledgedEventData;
 }
 
+// ── service_resolved event ───────────────────────────────────────────────────
+export interface ServiceResolvedEventData {
+  request_id: number;
+  resolved_at: string;
+}
+
+export interface ServiceResolvedEvent {
+  event: "service_resolved";
+  restaurant_id: number;
+  data: ServiceResolvedEventData;
+}
+
 // ── Union type for all kitchen events ─────────────────────────────────────────
 
 export type KitchenEvent =
@@ -126,4 +138,5 @@ export type KitchenEvent =
   | BillRequestedEvent
   | ServiceRequestedEvent
   | ServiceAcknowledgedEvent
-  | BillAcknowledgedEvent;
+  | BillAcknowledgedEvent
+  | ServiceResolvedEvent;

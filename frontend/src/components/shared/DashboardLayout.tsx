@@ -183,15 +183,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     () => [
       {
         path: "/admin/steward",
-        label: "Live Orders",
+        label: "Steward Hub",
         icon: Activity,
-        privilege: "QR_MENU",
-        moduleKey: "steward_ops",
-      },
-      {
-        path: "/admin/chat",
-        label: "Service Stream",
-        icon: MessageSquare,
         privilege: "QR_MENU",
         moduleKey: "steward_ops",
       },
@@ -665,6 +658,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     onServiceRequested: () => void fetchBadgeCounts(),
     onServiceAcknowledged: () => void fetchBadgeCounts(),
     onBillAcknowledged: () => void fetchBadgeCounts(),
+    onServiceResolved: () => void fetchBadgeCounts(),
   });
 
   useEffect(() => {

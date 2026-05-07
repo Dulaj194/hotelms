@@ -207,7 +207,7 @@ def list_bill_requests_for_restaurant(
         .filter(
             TableSession.restaurant_id == restaurant_id,
             TableSession.is_active.is_(True),
-            TableSession.session_status == TableSessionStatus.BILL_REQUESTED,
+            TableSession.session_status.in_([TableSessionStatus.BILL_REQUESTED, TableSessionStatus.BILL_ACKNOWLEDGED]),
             TableSession.expires_at > now,
         )
         .order_by(TableSession.updated_at.desc())
@@ -252,7 +252,6 @@ def list_active_service_requests(
             .filter(
                 TableServiceRequest.restaurant_id == restaurant_id,
                 TableServiceRequest.is_completed.is_(False),
-                TableServiceRequest.acknowledged_by.is_(None),
             )
             .order_by(TableServiceRequest.requested_at.desc())
             .all()
@@ -316,7 +315,7 @@ def count_active_requests_stats(db: Session, restaurant_id: int) -> int:
         .filter(
             TableSession.restaurant_id == restaurant_id,
             TableSession.is_active.is_(True),
-            TableSession.session_status == TableSessionStatus.BILL_REQUESTED,
+            TableSession.session_status.in_([TableSessionStatus.BILL_REQUESTED, TableSessionStatus.BILL_ACKNOWLEDGED]),
             TableSession.expires_at > now,
         )
         .count()
@@ -327,7 +326,6 @@ def count_active_requests_stats(db: Session, restaurant_id: int) -> int:
         .filter(
             TableServiceRequest.restaurant_id == restaurant_id,
             TableServiceRequest.is_completed.is_(False),
-            TableServiceRequest.acknowledged_by.is_(None),
         )
         .count()
     )

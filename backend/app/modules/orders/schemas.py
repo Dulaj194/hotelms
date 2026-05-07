@@ -85,6 +85,7 @@ class OrderHeaderResponse(BaseModel):
     confirmed_at: datetime | None
     processing_at: datetime | None
     completed_at: datetime | None
+    served_at: datetime | None
     rejected_at: datetime | None
     paid_at: datetime | None
     primary_item_name: str | None = None
@@ -159,6 +160,7 @@ class KitchenOrderCard(BaseModel):
     confirmed_at: datetime | None
     processing_at: datetime | None
     completed_at: datetime | None
+    served_at: datetime | None
     rejected_at: datetime | None
     notes: str | None
     items: list[KitchenOrderItemSummary]
