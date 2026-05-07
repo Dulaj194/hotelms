@@ -25,7 +25,7 @@ const AccountantBillingDashboard = lazy(() => import("@/pages/admin/AccountantBi
 const GenerateTableQRCodes = lazy(() => import("@/pages/admin/GenerateTableQRCodes"));
 const GenerateRoomQRCodes = lazy(() => import("@/pages/admin/GenerateRoomQRCodes"));
 const Kitchen = lazy(() => import("@/pages/admin/Kitchen"));
-const KitchenOldOrders = lazy(() => import("@/pages/admin/KitchenOldOrders"));
+const OrderHistory = lazy(() => import("@/pages/admin/OrderHistory"));
 const MenuCategories = lazy(() => import("@/pages/admin/MenuCategories"));
 const MenuItems = lazy(() => import("@/pages/admin/MenuItems"));
 const Menus = lazy(() => import("@/pages/admin/Menus"));
@@ -248,11 +248,11 @@ function AppRoutes() {
           }
         />
         <Route
-          path="/admin/kitchen/old-orders"
+          path="/admin/kitchen/history"
           element={
             <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
               <PrivilegeRoute requiredModuleKey="kds">
-                <KitchenOldOrders />
+                <OrderHistory />
               </PrivilegeRoute>
             </ProtectedRoute>
           }

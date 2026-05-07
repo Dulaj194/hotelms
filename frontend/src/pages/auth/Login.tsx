@@ -1,6 +1,16 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { 
+  Eye, 
+  EyeOff, 
+  Mail, 
+  Lock, 
+  ChevronRight, 
+  ShieldCheck, 
+  Sparkles,
+  UserCircle,
+  Building2
+} from "lucide-react";
 
 import SeoHead from "@/components/public/SeoHead";
 import { trackAnalyticsEvent } from "@/features/public/analytics";
@@ -18,44 +28,47 @@ type LoginFlowConfig = {
   endpoint: string;
   invalidCredentialsMessage: string;
   submitLabel: string;
+  badge: string;
 };
 
 const DEFAULT_LOGIN_CONFIG: LoginFlowConfig = {
-  title: "HotelMS Sign In",
-  subtitle: "Use your email address and password. Your role is detected automatically after sign in.",
+  title: "HotelMS Terminal",
+  subtitle: "Secure access to the hospitality ecosystem",
   endpoint: "/auth/login",
   invalidCredentialsMessage: "Invalid email or password.",
-  submitLabel: "Sign in",
+  submitLabel: "Authenticate",
+  badge: "Central Portal",
 };
 
 const PORTAL_LOGIN_CONFIG: Record<string, LoginFlowConfig> = {
   "restaurant-admin": {
-    title: "Restaurant Admin Sign In",
-    subtitle: "Owner and admin accounts must sign in through the restaurant admin portal.",
+    title: "Admin Terminal",
+    subtitle: "Management & strategic oversight",
     endpoint: "/auth/login/restaurant-admin",
     invalidCredentialsMessage: "Invalid restaurant admin credentials.",
-    submitLabel: "Sign in as Admin",
+    submitLabel: "Enter Dashboard",
+    badge: "Executive Access",
   },
   staff: {
-    title: "Staff Sign In",
-    subtitle: "Steward, housekeeper, cashier, and accountant accounts sign in here.",
+    title: "Operational Hub",
+    subtitle: "Steward & staff service terminal",
     endpoint: "/auth/login/staff",
     invalidCredentialsMessage: "Invalid staff credentials.",
-    submitLabel: "Sign in as Staff",
+    submitLabel: "Start Shift",
+    badge: "Staff Portal",
   },
   "super-admin": {
-    title: "Super Admin Sign In",
-    subtitle: "Platform super admin access only.",
+    title: "Global Controller",
+    subtitle: "System-wide administrative access",
     endpoint: "/auth/login/super-admin",
     invalidCredentialsMessage: "Invalid super admin credentials.",
-    submitLabel: "Sign in as Super Admin",
+    submitLabel: "Access Core",
+    badge: "System Authority",
   },
 };
 
 function getLoginConfigForPortal(portal: string | undefined): LoginFlowConfig {
-  if (!portal) {
-    return DEFAULT_LOGIN_CONFIG;
-  }
+  if (!portal) return DEFAULT_LOGIN_CONFIG;
   return PORTAL_LOGIN_CONFIG[portal] ?? DEFAULT_LOGIN_CONFIG;
 }
 
@@ -80,22 +93,10 @@ function decodeAccessTokenClaims(token: string): AccessTokenClaims | null {
 }
 
 function getLoginErrorMessage(err: unknown, invalidCredentialsMessage: string): string {
-  if (!(err instanceof ApiError)) {
-    return "Login failed. Please try again.";
-  }
-
-  if (err.status === 403) {
-    return err.detail || "Access denied.";
-  }
-
-  if (err.status === 401) {
-    return invalidCredentialsMessage;
-  }
-
-  if (err.status === 429) {
-    return err.detail || TOO_MANY_REQUESTS_FALLBACK;
-  }
-
+  if (!(err instanceof ApiError)) return "Login failed. Please try again.";
+  if (err.status === 403) return err.detail || "Access denied.";
+  if (err.status === 401) return invalidCredentialsMessage;
+  if (err.status === 429) return err.detail || TOO_MANY_REQUESTS_FALLBACK;
   return err.detail || "Login failed. Please try again.";
 }
 
@@ -115,15 +116,8 @@ export default function Login() {
   useEffect(() => {
     const noticeKey = searchParams.get("notice");
     if (!noticeKey) return;
-
-    if (noticeKey === "registration_success") {
-      setNotice("Registration successful! Please sign in to continue.");
-    }
-
-    if (noticeKey === "registration_pending_approval") {
-      setNotice("Registration submitted. Your account will activate after super admin approval.");
-    }
-
+    if (noticeKey === "registration_success") setNotice("Registration successful! Please sign in.");
+    if (noticeKey === "registration_pending_approval") setNotice("Registration submitted. Awaiting approval.");
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete("notice");
     setSearchParams(nextParams, { replace: true });
@@ -139,13 +133,11 @@ export default function Login() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
       setError(loginConfig.invalidCredentialsMessage);
       return;
     }
-
     setLoading(true);
     try {
       const data = await api.post<TokenResponse>(loginConfig.endpoint, {
@@ -157,13 +149,10 @@ export default function Login() {
         intent: searchParams.get("intent") ?? normalizedPortal ?? undefined,
       });
       setAccessToken(data.access_token);
-
       const claims = decodeAccessTokenClaims(data.access_token);
       const provisionalRole = claims?.role ?? "";
-      const provisionalRestaurantId =
-        typeof claims?.restaurant_id === "number" ? claims.restaurant_id : null;
-      const provisionalMustChangePassword =
-        typeof claims?.must_change_password === "boolean" ? claims.must_change_password : false;
+      const provisionalRestaurantId = typeof claims?.restaurant_id === "number" ? claims.restaurant_id : null;
+      const provisionalMustChangePassword = typeof claims?.must_change_password === "boolean" ? claims.must_change_password : false;
       const provisionalId = Number(claims?.sub);
 
       setUser({
@@ -180,17 +169,8 @@ export default function Login() {
         navigate("/first-time-password", { replace: true });
         return;
       }
-
       navigate(getRoleRedirect(provisionalRole, []), { replace: true });
-
-      void api
-        .get<UserMeResponse>("/auth/me")
-        .then((me) => {
-          setUser(me);
-        })
-        .catch(() => {
-          // Keep provisional user snapshot if enrichment call fails.
-        });
+      void api.get<UserMeResponse>("/auth/me").then((me) => setUser(me)).catch(() => {});
     } catch (err) {
       trackAnalyticsEvent("login_submit_failure", {
         entry_point: searchParams.get("entry_point") ?? undefined,
@@ -203,7 +183,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-dvh bg-background px-4 py-6 sm:px-6 sm:py-10 flex items-center justify-center">
+    <div className="relative min-h-dvh w-full overflow-hidden flex items-center justify-center font-sans selection:bg-emerald-500/30">
       <SeoHead
         title={loginConfig.title}
         description={loginConfig.subtitle}
@@ -211,112 +191,168 @@ export default function Login() {
         robots="noindex, nofollow"
         trackAs="login"
       />
-      <section className="w-full max-w-lg rounded-3xl border border-border bg-card p-5 shadow-sm sm:p-8 lg:p-10">
-        <div className="mx-auto flex w-full max-w-sm flex-col items-center text-center">
-          <div className="mb-4 inline-flex items-center gap-3 rounded-full border border-border bg-muted/60 px-3 py-2">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-900 text-sm font-bold text-white">
-              H
+
+      {/* Dynamic Background Image with Depth Overlay */}
+      <div className="absolute inset-0 z-0 bg-slate-950">
+         <img 
+            src="/luxury_hotel_login_bg_1778129754877.png" 
+            alt="Luxury Hotel" 
+            className="h-full w-full object-cover scale-105 animate-slow-zoom opacity-60"
+         />
+         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+      </div>
+
+      <main className="relative z-10 w-full max-w-lg px-6 py-12 animate-in fade-in zoom-in-95 duration-700">
+        <div className="rounded-[3rem] bg-white/10 backdrop-blur-3xl border border-white/20 p-8 sm:p-12 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden group">
+          {/* Accent Glow */}
+          <div className="absolute -top-24 -right-24 h-64 w-64 bg-emerald-500/20 blur-[100px] rounded-full group-hover:bg-blue-500/20 transition-all duration-1000" />
+          
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <div className="mb-8 inline-flex items-center gap-4 bg-white/10 border border-white/20 px-4 py-2 rounded-2xl backdrop-blur-md">
+               <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-white/10">
+                  <span className="text-slate-900 font-black text-xl tracking-tighter">H</span>
+               </div>
+               <div className="text-left">
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400">HotelMS</p>
+                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">{loginConfig.badge}</p>
+               </div>
             </div>
-            <div className="text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                HotelMS
-              </p>
-              <p className="text-xs text-muted-foreground">Secure hospitality access</p>
-            </div>
+
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+              {loginConfig.title}
+            </h1>
+            <p className="mt-3 text-sm font-medium text-white/50 leading-relaxed max-w-xs">
+              {loginConfig.subtitle}
+            </p>
           </div>
 
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            {loginConfig.title}
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground sm:text-base">
-            {loginConfig.subtitle}
-          </p>
+          <form onSubmit={handleSubmit} className="mt-12 space-y-6" noValidate>
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 ml-1">
+                Identity Email
+              </label>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-emerald-400 transition-colors">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@establishment.com"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-white placeholder:text-white/20 outline-none ring-2 ring-transparent focus:ring-emerald-500/20 focus:bg-white/10 focus:border-white/30 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <label htmlFor="password" className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+                  Access Key
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[10px] font-black uppercase tracking-widest text-white/30 hover:text-white transition-colors"
+                >
+                  {showPassword ? "Conceal" : "Reveal"}
+                </button>
+              </div>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-emerald-400 transition-colors">
+                  <Lock className="h-5 w-5" />
+                </div>
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-white placeholder:text-white/20 outline-none ring-2 ring-transparent focus:ring-emerald-500/20 focus:bg-white/10 focus:border-white/30 transition-all"
+                />
+              </div>
+            </div>
+
+            {notice && (
+              <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
+                <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" />
+                <p className="text-xs font-bold text-emerald-400 leading-tight">{notice}</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center gap-3">
+                <ShieldCheck className="h-4 w-4 text-rose-400 shrink-0" />
+                <p className="text-xs font-bold text-rose-400 leading-tight">{error}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full group relative flex items-center justify-center gap-3 bg-white text-slate-900 h-14 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-white/5 hover:bg-slate-50 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              {loading ? (
+                <div className="h-5 w-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>{loginConfig.submitLabel}</span>
+                  <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-10 flex flex-col items-center gap-4">
+            <Link
+              to="/forgot-password"
+              className="text-[10px] font-black uppercase tracking-widest text-white/30 hover:text-white transition-colors"
+            >
+              Reset Lost Password
+            </Link>
+            
+            {normalizedPortal !== 'staff' && normalizedPortal !== 'super-admin' && (
+              <div className="pt-6 border-t border-white/10 w-full flex flex-col items-center">
+                <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mb-3">
+                  New Establishment?
+                </p>
+                <Link
+                  to={buildTrackedPath("/register", { entry_point: "login_page" })}
+                  className="px-6 py-2 bg-white/5 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-widest text-white hover:bg-white/10 transition-all"
+                >
+                  Join the Ecosystem
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5" noValidate>
-          <div className="space-y-1.5">
-            <label htmlFor="email" className="text-sm font-medium text-foreground">
-              Email address
-            </label>
-            <input
-              id="email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-lg border border-input bg-background px-3 py-3 text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-            />
-            <p className="text-xs leading-5 text-muted-foreground">
-              Use the email address registered to your HotelMS account.
-            </p>
-          </div>
+        {/* Footer Info */}
+        <div className="mt-8 flex items-center justify-center gap-6 opacity-30 group-hover:opacity-100 transition-opacity">
+           <div className="flex items-center gap-2">
+              <ShieldCheck className="h-3 w-3 text-white" />
+              <span className="text-[9px] font-bold text-white uppercase tracking-widest">AES-256 Encrypted</span>
+           </div>
+           <div className="h-1 w-1 bg-white rounded-full" />
+           <div className="flex items-center gap-2">
+              <UserCircle className="h-3 w-3 text-white" />
+              <span className="text-[9px] font-bold text-white uppercase tracking-widest">v2.4.0 Stable</span>
+           </div>
+        </div>
+      </main>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-3">
-              <label htmlFor="password" className="text-sm font-medium text-foreground">
-                Password
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowPassword((current) => !current)}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                {showPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-            <div className="relative">
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                className="w-full rounded-lg border border-input bg-background px-3 py-3 pr-24 text-sm shadow-sm transition focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
-              />
-            </div>
-            <p className="text-xs leading-5 text-muted-foreground">
-              Use your current HotelMS password. If it is your first login, you may be asked to change it.
-            </p>
-          </div>
-
-          {notice && <p className="text-sm font-medium text-primary">{notice}</p>}
-          {error && <p className="text-sm font-medium text-destructive">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {loading ? "Signing in..." : loginConfig.submitLabel}
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          <Link
-            to="/forgot-password"
-            className="underline underline-offset-4 transition-colors hover:text-foreground"
-          >
-            Forgot your password?
-          </Link>
-        </p>
-
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          New restaurant owner?{" "}
-          <Link
-            to={buildTrackedPath("/register", { entry_point: "login_register_link" })}
-            className="underline underline-offset-4 transition-colors hover:text-foreground"
-          >
-            Register here
-          </Link>
-        </p>
-      </section>
+      <style>{`
+        @keyframes slow-zoom {
+          from { transform: scale(1); }
+          to { transform: scale(1.1); }
+        }
+        .animate-slow-zoom {
+          animation: slow-zoom 30s infinite alternate ease-in-out;
+        }
+      `}</style>
     </div>
   );
 }

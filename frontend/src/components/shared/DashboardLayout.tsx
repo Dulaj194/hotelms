@@ -2,22 +2,31 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  Activity,
+  BarChart3,
   BedDouble,
   ChevronDown,
   ClipboardList,
   CookingPot,
   HandPlatter,
   Handshake,
+  History,
   Home,
+  Kanban,
+  LayoutDashboard,
   LayoutGrid,
+  LogOut,
   Package,
   Menu,
   MessageSquare,
+  Monitor,
   QrCode,
   ReceiptText,
+  Settings,
   ShieldCheck,
   SquareMenu,
   Ticket,
+  User,
   UserCog,
   Users,
   UtensilsCrossed,
@@ -66,16 +75,24 @@ type SidebarGroupState = {
   qrOpen: boolean;
   housekeepingOpen: boolean;
   offersOpen: boolean;
+  opsOpen: boolean;
+  commOpen: boolean;
+  financeOpen: boolean;
+  settingsOpen: boolean;
 };
 
 const SIDEBAR_GROUPS_STORAGE_KEY = "hotelms.sidebar.groups";
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.admin";
 const DEFAULT_SIDEBAR_GROUP_STATE: SidebarGroupState = {
-  menusOpen: true,
+  menusOpen: false,
   kitchenOpen: true,
-  qrOpen: true,
+  qrOpen: false,
   housekeepingOpen: true,
-  offersOpen: true,
+  offersOpen: false,
+  opsOpen: true,
+  commOpen: true,
+  financeOpen: false,
+  settingsOpen: false,
 };
 
 function loadSidebarGroupState(): SidebarGroupState {
@@ -91,6 +108,10 @@ function loadSidebarGroupState(): SidebarGroupState {
       housekeepingOpen:
         parsed.housekeepingOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.housekeepingOpen,
       offersOpen: parsed.offersOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.offersOpen,
+      opsOpen: parsed.opsOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.opsOpen,
+      commOpen: parsed.commOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.commOpen,
+      financeOpen: parsed.financeOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.financeOpen,
+      settingsOpen: parsed.settingsOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.settingsOpen,
     };
   } catch {
     return DEFAULT_SIDEBAR_GROUP_STATE;
@@ -98,7 +119,6 @@ function loadSidebarGroupState(): SidebarGroupState {
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
-  { path: "/dashboard", label: "Home", icon: Home, roles: null },
   {
     path: "/admin/restaurant-profile",
     label: "Restaurant",
@@ -112,40 +132,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
     roles: RESTAURANT_ADMIN_ROLES,
   },
   { path: "/admin/staff", label: "Staff", icon: Users, roles: RESTAURANT_ADMIN_ROLES },
-  {
-    path: "/admin/menu/menus",
-    label: "Menus",
-    icon: SquareMenu,
-    roles: RESTAURANT_ADMIN_ROLES,
-  },
-  {
-    path: "/admin/menu/categories",
-    label: "Categories",
-    icon: ClipboardList,
-    roles: RESTAURANT_ADMIN_ROLES,
-  },
-  {
-    path: "/admin/menu/items",
-    label: "Menu Items",
-    icon: HandPlatter,
-    roles: RESTAURANT_ADMIN_ROLES,
-  },
-  {
-    path: "/admin/reports",
-    label: "Reports",
-    icon: ReceiptText,
-    roles: QR_MENU_STAFF_ROLES,
-    privilege: "QR_MENU",
-    moduleKey: "reports",
-  },
-  {
-    path: "/admin/billing",
-    label: "Billing",
-    icon: Ticket,
-    roles: BILLING_STAFF_ROLES,
-    privilege: "QR_MENU",
-    moduleKey: "billing",
-  },
 ];
 
 interface DashboardLayoutProps {
@@ -190,42 +176,89 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     []
   );
 
-  const kitchenSubItems: MenuSubItem[] = useMemo(
+  const opsSubItems: MenuSubItem[] = useMemo(
     () => [
       {
         path: "/admin/steward",
-        label: "Steward Dashboard",
-        icon: UserCog,
+        label: "Live Orders",
+        icon: Activity,
         privilege: "QR_MENU",
         moduleKey: "steward_ops",
       },
       {
         path: "/admin/chat",
-        label: "Chat",
+        label: "Service Stream",
         icon: MessageSquare,
         privilege: "QR_MENU",
         moduleKey: "steward_ops",
       },
       {
-        path: "/admin/steward",
-        label: "Orders",
-        icon: ClipboardList,
+        path: "/admin/kitchen/orders",
+        label: "Kitchen Queue",
+        icon: Kanban,
+        privilege: "QR_MENU",
+        moduleKey: "kds",
+      },
+      {
+        path: "/admin/kitchen/history",
+        label: "Order History",
+        icon: History,
+        privilege: "QR_MENU",
+        moduleKey: "kds",
+      },
+    ],
+    []
+  );
+
+  const commSubItems: MenuSubItem[] = useMemo(
+    () => [
+      {
+        path: "/admin/chat",
+        label: "Staff Chat",
+        icon: MessageSquare,
         privilege: "QR_MENU",
         moduleKey: "steward_ops",
       },
       {
-        path: "/admin/kitchen/orders",
-        label: "Kitchen Display",
-        icon: CookingPot,
+        path: "/admin/chat",
+        label: "Guest Requests",
+        icon: Handshake,
         privilege: "QR_MENU",
-        moduleKey: "kds",
+        moduleKey: "steward_ops",
+      },
+    ],
+    []
+  );
+
+  const financeSubItems: MenuSubItem[] = useMemo(
+    () => [
+      {
+        path: "/admin/billing",
+        label: "Billing",
+        icon: Ticket,
+        roles: BILLING_STAFF_ROLES,
+        privilege: "QR_MENU",
+        moduleKey: "billing",
       },
       {
-        path: "/admin/kitchen/old-orders",
-        label: "Old Orders",
-        icon: ReceiptText,
+        path: "/admin/reports",
+        label: "Reports",
+        icon: BarChart3,
+        roles: QR_MENU_STAFF_ROLES,
         privilege: "QR_MENU",
-        moduleKey: "kds",
+        moduleKey: "reports",
+      },
+    ],
+    []
+  );
+
+  const settingsSubItems: MenuSubItem[] = useMemo(
+    () => [
+      {
+        path: "/admin/restaurant-profile",
+        label: "Profile",
+        icon: User,
+        roles: RESTAURANT_ADMIN_ROLES,
       },
     ],
     []
@@ -291,13 +324,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   );
 
   const menuPaths = useMemo(() => menuSubItems.map((item) => item.path), [menuSubItems]);
-  const kitchenPaths = useMemo(() => kitchenSubItems.map((item) => item.path), [kitchenSubItems]);
-  const qrPaths = useMemo(() => qrSubItems.map((item) => item.path), [qrSubItems]);
-  const housekeepingPaths = useMemo(() => housekeepingSubItems.map((item) => item.path), [housekeepingSubItems]);
-  const offerPaths = useMemo(() => offerSubItems.map((item) => item.path), [offerSubItems]);
-  const visibleKitchenSubItems = useMemo(
+  const opsPaths = useMemo(() => opsSubItems.map((item) => item.path), [opsSubItems]);
+  const commPaths = useMemo(() => commSubItems.map((item) => item.path), [commSubItems]);
+  const financePaths = useMemo(() => financeSubItems.map((item) => item.path), [financeSubItems]);
+  const settingsPaths = useMemo(() => settingsSubItems.map((item) => item.path), [settingsSubItems]);
+
+  const visibleOpsSubItems = useMemo(
     () =>
-      kitchenSubItems.filter((item) =>
+      opsSubItems.filter((item) =>
         canAccessModuleItem(
           role,
           privileges,
@@ -307,11 +341,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           item.moduleKey,
         )
       ),
-    [kitchenSubItems, moduleAccess, privileges, role]
+    [opsSubItems, moduleAccess, privileges, role]
   );
-  const visibleQrSubItems = useMemo(
+  const visibleCommSubItems = useMemo(
     () =>
-      qrSubItems.filter((item) =>
+      commSubItems.filter((item) =>
         canAccessModuleItem(
           role,
           privileges,
@@ -321,11 +355,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           item.moduleKey,
         )
       ),
-    [moduleAccess, privileges, qrSubItems, role]
+    [commSubItems, moduleAccess, privileges, role]
   );
-  const visibleHousekeepingSubItems = useMemo(
+  const visibleFinanceSubItems = useMemo(
     () =>
-      housekeepingSubItems.filter((item) =>
+      financeSubItems.filter((item) =>
         canAccessModuleItem(
           role,
           privileges,
@@ -335,11 +369,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           item.moduleKey,
         )
       ),
-    [housekeepingSubItems, moduleAccess, privileges, role]
+    [financeSubItems, moduleAccess, privileges, role]
   );
-  const visibleOfferSubItems = useMemo(
+  const visibleSettingsSubItems = useMemo(
     () =>
-      offerSubItems.filter((item) =>
+      settingsSubItems.filter((item) =>
         canAccessModuleItem(
           role,
           privileges,
@@ -349,13 +383,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           item.moduleKey,
         )
       ),
-    [moduleAccess, offerSubItems, privileges, role]
+    [settingsSubItems, moduleAccess, privileges, role]
   );
+
   const isMenuGroupVisible = hasRoleAccess(role, RESTAURANT_ADMIN_ROLES);
   const isMenuGroupActive = menuPaths.some((path) => location.pathname === path);
-  const isKitchenGroupVisible = !privilegesLoading && visibleKitchenSubItems.length > 0;
-  const isKitchenGroupActive =
-    location.pathname.startsWith("/admin/kitchen") || location.pathname === "/admin/steward";
+  const isOpsGroupVisible = !privilegesLoading && visibleOpsSubItems.length > 0;
+  const isOpsGroupActive = opsPaths.some((path) => 
+    location.pathname === path || (path !== "/admin/steward" && location.pathname.startsWith(path))
+  );
+  const isCommGroupVisible = !privilegesLoading && visibleCommSubItems.length > 0;
+  const isCommGroupActive = commPaths.some((path) => location.pathname === path);
+  const isFinanceGroupVisible = !privilegesLoading && visibleFinanceSubItems.length > 0;
+  const isFinanceGroupActive = financePaths.some((path) => location.pathname === path || location.pathname.startsWith(path));
+  const isSettingsGroupVisible = !privilegesLoading && visibleSettingsSubItems.length > 0;
+  const isSettingsGroupActive = settingsPaths.some((path) => location.pathname === path);
+
   const isQrGroupVisible = !privilegesLoading && visibleQrSubItems.length > 0;
   const isQrGroupActive =
     location.pathname === "/admin/qr" ||
@@ -376,7 +419,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navItems = ALL_NAV_ITEMS.filter(
     (item) =>
       !menuPaths.includes(item.path) &&
-      !kitchenPaths.includes(item.path) &&
+      !opsPaths.includes(item.path) &&
+      !commPaths.includes(item.path) &&
+      !financePaths.includes(item.path) &&
+      !settingsPaths.includes(item.path) &&
       !qrPaths.includes(item.path) &&
       !housekeepingPaths.includes(item.path) &&
       !offerPaths.includes(item.path) &&
@@ -461,8 +507,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         next.menusOpen = true;
         changed = true;
       }
-      if (isKitchenGroupVisible && isKitchenGroupActive && !next.kitchenOpen) {
-        next.kitchenOpen = true;
+      if (isOpsGroupVisible && isOpsGroupActive && !next.opsOpen) {
+        next.opsOpen = true;
+        changed = true;
+      }
+      if (isCommGroupVisible && isCommGroupActive && !next.commOpen) {
+        next.commOpen = true;
+        changed = true;
+      }
+      if (isFinanceGroupVisible && isFinanceGroupActive && !next.financeOpen) {
+        next.financeOpen = true;
+        changed = true;
+      }
+      if (isSettingsGroupVisible && isSettingsGroupActive && !next.settingsOpen) {
+        next.settingsOpen = true;
         changed = true;
       }
       if (isQrGroupVisible && isQrGroupActive && !next.qrOpen) {
@@ -485,16 +543,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       return changed ? next : prev;
     });
   }, [
+    isCommGroupActive,
+    isCommGroupVisible,
+    isFinanceGroupActive,
+    isFinanceGroupVisible,
     isHousekeepingGroupActive,
     isHousekeepingGroupVisible,
-    isKitchenGroupActive,
-    isKitchenGroupVisible,
     isMenuGroupActive,
     isMenuGroupVisible,
     isOfferGroupActive,
     isOfferGroupVisible,
+    isOpsGroupActive,
+    isOpsGroupVisible,
     isQrGroupActive,
     isQrGroupVisible,
+    isSettingsGroupActive,
+    isSettingsGroupVisible,
   ]);
 
   useEffect(() => {
@@ -650,37 +714,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           )}
 
-          {isKitchenGroupVisible && (
+          {isOpsGroupVisible && (
             <div className="mb-1">
               <button
                 type="button"
-                onClick={() => toggleGroup("kitchenOpen")}
-                aria-expanded={kitchenOpen}
+                onClick={() => toggleGroup("opsOpen")}
+                aria-expanded={opsOpen}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
-                  isKitchenGroupActive
+                  isOpsGroupActive
                     ? "bg-slate-700 text-white"
                     : "text-gray-300 hover:bg-gray-800 hover:text-white"
                 }`}
               >
                 <span className="flex items-center">
                   <CookingPot className="h-4 w-4 mr-2 shrink-0" />
-                  Kitchen
+                  Kitchen Operations
                 </span>
-                <div className="flex items-center gap-2">
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform ${kitchenOpen ? "rotate-180" : ""}`}
-                  />
-                </div>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${opsOpen ? "rotate-180" : ""}`}
+                />
               </button>
 
-              {kitchenOpen && (
+              {opsOpen && (
                 <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
-                  {visibleKitchenSubItems.map((subItem) => {
+                  {visibleOpsSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
                     return (
                       <Link
-                        key={subItem.path}
+                        key={subItem.label + subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
                         className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors relative ${
@@ -691,16 +753,157 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       >
                         <SubIcon className="h-4 w-4 mr-2 shrink-0" />
                         <span>{subItem.label}</span>
-                        {subItem.label === "Chat" && badgeCounts.requests > 0 && (
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white shadow-sm animate-pulse">
-                            {badgeCounts.requests}
-                          </span>
-                        )}
-                        {subItem.label === "Orders" && badgeCounts.awaiting > 0 && (
+                        {subItem.label === "Live Orders" && badgeCounts.awaiting > 0 && (
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-black text-white shadow-sm animate-pulse">
                             {badgeCounts.awaiting}
                           </span>
                         )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isCommGroupVisible && (
+            <div className="mb-1">
+              <button
+                type="button"
+                onClick={() => toggleGroup("commOpen")}
+                aria-expanded={commOpen}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  isCommGroupActive
+                    ? "bg-slate-700 text-white"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                <span className="flex items-center">
+                  <MessageSquare className="h-4 w-4 mr-2 shrink-0" />
+                  Communication
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${commOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {commOpen && (
+                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                  {visibleCommSubItems.map((subItem) => {
+                    const subActive = location.pathname === subItem.path;
+                    const SubIcon = subItem.icon;
+                    return (
+                      <Link
+                        key={subItem.label + subItem.path}
+                        to={subItem.path}
+                        onClick={handleSidebarNavigate}
+                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors relative ${
+                          subActive
+                            ? "bg-blue-950 text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        }`}
+                      >
+                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <span>{subItem.label}</span>
+                        {subItem.label === "Guest Requests" && badgeCounts.requests > 0 && (
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white shadow-sm animate-pulse">
+                            {badgeCounts.requests}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isFinanceGroupVisible && (
+            <div className="mb-1">
+              <button
+                type="button"
+                onClick={() => toggleGroup("financeOpen")}
+                aria-expanded={financeOpen}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  isFinanceGroupActive
+                    ? "bg-slate-700 text-white"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                <span className="flex items-center">
+                  <Ticket className="h-4 w-4 mr-2 shrink-0" />
+                  Finance
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${financeOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {financeOpen && (
+                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                  {visibleFinanceSubItems.map((subItem) => {
+                    const subActive = location.pathname === subItem.path || location.pathname.startsWith(subItem.path);
+                    const SubIcon = subItem.icon;
+                    return (
+                      <Link
+                        key={subItem.label + subItem.path}
+                        to={subItem.path}
+                        onClick={handleSidebarNavigate}
+                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors relative ${
+                          subActive
+                            ? "bg-blue-950 text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        }`}
+                      >
+                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <span>{subItem.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {isSettingsGroupVisible && (
+            <div className="mb-1">
+              <button
+                type="button"
+                onClick={() => toggleGroup("settingsOpen")}
+                aria-expanded={settingsOpen}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                  isSettingsGroupActive
+                    ? "bg-slate-700 text-white"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                <span className="flex items-center">
+                  <Settings className="h-4 w-4 mr-2 shrink-0" />
+                  Settings
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${settingsOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {settingsOpen && (
+                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                  {visibleSettingsSubItems.map((subItem) => {
+                    const subActive = location.pathname === subItem.path;
+                    const SubIcon = subItem.icon;
+                    return (
+                      <Link
+                        key={subItem.label + subItem.path}
+                        to={subItem.path}
+                        onClick={handleSidebarNavigate}
+                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors relative ${
+                          subActive
+                            ? "bg-blue-950 text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        }`}
+                      >
+                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <span>{subItem.label}</span>
                       </Link>
                     );
                   })}

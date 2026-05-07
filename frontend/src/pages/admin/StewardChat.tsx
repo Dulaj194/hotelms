@@ -486,55 +486,42 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseLeave}
     >
-      {/* Header Section */}
-      <div className="rounded-[3rem] border border-slate-100 bg-white/80 backdrop-blur-xl p-8 shadow-2xl shadow-slate-200/50">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-6">
-            <div className="relative">
-              <div className="flex h-20 w-20 items-center justify-center rounded-[2.5rem] bg-slate-900 text-white shadow-2xl shadow-slate-400 ring-4 ring-white">
-                <Bell className="h-10 w-10" />
-              </div>
-              {isConnected && (
-                <div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-emerald-500 border-4 border-white animate-pulse" />
-              )}
+      {/* Workspace Header */}
+      <div className="rounded-[3rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-8 text-white shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+          <Bell className="h-64 w-64" />
+        </div>
+        
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-1 w-12 bg-blue-500 rounded-full" />
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400">Real-time Stream</p>
             </div>
-            <div>
-              <h1 className="text-4xl font-black tracking-tight text-slate-900">Service Stream</h1>
-              <div className="mt-2 flex items-center gap-3">
-                <div className={`h-2.5 w-2.5 rounded-full ${isConnected ? "bg-emerald-500" : "bg-rose-500"}`} />
-                <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">
-                  {isConnected ? "Live Connection Established" : "Attempting Reconnection..."}
-                </p>
-              </div>
+            <h1 className="text-4xl lg:text-5xl font-black tracking-tight mb-4">Service Stream</h1>
+            <div className="flex items-center gap-3">
+              <div className={`h-2.5 w-2.5 rounded-full ${isConnected ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : "bg-rose-500"}`} />
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                {isConnected ? "Live Connection Established" : "Attempting Reconnection..."}
+              </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="relative flex p-1.5 bg-slate-100 rounded-[2rem] shadow-inner overflow-hidden min-w-[320px]">
-              {/* Sliding Background Pill */}
-              <div 
-                className="absolute top-1.5 bottom-1.5 rounded-[1.5rem] bg-white shadow-xl transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
-                style={{
-                  left: sourceFilter === "table" ? "6px" : "calc(50% + 3px)",
-                  width: "calc(50% - 9px)",
-                }}
-              />
-
+          <div className="flex items-center gap-4">
+            <div className="flex bg-white/5 backdrop-blur-md p-1.5 rounded-[2rem] border border-white/10 min-w-[320px]">
               {(["table", "room"] as const).map((source) => (
                 <button
                   key={source}
                   onClick={() => setSourceFilter(source)}
-                  className={`relative z-10 flex-1 flex items-center justify-center gap-3 py-3.5 text-[11px] font-black uppercase tracking-widest transition-colors duration-500 ${
-                    sourceFilter === source ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
+                  className={`flex-1 flex items-center justify-center gap-3 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+                    sourceFilter === source ? "bg-white text-slate-900 shadow-xl" : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  <MapPin className={`h-3.5 w-3.5 transition-colors duration-500 ${
-                    sourceFilter === source ? "text-slate-900" : "text-slate-400"
-                  }`} />
+                  <MapPin className="h-3.5 w-3.5" />
                   <span>{source}s</span>
                   {counts[source] > 0 && (
-                    <span className={`flex h-6 min-w-[24px] items-center justify-center rounded-full px-1.5 text-[10px] font-black transition-all duration-500 ${
-                      sourceFilter === source ? "bg-slate-900 text-white scale-110" : "bg-slate-200 text-slate-500"
+                    <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[9px] font-black transition-all ${
+                      sourceFilter === source ? "bg-slate-900 text-white" : "bg-white/10 text-slate-300"
                     }`}>
                       {counts[source]}
                     </span>
@@ -547,8 +534,7 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
               type="button"
               onClick={() => void loadData(true)}
               disabled={loading || refreshing}
-              className="group flex h-14 w-14 items-center justify-center rounded-[1.75rem] bg-white border-2 border-slate-100 text-slate-900 transition-all hover:border-slate-900 hover:shadow-lg active:scale-90 disabled:opacity-50"
-              title="Manual Refresh"
+              className="group flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white transition-all hover:bg-white/10 active:scale-90 disabled:opacity-50"
             >
               <RotateCcw className={`h-6 w-6 ${refreshing ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-700"}`} />
             </button>

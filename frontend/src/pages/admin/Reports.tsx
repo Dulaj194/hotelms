@@ -1,4 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { 
+  BarChart3, 
+  Calendar, 
+  Download, 
+  Printer, 
+  History, 
+  TrendingUp, 
+  Package, 
+  Receipt,
+  Search,
+  Filter,
+  CheckCircle2,
+  AlertCircle,
+  FileText
+} from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api, ApiError, refreshAccessToken } from "@/lib/api";
@@ -14,11 +29,11 @@ type ReportViewMode = "daily" | "monthly" | "range" | "history";
 
 function formatDate(value: string | null): string {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString();
+  return new Date(value).toLocaleDateString([], { dateStyle: 'medium' });
 }
 
 function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString();
+  return new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 function money(value: number): string {
@@ -26,12 +41,8 @@ function money(value: number): string {
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    return error.detail || fallback;
-  }
-  if (error instanceof Error) {
-    return error.message || fallback;
-  }
+  if (error instanceof ApiError) return error.detail || fallback;
+  if (error instanceof Error) return error.message || fallback;
   return fallback;
 }
 
@@ -214,451 +225,318 @@ export default function Reports() {
 
   return (
     <DashboardLayout>
-      <div className="app-page-stack">
-        <div className="rounded-xl border bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="app-section-title text-gray-900">Reports</h1>
-              <p className="app-muted-text mt-1 text-gray-600">
-                Review daily and monthly sales, browse history, and download server-generated reports.
-              </p>
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div className="h-16 w-16 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-xl shadow-slate-200">
+                <BarChart3 className="h-8 w-8" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">Finance Reports</h1>
+                <p className="mt-1 text-sm font-medium text-slate-500">Analyze sales performance and export data</p>
+              </div>
             </div>
-            <div className="app-form-actions">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => void downloadCsv()}
                 disabled={viewMode === "history" || downloadBusy}
-                className="app-btn-base w-full border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-50"
               >
-                {downloadBusy ? "Downloading..." : "Download CSV"}
+                <Download className={`h-4 w-4 ${downloadBusy ? 'animate-bounce' : ''}`} />
+                {downloadBusy ? "Preparing..." : "Export CSV"}
               </button>
-              <button
+              <button 
                 onClick={() => window.print()}
-                className="app-btn-base w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
+                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-all active:scale-95 shadow-lg shadow-blue-100"
               >
-                Print
+                <Printer className="h-4 w-4" />
+                Print Report
               </button>
             </div>
           </div>
         </div>
 
-        <section className="rounded-xl border bg-white p-6 shadow-sm space-y-4">
-          <div className="app-form-actions">
-            <button
-              onClick={() => setViewMode("daily")}
-              className={`app-btn-compact w-full sm:w-auto ${
-                viewMode === "daily"
-                  ? "bg-blue-600 text-white"
-                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              Daily
-            </button>
-            <button
-              onClick={() => setViewMode("monthly")}
-              className={`app-btn-compact w-full sm:w-auto ${
-                viewMode === "monthly"
-                  ? "bg-blue-600 text-white"
-                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setViewMode("range")}
-              className={`app-btn-compact w-full sm:w-auto ${
-                viewMode === "range"
-                  ? "bg-blue-600 text-white"
-                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              Date Range
-            </button>
-            <button
-              onClick={() => setViewMode("history")}
-              className={`app-btn-compact w-full sm:w-auto ${
-                viewMode === "history"
-                  ? "bg-blue-600 text-white"
-                  : "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              Report History
-            </button>
+        {/* View Mode & Filters */}
+        <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 shadow-sm space-y-6">
+          <div className="flex flex-wrap items-center gap-2">
+            {(["daily", "monthly", "range", "history"] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+                  viewMode === mode 
+                    ? "bg-slate-900 text-white shadow-xl shadow-slate-200" 
+                    : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                }`}
+              >
+                {mode === "range" ? "Date Range" : mode === "history" ? "Report History" : mode}
+              </button>
+            ))}
           </div>
 
-          {viewMode === "daily" ? (
-            <div className="app-form-grid items-end">
-              <div>
-                <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                  Date
-                </label>
+          <div className="h-px bg-slate-100" />
+
+          <div className="flex flex-wrap items-end gap-4">
+            {viewMode === "daily" && (
+              <div className="flex-1 min-w-[200px]">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block px-1">Selected Date</label>
                 <input
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:bg-white ring-2 ring-transparent focus:ring-blue-100 transition-all"
                 />
               </div>
-              {report && report.available_dates.length > 0 && (
-                <div>
-                  <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                    History
-                  </label>
-                  <select
-                    value={selectedDate}
-                    onChange={(e) => {
-                      setSelectedDate(e.target.value);
-                      setViewMode("daily");
-                    }}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  >
-                    {report.available_dates.map((value) => (
-                      <option key={value} value={value}>
-                        {formatDate(value)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <button
-                onClick={() => void loadReport()}
-                className={`app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto ${
-                  report && report.available_dates.length > 0 ? "md:col-span-2" : ""
-                }`}
-              >
-                Apply
-              </button>
-            </div>
-          ) : viewMode === "monthly" ? (
-            <div className="app-form-grid items-end">
-              <div>
-                <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                  Month
-                </label>
+            )}
+            {viewMode === "monthly" && (
+              <div className="flex-1 min-w-[200px]">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block px-1">Selected Month</label>
                 <input
                   type="month"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:bg-white ring-2 ring-transparent focus:ring-blue-100 transition-all"
                 />
               </div>
-              <button
-                onClick={() => void loadReport()}
-                className="app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
-              >
-                Apply
-              </button>
-            </div>
-          ) : viewMode === "range" ? (
-            <div className="app-form-grid items-end">
-              <div>
-                <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                  From
-                </label>
-                <input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="app-muted-text mb-1 block font-medium text-gray-700">
-                  To
-                </label>
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                />
-              </div>
-              <button
-                onClick={() => void loadReport()}
-                className="app-btn-base w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto md:col-span-2"
-              >
-                Apply
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-blue-100 bg-blue-50 px-4 py-3">
-              <p className="text-sm text-blue-800">
-                Showing generated report history from server-side report logs.
-              </p>
-              <button
-                type="button"
-                onClick={() => void loadReport()}
-                className="rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700"
-              >
-                Refresh History
-              </button>
-            </div>
-          )}
-        </section>
-
-        {loading && (
-          <div className="rounded-lg border bg-white p-6 text-sm text-gray-500">Loading report...</div>
-        )}
-
-        {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {!loading && viewMode === "history" && (
-          <section className="rounded-xl border bg-white p-6 shadow-sm">
-            <h2 className="app-section-title text-gray-900">Generated Report History</h2>
-            {reportHistory.length === 0 ? (
-              <p className="mt-4 text-sm text-gray-500">No report history found yet.</p>
-            ) : (
+            )}
+            {viewMode === "range" && (
               <>
-                <div className="mt-4 space-y-3 md:hidden">
-                  {reportHistory.map((item) => {
-                    const totalSales = numberFromSummary(item.report_summary, "total_sales");
-                    const totalQuantity = numberFromSummary(item.report_summary, "total_quantity");
-                    const totalOrders = numberFromSummary(item.report_summary, "total_orders");
-                    return (
-                      <article key={item.id} className="rounded-lg border border-gray-200 p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold text-gray-900">#{item.id}</p>
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
-                            {item.output_format.toUpperCase()}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs text-gray-600">Generated: {formatDateTime(item.generated_at)}</p>
-                        <p className="mt-1 text-xs text-gray-600">Period: {formatHistoryPeriod(item)}</p>
-                        <p className="mt-2 text-xs text-gray-700">
-                          Total Sales: {totalSales !== null ? money(totalSales) : "-"}
-                        </p>
-                        <p className="text-xs text-gray-700">
-                          Qty: {totalQuantity !== null ? totalQuantity : "-"} | Orders:{" "}
-                          {totalOrders !== null ? totalOrders : "-"}
-                        </p>
-                      </article>
-                    );
-                  })}
+                <div className="flex-1 min-w-[150px]">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block px-1">From Date</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:bg-white ring-2 ring-transparent focus:ring-blue-100 transition-all"
+                  />
                 </div>
-                <div className="app-table-scroll hidden md:block">
-                  <table className="mt-4 w-full min-w-[920px] text-sm">
-                    <thead className="text-left text-gray-500">
-                      <tr>
-                        <th className="pb-2">ID</th>
-                        <th className="pb-2">Generated At</th>
-                        <th className="pb-2">Filter</th>
-                        <th className="pb-2">Period</th>
-                        <th className="pb-2">Format</th>
-                        <th className="pb-2">Status</th>
-                        <th className="pb-2 text-right">Total Sales</th>
-                        <th className="pb-2 text-right">Quantity</th>
-                        <th className="pb-2 text-right">Orders</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {reportHistory.map((item) => {
-                        const totalSales = numberFromSummary(item.report_summary, "total_sales");
-                        const totalQuantity = numberFromSummary(item.report_summary, "total_quantity");
-                        const totalOrders = numberFromSummary(item.report_summary, "total_orders");
-                        return (
-                          <tr key={item.id}>
-                            <td className="py-2 pr-3">{item.id}</td>
-                            <td className="py-2 pr-3">{formatDateTime(item.generated_at)}</td>
-                            <td className="py-2 pr-3">{item.filter_type ?? "-"}</td>
-                            <td className="py-2 pr-3">{formatHistoryPeriod(item)}</td>
-                            <td className="py-2 pr-3">{item.output_format.toUpperCase()}</td>
-                            <td className="py-2 pr-3">{item.status}</td>
-                            <td className="py-2 pr-3 text-right">
-                              {totalSales !== null ? money(totalSales) : "-"}
-                            </td>
-                            <td className="py-2 pr-3 text-right">
-                              {totalQuantity !== null ? totalQuantity : "-"}
-                            </td>
-                            <td className="py-2 pr-3 text-right">
-                              {totalOrders !== null ? totalOrders : "-"}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="flex-1 min-w-[150px]">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block px-1">To Date</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:bg-white ring-2 ring-transparent focus:ring-blue-100 transition-all"
+                  />
                 </div>
               </>
             )}
-          </section>
-        )}
+            {viewMode !== "history" && (
+              <button
+                onClick={() => void loadReport()}
+                className="px-8 py-3.5 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-slate-200"
+              >
+                Apply Filters
+              </button>
+            )}
+            {viewMode === "history" && (
+              <div className="flex-1 flex items-center justify-between bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                <p className="text-xs font-bold text-blue-700 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Showing generated report history from server-side logs.
+                </p>
+                <button 
+                  onClick={() => void loadReport()}
+                  className="text-xs font-black uppercase text-blue-700 hover:underline"
+                >
+                  Refresh Logs
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
-        {report && !loading && viewMode !== "history" && (
+        {/* Content Section */}
+        {loading ? (
+          <div className="p-32 flex flex-col items-center justify-center gap-6">
+            <div className="h-12 w-12 border-4 border-slate-100 border-t-blue-600 rounded-full animate-spin" />
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest animate-pulse">Processing Report Data...</p>
+          </div>
+        ) : error ? (
+           <div className="p-20 text-center bg-white rounded-3xl border border-rose-100">
+              <div className="h-16 w-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="h-8 w-8" />
+              </div>
+              <p className="text-lg font-black text-slate-900 tracking-tight">Report Generation Failed</p>
+              <p className="text-sm text-slate-500 mt-1">{error}</p>
+            </div>
+        ) : (
           <>
-            <section className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Total Sales</p>
-                <p className="mt-2 text-3xl font-semibold text-gray-900">{money(report.total_sales)}</p>
-              </div>
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Total Quantity</p>
-                <p className="mt-2 text-3xl font-semibold text-gray-900">{report.total_quantity}</p>
-              </div>
-              <div className="rounded-xl border bg-white p-5 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Total Orders</p>
-                <p className="mt-2 text-3xl font-semibold text-gray-900">{report.total_orders}</p>
-              </div>
-            </section>
+            {report && (
+              <div className="space-y-8 animate-in fade-in duration-700">
+                {/* Metric Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <MetricCard label="Total Revenue" value={money(report.total_sales)} icon={TrendingUp} color="blue" />
+                  <MetricCard label="Total Quantity" value={report.total_quantity.toString()} icon={Package} color="emerald" />
+                  <MetricCard label="Total Orders" value={report.total_orders.toString()} icon={Receipt} color="amber" />
+                </div>
 
-            <section className="grid gap-6 lg:grid-cols-2">
-              <div className="rounded-xl border bg-white p-6 shadow-sm">
-                <h2 className="app-section-title text-gray-900">Sales by Category</h2>
-                {report.categories.length === 0 ? (
-                  <p className="mt-4 text-sm text-gray-500">No category data for the selected period.</p>
-                ) : (
-                  <>
-                    <div className="mt-4 space-y-2 md:hidden">
-                      {report.categories.map((row) => (
-                        <article key={row.category_name} className="rounded-lg border border-gray-200 p-3">
-                          <p className="text-sm font-semibold text-gray-900">{row.category_name}</p>
-                          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-gray-600">
-                            <p>Qty: {row.total_quantity}</p>
-                            <p className="text-right">Lines: {row.line_count}</p>
-                            <p className="col-span-2 text-right font-semibold text-gray-800">
-                              Sales: {money(row.total_sales)}
-                            </p>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                    <div className="app-table-scroll hidden md:block">
-                      <table className="mt-4 w-full min-w-[480px] text-sm">
-                        <thead className="text-left text-gray-500">
+                {/* Subsections */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <ReportTableSection title="Sales by Category" items={report.categories} type="category" />
+                  <ReportTableSection title="Sales by Payment" items={report.payment_methods} type="payment" />
+                </div>
+
+                {/* Detailed Table */}
+                <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">Detailed Sales Log</h2>
+                    <span className="bg-slate-50 text-slate-500 px-3 py-1 rounded-full text-xs font-bold">{report.rows.length} entries</span>
+                  </div>
+                  {report.rows.length === 0 ? (
+                    <EmptyState message="No sales records found for this period" />
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse min-w-[1000px]">
+                        <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           <tr>
-                            <th className="pb-2">Category</th>
-                            <th className="pb-2">Qty</th>
-                            <th className="pb-2">Lines</th>
-                            <th className="pb-2 text-right">Sales</th>
+                            <th className="px-8 py-4">Timestamp</th>
+                            <th className="px-8 py-4">Item Details</th>
+                            <th className="px-8 py-4">Location</th>
+                            <th className="px-8 py-4">Payment</th>
+                            <th className="px-8 py-4 text-right">Amount</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
-                          {report.categories.map((row) => (
-                            <tr key={row.category_name}>
-                              <td className="py-2 pr-3">{row.category_name}</td>
-                              <td className="py-2 pr-3">{row.total_quantity}</td>
-                              <td className="py-2 pr-3">{row.line_count}</td>
-                              <td className="py-2 text-right font-medium">{money(row.total_sales)}</td>
+                        <tbody className="divide-y divide-slate-50">
+                          {report.rows.map((row, i) => (
+                            <tr key={i} className="hover:bg-slate-50/30 transition-colors">
+                              <td className="px-8 py-6 text-xs font-medium text-slate-500">{formatDateTime(row.sales_at)}</td>
+                              <td className="px-8 py-6">
+                                <p className="font-bold text-slate-900">{row.item_name}</p>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Qty: {row.quantity} • {row.category_name}</p>
+                              </td>
+                              <td className="px-8 py-6 text-sm font-bold text-slate-600">{row.location_label}</td>
+                              <td className="px-8 py-6">
+                                <span className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-100 text-[10px] font-black uppercase text-slate-500">
+                                  {row.payment_method}
+                                </span>
+                              </td>
+                              <td className="px-8 py-6 text-right font-black text-slate-900">{money(row.total_price)}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
+            )}
 
-              <div className="rounded-xl border bg-white p-6 shadow-sm">
-                <h2 className="app-section-title text-gray-900">Sales by Payment Method</h2>
-                {report.payment_methods.length === 0 ? (
-                  <p className="mt-4 text-sm text-gray-500">No payment data for the selected period.</p>
-                ) : (
-                  <>
-                    <div className="mt-4 space-y-2 md:hidden">
-                      {report.payment_methods.map((row) => (
-                        <article key={row.payment_method} className="rounded-lg border border-gray-200 p-3">
-                          <p className="text-sm font-semibold text-gray-900">{row.payment_method}</p>
-                          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-gray-600">
-                            <p>Count: {row.payment_count}</p>
-                            <p className="text-right font-semibold text-gray-800">
-                              Sales: {money(row.total_sales)}
-                            </p>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                    <div className="app-table-scroll hidden md:block">
-                      <table className="mt-4 w-full min-w-[420px] text-sm">
-                        <thead className="text-left text-gray-500">
+            {viewMode === "history" && (
+              <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+                 <div className="p-8 border-b border-slate-50">
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">Generated History</h2>
+                  </div>
+                  {reportHistory.length === 0 ? (
+                    <EmptyState message="No generated reports in history" />
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse min-w-[1200px]">
+                        <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           <tr>
-                            <th className="pb-2">Method</th>
-                            <th className="pb-2">Count</th>
-                            <th className="pb-2 text-right">Sales</th>
+                            <th className="px-8 py-4">ID</th>
+                            <th className="px-8 py-4">Generated At</th>
+                            <th className="px-8 py-4">Period</th>
+                            <th className="px-8 py-4">Type</th>
+                            <th className="px-8 py-4 text-right">Sales</th>
+                            <th className="px-8 py-4 text-right">Quantity</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
-                          {report.payment_methods.map((row) => (
-                            <tr key={row.payment_method}>
-                              <td className="py-2 pr-3">{row.payment_method}</td>
-                              <td className="py-2 pr-3">{row.payment_count}</td>
-                              <td className="py-2 text-right font-medium">{money(row.total_sales)}</td>
-                            </tr>
-                          ))}
+                        <tbody className="divide-y divide-slate-50">
+                           {reportHistory.map(item => {
+                             const totalSales = numberFromSummary(item.report_summary, "total_sales");
+                             const totalQty = numberFromSummary(item.report_summary, "total_quantity");
+                             return (
+                              <tr key={item.id} className="hover:bg-slate-50/30 transition-colors">
+                                <td className="px-8 py-6 font-black text-slate-400">#{item.id}</td>
+                                <td className="px-8 py-6 text-sm font-bold text-slate-900">{formatDateTime(item.generated_at)}</td>
+                                <td className="px-8 py-6 text-xs font-medium text-slate-500">{formatHistoryPeriod(item)}</td>
+                                <td className="px-8 py-6">
+                                  <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-black uppercase">
+                                    {item.filter_type}
+                                  </span>
+                                </td>
+                                <td className="px-8 py-6 text-right font-black text-slate-900">{totalSales !== null ? money(totalSales) : "-"}</td>
+                                <td className="px-8 py-6 text-right font-black text-slate-900">{totalQty ?? "-"}</td>
+                              </tr>
+                             );
+                           })}
                         </tbody>
                       </table>
                     </div>
-                  </>
-                )}
+                  )}
               </div>
-            </section>
-
-            <section className="rounded-xl border bg-white p-6 shadow-sm">
-              <h2 className="app-section-title text-gray-900">Detailed Sales Report</h2>
-              {report.rows.length === 0 ? (
-                <p className="mt-4 text-sm text-gray-500">No paid sales found for the selected period.</p>
-              ) : (
-                <>
-                  <div className="mt-4 space-y-3 md:hidden">
-                    {report.rows.map((row) => (
-                      <article
-                        key={`${row.order_id}-${row.item_name}-${row.sales_at}`}
-                        className="rounded-lg border border-gray-200 p-3 text-sm"
-                      >
-                        <p className="font-semibold text-gray-900">{row.item_name}</p>
-                        <p className="text-xs text-gray-500">{formatDateTime(row.sales_at)}</p>
-                        <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-600">
-                          <p>Category: {row.category_name ?? "-"}</p>
-                          <p className="text-right">Qty: {row.quantity}</p>
-                          <p>Unit: {money(row.unit_price)}</p>
-                          <p className="text-right">Total: {money(row.total_price)}</p>
-                          <p>Method: {row.payment_method}</p>
-                          <p className="text-right">Location: {row.location_label}</p>
-                          <p className="col-span-2">Customer: {row.customer_name ?? "-"}</p>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  <div className="app-table-scroll hidden md:block">
-                    <table className="mt-4 w-full min-w-[900px] text-sm">
-                      <thead className="text-left text-gray-500">
-                        <tr>
-                          <th className="pb-2">Date & Time</th>
-                          <th className="pb-2">Category</th>
-                          <th className="pb-2">Item</th>
-                          <th className="pb-2">Qty</th>
-                          <th className="pb-2">Unit</th>
-                          <th className="pb-2">Total</th>
-                          <th className="pb-2">Method</th>
-                          <th className="pb-2">Location</th>
-                          <th className="pb-2">Customer</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {report.rows.map((row) => (
-                          <tr key={`${row.order_id}-${row.item_name}-${row.sales_at}`}>
-                            <td className="py-2 pr-3">{formatDateTime(row.sales_at)}</td>
-                            <td className="py-2 pr-3">{row.category_name ?? "-"}</td>
-                            <td className="py-2 pr-3">{row.item_name}</td>
-                            <td className="py-2 pr-3">{row.quantity}</td>
-                            <td className="py-2 pr-3">{money(row.unit_price)}</td>
-                            <td className="py-2 pr-3 font-medium">{money(row.total_price)}</td>
-                            <td className="py-2 pr-3">{row.payment_method}</td>
-                            <td className="py-2 pr-3">{row.location_label}</td>
-                            <td className="py-2 pr-3">{row.customer_name ?? "-"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </section>
+            )}
           </>
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+function MetricCard({ label, value, icon: Icon, color }: { label: string, value: string, icon: any, color: 'blue' | 'emerald' | 'amber' }) {
+  const styles = {
+    blue: "bg-blue-50 border-blue-100 text-blue-600",
+    emerald: "bg-emerald-50 border-emerald-100 text-emerald-600",
+    amber: "bg-amber-50 border-amber-100 text-amber-600"
+  };
+
+  return (
+    <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
+      <div>
+        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{label}</p>
+        <p className="text-4xl font-black text-slate-900 mt-2 tabular-nums">{value}</p>
+      </div>
+      <div className={`p-4 rounded-2xl ${styles[color]}`}>
+        <Icon className="h-8 w-8" />
+      </div>
+    </div>
+  );
+}
+
+function ReportTableSection({ title, items, type }: { title: string, items: any[], type: 'category' | 'payment' }) {
+  return (
+    <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full">
+      <div className="p-8 border-b border-slate-50">
+        <h2 className="text-xl font-black text-slate-900 tracking-tight">{title}</h2>
+      </div>
+      {items.length === 0 ? (
+        <EmptyState message={`No ${type} data found`} />
+      ) : (
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-left border-collapse">
+             <thead className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <tr>
+                  <th className="px-8 py-4">{type === 'category' ? 'Category' : 'Method'}</th>
+                  <th className="px-8 py-4 text-right">Count/Qty</th>
+                  <th className="px-8 py-4 text-right">Total Revenue</th>
+                </tr>
+             </thead>
+             <tbody className="divide-y divide-slate-50">
+                {items.map((item, i) => (
+                  <tr key={i} className="hover:bg-slate-50/30 transition-colors">
+                    <td className="px-8 py-5 font-bold text-slate-700">{type === 'category' ? item.category_name : item.payment_method}</td>
+                    <td className="px-8 py-5 text-right font-bold text-slate-500 tabular-nums">{type === 'category' ? item.total_quantity : item.payment_count}</td>
+                    <td className="px-8 py-5 text-right font-black text-slate-900 tabular-nums">{money(item.total_sales)}</td>
+                  </tr>
+                ))}
+             </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="p-20 text-center">
+      <div className="h-16 w-16 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
+        <FileText className="h-8 w-8" />
+      </div>
+      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{message}</p>
+    </div>
   );
 }

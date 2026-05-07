@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { 
+  Ticket, 
+  Search, 
+  History, 
+  CreditCard, 
+  Printer, 
+  Wallet, 
+  FileText, 
+  CheckCircle2, 
+  AlertCircle,
+  ArrowRight,
+  User,
+  Coffee,
+  MoreHorizontal
+} from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { getUser, normalizeRole } from "@/lib/auth";
@@ -16,16 +31,18 @@ import type {
   SettleSessionResponse,
 } from "@/types/billing";
 
-const METHODS: Array<{ value: BillPaymentMethod; label: string }> = [
-  { value: "cash", label: "Cash" },
-  { value: "card", label: "Card / POS" },
-  { value: "manual", label: "Manual" },
+const METHODS: Array<{ value: BillPaymentMethod; label: string; icon: any }> = [
+  { value: "cash", label: "Cash", icon: Wallet },
+  { value: "card", label: "Card / POS", icon: CreditCard },
+  { value: "manual", label: "Manual", icon: FileText },
 ];
+
 const TABS = [
-  { id: "table", label: "Table Billing" },
-  { id: "room", label: "Room Folio" },
-  { id: "folios", label: "Folio Queue" },
+  { id: "table", label: "Table Billing", icon: Coffee },
+  { id: "room", label: "Room Folio", icon: User },
+  { id: "folios", label: "Folio Queue", icon: History },
 ] as const;
+
 const FILTERS: Array<{ value: "all" | BillHandoffStatus; label: string }> = [
   { value: "all", label: "All" },
   { value: "none", label: "Fresh" },
@@ -38,24 +55,27 @@ type Tab = (typeof TABS)[number]["id"];
 type Mode = Extract<Tab, "table" | "room">;
 type ReceiptState = { summary: BillSummaryResponse; receipt: SettleSessionResponse };
 
-const cur = (value: number) => `$${value.toFixed(2)}`;
+const cur = (value: number) => `${value.toFixed(2)}`;
 const dt = (value: string | null | undefined) =>
-  value ? new Date(value).toLocaleString() : "Pending";
+  value ? new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : "Pending";
+
 const contextLabel = (type: BillContextType, table: string | null, room: string | null) =>
   type === "room" ? `Room ${room ?? "-"}` : `Table ${table ?? "-"}`;
+
+const handoffClass = (status: BillHandoffStatus) =>
+  ({
+    none: "bg-slate-100 text-slate-500",
+    sent_to_cashier: "bg-amber-100 text-amber-700",
+    sent_to_accountant: "bg-blue-100 text-blue-700",
+    completed: "bg-emerald-100 text-emerald-700",
+  })[status];
+
 const handoffLabel = (status: BillHandoffStatus) =>
   ({
     none: "Fresh",
     sent_to_cashier: "With Cashier",
     sent_to_accountant: "With Accountant",
     completed: "Completed",
-  })[status];
-const handoffClass = (status: BillHandoffStatus) =>
-  ({
-    none: "bg-slate-100 text-slate-700",
-    sent_to_cashier: "bg-amber-100 text-amber-800",
-    sent_to_accountant: "bg-sky-100 text-sky-800",
-    completed: "bg-emerald-100 text-emerald-800",
   })[status];
 
 function errorText(error: unknown, fallback: string): string {
@@ -126,37 +146,38 @@ function printInvoice(summary: BillSummaryResponse, receipt?: SettleSessionRespo
 function Alert({ tone, children }: { tone: "error" | "info" | "warning"; children: ReactNode }) {
   const cls =
     tone === "error"
-      ? "border-red-200 bg-red-50 text-red-700"
+      ? "border-rose-200 bg-rose-50 text-rose-700"
       : tone === "warning"
         ? "border-amber-200 bg-amber-50 text-amber-800"
-        : "border-sky-200 bg-sky-50 text-sky-800";
-  return <div className={`rounded-2xl border p-3 text-sm ${cls}`}>{children}</div>;
+        : "border-blue-200 bg-blue-50 text-blue-800";
+  return <div className={`rounded-2xl border p-4 text-sm font-medium ${cls}`}>{children}</div>;
 }
 
 function OrderCard({ order }: { order: BillOrder }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">#{order.order_number}</p>
-          <p className="text-xs text-slate-500">
-            {new Date(order.placed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </p>
+    <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xs">
+             #{order.order_number}
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order Reference</p>
+            <p className="text-xs font-bold text-slate-500">{new Date(order.placed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+          </div>
         </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-          {cur(order.total_amount)}
-        </span>
+        <div className="text-right">
+           <p className="text-lg font-black text-slate-900 tabular-nums">{cur(order.total_amount)}</p>
+        </div>
       </div>
       <div className="space-y-2">
         {order.items.map((item) => (
-          <div key={item.id} className="flex items-start justify-between gap-3 rounded-xl bg-slate-50 p-3 text-sm">
-            <div>
-              <p className="font-medium text-slate-800">{item.item_name_snapshot}</p>
-              <p className="text-xs text-slate-500">
-                {item.quantity} x {cur(item.unit_price_snapshot)}
-              </p>
+          <div key={item.id} className="flex items-center justify-between gap-4 p-3 bg-slate-50 rounded-2xl border border-white">
+            <div className="flex items-center gap-3">
+              <span className="h-6 w-6 bg-white border border-slate-100 text-slate-400 rounded-lg flex items-center justify-center text-[10px] font-black">{item.quantity}</span>
+              <p className="text-sm font-bold text-slate-700">{item.item_name_snapshot}</p>
             </div>
-            <span className="font-semibold text-slate-900">{cur(item.line_total)}</span>
+            <span className="text-sm font-black text-slate-900 tabular-nums">{cur(item.line_total)}</span>
           </div>
         ))}
       </div>
@@ -182,33 +203,63 @@ function FolioCard({
   const canCashier = ["owner", "admin", "steward"].includes(role) && bill.handoff_status === "none";
   const canAccountant = ["owner", "admin", "cashier"].includes(role) && bill.handoff_status === "sent_to_cashier";
   const canComplete = ["owner", "admin", "accountant"].includes(role) && bill.handoff_status === "sent_to_accountant";
+  
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{bill.bill_number}</p>
-          <h3 className="text-xl font-bold text-slate-900">
-            {contextLabel(bill.context_type, bill.table_number, bill.room_number)}
-          </h3>
-          <p className="font-mono text-xs text-slate-400">{bill.session_id}</p>
+    <article className="rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm hover:shadow-lg transition-all group">
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <div className="h-14 w-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-xl shadow-slate-200">
+             <Ticket className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+              {contextLabel(bill.context_type, bill.table_number, bill.room_number)}
+            </h3>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest ${handoffClass(bill.handoff_status)}`}>
+                {handoffLabel(bill.handoff_status)}
+              </span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{bill.bill_number}</span>
+            </div>
+          </div>
         </div>
         <div className="text-right">
-          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${handoffClass(bill.handoff_status)}`}>
-            {handoffLabel(bill.handoff_status)}
-          </span>
-          <p className="mt-2 text-lg font-bold text-slate-900">{cur(bill.total_amount)}</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Folio Amount</p>
+          <p className="text-2xl font-black text-slate-900 tabular-nums">{cur(bill.total_amount)}</p>
         </div>
       </div>
-      <div className="grid gap-2 text-sm sm:grid-cols-2">
-        <p><span className="text-slate-500">Payment:</span> {bill.payment_method ?? "manual"}</p>
-        <p><span className="text-slate-500">Settled:</span> {dt(bill.settled_at)}</p>
+      
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="p-3 bg-slate-50 rounded-2xl">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Payment Method</p>
+          <p className="text-xs font-bold text-slate-700 capitalize">{bill.payment_method ?? "manual"}</p>
+        </div>
+        <div className="p-3 bg-slate-50 rounded-2xl">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Settled At</p>
+          <p className="text-xs font-bold text-slate-700">{dt(bill.settled_at)}</p>
+        </div>
       </div>
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <button type="button" onClick={onOpen} className="app-btn-compact rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Open</button>
-        <button type="button" onClick={onPrint} className="app-btn-compact rounded-xl bg-slate-900 text-white hover:bg-slate-800">Print</button>
-        {canCashier && <button type="button" disabled={busy} onClick={() => onAction("cashier")} className="app-btn-compact rounded-xl bg-amber-500 text-white hover:bg-amber-600">Send to Cashier</button>}
-        {canAccountant && <button type="button" disabled={busy} onClick={() => onAction("accountant")} className="app-btn-compact rounded-xl bg-sky-600 text-white hover:bg-sky-700">Send to Accountant</button>}
-        {canComplete && <button type="button" disabled={busy} onClick={() => onAction("complete")} className="app-btn-compact rounded-xl bg-emerald-600 text-white hover:bg-emerald-700">Complete</button>}
+
+      <div className="flex flex-wrap gap-2">
+        <button onClick={onOpen} className="flex-1 min-w-[100px] py-3 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95">Open</button>
+        <button onClick={onPrint} className="px-4 py-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all">
+          <Printer className="h-4 w-4" />
+        </button>
+        {canCashier && (
+          <button disabled={busy} onClick={() => onAction("cashier")} className="px-6 py-3 bg-amber-100 text-amber-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-amber-200 transition-all disabled:opacity-50">
+            To Cashier
+          </button>
+        )}
+        {canAccountant && (
+          <button disabled={busy} onClick={() => onAction("accountant")} className="px-6 py-3 bg-blue-100 text-blue-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-200 transition-all disabled:opacity-50">
+            To Accountant
+          </button>
+        )}
+        {canComplete && (
+          <button disabled={busy} onClick={() => onAction("complete")} className="px-6 py-3 bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-200 transition-all disabled:opacity-50">
+            Complete
+          </button>
+        )}
       </div>
     </article>
   );
@@ -348,241 +399,260 @@ export default function Billing() {
 
   return (
     <DashboardLayout>
-      <div className="app-page-stack mx-auto max-w-7xl">
-        <div className="rounded-[28px] bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-800 p-6 text-white shadow-sm">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">Billing Workspace</p>
-              <h1 className="app-page-title">Table and Room Billing Settlement</h1>
-              <p className="app-body-text text-slate-300">
-                Handle table number billing, room number folios, invoice printing, and cashier to accountant handoff in one responsive view.
+      <div className="space-y-8 pb-20">
+        {/* Workspace Header */}
+        <div className="rounded-[3rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-8 text-white shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
+            <Ticket className="h-64 w-64" />
+          </div>
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-1 w-12 bg-emerald-500 rounded-full" />
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400">Financial Hub</p>
+              </div>
+              <h1 className="text-4xl lg:text-5xl font-black tracking-tight mb-4">Billing Workspace</h1>
+              <p className="text-slate-400 font-medium leading-relaxed">
+                Streamline guest checkouts, handle room folios, and manage financial handoffs between staff roles.
               </p>
-              <div className="flex flex-wrap gap-2 pt-2">
-                {["owner", "admin", "cashier"].includes(role) && (
-                  <Link
-                    to="/admin/billing/cashier"
-                    className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
-                  >
-                    Cashier Dashboard
-                  </Link>
-                )}
-                {["owner", "admin", "accountant"].includes(role) && (
-                  <Link
-                    to="/admin/billing/accountant"
-                    className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
-                  >
-                    Accountant Dashboard
-                  </Link>
-                )}
-              </div>
             </div>
-            <div className="w-full overflow-x-auto pb-1 lg:w-auto">
-              <div className="flex min-w-max gap-2">
-                {TABS.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setTab(item.id);
-                      if (item.id === "folios") resetState();
-                    }}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold ${tab === item.id ? "bg-white text-slate-900" : "bg-white/10 text-white hover:bg-white/15"}`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+            <div className="flex bg-white/5 backdrop-blur-md p-1.5 rounded-[2rem] border border-white/10 min-w-[320px]">
+              {TABS.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setTab(item.id);
+                    if (item.id === "folios") resetState();
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+                    tab === item.id ? "bg-white text-slate-900 shadow-xl" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <item.icon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{item.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
         {tab !== "folios" && (
-          <>
-            <form onSubmit={onLookup} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4">
-                <h2 className="app-section-title text-slate-900">{mode === "room" ? "Room billing lookup" : "Table billing lookup"}</h2>
-                <p className="app-muted-text text-slate-500">
-                  Search by room/table number first. You can also paste a full session ID or a short session prefix if needed.
-                </p>
-              </div>
-              <div className="app-form-grid items-end">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    {mode === "room" ? "Room Number / Session ID" : "Table Number / Session ID"}
-                  </label>
-                  <input
+          <div className="grid grid-cols-1 xl:grid-cols-[400px_1fr] gap-8 items-start">
+            {/* Lookup Section */}
+            <div className="space-y-6">
+              <form onSubmit={onLookup} className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
+                <div className="mb-6">
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">Lookup Session</h2>
+                  <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">Enter {mode} number</p>
+                </div>
+                <div className="relative group mb-4">
+                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-slate-900 transition-colors" />
+                   <input
                     type="text"
                     value={lookup}
-                    onChange={(event) => (mode === "room" ? setRoomLookup(event.target.value) : setTableLookup(event.target.value))}
-                    placeholder={mode === "room" ? "e.g. 101 or room session id" : "e.g. 4 or table session id"}
-                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                    onChange={(e) => mode === "room" ? setRoomLookup(e.target.value) : setTableLookup(e.target.value)}
+                    placeholder={mode === "room" ? "e.g. 101 or Room Session ID" : "e.g. 4 or Table Session ID"}
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 outline-none ring-2 ring-transparent focus:ring-slate-200 focus:bg-white transition-all"
                   />
                 </div>
-                <button type="submit" disabled={fetching || !lookup.trim()} className="app-btn-base w-full rounded-2xl bg-slate-900 text-white hover:bg-slate-800 sm:w-auto">
-                  {fetching ? "Loading..." : "Load Summary"}
+                <button 
+                  disabled={fetching || !lookup.trim()}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-[0.98] disabled:opacity-50"
+                >
+                  {fetching ? "Syncing..." : "Load Summary"}
                 </button>
-              </div>
-            </form>
+              </form>
 
-            {fetchError && <Alert tone="error">{fetchError}</Alert>}
+              {fetchError && <Alert tone="error">{fetchError}</Alert>}
 
-            {receipt && (
-              <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
-                <h2 className="app-section-title text-emerald-900">Settlement Complete</h2>
-                <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-                  <p><span className="text-emerald-800">Bill:</span> {receipt.receipt.bill_number}</p>
-                  <p><span className="text-emerald-800">Context:</span> {contextLabel(receipt.receipt.context_type, receipt.receipt.table_number, receipt.receipt.room_number)}</p>
-                  <p><span className="text-emerald-800">Orders:</span> {receipt.receipt.order_count}</p>
-                  <p><span className="text-emerald-800">Total:</span> {cur(receipt.receipt.total_amount)}</p>
-                </div>
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void api
-                        .post(`/billing/folios/${receipt.receipt.bill_id}/print`, {})
-                        .catch(() => null)
-                        .then(() => printInvoice(receipt.summary, receipt.receipt))
-                    }
-                    className="app-btn-base rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
-                  >
-                    Print Invoice
-                  </button>
-                  {receipt.receipt.context_type === "room" && <button type="button" onClick={() => setTab("folios")} className="app-btn-base rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Open Folio Queue</button>}
-                  <button type="button" onClick={resetState} className="app-btn-base rounded-2xl border border-emerald-300 bg-transparent text-emerald-900 hover:bg-emerald-100">Start Another Lookup</button>
-                </div>
-              </div>
-            )}
-
-            {summary && !receipt && (
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="space-y-5">
-                  <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-700 p-5 text-white shadow-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]">{summary.context_type === "room" ? "Room Folio" : "Table Billing"}</span>
-                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${summary.is_settled ? "bg-emerald-100 text-emerald-700" : summary.session_is_active ? "bg-blue-100 text-blue-700" : "bg-slate-200 text-slate-700"}`}>
-                        {summary.is_settled ? "Settled" : summary.session_is_active ? "Active" : "Closed"}
-                      </span>
-                      {summary.bill && summary.context_type === "room" && <span className={`rounded-full px-3 py-1 text-xs font-semibold ${handoffClass(summary.bill.handoff_status)}`}>{handoffLabel(summary.bill.handoff_status)}</span>}
+              {receipt && (
+                <div className="bg-emerald-600 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-emerald-200 animate-in zoom-in-95 duration-500">
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="h-12 w-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                       <CheckCircle2 className="h-6 w-6" />
                     </div>
-                    <h3 className="mt-3 text-2xl font-bold">{contextLabel(summary.context_type, summary.table_number, summary.room_number)}</h3>
-                    <p className="font-mono text-xs text-slate-300">{summary.session_id}</p>
-                  </div>
-
-                  {summary.is_settled && <Alert tone="info">This record is already settled. You can reprint the invoice or move to another lookup.</Alert>}
-                  {!summary.is_settled && summary.order_count === 0 && <Alert tone="warning">No completed orders are ready for settlement yet.</Alert>}
-
-                  <div className="space-y-4">
-                    {summary.orders.map((order) => <OrderCard key={order.id} order={order} />)}
-                  </div>
-                </div>
-
-                <div className="space-y-5">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span>{cur(summary.subtotal)}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Tax</span><span>{cur(summary.tax_amount)}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Discount</span><span>{cur(summary.discount_amount)}</span></div>
-                      <div className="flex justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-900"><span>Grand Total</span><span>{cur(summary.grand_total)}</span></div>
+                    <div>
+                       <h3 className="text-xl font-black tracking-tight leading-none">Settled Successfully</h3>
+                       <p className="text-emerald-100 text-[10px] font-black uppercase tracking-widest mt-1">Transaction Ref: {receipt.receipt.bill_number}</p>
                     </div>
                   </div>
+                  <div className="space-y-4 mb-8">
+                     <div className="flex justify-between border-b border-white/10 pb-2"><span className="text-emerald-100 text-xs font-bold">Orders</span><span className="font-black tabular-nums">{receipt.receipt.order_count}</span></div>
+                     <div className="flex justify-between border-b border-white/10 pb-2"><span className="text-emerald-100 text-xs font-bold">Total Settled</span><span className="font-black tabular-nums">{cur(receipt.receipt.total_amount)}</span></div>
+                  </div>
+                  <div className="space-y-3">
+                    <button 
+                      onClick={() => void api.post(`/billing/folios/${receipt.receipt.bill_id}/print`, {}).catch(() => null).then(() => printInvoice(receipt.summary, receipt.receipt))}
+                      className="w-full py-4 bg-white text-emerald-600 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-800/20 hover:bg-emerald-50 transition-all"
+                    >
+                      Print Receipt
+                    </button>
+                    <button onClick={resetState} className="w-full py-4 bg-white/10 text-white border border-white/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/20 transition-all">
+                      New Lookup
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
-                  {canSettle ? (
-                    <form onSubmit={onSettle} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                      <h2 className="text-lg font-semibold text-slate-900">Settlement</h2>
-                      <div className="mt-4 space-y-4">
-                        <div className="app-form-grid">
-                          {METHODS.map((item) => (
-                            <label key={item.value} className={`flex cursor-pointer items-center rounded-2xl border px-4 py-3 text-sm font-medium ${method === item.value ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-600"}`}>
-                              <input type="radio" className="sr-only" checked={method === item.value} onChange={() => setMethod(item.value)} />
-                              {item.label}
-                            </label>
-                          ))}
+            {/* Details Section */}
+            <div className="space-y-8">
+              {summary && !receipt && (
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 animate-in slide-in-from-right-8 duration-700">
+                  <div className="space-y-6">
+                     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm flex items-center justify-between">
+                        <div className="flex items-center gap-5">
+                           <div className="h-14 w-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400">
+                              {mode === 'room' ? <User className="h-6 w-6" /> : <Coffee className="h-6 w-6" />}
+                           </div>
+                           <div>
+                              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{contextLabel(summary.context_type, summary.table_number, summary.room_number)}</h3>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{summary.session_id}</p>
+                           </div>
                         </div>
-                        {(method === "card" || method === "manual") && (
-                          <input
-                            type="text"
-                            value={transactionRef}
-                            onChange={(event) => setTransactionRef(event.target.value)}
-                            placeholder="Transaction reference"
-                            className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-                          />
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${summary.is_settled ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                           {summary.is_settled ? 'Settled' : 'Unpaid Session'}
+                        </span>
+                     </div>
+
+                     <div className="space-y-4">
+                        {summary.orders.map((order) => <OrderCard key={order.id} order={order} />)}
+                        {summary.orders.length === 0 && (
+                          <div className="p-20 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100 text-center">
+                             <Coffee className="h-12 w-12 text-slate-100 mx-auto mb-4" />
+                             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No orders found for this session</p>
+                          </div>
                         )}
-                        <textarea
-                          rows={3}
-                          value={notes}
-                          onChange={(event) => setNotes(event.target.value)}
-                          placeholder="Settlement notes"
-                          className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-                        />
-                        {settleError && <Alert tone="error">{settleError}</Alert>}
-                        <div className="app-form-actions">
-                          <button type="submit" disabled={settling} className="app-btn-base w-full rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto">{settling ? "Processing..." : `Settle ${cur(summary.grand_total)}`}</button>
-                          <button type="button" onClick={resetState} className="app-btn-base w-full rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 sm:w-auto">Reset</button>
+                     </div>
+                  </div>
+
+                  {/* Payment Panel */}
+                  <div className="space-y-6 sticky top-8">
+                     <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
+                        <div className="space-y-4 mb-8">
+                           <div className="flex justify-between text-slate-400 text-xs font-bold"><span>Subtotal</span><span className="tabular-nums">{cur(summary.subtotal)}</span></div>
+                           <div className="flex justify-between text-slate-400 text-xs font-bold"><span>Tax & Service</span><span className="tabular-nums">{cur(summary.tax_amount)}</span></div>
+                           <div className="flex justify-between text-rose-400 text-xs font-bold"><span>Discount</span><span className="tabular-nums">-{cur(summary.discount_amount)}</span></div>
+                           <div className="h-px bg-slate-800 my-2" />
+                           <div className="flex justify-between items-center pt-2">
+                              <span className="text-xs font-black uppercase tracking-widest text-slate-500">Total Due</span>
+                              <span className="text-3xl font-black tabular-nums">{cur(summary.grand_total)}</span>
+                           </div>
                         </div>
-                      </div>
-                    </form>
-                  ) : (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <div className="flex flex-col gap-3">
-                        {summary.is_settled && summary.bill && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void api
-                                .post(`/billing/folios/${summary.bill!.id}/print`, {})
-                                .catch(() => null)
-                                .then(() => printInvoice(summary))
-                            }
-                            className="app-btn-base rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
-                          >
-                            Print Invoice
-                          </button>
+
+                        {canSettle ? (
+                          <form onSubmit={onSettle} className="space-y-6">
+                            <div className="space-y-3">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 px-1">Payment Method</p>
+                              <div className="grid grid-cols-1 gap-2">
+                                {METHODS.map((m) => (
+                                  <button
+                                    key={m.value}
+                                    type="button"
+                                    onClick={() => setMethod(m.value)}
+                                    className={`flex items-center justify-between px-5 py-4 rounded-2xl border transition-all ${
+                                      method === m.value ? 'bg-white border-white text-slate-900 shadow-xl' : 'bg-slate-800 border-slate-700 text-slate-400'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                       <m.icon className="h-4 w-4" />
+                                       <span className="text-sm font-bold">{m.label}</span>
+                                    </div>
+                                    {method === m.value && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <textarea
+                              rows={2}
+                              value={notes}
+                              onChange={(e) => setNotes(e.target.value)}
+                              placeholder="Notes / Internal remarks..."
+                              className="w-full px-5 py-4 bg-slate-800 border-none rounded-2xl text-sm font-medium text-white placeholder-slate-600 outline-none focus:bg-slate-700 transition-all"
+                            />
+
+                            {settleError && <Alert tone="error">{settleError}</Alert>}
+
+                            <button
+                              disabled={settling}
+                              className="w-full py-5 bg-emerald-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-900/40 hover:bg-emerald-400 transition-all active:scale-[0.98] disabled:opacity-50"
+                            >
+                              {settling ? "Processing..." : `Settle Payment`}
+                            </button>
+                          </form>
+                        ) : (
+                          <div className="space-y-3">
+                             {summary.is_settled && summary.bill && (
+                                <button 
+                                  onClick={() => void api.post(`/billing/folios/${summary.bill!.id}/print`, {}).catch(() => null).then(() => printInvoice(summary))}
+                                  className="w-full py-4 bg-white text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-slate-50 transition-all"
+                                >
+                                  Reprint Invoice
+                                </button>
+                             )}
+                             <button onClick={resetState} className="w-full py-4 bg-white/10 text-white border border-white/20 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/20 transition-all">
+                                New Lookup
+                             </button>
+                          </div>
                         )}
-                        {summary.is_settled && summary.context_type === "room" && <button type="button" onClick={() => setTab("folios")} className="app-btn-base rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Open Folio Queue</button>}
-                        <button type="button" onClick={resetState} className="app-btn-base rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Start Another Lookup</button>
-                      </div>
-                    </div>
-                  )}
+                     </div>
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
+              )}
+
+              {!summary && !receipt && (
+                 <div className="py-40 flex flex-col items-center justify-center bg-white rounded-[3rem] border border-slate-100 shadow-sm opacity-60">
+                    <div className="h-24 w-24 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-8">
+                       <Ticket className="h-10 w-10 text-slate-200" />
+                    </div>
+                    <p className="text-2xl font-black text-slate-900 tracking-tight">Financial Terminal Idle</p>
+                    <p className="text-sm text-slate-400 mt-2 font-medium">Load a session to start billing operations</p>
+                 </div>
+              )}
+            </div>
+          </div>
         )}
 
         {tab === "folios" && (
-          <div className="space-y-5">
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <h2 className="app-section-title text-slate-900">Room Folio Queue</h2>
-                  <p className="app-muted-text text-slate-500">Review settled room invoices, print again, and move them through cashier and accountant checkpoints.</p>
-                </div>
-                <div className="w-full overflow-x-auto pb-1 lg:w-auto">
-                  <div className="flex min-w-max gap-2">
-                    {FILTERS.map((item) => (
-                      <button key={item.value} type="button" onClick={() => setFilter(item.value)} className={`rounded-full px-4 py-2 text-sm font-semibold ${filter === item.value ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-                        {item.label}
-                      </button>
-                    ))}
-                    <button type="button" onClick={() => void loadFolios()} className="app-btn-base rounded-2xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">Refresh</button>
-                  </div>
-                </div>
+          <div className="space-y-8 animate-in fade-in duration-700">
+            {/* Folio Filters */}
+            <div className="bg-white rounded-[2.5rem] border border-slate-100 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex p-1 bg-slate-50 rounded-2xl">
+                 {FILTERS.map((f) => (
+                    <button
+                      key={f.value}
+                      onClick={() => setFilter(f.value)}
+                      className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                        filter === f.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                 ))}
               </div>
+              <button 
+                onClick={() => void loadFolios()}
+                disabled={folioLoading}
+                className="px-6 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95"
+              >
+                {folioLoading ? "Syncing..." : "Refresh Queue"}
+              </button>
             </div>
 
             {folioError && <Alert tone="error">{folioError}</Alert>}
             {folioActionError && <Alert tone="error">{folioActionError}</Alert>}
 
-            {folioLoading ? (
-              <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">Loading folio queue...</div>
-            ) : folios.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
-                <h3 className="text-lg font-semibold text-slate-900">No room folios found</h3>
-                <p className="mt-2 text-sm text-slate-500">Settled room bills will appear here for printing and handoff review.</p>
+            {folios.length === 0 && !folioLoading ? (
+              <div className="py-40 flex flex-col items-center justify-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
+                <div className="h-24 w-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mb-8">
+                   <History className="h-10 w-10 text-slate-200" />
+                </div>
+                <p className="text-2xl font-black text-slate-900 tracking-tight">Folio queue is empty</p>
+                <p className="text-sm text-slate-400 mt-2 font-medium px-6 text-center">Settled room invoices will appear here for processing</p>
               </div>
             ) : (
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {folios.map((bill) => (
                   <FolioCard
                     key={bill.id}

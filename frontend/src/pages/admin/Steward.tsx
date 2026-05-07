@@ -1,9 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-
+import { 
+  Activity, 
+  CheckCircle2, 
+  Clock, 
+  MessageSquare, 
+  MoreVertical, 
+  Package, 
+  PlayCircle, 
+  Printer, 
+  AlertCircle,
+  XCircle,
+  CheckCircle,
+  ChefHat
+} from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
-import KitchenOrderSection from "@/components/shared/KitchenOrderSection";
+import OrderCard from "@/components/shared/OrderCard";
 import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -14,57 +27,25 @@ import type {
 } from "@/types/realtime";
 import type {
   KitchenOrderCard,
-  KitchenOrderItemSummary,
   KitchenOrderListResponse,
+  OrderStatus
 } from "@/types/order";
 
 const STEWARD_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
-const POLL_INTERVAL_MS = 6000;
+const POLL_INTERVAL_MS = 30000; // Polling as fallback only
 const SERVED_STORAGE_TTL_MS = 12 * 60 * 60 * 1000;
 
-
-
-type StewardTab = "awaiting" | "ready";
-type SourceFilter = "all" | "table" | "room";
-
-interface StoredServedState {
-  [orderId: string]: number;
-}
-
-function orderCardFromEvent(data: NewOrderEvent["data"]): KitchenOrderCard {
-  const items: KitchenOrderItemSummary[] = data.items.map((item, index) => ({
-    id: index,
-    item_id: 0,
-    item_name_snapshot: item.item_name_snapshot,
-    quantity: item.quantity,
-    unit_price_snapshot: item.quantity > 0 ? item.line_total / item.quantity : 0,
-    line_total: item.line_total,
-  }));
-
-  return {
-    id: data.order_id,
-    order_number: data.order_number,
-    table_number: data.table_number,
-    customer_name: null,
-    customer_phone: null,
-    status: "pending",
-    total_amount: data.total_amount,
-    placed_at: data.placed_at,
-    confirmed_at: null,
-    processing_at: null,
-    completed_at: null,
-    rejected_at: null,
-    notes: null,
-    items,
-    order_source: data.order_source,
-    room_id: data.room_id,
-    room_number: data.room_number,
-  };
+interface ActivityItem {
+  id: string;
+  message: string;
+  timestamp: string;
+  type: 'order' | 'request' | 'system';
+  level?: 'info' | 'urgent';
 }
 
 function playNotificationTone() {
   try {
-    const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
 
     const audioContext = new AudioCtx();
@@ -73,72 +54,20 @@ function playNotificationTone() {
 
     oscillator.type = "sine";
     oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-    gainNode.gain.setValueAtTime(0.08, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.25);
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
 
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
 
     oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.25);
+    oscillator.stop(audioContext.currentTime + 0.3);
     oscillator.onended = () => {
       void audioContext.close();
     };
   } catch {
-    // Audio notification is best-effort only.
+    // Best effort
   }
-}
-
-function sourceMatches(order: KitchenOrderCard, sourceFilter: SourceFilter): boolean {
-  if (sourceFilter === "all") return true;
-  if (sourceFilter === "room") return order.order_source === "room";
-  return order.order_source !== "room";
-}
-
-function locationMatches(order: KitchenOrderCard, locationFilter: string): boolean {
-  const filter = locationFilter.trim().toLowerCase();
-  if (!filter) return true;
-
-  const haystack = [
-    order.order_number,
-    order.table_number ?? "",
-    order.room_number ?? "",
-    order.customer_name ?? "",
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  return haystack.includes(filter);
-}
-
-function loadServedOrderIds(storageKey: string | null): Set<number> {
-  if (!storageKey) return new Set();
-
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return new Set();
-
-    const parsed = JSON.parse(raw) as StoredServedState;
-    const now = Date.now();
-    const filteredEntries = Object.entries(parsed).filter(([, ts]) => now - ts <= SERVED_STORAGE_TTL_MS);
-    localStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(filteredEntries)));
-
-    return new Set(filteredEntries.map(([id]) => Number(id)).filter((id) => Number.isFinite(id)));
-  } catch {
-    return new Set();
-  }
-}
-
-function persistServedOrderIds(storageKey: string | null, servedOrderIds: Set<number>) {
-  if (!storageKey) return;
-
-  const now = Date.now();
-  const payload: StoredServedState = {};
-  servedOrderIds.forEach((id) => {
-    payload[String(id)] = now;
-  });
-
-  localStorage.setItem(storageKey, JSON.stringify(payload));
 }
 
 export default function Steward() {
@@ -151,512 +80,452 @@ export default function Steward() {
 
   return (
     <DashboardLayout>
-      <StewardDashboard restaurantId={user.restaurant_id} />
+      <LiveOperationsDashboard restaurantId={user.restaurant_id} />
     </DashboardLayout>
   );
 }
 
-interface StewardDashboardProps {
-  restaurantId: number | null;
-}
-
-function StewardDashboard({ restaurantId }: StewardDashboardProps) {
-  const canAccessSteward = Boolean(restaurantId);
-
+function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null }) {
   const servedStorageKey = useMemo(
     () => (restaurantId ? `steward_served_orders_${restaurantId}` : null),
     [restaurantId]
   );
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [pendingOrders, setPendingOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
-  const [readyOrders, setReadyOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
-  const [servedOrderIds, setServedOrderIds] = useState<Set<number>>(() => loadServedOrderIds(servedStorageKey));
-
-  const [activeTab, setActiveTab] = useState<StewardTab>(() => {
-    const tab = searchParams.get("tab") as StewardTab;
-    return (tab === "awaiting" || tab === "ready") ? tab : "awaiting";
-  });
-  
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [locationFilter, setLocationFilter] = useState("");
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const isInternalScrollRef = useRef(false);
-
-  const handleTabChange = useCallback((tab: StewardTab) => {
-    setActiveTab(tab);
-    setSearchParams({ tab }, { replace: true });
-  }, [setSearchParams]);
-
-  const tabIndex = useMemo(() => {
-    if (activeTab === "awaiting") return 0;
-    return 1;
-  }, [activeTab]);
-
-  // Handle programmatic tab changes (button clicks)
-  useEffect(() => {
-    if (scrollRef.current && !isInternalScrollRef.current) {
-      const container = scrollRef.current;
-      const width = container.clientWidth;
-      container.scrollTo({
-        left: width * tabIndex,
-        behavior: "smooth",
-      });
-    }
-    isInternalScrollRef.current = false;
-  }, [tabIndex]);
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const container = e.currentTarget;
-    const scrollLeft = container.scrollLeft;
-    const width = container.clientWidth;
-    if (width <= 0) return;
-
-    const index = Math.round(scrollLeft / width);
-    const tabs: StewardTab[] = ["awaiting", "ready"];
-    const targetTab = tabs[index];
-
-    if (targetTab && targetTab !== activeTab) {
-      isInternalScrollRef.current = true;
-      handleTabChange(targetTab);
-    }
-  };
-
-  // Sync state if URL changes (e.g. sidebar link click)
-  useEffect(() => {
-    const tab = searchParams.get("tab") as StewardTab;
-    if (tab && (tab === "awaiting" || tab === "ready") && tab !== activeTab) {
-      setActiveTab(tab);
-    }
-  }, [searchParams, activeTab]);
-
-
-
+  const [orders, setOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
+  const [servedOrderIds, setServedOrderIds] = useState<Set<number>>(new Set());
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionLoadingId, setActionLoadingId] = useState<number | string | null>(null);
-  const [alert, setAlert] = useState<string | null>(null);
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [alert, setAlert] = useState<{ message: string; type: 'info' | 'urgent' } | null>(null);
 
-  const alertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastPendingCountRef = useRef<number | null>(null);
-
+  // Load served order IDs from localStorage
   useEffect(() => {
-    setServedOrderIds(loadServedOrderIds(servedStorageKey));
+    if (!servedStorageKey) return;
+    try {
+      const raw = localStorage.getItem(servedStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const now = Date.now();
+        const filtered = Object.entries(parsed)
+          .filter(([, ts]) => now - (ts as number) <= SERVED_STORAGE_TTL_MS)
+          .map(([id]) => Number(id));
+        setServedOrderIds(new Set(filtered));
+      }
+    } catch { /* ignore */ }
   }, [servedStorageKey]);
 
+  // Persist served order IDs
   useEffect(() => {
-    persistServedOrderIds(servedStorageKey, servedOrderIds);
+    if (!servedStorageKey) return;
+    const now = Date.now();
+    const payload: Record<string, number> = {};
+    servedOrderIds.forEach(id => payload[String(id)] = now);
+    localStorage.setItem(servedStorageKey, JSON.stringify(payload));
   }, [servedOrderIds, servedStorageKey]);
 
-  useEffect(() => {
-    return () => {
-      if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+  const addActivity = useCallback((message: string, type: ActivityItem['type'], level: ActivityItem['level'] = 'info') => {
+    const item: ActivityItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      message,
+      timestamp: new Date().toISOString(),
+      type,
+      level
     };
+    setActivities(prev => [item, ...prev].slice(0, 50));
   }, []);
 
-  const showAlert = useCallback((message: string, withSound = false) => {
-    if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
-    setAlert(message);
-    alertTimerRef.current = setTimeout(() => setAlert(null), 8000);
-    if (withSound) playNotificationTone();
-  }, []);
+  const loadData = useCallback(async (silent = false) => {
+    if (!restaurantId) return;
+    if (!silent) setLoading(true);
+    try {
+      const [pending, processing, completed] = await Promise.all([
+        api.get<KitchenOrderListResponse>("/orders/pending"),
+        api.get<KitchenOrderListResponse>("/orders/processing"),
+        api.get<KitchenOrderListResponse>("/orders/completed"),
+      ]);
 
-  const loadData = useCallback(
-    async (silent = false, notifyIfIncreased = false) => {
-      if (!restaurantId || !canAccessSteward) {
-        setLoading(false);
-        return;
-      }
-
-      if (silent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      setLoadError(null);
-
-      try {
-        const [pendingRes, completedRes] = await Promise.all([
-          api.get<KitchenOrderListResponse>("/orders/pending"),
-          api.get<KitchenOrderListResponse>("/orders/completed"),
-        ]);
-
-        const nextPending = new Map<number, KitchenOrderCard>();
-        for (const order of pendingRes.orders) {
-          nextPending.set(order.id, order);
-        }
-
-        const nextReady = new Map<number, KitchenOrderCard>();
-        for (const order of completedRes.orders) {
-          if (!servedOrderIds.has(order.id)) {
-            nextReady.set(order.id, order);
-          }
-        }
-
-        setPendingOrders(nextPending);
-        setReadyOrders(nextReady);
-
-        if (
-          notifyIfIncreased &&
-          lastPendingCountRef.current !== null &&
-          nextPending.size > lastPendingCountRef.current
-        ) {
-          showAlert("New pending orders arrived.", true);
-        }
-
-        lastPendingCountRef.current = nextPending.size;
-      } catch (err) {
-        if (err instanceof ApiError) {
-          setLoadError(err.detail || "Failed to load steward orders.");
-        } else {
-          setLoadError("Failed to load steward orders.");
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [canAccessSteward, restaurantId, servedOrderIds, showAlert]
-  );
+      const map = new Map<number, KitchenOrderCard>();
+      [...pending.orders, ...processing.orders, ...completed.orders].forEach(o => map.set(o.id, o));
+      setOrders(map);
+    } catch (err) {
+      console.error("Failed to load operations data", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [restaurantId]);
 
   useEffect(() => {
     void loadData();
+    const interval = setInterval(() => void loadData(true), POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
   }, [loadData]);
 
-  useEffect(() => {
-    if (!canAccessSteward) return;
-    const interval = setInterval(() => {
-      void loadData(true, true);
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [canAccessSteward, loadData]);
+  const handleNewOrder = useCallback((event: NewOrderEvent) => {
+    playNotificationTone();
+    const orderNum = event.data.order_number;
+    const location = event.data.order_source === 'room' ? `Room ${event.data.room_number}` : `Table ${event.data.table_number}`;
+    addActivity(`${location} placed a new order #${orderNum}`, 'order', 'urgent');
+    setAlert({ message: `New Order #${orderNum} from ${location}`, type: 'urgent' });
+    setTimeout(() => setAlert(null), 8000);
+    void loadData(true);
+  }, [addActivity, loadData]);
 
-  const handleNewOrder = useCallback(
-    (event: NewOrderEvent) => {
-      const order = orderCardFromEvent(event.data);
-
-      setPendingOrders((prev) => {
-        const next = new Map(prev);
-        if (!next.has(order.id)) {
-          showAlert(`New order ${order.order_number} requires confirmation.`, true);
-        }
-        next.set(order.id, order);
-        lastPendingCountRef.current = next.size;
-        return next;
-      });
-    },
-    [showAlert]
-  );
-
-  const handleStatusUpdate = useCallback(
-    (event: OrderStatusUpdatedEvent) => {
-      const { order_id, status, updated_at } = event.data;
-
-      setPendingOrders((prev) => {
-        if (!prev.has(order_id)) return prev;
-        const next = new Map(prev);
-        if (status !== "pending") {
-          next.delete(order_id);
-        }
-        lastPendingCountRef.current = next.size;
-        return next;
-      });
-
-      setReadyOrders((prev) => {
-        const next = new Map(prev);
-
-        if (status === "completed") {
-          const current = next.get(order_id);
-          if (current) {
-            next.set(order_id, { ...current, status: "completed", completed_at: updated_at });
-          }
-        }
-
-        if (status === "paid" || status === "rejected") {
-          next.delete(order_id);
-        }
-
-        return next;
-      });
-
-      if (status === "completed") {
-        void loadData(true);
+  const handleStatusUpdate = useCallback((event: OrderStatusUpdatedEvent) => {
+    const { order_id, status } = event.data;
+    const order = orders.get(order_id);
+    if (order) {
+      if (status === 'completed') {
+        playNotificationTone();
+        addActivity(`Order #${order.order_number} is READY for service!`, 'order', 'info');
       }
-    },
-    [loadData]
-  );
+    }
+    void loadData(true);
+  }, [addActivity, loadData, orders]);
 
-  const { isConnected, connectionError } = useKitchenSocket({
+  const { isConnected } = useKitchenSocket({
     restaurantId,
     onNewOrder: handleNewOrder,
     onStatusUpdate: handleStatusUpdate,
+    onServiceRequested: (ev) => {
+      playNotificationTone();
+      addActivity(`${ev.data.location_label} requested ${ev.data.service_type}`, 'request', 'urgent');
+    }
   });
 
-
-
-
-
-  const handlePendingAction = useCallback(async (orderId: number, newStatus: string) => {
+  const handleAction = async (orderId: number, status: string) => {
     setActionLoadingId(orderId);
-    setActionError(null);
-
     try {
-      await api.patch(`/orders/${orderId}/status`, { status: newStatus });
-
-      setPendingOrders((prev) => {
-        const next = new Map(prev);
-        next.delete(orderId);
-        lastPendingCountRef.current = next.size;
-        return next;
-      });
+      await api.patch(`/orders/${orderId}/status`, { status });
+      void loadData(true);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setActionError(err.detail || "Failed to update order.");
-      } else {
-        setActionError("Failed to update order.");
-      }
+      console.error("Action failed", err);
     } finally {
       setActionLoadingId(null);
     }
-  }, []);
+  };
 
-  const handleMarkServed = useCallback((orderId: number) => {
-    setServedOrderIds((prev) => {
-      const next = new Set(prev);
-      next.add(orderId);
-      return next;
-    });
-    setReadyOrders((prev) => {
-      const next = new Map(prev);
-      next.delete(orderId);
-      return next;
-    });
-  }, []);
+  const markServed = (orderId: number) => {
+    setServedOrderIds(prev => new Set(prev).add(orderId));
+  };
 
-  const filteredPendingOrders = useMemo(() => {
-    return Array.from(pendingOrders.values())
-      .filter((order) => sourceMatches(order, sourceFilter))
-      .filter((order) => locationMatches(order, locationFilter))
-      .sort((a, b) => new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime());
-  }, [locationFilter, pendingOrders, sourceFilter]);
+  const metrics = useMemo(() => {
+    const all = Array.from(orders.values());
+    const served = all.filter(o => servedOrderIds.has(o.id)).length;
+    return {
+      pending: all.filter(o => o.status === 'pending').length,
+      preparing: all.filter(o => o.status === 'confirmed' || o.status === 'processing').length,
+      ready: all.filter(o => o.status === 'completed' && !servedOrderIds.has(o.id)).length,
+      delivered: served,
+      rejected: all.filter(o => o.status === 'rejected').length
+    };
+  }, [orders, servedOrderIds]);
 
-  const filteredReadyOrders = useMemo(() => {
-    return Array.from(readyOrders.values())
-      .filter((order) => sourceMatches(order, sourceFilter))
-      .filter((order) => locationMatches(order, locationFilter))
-      .sort(
-        (a, b) =>
-          new Date(b.completed_at ?? b.placed_at).getTime() -
-          new Date(a.completed_at ?? a.placed_at).getTime()
-      );
-  }, [locationFilter, readyOrders, sourceFilter]);
+  const columns = useMemo(() => {
+    const all = Array.from(orders.values());
+    return {
+      new: all.filter(o => o.status === 'pending'),
+      cooking: all.filter(o => o.status === 'confirmed' || o.status === 'processing'),
+      ready: all.filter(o => o.status === 'completed' && !servedOrderIds.has(o.id))
+    };
+  }, [orders, servedOrderIds]);
 
-  const awaitingTableOrders = useMemo(
-    () => filteredPendingOrders.filter((order) => order.order_source !== "room"),
-    [filteredPendingOrders]
-  );
-  const awaitingRoomOrders = useMemo(
-    () => filteredPendingOrders.filter((order) => order.order_source === "room"),
-    [filteredPendingOrders]
-  );
-  const readyTableOrders = useMemo(
-    () => filteredReadyOrders.filter((order) => order.order_source !== "room"),
-    [filteredReadyOrders]
-  );
-  const readyRoomOrders = useMemo(
-    () => filteredReadyOrders.filter((order) => order.order_source === "room"),
-    [filteredReadyOrders]
-  );
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-500">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3" />
+        Loading Operations...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* Sticky Header with Alert */}
+      {alert && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md animate-in fade-in slide-in-from-top-4 duration-300`}>
+          <div className={`mx-4 rounded-xl border p-4 shadow-2xl flex items-center gap-3 ${alert.type === 'urgent' ? 'bg-red-600 text-white border-red-500' : 'bg-blue-600 text-white border-blue-500'}`}>
+            {alert.type === 'urgent' ? <AlertCircle className="h-6 w-6 animate-bounce" /> : <CheckCircle2 className="h-6 w-6" />}
+            <span className="font-bold flex-1">{alert.message}</span>
+            <button onClick={() => setAlert(null)} className="p-1 hover:bg-white/20 rounded">
+              <XCircle className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <MetricCard label="New" value={metrics.pending} icon={Package} color="amber" />
+        <MetricCard label="Cooking" value={metrics.preparing} icon={ChefHat} color="blue" />
+        <MetricCard label="Ready" value={metrics.ready} icon={CheckCircle} color="green" />
+        <MetricCard label="Served" value={metrics.delivered} icon={CheckCircle2} color="slate" />
+        <MetricCard label="Rejected" value={metrics.rejected} icon={XCircle} color="red" />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
+        {/* Kanban Board */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
+          {/* New Orders */}
+          <KanbanColumn title="New Orders" count={columns.new.length} color="amber">
+            {columns.new.map(order => (
+              <OperationCard 
+                key={order.id} 
+                order={order} 
+                onAction={handleAction} 
+                loading={actionLoadingId === order.id}
+              />
+            ))}
+          </KanbanColumn>
+
+          {/* Cooking */}
+          <KanbanColumn title="Cooking" count={columns.cooking.length} color="blue">
+            {columns.cooking.map(order => (
+              <OperationCard 
+                key={order.id} 
+                order={order} 
+                onAction={handleAction} 
+                loading={actionLoadingId === order.id}
+              />
+            ))}
+          </KanbanColumn>
+
+          {/* Ready */}
+          <KanbanColumn title="Ready" count={columns.ready.length} color="green">
+            {columns.ready.map(order => (
+              <OperationCard 
+                key={order.id} 
+                order={order} 
+                loading={actionLoadingId === order.id}
+                onAction={handleAction}
+                renderActions={() => (
+                  <button 
+                    onClick={() => markServed(order.id)}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-95"
+                  >
+                    <CheckCircle2 className="h-5 w-5" />
+                    Mark Served
+                  </button>
+                )}
+              />
+            ))}
+          </KanbanColumn>
+        </div>
+
+        {/* Sidebar Activity Feed */}
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-320px)] sticky top-6">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 flex items-center gap-2 text-sm uppercase tracking-wider">
+                <Activity className="h-4 w-4 text-blue-600" />
+                Activity Feed
+              </h3>
+              <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+              {activities.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No recent activities
+                </div>
+              ) : (
+                activities.map(item => (
+                  <div key={item.id} className={`flex gap-3 text-sm animate-in fade-in slide-in-from-right-2 duration-300`}>
+                    <div className={`mt-0.5 h-8 w-8 rounded-full shrink-0 flex items-center justify-center ${
+                      item.type === 'order' ? 'bg-blue-100 text-blue-600' : 
+                      item.type === 'request' ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {item.type === 'order' ? <Package className="h-4 w-4" /> : 
+                       item.type === 'request' ? <MessageSquare className="h-4 w-4" /> : <Activity className="h-4 w-4" />}
+                    </div>
+                    <div>
+                      <p className={`font-medium leading-tight ${item.level === 'urgent' ? 'text-slate-900' : 'text-slate-700'}`}>
+                        {item.message}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ label, value, icon: Icon, color }: { label: string, value: number, icon: any, color: string }) {
+  const colors: Record<string, string> = {
+    amber: "text-amber-600 bg-amber-50 border-amber-100",
+    blue: "text-blue-600 bg-blue-50 border-blue-100",
+    green: "text-green-600 bg-green-50 border-green-100",
+    slate: "text-slate-600 bg-slate-50 border-slate-100",
+    red: "text-red-600 bg-red-50 border-red-100"
+  };
+
+  return (
+    <div className={`rounded-2xl border p-4 shadow-sm flex items-center justify-between bg-white transition-all hover:shadow-md ${colors[color] || colors.slate}`}>
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider opacity-70">{label}</p>
+        <p className="text-2xl font-black mt-1 tabular-nums">{value}</p>
+      </div>
+      <div className={`p-2.5 rounded-xl ${colors[color].replace('border-', 'bg-opacity-20 ')}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+    </div>
+  );
+}
+
+function KanbanColumn({ title, count, color, children }: { title: string, count: number, color: string, children: React.ReactNode }) {
+  const colors: Record<string, string> = {
+    amber: "border-amber-500",
+    blue: "border-blue-500",
+    green: "border-green-500"
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50/50 rounded-2xl border border-slate-100 overflow-hidden">
+      <div className={`p-4 border-t-4 ${colors[color]} flex items-center justify-between bg-white`}>
+        <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">{title}</h3>
+        <span className="bg-slate-100 px-2 py-0.5 rounded-lg text-xs font-bold text-slate-600">{count}</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbar">
+        {count === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 opacity-30 text-slate-400">
+            <Package className="h-12 w-12 mb-2 stroke-1" />
+            <p className="text-sm font-medium">Empty</p>
+          </div>
+        ) : children}
+      </div>
+    </div>
+  );
+}
+
+function OperationCard({ order, onAction, loading, renderActions }: { 
+  order: KitchenOrderCard, 
+  onAction: (id: number, status: string) => void, 
+  loading: boolean,
+  renderActions?: () => React.ReactNode
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const timeInQueue = Math.floor((Date.now() - new Date(order.placed_at).getTime()) / 60000);
+  const isUrgent = timeInQueue > 15 && order.status !== 'completed';
+
+  const statusColors: Record<string, string> = {
+    pending: "bg-amber-100 text-amber-700",
+    confirmed: "bg-blue-100 text-blue-700",
+    processing: "bg-indigo-100 text-indigo-700",
+    completed: "bg-green-100 text-green-700",
+    rejected: "bg-red-100 text-red-700"
+  };
+
+  return (
+    <div className={`bg-white rounded-xl border shadow-sm transition-all overflow-hidden ${isUrgent ? 'border-red-300 ring-2 ring-red-50' : 'border-slate-200'}`}>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Steward Dashboard</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Confirm incoming orders quickly and manage the ready-to-serve queue.
+            <div className="flex items-center gap-2">
+              <h4 className="font-black text-slate-900">#{order.order_number}</h4>
+              {isUrgent && <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-black uppercase animate-pulse">Late</span>}
+            </div>
+            <p className="text-sm font-bold text-slate-600 mt-0.5">
+              {order.order_source === 'room' ? `Room ${order.room_number}` : `Table ${order.table_number}`}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void loadData(true)}
-            disabled={loading || refreshing}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {refreshing ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold ${
-              isConnected ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-slate-400"}`} />
-            {isConnected ? "Live" : "Polling every 3s"}
-          </span>
-          <span className="text-slate-500">Awaiting: {pendingOrders.size}</span>
-          <span className="text-slate-500">Ready to Serve: {readyOrders.size}</span>
-        </div>
-      </div>
-
-      {alert && (
-        <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-medium text-orange-800">
-          {alert}
-        </div>
-      )}
-
-      {connectionError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {connectionError}
-        </div>
-      )}
-
-      {actionError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {actionError}
-        </div>
-      )}
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => handleTabChange("awaiting")}
-            className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-              activeTab === "awaiting"
-                ? "bg-blue-600 text-white shadow-lg shadow-blue-100"
-                : "bg-blue-50 text-blue-700 hover:bg-blue-100/50"
-            }`}
-          >
-            <span>Awaiting</span>
-            <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "awaiting" ? "bg-white/20" : "bg-blue-200/50"}`}>
-              {pendingOrders.size}
+          <div className="flex flex-col items-end gap-1">
+             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${statusColors[order.status]}`}>
+              {order.status}
             </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTabChange("ready")}
-            className={`flex flex-1 min-w-[140px] items-center justify-between rounded-lg px-4 py-3 text-sm font-bold transition-all ${
-              activeTab === "ready"
-                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-100"
-                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100/50"
-            }`}
-          >
-            <span>Ready</span>
-            <span className={`rounded-md px-2 py-0.5 text-xs ${activeTab === "ready" ? "bg-white/20" : "bg-emerald-200/50"}`}>
-              {readyOrders.size}
-            </span>
-          </button>
-        </div>
-
-        <div className="h-px bg-slate-100 mx-1" />
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <select
-            value={sourceFilter}
-            onChange={(event) => setSourceFilter(event.target.value as SourceFilter)}
-            className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-slate-50/50"
-          >
-            <option value="all">All Sources</option>
-            <option value="table">Table Orders</option>
-            <option value="room">Room Orders</option>
-          </select>
-
-          <input
-            type="text"
-            value={locationFilter}
-            onChange={(event) => setLocationFilter(event.target.value)}
-            placeholder="Search by order no / table / room / guest"
-            className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-slate-50/50"
-          />
-        </div>
-      </div>
-
-      {loading && (
-        <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
-          Loading steward orders...
-        </div>
-      )}
-
-      {loadError && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">{loadError}</div>
-      )}
-
-      <div className="relative overflow-hidden">
-        <div 
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {/* Awaiting Tab */}
-          <div className="w-full shrink-0 snap-start px-0.5">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <KitchenOrderSection
-                title="Table Orders"
-                orders={awaitingTableOrders}
-                headerColor="bg-indigo-600"
-                emptyMessage="No pending table orders"
-                onAction={handlePendingAction}
-                actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
-              />
-              <KitchenOrderSection
-                title="Room Orders"
-                orders={awaitingRoomOrders}
-                headerColor="bg-teal-600"
-                emptyMessage="No pending room orders"
-                onAction={handlePendingAction}
-                actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
-              />
+            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+              <Clock className="h-3 w-3" />
+              {timeInQueue} min
             </div>
           </div>
+        </div>
 
-          {/* Ready Tab */}
-          <div className="w-full shrink-0 snap-start px-0.5">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <KitchenOrderSection
-                title="Ready Table Orders"
-                orders={readyTableOrders}
-                headerColor="bg-emerald-600"
-                emptyMessage="No ready table orders"
-                onAction={handlePendingAction}
-                actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
-                renderActions={(order) => (
-                  <button
-                    type="button"
-                    onClick={() => handleMarkServed(order.id)}
-                    className="w-full rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
-                  >
-                    Mark Served
-                  </button>
-                )}
-              />
-              <KitchenOrderSection
-                title="Ready Room Orders"
-                orders={readyRoomOrders}
-                headerColor="bg-cyan-600"
-                emptyMessage="No ready room orders"
-                onAction={handlePendingAction}
-                actionLoadingId={typeof actionLoadingId === 'number' ? actionLoadingId : null}
-                renderActions={(order) => (
-                  <button
-                    type="button"
-                    onClick={() => handleMarkServed(order.id)}
-                    className="w-full rounded bg-cyan-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-cyan-700"
-                  >
-                    Mark Served
-                  </button>
-                )}
-              />
-            </div>
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-500 font-medium">Items ({order.items.length})</span>
+            <button 
+              onClick={() => setExpanded(!expanded)} 
+              className="text-blue-600 font-bold hover:underline"
+            >
+              {expanded ? 'Hide' : 'Show Details'}
+            </button>
           </div>
+          
+          {(expanded || order.items.length <= 3) && (
+            <ul className="space-y-1.5">
+              {order.items.map((item, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-sm">
+                  <span className="bg-slate-100 text-slate-700 font-bold px-1.5 py-0.5 rounded text-xs min-w-[24px] text-center">
+                    {item.quantity}
+                  </span>
+                  <span className="text-slate-800 font-medium">{item.item_name_snapshot}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {!expanded && order.items.length > 3 && (
+            <p className="text-xs text-slate-400 italic">+ {order.items.length - 3} more items...</p>
+          )}
+        </div>
+
+        {order.notes && (
+          <div className="mt-3 p-2 bg-amber-50 border border-amber-100 rounded-lg flex gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800 font-medium italic">{order.notes}</p>
+          </div>
+        )}
+
+        <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
+          {renderActions ? renderActions() : (
+            <>
+              {order.status === 'pending' && (
+                <>
+                  <button 
+                    disabled={loading}
+                    onClick={() => onAction(order.id, 'confirmed')}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2.5 rounded-lg transition-all active:scale-95"
+                  >
+                    Accept
+                  </button>
+                  <button 
+                    disabled={loading}
+                    onClick={() => onAction(order.id, 'rejected')}
+                    className="bg-red-50 hover:bg-red-100 text-red-600 p-2.5 rounded-lg transition-all"
+                  >
+                    <XCircle className="h-5 w-5" />
+                  </button>
+                </>
+              )}
+              {order.status === 'confirmed' && (
+                <button 
+                  disabled={loading}
+                  onClick={() => onAction(order.id, 'processing')}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2.5 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <PlayCircle className="h-5 w-5" />
+                  Start Cooking
+                </button>
+              )}
+              {order.status === 'processing' && (
+                <button 
+                  disabled={loading}
+                  onClick={() => onAction(order.id, 'completed')}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="h-5 w-5" />
+                  Ready to Serve
+                </button>
+              )}
+            </>
+          )}
+          <button className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2.5 rounded-lg transition-all">
+            <Printer className="h-5 w-5" />
+          </button>
         </div>
       </div>
     </div>
