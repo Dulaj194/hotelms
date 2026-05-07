@@ -41,7 +41,20 @@ function getWsBaseUrl(): string {
 
 export const WS_BASE_URL = normalizeBase(getWsBaseUrl());
 
-export const RESOLVED_API_BASE_URL = API_BASE_URL;
-export const RESOLVED_WS_BASE_URL = WS_BASE_URL;
+export const RESOLVED_API_BASE_URL = (function() {
+  if (typeof window === "undefined") return API_BASE_URL;
+  
+  // Dynamic resolution trick:
+  // If the hardcoded API is localhost but we are accessing from an IP/domain,
+  // assume the backend is on the same host (typical for single-server Docker setups).
+  if (API_BASE_URL.includes("localhost:8000") || API_BASE_URL.includes("127.0.0.1:8000")) {
+    if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      return `http://${window.location.hostname}:8000/api/v1`;
+    }
+  }
+  return API_BASE_URL;
+})();
+
+export const RESOLVED_WS_BASE_URL = RESOLVED_API_BASE_URL.replace(/^http/i, "ws") + "/ws";
 export const RESOLVED_BACKEND_ORIGIN = getBackendOrigin();
 
