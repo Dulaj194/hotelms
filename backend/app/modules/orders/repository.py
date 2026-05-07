@@ -230,8 +230,8 @@ def count_history_orders_by_restaurant(
     # Initialize with 0s
     counts = {"completed": 0, "served": 0, "paid": 0, "rejected": 0}
     for status_val, count in results:
-        if status_val.value in counts:
-            counts[status_val.value] = count
+        if status_val in counts:
+            counts[status_val] = count
             
     return counts
 
