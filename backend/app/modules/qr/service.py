@@ -164,12 +164,12 @@ def _normalize_target_number(target_number: str, qr_type: str) -> str:
     normalized = target_number.strip()
     if not normalized:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"{_qr_label(qr_type)} number is required.",
         )
     if len(normalized) > _MAX_TARGET_LENGTH:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=(
                 f"{_qr_label(qr_type)} number must be at most "
                 f"{_MAX_TARGET_LENGTH} characters."
@@ -177,7 +177,7 @@ def _normalize_target_number(target_number: str, qr_type: str) -> str:
         )
     if "/" in normalized or "\\" in normalized:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"{_qr_label(qr_type)} number contains invalid characters.",
         )
     return normalized
@@ -450,7 +450,7 @@ def generate_bulk_room_qr(
 
     if not normalized:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="At least one room number is required.",
         )
 

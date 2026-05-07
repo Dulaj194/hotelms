@@ -122,7 +122,12 @@ class Restaurant(Base):
     )
     registration_reviewed_by_id: Mapped[int | None] = mapped_column(
         Integer,
-        ForeignKey("users.id", ondelete="SET NULL"),
+        ForeignKey(
+            "users.id", 
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_restaurant_registration_reviewer"
+        ),
         nullable=True,
         index=True,
     )

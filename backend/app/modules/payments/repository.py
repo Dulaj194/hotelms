@@ -78,7 +78,6 @@ def list_payments_by_session(
             OrderHeader.session_id == session_id,
             OrderHeader.restaurant_id == restaurant_id,
         )
-        .subquery()
     )
     return (
         db.query(Payment)

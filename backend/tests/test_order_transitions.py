@@ -13,8 +13,8 @@ class OrderTransitionTests(unittest.TestCase):
         self.assertIn(OrderStatus.rejected, ALLOWED_TRANSITIONS[OrderStatus.pending])
         self.assertNotIn(OrderStatus.paid, ALLOWED_TRANSITIONS[OrderStatus.pending])
 
-    def test_completed_only_to_paid(self) -> None:
-        self.assertEqual(ALLOWED_TRANSITIONS[OrderStatus.completed], {OrderStatus.paid})
+    def test_completed_transitions(self) -> None:
+        self.assertEqual(ALLOWED_TRANSITIONS[OrderStatus.completed], {OrderStatus.served, OrderStatus.paid})
 
     def test_terminal_states_have_no_transitions(self) -> None:
         self.assertEqual(ALLOWED_TRANSITIONS[OrderStatus.paid], set())

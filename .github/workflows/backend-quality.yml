@@ -43,7 +43,7 @@ jobs:
         run: bandit -r app/ -ll --exit-zero
 
       - name: Run unittest suite with coverage
-        run: python -m pytest tests/ --cov=app --cov-report=term-level=2 --tb=short || python -m unittest discover tests
+        run: python -m pytest tests/ --cov=app --cov-report=term --tb=short || python -m unittest discover tests
 
       - name: Summary
         if: always()
