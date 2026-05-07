@@ -33,7 +33,7 @@ function getRemainingCancelSeconds(order: OrderDetailResponse | null): number {
 
 const POLL_INTERVAL_MS = 15_000; // refresh every 15 s
 
-const FINALIZED: Set<string> = new Set(["completed", "paid", "rejected"]);
+const FINALIZED: Set<string> = new Set(["completed", "served", "paid", "rejected"]);
 
 export default function TableOrderStatus() {
   const [searchParams] = useSearchParams();
@@ -348,6 +348,7 @@ const LIFECYCLE_STEPS: Array<{ status: OrderDetailResponse["status"]; label: str
   { status: "confirmed", label: "Confirmed" },
   { status: "processing", label: "Being prepared" },
   { status: "completed", label: "Ready" },
+  { status: "served", label: "Served" },
   { status: "paid", label: "Paid" },
 ];
 

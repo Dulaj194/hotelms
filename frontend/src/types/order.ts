@@ -5,6 +5,7 @@ export type OrderStatus =
   | "confirmed"
   | "processing"
   | "completed"
+  | "served"
   | "paid"
   | "rejected";
 
@@ -73,6 +74,7 @@ export interface OrderHeaderResponse {
   confirmed_at: string | null;
   processing_at: string | null;
   completed_at: string | null;
+  served_at: string | null;
   rejected_at: string | null;
   paid_at: string | null;
   order_source: string;
@@ -117,6 +119,7 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   confirmed: "Confirmed",
   processing: "Preparing",
   completed: "Ready",
+  served: "Served",
   paid: "Paid",
   rejected: "Rejected",
 };
@@ -126,6 +129,7 @@ export const ORDER_STATUS_COLOR: Record<OrderStatus, string> = {
   confirmed: "bg-blue-100 text-blue-800",
   processing: "bg-orange-100 text-orange-800",
   completed: "bg-green-100 text-green-800",
+  served: "bg-slate-100 text-slate-800",
   paid: "bg-emerald-100 text-emerald-800",
   rejected: "bg-red-100 text-red-800",
 };
@@ -153,6 +157,7 @@ export interface KitchenOrderCard {
   confirmed_at: string | null;
   processing_at: string | null;
   completed_at: string | null;
+  served_at: string | null;
   rejected_at: string | null;
   notes: string | null;
   items: KitchenOrderItemSummary[];

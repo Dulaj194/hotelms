@@ -37,7 +37,7 @@ function sourceLabel(order: OrderHeaderResponse): string {
 export default function OrderHistory() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState<OrderHeaderResponse[]>([]);
-  const [stats, setStats] = useState<Record<string, number>>({ completed: 0, paid: 0, rejected: 0 });
+  const [stats, setStats] = useState<Record<string, number>>({ completed: 0, served: 0, paid: 0, rejected: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +46,7 @@ export default function OrderHistory() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [searchText, setSearchText] = useState("");
 
-  const statusList: ("all" | OrderStatus)[] = ["all", "completed", "paid", "rejected"];
+  const statusList: ("all" | OrderStatus)[] = ["all", "completed", "served", "paid", "rejected"];
 
   const handleStatusChange = useCallback((status: "all" | OrderStatus) => {
     setSearchParams(prev => {

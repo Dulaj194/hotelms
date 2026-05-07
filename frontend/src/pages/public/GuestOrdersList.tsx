@@ -25,7 +25,7 @@ type OrdersFilterTab = "active" | "completed" | "canceled";
 
 const TAB_TO_STATUSES: Record<OrdersFilterTab, OrderHeaderResponse["status"][]> = {
   active: ["pending", "confirmed", "processing"],
-  completed: ["completed", "paid"],
+  completed: ["completed", "served", "paid"],
   canceled: ["rejected"],
 };
 

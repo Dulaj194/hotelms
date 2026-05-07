@@ -15,7 +15,7 @@ import type {
 const CANCEL_WINDOW_SECONDS = 10;
 
 const POLL_INTERVAL_MS = 15_000;
-const FINALIZED: Set<OrderStatus> = new Set(["completed", "paid", "rejected"]);
+const FINALIZED: Set<OrderStatus> = new Set(["completed", "served", "paid", "rejected"]);
 
 function parseServerTimestamp(value: string): number {
   const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(value);
@@ -42,6 +42,7 @@ function OrderTimeline({ order }: { order: RoomOrderDetailResponse }) {
     { status: "confirmed", label: "Confirmed" },
     { status: "processing", label: "Being prepared" },
     { status: "completed", label: "Ready for delivery" },
+    { status: "served", label: "Delivered" },
     { status: "paid", label: "Charged to folio" },
   ];
 

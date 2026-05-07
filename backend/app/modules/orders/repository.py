@@ -213,8 +213,8 @@ def count_history_orders_by_restaurant(
     db: Session, 
     restaurant_id: int
 ) -> dict[str, int]:
-    """Return counts for completed, paid, and rejected orders."""
-    history_statuses = {OrderStatus.completed, OrderStatus.paid, OrderStatus.rejected}
+    """Return counts for completed, served, paid, and rejected orders."""
+    history_statuses = {OrderStatus.completed, OrderStatus.served, OrderStatus.paid, OrderStatus.rejected}
     
     from sqlalchemy import func
     results = (

@@ -10,7 +10,6 @@ import {
   AlertCircle,
   XCircle,
   CheckCircle,
-  ChefHat,
   Droplets,
   FileText,
   Utensils,
@@ -22,8 +21,6 @@ import {
   Wifi,
   Star,
   Bell,
-  MapPin,
-  Send,
   User
 } from "lucide-react";
 
@@ -36,6 +33,10 @@ import type {
   NewOrderEvent, 
   OrderStatusUpdatedEvent, 
 } from "@/types/realtime";
+import {
+  ORDER_STATUS_COLOR,
+  ORDER_STATUS_LABEL,
+} from "@/types/order";
 import type {
   KitchenOrderCard,
   KitchenOrderListResponse,
@@ -552,27 +553,6 @@ function MetricBadge({ label, value, color }: { label: string, value: number, co
   );
 }
 
-function MetricCard({ label, value, icon: Icon, color }: { label: string, value: number, icon: any, color: string }) {
-  const colors: Record<string, string> = {
-    amber: "text-amber-600 bg-amber-50 border-amber-100",
-    blue: "text-blue-600 bg-blue-50 border-blue-100",
-    green: "text-green-600 bg-green-50 border-green-100",
-    slate: "text-slate-600 bg-slate-50 border-slate-100",
-    red: "text-red-600 bg-red-50 border-red-100"
-  };
-
-  return (
-    <div className={`rounded-2xl border p-4 shadow-sm flex items-center justify-between bg-white transition-all hover:shadow-md ${colors[color] || colors.slate}`}>
-      <div>
-        <p className="text-xs font-bold uppercase tracking-wider opacity-70">{label}</p>
-        <p className="text-2xl font-black mt-1 tabular-nums">{value}</p>
-      </div>
-      <div className={`p-2.5 rounded-xl ${colors[color]?.replace('border-', 'bg-opacity-20 ') || ''}`}>
-        <Icon className="h-5 w-5" />
-      </div>
-    </div>
-  );
-}
 
 function KanbanColumn({ title, count, color, children }: { title: string, count: number, color: string, children: React.ReactNode }) {
   const colors: Record<string, string> = {
@@ -610,14 +590,6 @@ function OperationCard({ order, onAction, loading, renderActions }: {
   const timeInQueue = Math.floor((Date.now() - new Date(order.placed_at).getTime()) / 60000);
   const isUrgent = timeInQueue > 15 && order.status !== 'completed';
 
-  const statusColors: Record<string, string> = {
-    pending: "bg-amber-100 text-amber-700",
-    confirmed: "bg-blue-100 text-blue-700",
-    processing: "bg-indigo-100 text-indigo-700",
-    completed: "bg-green-100 text-green-700",
-    served: "bg-slate-100 text-slate-700",
-    rejected: "bg-red-100 text-red-700"
-  };
 
   return (
     <div className={`bg-white rounded-xl border shadow-sm transition-all overflow-hidden ${isUrgent ? 'border-red-300 ring-2 ring-red-50' : 'border-slate-200'}`}>
@@ -633,8 +605,8 @@ function OperationCard({ order, onAction, loading, renderActions }: {
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
-             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${statusColors[order.status]}`}>
-              {order.status}
+             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${ORDER_STATUS_COLOR[order.status]}`}>
+              {ORDER_STATUS_LABEL[order.status]}
             </span>
             <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
               <Clock className="h-3 w-3" />
