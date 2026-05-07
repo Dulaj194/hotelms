@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { 
   Activity, 
   CheckCircle2, 
   Clock, 
   MessageSquare, 
-  MoreVertical, 
   Package, 
   PlayCircle, 
   Printer, 
@@ -16,9 +14,8 @@ import {
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
-import OrderCard from "@/components/shared/OrderCard";
 import { useKitchenSocket } from "@/hooks/useKitchenSocket";
-import { ApiError, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
 import type { 
@@ -28,7 +25,6 @@ import type {
 import type {
   KitchenOrderCard,
   KitchenOrderListResponse,
-  OrderStatus
 } from "@/types/order";
 
 const STEWARD_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
@@ -188,7 +184,8 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
     onStatusUpdate: handleStatusUpdate,
     onServiceRequested: (ev) => {
       playNotificationTone();
-      addActivity(`${ev.data.location_label} requested ${ev.data.service_type}`, 'request', 'urgent');
+      const location = ev.data.order_source === 'room' ? `Room ${ev.data.table_number}` : `Table ${ev.data.table_number}`;
+      addActivity(`${location} requested ${ev.data.service_type}`, 'request', 'urgent');
     }
   });
 

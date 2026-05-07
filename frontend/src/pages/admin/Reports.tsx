@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { 
   BarChart3, 
-  Calendar, 
   Download, 
   Printer, 
-  History, 
   TrendingUp, 
   Package, 
   Receipt,
-  Search,
-  Filter,
-  CheckCircle2,
   AlertCircle,
   FileText
 } from "lucide-react";

@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { 
   Monitor, 
   Clock, 
   Flame, 
   CheckCircle2, 
-  ChevronRight, 
   AlertCircle,
   Play,
   Package
@@ -12,14 +11,13 @@ import {
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { useKitchenSocket } from "@/hooks/useKitchenSocket";
-import { ApiError, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
 import { QR_MENU_STAFF_ROLES } from "@/lib/moduleAccess";
-import type { NewOrderEvent, OrderStatusUpdatedEvent } from "@/types/realtime";
+import type { OrderStatusUpdatedEvent } from "@/types/realtime";
 import type {
   KitchenOrderCard,
   KitchenOrderListResponse,
-  OrderStatus,
 } from "@/types/order";
 
 const KITCHEN_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);

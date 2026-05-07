@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
-import { Link } from "react-router-dom";
 import { 
   Ticket, 
   Search, 
@@ -10,11 +9,8 @@ import {
   Wallet, 
   FileText, 
   CheckCircle2, 
-  AlertCircle,
-  ArrowRight,
   User,
-  Coffee,
-  MoreHorizontal
+  Coffee
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";

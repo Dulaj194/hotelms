@@ -11,23 +11,17 @@ import {
   HandPlatter,
   Handshake,
   History,
-  Home,
   Kanban,
-  LayoutDashboard,
   LayoutGrid,
-  LogOut,
-  Package,
   Menu,
   MessageSquare,
-  Monitor,
+  Package,
   QrCode,
-  ReceiptText,
   Settings,
   ShieldCheck,
   SquareMenu,
   Ticket,
   User,
-  UserCog,
   Users,
   UtensilsCrossed,
 } from "lucide-react";
@@ -157,7 +151,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [badgeCounts, setBadgeCounts] = useState({ awaiting: 0, requests: 0 });
   const sidebarNavRef = useRef<HTMLElement | null>(null);
 
-  const { menusOpen, kitchenOpen, qrOpen, housekeepingOpen, offersOpen } = groupState;
+  const { 
+    menusOpen, 
+    qrOpen, 
+    housekeepingOpen, 
+    offersOpen, 
+    opsOpen, 
+    commOpen, 
+    financeOpen, 
+    settingsOpen 
+  } = groupState;
 
   const menuSubItems: MenuSubItem[] = useMemo(
     () => [
@@ -328,6 +331,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const commPaths = useMemo(() => commSubItems.map((item) => item.path), [commSubItems]);
   const financePaths = useMemo(() => financeSubItems.map((item) => item.path), [financeSubItems]);
   const settingsPaths = useMemo(() => settingsSubItems.map((item) => item.path), [settingsSubItems]);
+  const qrPaths = useMemo(() => qrSubItems.map((item) => item.path), [qrSubItems]);
+  const housekeepingPaths = useMemo(() => housekeepingSubItems.map((item) => item.path), [housekeepingSubItems]);
+  const offerPaths = useMemo(() => offerSubItems.map((item) => item.path), [offerSubItems]);
 
   const visibleOpsSubItems = useMemo(
     () =>
@@ -384,6 +390,51 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         )
       ),
     [settingsSubItems, moduleAccess, privileges, role]
+  );
+
+  const visibleQrSubItems = useMemo(
+    () =>
+      qrSubItems.filter((item) =>
+        canAccessModuleItem(
+          role,
+          privileges,
+          moduleAccess,
+          item.roles,
+          item.privilege,
+          item.moduleKey,
+        )
+      ),
+    [qrSubItems, moduleAccess, privileges, role]
+  );
+
+  const visibleHousekeepingSubItems = useMemo(
+    () =>
+      housekeepingSubItems.filter((item) =>
+        canAccessModuleItem(
+          role,
+          privileges,
+          moduleAccess,
+          item.roles,
+          item.privilege,
+          item.moduleKey,
+        )
+      ),
+    [housekeepingSubItems, moduleAccess, privileges, role]
+  );
+
+  const visibleOfferSubItems = useMemo(
+    () =>
+      offerSubItems.filter((item) =>
+        canAccessModuleItem(
+          role,
+          privileges,
+          moduleAccess,
+          item.roles,
+          item.privilege,
+          item.moduleKey,
+        )
+      ),
+    [offerSubItems, moduleAccess, privileges, role]
   );
 
   const isMenuGroupVisible = hasRoleAccess(role, RESTAURANT_ADMIN_ROLES);
