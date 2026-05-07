@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { 
   Activity, 
   CheckCircle2, 
@@ -122,11 +122,6 @@ export default function Steward() {
 }
 
 function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null }) {
-  const servedStorageKey = useMemo(
-    () => (restaurantId ? `steward_served_orders_${restaurantId}` : null),
-    [restaurantId]
-  );
-
   const [orders, setOrders] = useState<Map<number, KitchenOrderCard>>(new Map());
   const [requests, setRequests] = useState<Map<string, UnifiedRequest>>(new Map());
   const [activeTab, setActiveTab] = useState<'orders' | 'requests'>('orders');
@@ -134,7 +129,6 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<number | string | null>(null);
   const [alert, setAlert] = useState<{ message: string; type: 'info' | 'urgent' } | null>(null);
-
 
   const addActivity = useCallback((message: string, type: ActivityItem['type'], level: ActivityItem['level'] = 'info') => {
     const item: ActivityItem = {
@@ -315,9 +309,6 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
         await api.patch(endpoint, {});
       } else {
         if (req.type === 'BILL') {
-          // Resolving a bill is usually done by closing the session or payment.
-          // For now, we don't have a direct "resolve bill" other than payment.
-          // But we can let them hide it if it's acknowledged.
           setRequests(prev => {
             const next = new Map(prev);
             next.delete(`BILL:${req.id}`);
@@ -339,6 +330,7 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
     handleAction(orderId, 'served');
   };
 
+  const metrics = useMemo(() => {
     const allOrders = Array.from(orders.values());
     const allRequests = Array.from(requests.values());
     return {
@@ -347,7 +339,7 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
       ready: allOrders.filter(o => o.status === 'completed').length,
       delivered: allOrders.filter(o => o.status === 'served').length,
       rejected: allOrders.filter(o => o.status === 'rejected').length,
-      requests: allRequests.filter(r => !r.acknowledged_by).length
+      activeRequestsCount: allRequests.filter(r => !r.acknowledged_by).length
     };
   }, [orders, requests]);
 
@@ -414,15 +406,15 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
           >
             <Bell className="h-4 w-4" />
             Service Requests
-            {metrics.requests > 0 && (
-              <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{metrics.requests}</span>
+            {metrics.activeRequestsCount > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{metrics.activeRequestsCount}</span>
             )}
           </button>
         </div>
         
         <div className="flex items-center gap-4 overflow-x-auto no-scrollbar pb-1 md:pb-0">
           <MetricBadge label="Orders" value={metrics.pending + metrics.preparing + metrics.ready} color="blue" />
-          <MetricBadge label="Active Requests" value={metrics.requests} color="rose" />
+          <MetricBadge label="Active Requests" value={metrics.activeRequestsCount} color="rose" />
           <MetricBadge label="Today Served" value={metrics.delivered} color="slate" />
         </div>
       </div>
@@ -575,7 +567,7 @@ function MetricCard({ label, value, icon: Icon, color }: { label: string, value:
         <p className="text-xs font-bold uppercase tracking-wider opacity-70">{label}</p>
         <p className="text-2xl font-black mt-1 tabular-nums">{value}</p>
       </div>
-      <div className={`p-2.5 rounded-xl ${colors[color].replace('border-', 'bg-opacity-20 ')}`}>
+      <div className={`p-2.5 rounded-xl ${colors[color]?.replace('border-', 'bg-opacity-20 ') || ''}`}>
         <Icon className="h-5 w-5" />
       </div>
     </div>
@@ -738,6 +730,7 @@ function OperationCard({ order, onAction, loading, renderActions }: {
     </div>
   );
 }
+
 function RequestOperationCard({ request, onAction, loading }: {
   request: UnifiedRequest,
   onAction: (req: UnifiedRequest, action: 'acknowledge' | 'resolve') => void,
