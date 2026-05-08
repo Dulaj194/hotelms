@@ -686,8 +686,8 @@ export default function TableMenu() {
   const cartItemCount = cart?.item_count ?? 0;
 
   return (
-    <div className="box-border min-h-dvh w-full max-w-full min-w-0 overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900 pb-[env(safe-area-inset-bottom,0px)]">
-      <header id="menu-top" className="fixed top-0 left-0 right-0 z-50 w-full border-b border-slate-200/60 bg-white/95 shadow-lg backdrop-blur-md transition-all duration-300 ease-in-out">
+    <div className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
+      <header id="menu-top" className="z-50 shrink-0 border-b border-slate-200/60 bg-white/95 shadow-lg backdrop-blur-md">
         {/* Top Bar */}
         <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
           headerVisible ? "h-16 opacity-100" : "h-0 opacity-0"
@@ -806,8 +806,6 @@ export default function TableMenu() {
         </div>
       </header>
 
-      {/* Fixed-height Spacer: Prevents jittering by never changing its layout height */}
-      <div className="h-[calc(4rem+4rem+env(safe-area-inset-top,0px))]" />
 
       <main
         id="menu-content"
@@ -844,7 +842,7 @@ export default function TableMenu() {
             return (
               <div
                 key={catId ?? "all"}
-                className="box-border h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 py-3 pb-40 no-scrollbar sm:px-5 lg:px-6"
+                className="box-border h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 py-3 pb-44 no-scrollbar sm:px-5 lg:px-6"
               >
                 <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
                   {/* Banner Only on "All" View */}
