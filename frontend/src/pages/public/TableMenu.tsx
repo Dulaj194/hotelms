@@ -206,8 +206,8 @@ export default function TableMenu() {
     const lastScrollTop = lastMenuScrollYRef.current;
     const delta = currentScrollTop - lastScrollTop;
 
-    // Higher threshold for hiding (30px), lower for showing (10px) to stabilize momentum
-    if (delta > 30 && currentScrollTop > 150) {
+    // Hide header more aggressively when scrolling down to reveal sticky category bar
+    if (delta > 10 && currentScrollTop > 60) {
       if (headerVisible) {
         setHeaderVisible(false);
         isHeaderTransitioningRef.current = true;
@@ -216,7 +216,7 @@ export default function TableMenu() {
           isHeaderTransitioningRef.current = false;
         }, 400); 
       }
-    } else if (delta < -12 || currentScrollTop < 50) {
+    } else if (delta < -12 || currentScrollTop < 30) {
       if (!headerVisible) {
         setHeaderVisible(true);
         isHeaderTransitioningRef.current = true;
