@@ -100,7 +100,8 @@ export default function TableMenu() {
   const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
   const categoryRailShellRef = useRef<HTMLDivElement>(null);
   const lastMenuScrollYRef = useRef(0);
-  const menuScrollFrameRef = useRef<number | null>(null);
+  const isHeaderTransitioningRef = useRef(false);
+  const headerTransitionTimeoutRef = useRef<number | null>(null);
 
   const { cart, addItem, updateItem, removeItem } = useLocalTableCart({
     restaurantId: restaurantContextId,
@@ -144,6 +145,9 @@ export default function TableMenu() {
         left: width * index,
         behavior: "smooth",
       });
+      // Haptic feedback for manual category selection
+      if (window.navigator.vibrate) window.navigator.vibrate(5);
+      
       setTimeout(() => {
         isScrollingRef.current = false;
       }, 500);
@@ -176,50 +180,41 @@ export default function TableMenu() {
     setActiveBannerIndex(0);
   }, [featuredBannerPaths.length]);
 
-  useEffect(() => {
-    const scrollDeltaThreshold = 15;
+  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (searchPanelOpen || isHeaderTransitioningRef.current) return;
+    
+    const currentScrollTop = e.currentTarget.scrollTop;
+    const lastScrollTop = lastMenuScrollYRef.current;
+    const delta = currentScrollTop - lastScrollTop;
 
-    lastMenuScrollYRef.current = window.scrollY;
-
-    if (searchPanelOpen) {
-      setHeaderVisible(true);
-      return;
+    // Higher threshold for hiding, lower for showing (more responsive)
+    if (delta > 20 && currentScrollTop > 120) {
+      if (headerVisible) {
+        setHeaderVisible(false);
+        isHeaderTransitioningRef.current = true;
+        if (headerTransitionTimeoutRef.current) window.clearTimeout(headerTransitionTimeoutRef.current);
+        headerTransitionTimeoutRef.current = window.setTimeout(() => {
+          isHeaderTransitioningRef.current = false;
+        }, 400); // Slightly more than transition duration
+      }
+    } else if (delta < -8 || currentScrollTop < 40) {
+      if (!headerVisible) {
+        setHeaderVisible(true);
+        isHeaderTransitioningRef.current = true;
+        if (headerTransitionTimeoutRef.current) window.clearTimeout(headerTransitionTimeoutRef.current);
+        headerTransitionTimeoutRef.current = window.setTimeout(() => {
+          isHeaderTransitioningRef.current = false;
+        }, 400);
+      }
     }
 
-    const updateHeaderVisibility = () => {
-      const currentScrollY = window.scrollY;
-      const lastScrollY = lastMenuScrollYRef.current;
-      const scrollDelta = currentScrollY - lastScrollY;
+    lastMenuScrollYRef.current = currentScrollTop;
+  }, [headerVisible, searchPanelOpen]);
 
-      // Only toggle if we've scrolled more than the threshold
-      if (Math.abs(scrollDelta) >= scrollDeltaThreshold) {
-        // scrollDelta > 0 means scrolling down the page (content moves up)
-        // In this state, we want to HIDE the header.
-        if (scrollDelta > 0 && currentScrollY > 100) {
-          setHeaderVisible(false);
-        } else if (scrollDelta < 0) {
-          setHeaderVisible(true);
-        }
-        lastMenuScrollYRef.current = currentScrollY;
-      }
-
-      menuScrollFrameRef.current = null;
-    };
-
-    const handleWindowScroll = () => {
-      if (menuScrollFrameRef.current !== null) return;
-      menuScrollFrameRef.current = window.requestAnimationFrame(updateHeaderVisibility);
-    };
-
-    window.addEventListener("scroll", handleWindowScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleWindowScroll);
-      if (menuScrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(menuScrollFrameRef.current);
-      }
-    };
-  }, [searchPanelOpen]);
+  useEffect(() => {
+    // Reset scroll tracker when switching categories to avoid jumpy behavior
+    lastMenuScrollYRef.current = 0;
+  }, [activeCategoryId]);
 
   useEffect(() => {
     if (featuredBannerPaths.length <= 1) {
@@ -342,10 +337,14 @@ export default function TableMenu() {
     const trimmed = guestNameInput.trim();
     if (!trimmed) {
       setNameError("Please enter your name to start ordering.");
+      if (window.navigator.vibrate) window.navigator.vibrate([30, 100, 30]);
       return;
     }
     setNameError(null);
     setGuestName(trimmed);
+
+    // Haptic feedback for starting session
+    if (window.navigator.vibrate) window.navigator.vibrate(20);
 
     // Senior Engineer Approach: Persist name so it's not lost on refresh
     if (restaurantContextId && tableNumber) {
@@ -404,6 +403,9 @@ export default function TableMenu() {
         headers: { "X-Guest-Session": guestToken },
       });
       
+      // Haptic feedback for successful request
+      if (window.navigator.vibrate) window.navigator.vibrate(25);
+
       // Show success state briefly then reset
       setTimeout(() => {
         setIsRequestingService(false);
@@ -621,10 +623,10 @@ export default function TableMenu() {
 
           {/* 3. Item Name and Price Section */}
           <div className="mt-1 flex items-start justify-between gap-2">
-            <h3 className="min-w-0 flex-1 break-words text-[22px] font-bold leading-tight text-[#0F172A] line-clamp-1">
+            <h3 className="min-w-0 flex-1 break-words text-[18px] font-bold leading-tight text-[#0F172A] line-clamp-1 min-[380px]:text-[20px]">
               {item.name}
             </h3>
-            <span className="shrink-0 text-[20px] font-extrabold text-[#0F172A]">
+            <span className="shrink-0 text-[18px] font-extrabold text-orange-600 min-[380px]:text-[20px]">
               {formatPrice(item.price)}
             </span>
           </div>
@@ -689,8 +691,8 @@ export default function TableMenu() {
     <div className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
       <header id="menu-top" className="z-50 shrink-0 border-b border-slate-200/60 bg-white/95 shadow-lg backdrop-blur-md">
         {/* Top Bar */}
-        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
-          headerVisible ? "h-16 opacity-100" : "h-0 opacity-0"
+        <div className={`overflow-hidden transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${
+          headerVisible ? "max-h-16 opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-4"
         }`}>
           <div className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center justify-between gap-3 px-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
@@ -842,6 +844,7 @@ export default function TableMenu() {
             return (
               <div
                 key={catId ?? "all"}
+                onScroll={handleContentScroll}
                 className="box-border h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 py-3 pb-40 no-scrollbar sm:px-3 lg:px-0"
               >
                 <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
@@ -925,9 +928,9 @@ export default function TableMenu() {
           <button
             type="button"
             onClick={() => setMenuDropdownOpen(true)}
-            className={`flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold transition-all duration-300 min-[360px]:rounded-2xl min-[360px]:text-[11px] ${
+            className={`flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold transition-all duration-500 ease-out min-[360px]:rounded-2xl min-[360px]:text-[11px] ${
               menuDropdownOpen 
-              ? "bg-orange-500 text-white shadow-md scale-105" 
+              ? "bg-orange-500 text-white shadow-[0_8px_16px_rgba(249,115,22,0.3)] scale-105" 
               : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
             }`}
           >
