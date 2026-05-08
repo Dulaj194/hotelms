@@ -55,15 +55,27 @@
 
   /* 1. Fluid Layouts & 2. Viewport Management */
   html,
-  body,
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+  }
+
+  body {
+    position: fixed;
+    width: 100%;
+    overscroll-behavior-y: none;
+    @apply bg-background text-foreground;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   #root {
     width: 100%;
     max-width: 100%;
-    min-height: 100dvh;
-    margin: 0;
-    padding: 0;
-    /* Allow standard pull-to-refresh and smooth scrolling */
-    overscroll-behavior-y: none;
+    height: 100%;
   }
 
   /* Senior Engineer Approach: Custom Sleek Scrollbar */

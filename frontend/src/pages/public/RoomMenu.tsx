@@ -598,11 +598,14 @@ export default function RoomMenu() {
   };
 
   return (
-    <div className="box-border flex min-h-dvh w-full max-w-full min-w-0 flex-col overflow-x-hidden bg-gray-50 pb-28">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-gray-50">
       {/* Top bar */}
-      <header id="menu-top" className={`fixed top-0 left-0 right-0 z-50 w-full border-b bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] pt-[env(safe-area-inset-top,0px)] backdrop-blur-md transition-transform duration-500 ease-in-out ${
-        headerVisible ? "translate-y-0" : "-translate-y-16"
-      }`}>
+      <header
+        id="menu-top"
+        className={`sticky top-0 left-0 right-0 z-50 w-full border-b bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] pt-[env(safe-area-inset-top)] backdrop-blur-md transition-transform duration-500 ease-in-out ${
+          headerVisible ? "translate-y-0" : "-translate-y-16"
+        }`}
+      >
         <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4">
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
@@ -670,7 +673,7 @@ export default function RoomMenu() {
         </div>
 
         {/* Category rail */}
-        <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
+        <div className="mx-auto box-border flex h-24 shrink-0 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
           <div className="w-full">
             <MenuBrowserRail
               visibleCategories={visibleCategories}
@@ -681,13 +684,12 @@ export default function RoomMenu() {
         </div>
       </header>
 
-      {/* Fixed-height Spacer: Prevents jittering by never changing its layout height */}
-      <div className="h-[calc(4rem+3.5rem+env(safe-area-inset-top,0px))]" />
+
 
       {/* Item grid */}
       <main
         id="menu-list"
-        className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 flex-1 touch-pan-y space-y-6 overflow-x-hidden px-4 py-4"
+        className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 flex-1 touch-pan-y space-y-6 overflow-y-auto overscroll-contain px-4 py-4 pb-40 no-scrollbar"
         {...menuSwipeHandlers}
       >
         {renderedCategories.length === 0 ? (

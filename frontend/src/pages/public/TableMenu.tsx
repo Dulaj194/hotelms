@@ -689,7 +689,10 @@ export default function TableMenu() {
 
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
-      <header id="menu-top" className="z-50 shrink-0 border-b border-slate-200/60 bg-white/95 shadow-lg backdrop-blur-md">
+      <header
+        id="menu-top"
+        className="sticky top-0 z-50 shrink-0 border-b border-slate-200/60 bg-white/95 shadow-lg backdrop-blur-md pt-[env(safe-area-inset-top)]"
+      >
         {/* Top Bar */}
         <div className={`overflow-hidden transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${
           headerVisible ? "max-h-16 opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-4"
@@ -796,7 +799,7 @@ export default function TableMenu() {
         {/* Category Bar */}
         <div
           ref={categoryRailShellRef}
-          className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center px-4 sm:px-6"
+          className="mx-auto flex h-24 shrink-0 w-full max-w-[min(72rem,100%)] items-center px-4 sm:px-6"
         >
           <div className="w-full">
             <MenuBrowserRail
