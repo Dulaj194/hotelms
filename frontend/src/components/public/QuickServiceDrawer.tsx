@@ -126,7 +126,7 @@ export default function QuickServiceDrawer({
         </div>
 
         {/* Scrollable List Content */}
-        <div className="flex-1 overflow-y-auto no-scrollbar px-6 pb-6 space-y-3">
+        <div className="flex-1 overflow-y-auto no-scrollbar px-6 pb-[max(2rem,env(safe-area-inset-bottom,24px))] space-y-3">
           {SERVICES.map((service) => {
             const isSelected = lastRequestedType === service.id;
             const Icon = service.icon;

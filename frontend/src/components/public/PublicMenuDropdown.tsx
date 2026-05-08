@@ -95,7 +95,7 @@ export default function PublicMenuDropdown({
         </div>
 
         {/* Menu List */}
-        <div className="flex-1 overflow-y-auto no-scrollbar px-5 pb-10">
+        <div className="flex-1 overflow-y-auto no-scrollbar px-5 pb-[max(2rem,env(safe-area-inset-bottom,24px))]">
           <div className="space-y-2.5 mt-2">
              {/* "All" Option */}
              <button
