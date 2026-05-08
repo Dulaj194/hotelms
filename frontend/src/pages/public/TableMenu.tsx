@@ -584,6 +584,18 @@ export default function TableMenu() {
   const displayTableNumber =
     tableNumber && /^\d+$/.test(tableNumber) ? tableNumber.padStart(2, "0") : tableNumber;
 
+  const handleDecreaseQty = useCallback((itemId: number, qtyInCart: number) => {
+    if (qtyInCart > 1) {
+      updateItem(itemId, qtyInCart - 1);
+      return;
+    }
+    removeItem(itemId);
+  }, [removeItem, updateItem]);
+
+  const handleIncreaseQty = useCallback((itemId: number, qtyInCart: number) => {
+    updateItem(itemId, qtyInCart + 1);
+  }, [updateItem]);
+
   const renderItemCard = ({ item, categoryName }: MenuTile) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
@@ -594,11 +606,19 @@ export default function TableMenu() {
       <article
         key={item.id}
         id={`item-${item.id}`}
+<<<<<<< HEAD
         className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white p-2 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.08)] ${
           !item.is_available ? "opacity-75 grayscale-[0.3]" : ""
         }`}
       >
         <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[2rem] bg-slate-100">
+=======
+        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-1.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)] ${
+          !item.is_available ? "opacity-70" : ""
+        }`}
+      >
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.65rem] bg-slate-100">
+>>>>>>> f6d82509d866830b6271c2e4547dca86a01894f5
           <SafeMenuAsset
             path={item.image_path}
             alt={item.name}
@@ -621,15 +641,27 @@ export default function TableMenu() {
           )}
         </div>
 
+<<<<<<< HEAD
         <div className="flex flex-1 flex-col gap-3 p-4 pt-5">
           <div className="flex items-start justify-between gap-2">
             <h3 className="min-w-0 flex-1 break-words text-lg font-black leading-tight text-slate-900 line-clamp-2">
               {item.name}
             </h3>
             <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+=======
+        <div className="flex flex-1 flex-col gap-3 p-3.5 pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] ${item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+              {item.is_available ? "Available" : "Sold out"}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+>>>>>>> f6d82509d866830b6271c2e4547dca86a01894f5
               {metaLabel}
             </span>
           </div>
+          <h3 className="min-w-0 break-words text-lg font-extrabold leading-tight text-slate-900 line-clamp-2">
+            {item.name}
+          </h3>
 
           <p className="text-xs leading-relaxed text-slate-500 line-clamp-2">
             {item.description || "Chef's special selection prepared with the finest seasonal ingredients."}
@@ -645,18 +677,30 @@ export default function TableMenu() {
               <div className="flex items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-xl animate-in zoom-in-95 duration-300">
                 <button
                   type="button"
+<<<<<<< HEAD
                   onClick={() => handleDecreaseQty(item.id, qtyInCart)}
                   className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-lg transition hover:bg-white/20 active:scale-90"
                   aria-label="Decrease quantity"
+=======
+                  aria-label={`Decrease ${item.name} quantity`}
+                  onClick={() => handleDecreaseQty(item.id, qtyInCart)}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-lg leading-none transition hover:bg-white/20 active:scale-90"
+>>>>>>> f6d82509d866830b6271c2e4547dca86a01894f5
                 >
                   −
                 </button>
                 <span className="min-w-[1.5ch] text-center text-sm font-black">{qtyInCart}</span>
                 <button
                   type="button"
+<<<<<<< HEAD
                   onClick={() => handleIncreaseQty(item.id, qtyInCart)}
                   className="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-lg transition hover:bg-orange-600 active:scale-90"
                   aria-label="Increase quantity"
+=======
+                  aria-label={`Increase ${item.name} quantity`}
+                  onClick={() => handleIncreaseQty(item.id, qtyInCart)}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-lg leading-none transition hover:bg-orange-600 active:scale-90"
+>>>>>>> f6d82509d866830b6271c2e4547dca86a01894f5
                 >
                   +
                 </button>
@@ -664,9 +708,16 @@ export default function TableMenu() {
             ) : (
               <button
                 type="button"
+<<<<<<< HEAD
                 disabled={isAdding || !item.is_available || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
                 className={`group/btn relative flex h-11 items-center justify-center gap-2 rounded-full px-6 font-bold transition-all duration-300 active:scale-95 disabled:opacity-40 ${
+=======
+                aria-label={`Add ${item.name} to cart`}
+                disabled={isAdding || !item.is_available || !sessionReady}
+                onClick={() => handleAddToCart(item.id)}
+                className={`relative flex h-10 items-center justify-center gap-2 rounded-full px-5 font-semibold transition-all duration-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+>>>>>>> f6d82509d866830b6271c2e4547dca86a01894f5
                   recentlyAddedItemId === item.id
                     ? "bg-emerald-500 text-white shadow-[0_12px_24px_rgba(16,185,129,0.3)]"
                     : "bg-slate-100 text-slate-900 hover:bg-orange-500 hover:text-white hover:shadow-[0_12px_24px_rgba(249,115,22,0.3)]"
