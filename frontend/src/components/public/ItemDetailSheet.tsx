@@ -24,12 +24,29 @@ export default function ItemDetailSheet({
   const [success, setSuccess] = useState(false);
   const [localQty, setLocalQty] = useState(1);
 
+  const images = useMemo(() => {
+    if (!item) return [];
+    return [
+      item.image_path,
+      item.image_path_2,
+      item.image_path_3,
+      item.image_path_4,
+      item.image_path_5,
+    ].filter(Boolean) as string[];
+  }, [item]);
+
+  const [activeImage, setActiveImage] = useState<string | null>(null);
+
   useEffect(() => {
     if (isOpen) {
       setLocalQty(qtyInCart > 0 ? qtyInCart : 1);
       setSuccess(false);
     }
   }, [isOpen, qtyInCart]);
+
+  useEffect(() => {
+    if (item) setActiveImage(item.image_path);
+  }, [item]);
 
   if (!item) return null;
 
@@ -59,23 +76,6 @@ export default function ItemDetailSheet({
     setLocalQty((prev) => Math.max(prev - 1, 1));
     if (window.navigator.vibrate) window.navigator.vibrate(5);
   };
-
-  const images = useMemo(() => {
-    if (!item) return [];
-    return [
-      item.image_path,
-      item.image_path_2,
-      item.image_path_3,
-      item.image_path_4,
-      item.image_path_5,
-    ].filter(Boolean) as string[];
-  }, [item]);
-
-  const [activeImage, setActiveImage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (item) setActiveImage(item.image_path);
-  }, [item]);
 
   return (
     <>
