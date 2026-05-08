@@ -602,7 +602,7 @@ export default function RoomMenu() {
       {/* Top bar */}
       <header
         id="menu-top"
-        className={`sticky top-0 left-0 right-0 z-50 w-full border-b bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] pt-[env(safe-area-inset-top)] backdrop-blur-md transition-transform duration-500 ease-in-out ${
+        className={`sticky top-0 left-0 right-0 z-50 w-full border-b bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] pt-[env(safe-area-inset-top,20px)] backdrop-blur-md transition-transform duration-500 ease-in-out ${
           headerVisible ? "translate-y-0" : "-translate-y-16"
         }`}
       >
@@ -673,7 +673,7 @@ export default function RoomMenu() {
         </div>
 
         {/* Category rail */}
-        <div className="mx-auto box-border flex h-24 shrink-0 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
+        <div className="mx-auto box-border flex h-20 shrink-0 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
           <div className="w-full">
             <MenuBrowserRail
               visibleCategories={visibleCategories}
