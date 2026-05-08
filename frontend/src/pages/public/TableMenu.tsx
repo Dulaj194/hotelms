@@ -688,11 +688,14 @@ export default function TableMenu() {
   const cartItemCount = cart?.item_count ?? 0;
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(180deg,#fffaf5_0%,#f8fafc_38%,#f8fafc_100%)] text-slate-900">
+    <div className="flex h-dvh flex-col overflow-hidden bg-slate-50 text-slate-900">
       <header
         id="menu-top"
-        className="sticky top-0 z-50 shrink-0 border-b border-slate-200/60 bg-white/95 shadow-lg backdrop-blur-md pt-[env(safe-area-inset-top,20px)]"
+        className="shrink-0 border-b border-slate-200/60 bg-white/95 shadow-sm backdrop-blur-md"
       >
+        {/* iOS Safe Area Spacer */}
+        <div className="h-[env(safe-area-inset-top,0px)]" />
+
         {/* Top Bar */}
         <div className={`overflow-hidden transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${
           headerVisible ? "max-h-16 opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-4"
@@ -719,7 +722,7 @@ export default function TableMenu() {
           </div>
         </div>
 
-        {/* Search Panel - Drops down and pushes content */}
+        {/* Search Panel */}
         <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
           searchPanelOpen ? "max-h-[80dvh] opacity-100" : "max-h-0 opacity-0"
         }`}>
@@ -799,7 +802,7 @@ export default function TableMenu() {
         {/* Category Bar */}
         <div
           ref={categoryRailShellRef}
-          className="mx-auto flex h-20 shrink-0 w-full max-w-[min(72rem,100%)] items-center px-4 sm:px-6"
+          className="mx-auto flex h-16 shrink-0 w-full max-w-[min(72rem,100%)] items-center px-4 sm:px-6"
         >
           <div className="w-full">
             <MenuBrowserRail
@@ -926,7 +929,7 @@ export default function TableMenu() {
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 box-border w-full max-w-full overflow-hidden border-t border-white/70 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
+      <nav className="shrink-0 border-t border-slate-200/60 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
         <div className="mx-auto grid w-full max-w-[min(72rem,100%)] min-w-0 grid-cols-5 items-end gap-1 min-[360px]:gap-2">
           <button
             type="button"
@@ -977,7 +980,7 @@ export default function TableMenu() {
             <span className="max-w-full truncate">Service</span>
           </button>
         </div>
-      </div>
+      </nav>
 
       {menu && (
         <PublicMenuDropdown

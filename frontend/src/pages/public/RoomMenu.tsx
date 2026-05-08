@@ -598,14 +598,16 @@ export default function RoomMenu() {
   };
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-gray-50">
+    <div className="flex h-dvh flex-col overflow-hidden bg-gray-50">
       {/* Top bar */}
       <header
         id="menu-top"
-        className={`sticky top-0 left-0 right-0 z-50 w-full border-b bg-white/95 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07),0_4px_6px_-2px_rgba(0,0,0,0.05)] pt-[env(safe-area-inset-top,20px)] backdrop-blur-md transition-transform duration-500 ease-in-out ${
+        className={`shrink-0 border-b bg-white/95 shadow-sm backdrop-blur-md transition-transform duration-500 ease-in-out ${
           headerVisible ? "translate-y-0" : "-translate-y-16"
         }`}
       >
+        <div className="h-[env(safe-area-inset-top,0px)]" />
+        <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4">
         <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4">
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
@@ -673,7 +675,7 @@ export default function RoomMenu() {
         </div>
 
         {/* Category rail */}
-        <div className="mx-auto box-border flex h-20 shrink-0 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
+        <div className="mx-auto box-border flex h-16 shrink-0 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
           <div className="w-full">
             <MenuBrowserRail
               visibleCategories={visibleCategories}
@@ -714,7 +716,7 @@ export default function RoomMenu() {
         )}
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 box-border w-full max-w-full overflow-hidden border-t border-white/70 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
+      <nav className="shrink-0 border-t border-slate-200/60 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">
         <div className="mx-auto grid w-full max-w-[min(42rem,100%)] min-w-0 grid-cols-5 items-end gap-1 min-[360px]:gap-2">
           <button
             type="button"
@@ -771,7 +773,7 @@ export default function RoomMenu() {
             <span className="max-w-full truncate">Request</span>
           </button>
         </div>
-      </div>
+      </nav>
 
       <PublicMenuDropdown
         menu={menu}
