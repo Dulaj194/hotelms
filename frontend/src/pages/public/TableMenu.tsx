@@ -99,6 +99,7 @@ export default function TableMenu() {
   const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuTile | null>(null);
 
+  const [isMenuSelectionActive, setIsMenuSelectionActive] = useState(false);
   const lastMenuScrollYRef = useRef(0);
   const isHeaderTransitioningRef = useRef(false);
   const headerTransitionTimeoutRef = useRef<number | null>(null);
@@ -121,11 +122,39 @@ export default function TableMenu() {
     visibleCategories,
   } = usePublicMenuBrowser(menu);
 
-  const navigationItems = useMemo(() => [null, ...visibleCategories], [visibleCategories]);
+  const sortedCategories = useMemo(() => {
+    if (!isMenuSelectionActive || activeCategoryId === null || !menu) {
+      return visibleCategories;
+    }
+
+    const selected = visibleCategories.find((c) => c.id === activeCategoryId);
+    if (!selected) return visibleCategories;
+
+    // Find siblings in the same menu section
+    let siblings: typeof visibleCategories = [];
+    let others: typeof visibleCategories = [];
+
+    // Find the section containing the active category
+    const section = menu.menus.find((m) =>
+      m.categories.some((c) => c.id === activeCategoryId)
+    ) || (menu.uncategorized_categories.some(c => c.id === activeCategoryId) ? { categories: menu.uncategorized_categories } : null);
+
+    if (section && section.categories) {
+      const sectionCategoryIds = new Set(section.categories.map(c => c.id));
+      siblings = section.categories.filter((c) => c.id !== activeCategoryId);
+      others = visibleCategories.filter((c) => !sectionCategoryIds.has(c.id));
+      return [selected, ...siblings, ...others];
+    }
+
+    return visibleCategories;
+  }, [activeCategoryId, isMenuSelectionActive, menu, visibleCategories]);
+
+  const navigationItems = useMemo(() => [null, ...sortedCategories], [sortedCategories]);
 
 
 
   const handleCategorySelect = (categoryId: number | null) => {
+    setIsMenuSelectionActive(false); // Reset custom sort when clicking directly on the rail or "All"
     setActiveCategoryId(categoryId);
     const index = navigationItems.findIndex((item) => (item?.id ?? null) === categoryId);
     if (scrollRef.current && index !== -1) {
@@ -822,7 +851,7 @@ export default function TableMenu() {
         <div className="sticky top-0 z-40 w-full border-b border-slate-200/60 bg-white/95 backdrop-blur-md">
           <div className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center px-4 sm:px-6">
             <MenuBrowserRail
-              visibleCategories={visibleCategories}
+              visibleCategories={sortedCategories}
               activeCategoryId={activeCategoryId}
               onSelectCategory={handleCategorySelect}
             />
@@ -950,11 +979,13 @@ export default function TableMenu() {
           menu={menu}
           activeCategoryId={activeCategoryId}
           onSelectCategory={(id) => {
+            setIsMenuSelectionActive(true); // Enable custom sort flow
             setActiveCategoryId(id);
             if (id === null) {
               handleScrollTo("menu-top");
             } else {
-              handleScrollTo("menu-list");
+              // Wait for the re-ordering and rendering to complete before scrolling
+              setTimeout(() => handleScrollTo(`category-section-${id}`), 100);
             }
           }}
           isOpen={menuDropdownOpen}
