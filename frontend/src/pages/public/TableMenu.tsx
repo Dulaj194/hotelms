@@ -594,10 +594,10 @@ export default function TableMenu() {
       <article
         key={item.id}
         id={`item-${item.id}`}
-        className="group relative flex h-full w-full flex-col overflow-hidden rounded-[24px] bg-white p-4 shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
+        className="group relative flex h-full w-full flex-col overflow-hidden rounded-[24px] bg-white p-3 shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
       >
         {/* 1. Image Section */}
-        <div className="relative w-full overflow-hidden rounded-t-[16px] bg-[#F8F9FB] h-[140px] sm:h-[160px] lg:h-[180px]">
+        <div className="relative w-full overflow-hidden rounded-[16px] bg-[#F8F9FB] h-[140px] sm:h-[160px] lg:h-[180px]">
           <SafeMenuAsset
             path={item.image_path}
             alt={item.name}
@@ -910,7 +910,7 @@ export default function TableMenu() {
                         <p className="mt-1 text-xs font-medium text-slate-400">This category is currently being updated. Check back soon!</p>
                       </div>
                     ) : (
-                      <div className="grid w-full max-w-full min-w-0 grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+                      <div className="grid w-full grid-cols-2 gap-[10px] p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
                         {categoryTiles.map(renderItemCard)}
                       </div>
                     )}
