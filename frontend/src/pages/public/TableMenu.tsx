@@ -565,6 +565,22 @@ export default function TableMenu() {
   const displayTableNumber =
     tableNumber && /^\d+$/.test(tableNumber) ? tableNumber.padStart(2, "0") : tableNumber;
 
+  const formatPrice = (price: number) => `$${price.toFixed(2)}`;
+
+  const handleDecreaseQty = (itemId: number, qtyInCart: number) => {
+    if (qtyInCart > 1) {
+      updateItem(itemId, qtyInCart - 1);
+      return;
+    }
+    removeItem(itemId);
+  };
+
+  const getAddButtonLabel = (itemName: string, isAdding: boolean, wasAdded: boolean) => {
+    if (isAdding) return `Adding ${itemName} to cart`;
+    if (wasAdded) return `${itemName} added to cart`;
+    return `Add ${itemName} to cart`;
+  };
+
   const renderItemCard = ({ item, categoryName }: MenuTile) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
@@ -579,7 +595,7 @@ export default function TableMenu() {
           !item.is_available ? "opacity-60 grayscale-[0.5]" : ""
         }`}
       >
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.65rem]">
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.65rem] bg-slate-100">
           <SafeMenuAsset
             path={item.image_path}
             alt={item.name}
@@ -609,22 +625,35 @@ export default function TableMenu() {
             {item.description || "Freshly prepared with premium ingredients."}
           </p>
 
-          <div className="mt-auto flex items-center justify-between pt-2">
-            <span className="text-lg font-black text-slate-900">
-              ${item.price.toFixed(2)}
-            </span>
+          <div className="mt-auto space-y-2 pt-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-lg font-black text-slate-900">{formatPrice(item.price)}</span>
+              <span
+                className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                  item.is_available
+                    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+                    : "bg-rose-50 text-rose-700 ring-1 ring-rose-100"
+                }`}
+              >
+                {item.is_available ? "Available" : "Unavailable"}
+              </span>
+            </div>
             
             {qtyInCart > 0 ? (
               <div className="flex items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-lg">
                 <button
-                  onClick={() => qtyInCart > 1 ? updateItem(item.id, qtyInCart - 1) : removeItem(item.id)}
+                  type="button"
+                  onClick={() => handleDecreaseQty(item.id, qtyInCart)}
+                  aria-label={`Reduce ${item.name} quantity`}
                   className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90"
                 >
                   -
                 </button>
                 <span className="min-w-[1ch] text-xs font-black">{qtyInCart}</span>
                 <button
+                  type="button"
                   onClick={() => updateItem(item.id, qtyInCart + 1)}
+                  aria-label={`Increase ${item.name} quantity`}
                   className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 transition hover:bg-orange-600 active:scale-90"
                 >
                   +
@@ -632,8 +661,14 @@ export default function TableMenu() {
               </div>
             ) : (
               <button
+                type="button"
                 disabled={isAdding || !item.is_available || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
+                aria-label={getAddButtonLabel(
+                  item.name,
+                  isAdding,
+                  recentlyAddedItemId === item.id
+                )}
                 className={`relative flex h-10 items-center justify-center gap-2 rounded-full px-5 transition-all duration-300 active:scale-95 disabled:opacity-50 ${
                   recentlyAddedItemId === item.id
                     ? "bg-emerald-500 text-white"
