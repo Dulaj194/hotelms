@@ -20,7 +20,6 @@ import {
   setGuestQrAccessKey,
 } from "@/hooks/useGuestSession";
 import { useLocalTableCart } from "@/hooks/useLocalMenuCart";
-import { toAssetUrl } from "@/lib/assets";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import { publicGet } from "@/lib/publicApi";
