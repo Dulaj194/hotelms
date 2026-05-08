@@ -690,7 +690,7 @@ export default function RoomMenu() {
       {/* Item grid */}
       <main
         id="menu-list"
-        className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-40 no-scrollbar"
+        className="flex-1 overflow-y-auto px-4 py-4 pb-40 no-scrollbar"
         {...menuSwipeHandlers}
       >
         <div className="mx-auto w-full max-w-[min(42rem,100%)] space-y-8">

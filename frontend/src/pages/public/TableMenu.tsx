@@ -805,7 +805,7 @@ export default function TableMenu() {
 
       <main
         id="menu-content"
-        className="flex-1 overflow-y-auto overscroll-contain no-scrollbar"
+        className="flex-1 overflow-y-auto no-scrollbar"
         onScroll={handleContentScroll}
       >
         <div className="mx-auto w-full max-w-[min(72rem,100%)] px-4 py-4 pb-40">
