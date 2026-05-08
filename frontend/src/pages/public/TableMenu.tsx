@@ -625,7 +625,7 @@ export default function TableMenu() {
               {item.name}
             </h3>
             <span className="shrink-0 text-[20px] font-extrabold text-[#0F172A]">
-              ${item.price.toFixed(2)}
+              {formatPrice(item.price)}
             </span>
           </div>
 
