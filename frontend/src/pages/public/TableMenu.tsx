@@ -589,21 +589,21 @@ export default function TableMenu() {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
-    const metaLabel = categoryName;
 
     return (
       <article
         key={item.id}
         id={`item-${item.id}`}
-        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white p-2 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.08)] ${
-          !item.is_available ? "opacity-75 grayscale-[0.3]" : ""
+        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white p-2.5 shadow-sm transition-all duration-500 hover:-translate-y-1.5 hover:border-orange-200 hover:shadow-[0_32px_64px_-16px_rgba(15,23,42,0.12)] ${
+          !item.is_available ? "opacity-75 grayscale-[0.4]" : ""
         }`}
       >
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[2rem] bg-slate-100">
+        {/* Image Container */}
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[2rem] bg-slate-50">
           <SafeMenuAsset
             path={item.image_path}
             alt={item.name}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="h-full w-full object-cover transition-transform duration-1000 group-hover:scale-110"
             fallback={<UtensilsCrossed className="h-8 w-8 text-slate-200" />}
           />
           {!item.is_available && (
@@ -615,48 +615,50 @@ export default function TableMenu() {
           )}
           {item.is_available && (
             <div className="absolute right-3 top-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur-md">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur-md ring-1 ring-black/5">
                 <Sparkles className="h-4 w-4 text-orange-500" />
               </div>
             </div>
           )}
         </div>
 
-        <div className="flex flex-1 flex-col gap-3 p-4 pt-5">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="min-w-0 flex-1 break-words text-lg font-black leading-tight text-slate-900 line-clamp-2">
+        {/* Content Section */}
+        <div className="flex flex-1 flex-col gap-2 p-4 pt-5">
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-500/80">
+              {categoryName}
+            </span>
+            <h3 className="min-w-0 break-words text-lg font-black leading-tight text-slate-900 line-clamp-2">
               {item.name}
             </h3>
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
-              {metaLabel}
-            </span>
           </div>
 
-          <p className="text-xs leading-relaxed text-slate-500 line-clamp-2">
+          <p className="text-[11px] leading-relaxed text-slate-500 line-clamp-2">
             {item.description || "Chef's special selection prepared with the finest seasonal ingredients."}
           </p>
 
-          <div className="mt-auto flex items-center justify-between pt-3">
+          {/* Footer - Price & Actions */}
+          <div className="mt-auto flex items-center justify-between border-t border-slate-50 pt-4">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Price</span>
-              <span className="text-xl font-black text-slate-900">{formatPrice(item.price)}</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Price</span>
+              <span className="text-xl font-black tracking-tight text-slate-900">{formatPrice(item.price)}</span>
             </div>
             
             {qtyInCart > 0 ? (
-              <div className="flex items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-xl animate-in zoom-in-95 duration-300">
+              <div className="flex h-11 items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-lg animate-in zoom-in-95 duration-300">
                 <button
                   type="button"
                   onClick={() => handleDecreaseQty(item.id, qtyInCart)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-lg transition hover:bg-white/20 active:scale-90"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-lg font-medium transition hover:bg-white/20 active:scale-90"
                   aria-label="Decrease quantity"
                 >
                   −
                 </button>
-                <span className="min-w-[1.5ch] text-center text-sm font-black">{qtyInCart}</span>
+                <span className="min-w-[1.2ch] text-center text-sm font-black">{qtyInCart}</span>
                 <button
                   type="button"
                   onClick={() => handleIncreaseQty(item.id, qtyInCart)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-lg transition hover:bg-orange-600 active:scale-90"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-lg font-medium transition hover:bg-orange-600 active:scale-90"
                   aria-label="Increase quantity"
                 >
                   +
@@ -667,10 +669,10 @@ export default function TableMenu() {
                 type="button"
                 disabled={isAdding || !item.is_available || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className={`group/btn relative flex h-11 items-center justify-center gap-2 rounded-full px-6 font-bold transition-all duration-300 active:scale-95 disabled:opacity-40 ${
+                className={`group/btn relative flex h-11 items-center justify-center gap-2.5 rounded-full px-6 font-bold transition-all duration-300 active:scale-95 disabled:opacity-40 ${
                   recentlyAddedItemId === item.id
                     ? "bg-emerald-500 text-white shadow-[0_12px_24px_rgba(16,185,129,0.3)]"
-                    : "bg-slate-100 text-slate-900 hover:bg-orange-500 hover:text-white hover:shadow-[0_12px_24px_rgba(249,115,22,0.3)]"
+                    : "bg-slate-100 text-slate-900 hover:bg-slate-900 hover:text-white"
                 }`}
               >
                 {isAdding ? (
@@ -679,8 +681,8 @@ export default function TableMenu() {
                   <Check className="h-5 w-5 animate-in zoom-in-50" />
                 ) : (
                   <>
-                    <span className="text-xs">Add to Cart</span>
-                    <ShoppingCart className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
+                    <span className="text-xs">Add</span>
+                    <ShoppingCart className="h-4 w-4 transition-transform group-hover/btn:scale-110" />
                   </>
                 )}
               </button>
