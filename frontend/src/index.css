@@ -160,7 +160,8 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  .horizontal-scroll {
+  .horizontal-scroll,
+  .vertical-scroll {
     -webkit-overflow-scrolling: touch;
   }
 }

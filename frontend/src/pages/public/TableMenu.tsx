@@ -175,17 +175,17 @@ export default function TableMenu() {
     const lastScrollTop = lastMenuScrollYRef.current;
     const delta = currentScrollTop - lastScrollTop;
 
-    // Higher threshold for hiding, lower for showing (more responsive)
-    if (delta > 20 && currentScrollTop > 120) {
+    // Higher threshold for hiding (30px), lower for showing (10px) to stabilize momentum
+    if (delta > 30 && currentScrollTop > 150) {
       if (headerVisible) {
         setHeaderVisible(false);
         isHeaderTransitioningRef.current = true;
         if (headerTransitionTimeoutRef.current) window.clearTimeout(headerTransitionTimeoutRef.current);
         headerTransitionTimeoutRef.current = window.setTimeout(() => {
           isHeaderTransitioningRef.current = false;
-        }, 400); // Slightly more than transition duration
+        }, 400); 
       }
-    } else if (delta < -8 || currentScrollTop < 40) {
+    } else if (delta < -12 || currentScrollTop < 50) {
       if (!headerVisible) {
         setHeaderVisible(true);
         isHeaderTransitioningRef.current = true;
@@ -805,7 +805,7 @@ export default function TableMenu() {
 
       <main
         id="menu-content"
-        className="flex-1 overflow-y-auto no-scrollbar"
+        className="flex-1 overflow-y-auto no-scrollbar vertical-scroll"
         onScroll={handleContentScroll}
       >
         <div className="mx-auto w-full max-w-[min(72rem,100%)] px-4 py-4 pb-40">

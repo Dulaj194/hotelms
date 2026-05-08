@@ -318,7 +318,7 @@ export default function RoomMenu() {
   const [headerVisible, setHeaderVisible] = useState(true);
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
   const lastMenuScrollYRef = useRef(0);
-  const menuScrollFrameRef = useRef<number | null>(null);
+
   
   const [isRequestingService, setIsRequestingService] = useState(false);
   const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
@@ -377,54 +377,21 @@ export default function RoomMenu() {
   }, [restaurantId]);
 
   // 3. Scroll visibility logic
-  useEffect(() => {
-    const topRevealOffset = 40;
-    const scrollDeltaThreshold = 15;
+  const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const currentScrollTop = e.currentTarget.scrollTop;
+    const lastScrollTop = lastMenuScrollYRef.current;
+    const delta = currentScrollTop - lastScrollTop;
 
-    lastMenuScrollYRef.current = window.scrollY;
+    if (currentScrollTop <= 40) {
+      setHeaderVisible(true);
+      lastMenuScrollYRef.current = currentScrollTop;
+      return;
+    }
 
-    const updateHeaderVisibility = () => {
-      const currentScrollY = window.scrollY;
-      const lastScrollY = lastMenuScrollYRef.current;
-      const scrollDelta = currentScrollY - lastScrollY;
-
-      const windowHeight = window.innerHeight;
-      const documentHeight = document.documentElement.scrollHeight;
-
-      if (currentScrollY <= topRevealOffset) {
-        setHeaderVisible(true);
-        lastMenuScrollYRef.current = currentScrollY;
-        menuScrollFrameRef.current = null;
-        return;
-      }
-
-      // Prevent header jitter at the bottom
-      if (currentScrollY + windowHeight >= documentHeight - 50) {
-        menuScrollFrameRef.current = null;
-        return;
-      }
-
-      if (Math.abs(scrollDelta) >= scrollDeltaThreshold) {
-        setHeaderVisible(scrollDelta < 0);
-        lastMenuScrollYRef.current = currentScrollY;
-      }
-
-      menuScrollFrameRef.current = null;
-    };
-
-    const handleWindowScroll = () => {
-      if (menuScrollFrameRef.current !== null) return;
-      menuScrollFrameRef.current = window.requestAnimationFrame(updateHeaderVisibility);
-    };
-
-    window.addEventListener("scroll", handleWindowScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener("scroll", handleWindowScroll);
-      if (menuScrollFrameRef.current !== null) {
-        window.cancelAnimationFrame(menuScrollFrameRef.current);
-      }
-    };
+    if (Math.abs(delta) >= 20) {
+      setHeaderVisible(delta < 0);
+      lastMenuScrollYRef.current = currentScrollTop;
+    }
   }, []);
 
   const handleAddToCart = useCallback(
@@ -690,7 +657,8 @@ export default function RoomMenu() {
       {/* Item grid */}
       <main
         id="menu-list"
-        className="flex-1 overflow-y-auto px-4 py-4 pb-40 no-scrollbar"
+        onScroll={handleContentScroll}
+        className="flex-1 overflow-y-auto px-4 py-4 pb-40 no-scrollbar vertical-scroll"
         {...menuSwipeHandlers}
       >
         <div className="mx-auto w-full max-w-[min(42rem,100%)] space-y-8">
