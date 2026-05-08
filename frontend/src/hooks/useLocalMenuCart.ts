@@ -151,6 +151,7 @@ export function useLocalTableCart(params: {
           quantity,
           line_total: Math.round(unitPrice * quantity * 100) / 100,
           is_available: item.is_available,
+          image_path: item.image_path,
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -284,6 +285,7 @@ export function useLocalRoomCart(params: {
           quantity,
           line_total: Math.round(unitPrice * quantity * 100) / 100,
           is_available: item.is_available,
+          image_path: item.image_path,
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);

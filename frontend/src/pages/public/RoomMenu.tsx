@@ -12,7 +12,7 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, ChefHat, ChevronRight, Menu as MenuIcon, Search, ShoppingCart } from "lucide-react";
+import { Bell, ChefHat, ChevronRight, Menu as MenuIcon, Search, ShoppingCart, X } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
@@ -21,6 +21,8 @@ import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { useLocalRoomCart } from "@/hooks/useLocalMenuCart";
 import { toAssetUrl } from "@/lib/assets";
 import { publicGet, publicPost } from "@/lib/publicApi";
+import SafeMenuAsset from "@/components/public/SafeMenuAsset";
+import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import QuickServiceDrawer from "@/components/public/QuickServiceDrawer";
 import { getRoomToken } from "@/hooks/useRoomSession";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
@@ -187,71 +189,64 @@ function RoomCartDrawer({
                 cart.items.map((item) => (
                   <div
                     key={item.item_id}
-                    className="space-y-2 rounded-xl border p-3"
+                    className="flex gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm break-words">{item.name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          ${item.unit_price.toFixed(2)} each
-                        </p>
-                        {!item.is_available && (
-                          <p className="text-xs text-red-500 mt-0.5">Unavailable</p>
-                        )}
-                      </div>
-
-                      {/* Remove button */}
-                      <button
-                        onClick={() => onRemoveItem(item.item_id)}
-                        className="grid h-10 w-10 flex-shrink-0 place-items-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                        aria-label={`Remove ${item.name}`}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                      </button>
+                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-50 bg-slate-50">
+                      <SafeMenuAsset
+                        path={item.image_path}
+                        alt={item.name}
+                        className="h-full w-full object-cover"
+                        fallback={
+                          <div className="flex h-full w-full items-center justify-center text-slate-300">
+                            <ChefHat className="h-6 w-6" />
+                          </div>
+                        }
+                      />
                     </div>
-
-                    <div className="flex items-center justify-between gap-2">
-                      {/* Quantity controls */}
-                      <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 p-1">
+                    <div className="flex flex-1 min-w-0 flex-col justify-between">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm text-slate-900 break-words line-clamp-1">{item.name}</p>
+                          <p className="text-xs font-medium text-slate-500 mt-0.5">
+                            ${item.unit_price.toFixed(2)} each
+                          </p>
+                          {!item.is_available && (
+                            <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-wider">Unavailable</p>
+                          )}
+                        </div>
                         <button
-                          onClick={() =>
-                            item.quantity > 1
-                              ? onUpdateItem(item.item_id, item.quantity - 1)
-                              : onRemoveItem(item.item_id)
-                          }
-                          className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold transition-colors hover:bg-white"
-                          aria-label="Decrease"
+                          onClick={() => onRemoveItem(item.item_id)}
+                          className="grid h-8 w-8 place-items-center rounded-full text-slate-300 transition-colors hover:bg-red-50 hover:text-red-500"
                         >
-                          -
-                        </button>
-                        <span className="w-6 text-center text-sm font-semibold">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
-                          aria-label="Increase"
-                        >
-                          +
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
 
-                      {/* Line total */}
-                      <div className="text-xs font-semibold">
-                        ${item.line_total.toFixed(2)}
+                      <div className="flex items-center justify-between gap-2 mt-2">
+                        <div className="flex items-center gap-1 rounded-full border border-slate-100 bg-slate-50 p-1">
+                          <button
+                            onClick={() =>
+                              item.quantity > 1
+                                ? onUpdateItem(item.item_id, item.quantity - 1)
+                                : onRemoveItem(item.item_id)
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm font-bold shadow-sm transition active:scale-90"
+                          >
+                            -
+                          </button>
+                          <span className="w-6 text-center text-xs font-bold text-slate-900">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white shadow-sm transition active:scale-90"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="text-sm font-black text-slate-900">
+                          ${item.line_total.toFixed(2)}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -323,6 +318,7 @@ export default function RoomMenu() {
   const [isRequestingService, setIsRequestingService] = useState(false);
   const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
   const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<PublicItemSummaryResponse | null>(null);
 
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing } =
     useLocalRoomCart({
@@ -399,6 +395,18 @@ export default function RoomMenu() {
       setAddingItemId(itemId);
       try {
         await addItem(itemId, 1);
+      } finally {
+        setAddingItemId(null);
+      }
+    },
+    [addItem]
+  );
+  
+  const handleAddToCartWithQty = useCallback(
+    async (itemId: number, quantity: number) => {
+      setAddingItemId(itemId);
+      try {
+        await addItem(itemId, quantity);
       } finally {
         setAddingItemId(null);
       }
@@ -489,19 +497,23 @@ export default function RoomMenu() {
     return (
       <div
         key={item.id}
-        className={`box-border flex h-full w-full max-w-full min-w-0 flex-col overflow-hidden rounded-xl border bg-white ${
+        onClick={() => setSelectedItem(item)}
+        className={`box-border flex h-full w-full max-w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition-all hover:shadow-md ${
           !item.is_available ? "opacity-60" : ""
         }`}
       >
-        {item.image_path && (
-          <img
-            src={toAssetUrl(item.image_path)}
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-50">
+          <SafeMenuAsset
+            path={item.image_path}
             alt={item.name}
-            loading="lazy"
-            decoding="async"
-            className="block aspect-[4/3] w-full max-w-full object-cover"
+            className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+            fallback={
+              <div className="flex h-full w-full items-center justify-center text-slate-300">
+                <ChefHat className="h-8 w-8" />
+              </div>
+            }
           />
-        )}
+        </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
           <div className="flex min-w-0 items-start justify-between gap-2">
             <p className="min-w-0 break-words text-sm font-semibold leading-tight line-clamp-2">{item.name}</p>
@@ -530,11 +542,12 @@ export default function RoomMenu() {
           {qtyInCart > 0 ? (
             <div className="box-border flex min-h-10 w-full max-w-full items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
               <button
-                onClick={() =>
+                onClick={(e) => {
+                  e.stopPropagation();
                   qtyInCart > 1
                     ? updateItem(item.id, qtyInCart - 1)
-                    : removeItem(item.id)
-                }
+                    : removeItem(item.id);
+                }}
                 className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-gray-600 transition-colors hover:bg-white"
                 aria-label="Decrease"
               >
@@ -542,7 +555,10 @@ export default function RoomMenu() {
               </button>
               <span className="text-sm font-semibold w-6 text-center">{qtyInCart}</span>
               <button
-                onClick={() => updateItem(item.id, qtyInCart + 1)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateItem(item.id, qtyInCart + 1);
+                }}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white transition-colors hover:bg-orange-600"
                 aria-label="Increase"
               >
@@ -552,7 +568,10 @@ export default function RoomMenu() {
           ) : (
             <button
               disabled={isAdding || !sessionReady}
-              onClick={() => handleAddToCart(item.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddToCart(item.id);
+              }}
               className="box-border flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
             >
               {isAdding ? "Adding..." : "Add to Cart"}
@@ -784,6 +803,15 @@ export default function RoomMenu() {
         onRequestService={handleRequestService}
         isSubmitting={isRequestingService}
         lastRequestedType={lastRequestedService}
+      />
+
+      <ItemDetailSheet
+        item={selectedItem}
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+        onAddToCart={handleAddToCartWithQty}
+        qtyInCart={cart?.items.find(i => i.item_id === selectedItem?.id)?.quantity ?? 0}
+        formatPrice={(p) => `$${p.toFixed(2)}`}
       />
 
       {/* Room cart drawer */}

@@ -3,8 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Check,
-  ChevronDown,
-  ChevronUp,
+  ChevronRight,
   Minus,
   Pencil,
   Plus,
@@ -22,6 +21,8 @@ import {
 } from "@/hooks/useGuestSession";
 import { useLocalTableCart } from "@/hooks/useLocalMenuCart";
 import { toAssetUrl } from "@/lib/assets";
+import SafeMenuAsset from "@/components/public/SafeMenuAsset";
+import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import { publicGet } from "@/lib/publicApi";
 import type { CartItemResponse } from "@/types/cart";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
@@ -54,9 +55,6 @@ function buildMenuItems(menu: PublicMenuResponse | null): MenuItemWithCategory[]
   );
 }
 
-function getItemImage(item: MenuItemWithCategory | undefined): string | undefined {
-  return toAssetUrl(item?.image_path);
-}
 
 export default function TableCartCheckout() {
   const navigate = useNavigate();
@@ -73,7 +71,6 @@ export default function TableCartCheckout() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<number>>(() => new Set());
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [couponInput, setCouponInput] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -81,6 +78,7 @@ export default function TableCartCheckout() {
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<PublicItemSummaryResponse | null>(null);
 
   const customerName =
     restaurantContextId && tableNumber
@@ -176,17 +174,6 @@ export default function TableCartCheckout() {
     }
   }, [itemCount]);
 
-  const toggleDetails = useCallback((itemId: number) => {
-    setExpandedItems((current) => {
-      const next = new Set(current);
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
-      return next;
-    });
-  }, []);
 
   const handleApplyCoupon = useCallback(async () => {
     const code = couponInput.trim();
@@ -234,30 +221,23 @@ export default function TableCartCheckout() {
     }
   }, [appliedCoupon, itemCount, placeOrder, restaurantId, tableNumber]);
 
-  const renderImage = (item: MenuItemWithCategory | undefined, name: string) => {
-    const imageUrl = getItemImage(item);
-    if (imageUrl) {
-      return (
-        <img
-          src={imageUrl}
-          alt={name}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-cover"
-        />
-      );
-    }
-
+  const renderImage = (path: string | undefined | null, name: string) => {
     return (
-      <div className="grid h-full w-full place-items-center bg-gradient-to-br from-orange-50 via-white to-emerald-50 text-orange-300">
-        <UtensilsCrossed className="h-6 w-6" />
-      </div>
+      <SafeMenuAsset
+        path={path}
+        alt={name}
+        className="h-full w-full object-cover"
+        fallback={
+          <div className="grid h-full w-full place-items-center bg-gradient-to-br from-orange-50 via-white to-emerald-50 text-orange-300">
+            <UtensilsCrossed className="h-6 w-6" />
+          </div>
+        }
+      />
     );
   };
 
   const renderCartItem = (item: CartItemResponse) => {
     const menuItem = itemById.get(item.item_id);
-    const expanded = expandedItems.has(item.item_id);
 
     return (
       <article
@@ -266,7 +246,7 @@ export default function TableCartCheckout() {
       >
         <div className="grid grid-cols-[5.25rem_minmax(0,1fr)] gap-3">
           <div className="h-[5.25rem] w-[5.25rem] overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
-            {renderImage(menuItem, item.name)}
+            {renderImage(item.image_path, item.name)}
           </div>
 
           <div className="min-w-0">
@@ -331,21 +311,12 @@ export default function TableCartCheckout() {
 
         <button
           type="button"
-          onClick={() => toggleDetails(item.item_id)}
+          onClick={() => setSelectedItem(menuItem ?? null)}
           className="mt-3 flex min-h-10 w-full items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
         >
-          Product details
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          View details
+          <ChevronRight className="h-4 w-4" />
         </button>
-
-        {expanded && (
-          <div className="mt-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-xs leading-5 text-slate-600">
-            <p>{menuItem?.description?.trim() || "No additional details available."}</p>
-            {menuItem?.categoryName && (
-              <p className="mt-1 font-semibold text-slate-500">Category: {menuItem.categoryName}</p>
-            )}
-          </div>
-        )}
       </article>
     );
   };
@@ -485,7 +456,7 @@ export default function TableCartCheckout() {
                     className="flex min-h-[14.5rem] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_20px_rgba(15,23,42,0.06)]"
                   >
                     <div className="h-24 bg-slate-50">
-                      {renderImage(item, item.name)}
+                      {renderImage(item.image_path, item.name)}
                     </div>
                     <div className="flex flex-1 flex-col p-3">
                       <h3 className="line-clamp-2 min-h-9 text-xs font-bold leading-4 text-slate-900">
@@ -606,6 +577,17 @@ export default function TableCartCheckout() {
           </button>
         </div>
       </div>
+
+      <ItemDetailSheet
+        item={selectedItem}
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+        onAddToCart={async (id, qty) => {
+          await addItem(id, qty);
+        }}
+        qtyInCart={cart?.items.find(i => i.item_id === selectedItem?.id)?.quantity ?? 0}
+        formatPrice={formatCurrency}
+      />
     </div>
   );
 }

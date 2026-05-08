@@ -20,6 +20,7 @@ import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import QuickServiceDrawer from "@/components/public/QuickServiceDrawer";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
+import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { getGuestToken } from "@/hooks/useGuestSession";
 import {
@@ -96,6 +97,7 @@ export default function TableMenu() {
   const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);
   const [isRequestingService, setIsRequestingService] = useState(false);
   const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<MenuTile | null>(null);
 
   const lastMenuScrollYRef = useRef(0);
   const isHeaderTransitioningRef = useRef(false);
@@ -306,6 +308,21 @@ export default function TableMenu() {
         await addItem(itemId, 1);
         setRecentlyAddedItemId(itemId);
         // Haptic feedback
+        if (window.navigator.vibrate) window.navigator.vibrate([10, 30, 10]);
+        setTimeout(() => setRecentlyAddedItemId(null), 1500);
+      } finally {
+        setAddingItemId(null);
+      }
+    },
+    [addItem]
+  );
+
+  const handleAddToCartWithQty = useCallback(
+    async (itemId: number, quantity: number) => {
+      setAddingItemId(itemId);
+      try {
+        await addItem(itemId, quantity);
+        setRecentlyAddedItemId(itemId);
         if (window.navigator.vibrate) window.navigator.vibrate([10, 30, 10]);
         setTimeout(() => setRecentlyAddedItemId(null), 1500);
       } finally {
@@ -575,7 +592,7 @@ export default function TableMenu() {
     tableNumber && /^\d+$/.test(tableNumber) ? tableNumber.padStart(2, "0") : tableNumber;
 
 
-  const renderItemCard = ({ item, categoryName }: MenuTile) => {
+  const renderItemCard = ({ item, categoryId, categoryName }: MenuTile) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
@@ -584,7 +601,8 @@ export default function TableMenu() {
       <article
         key={item.id}
         id={`item-${item.id}`}
-        className="group relative flex h-full w-full flex-col overflow-hidden rounded-[24px] bg-white p-3 shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
+        onClick={() => setSelectedItem({ item, categoryId, categoryName })}
+        className="group relative flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-[24px] bg-white p-3 shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
       >
         {/* 1. Image Section */}
         <div className="relative w-full overflow-hidden rounded-[16px] bg-[#F8F9FB] h-[140px] sm:h-[160px] lg:h-[180px]">
@@ -630,7 +648,10 @@ export default function TableMenu() {
               <div className="flex h-[48px] w-full items-center justify-between rounded-[16px] bg-[#0F172A] p-1.5 text-white shadow-lg">
                 <button
                   type="button"
-                  onClick={() => handleDecreaseQty(item.id, qtyInCart)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDecreaseQty(item.id, qtyInCart);
+                  }}
                   className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-xl transition hover:bg-white/20 active:scale-90"
                 >
                   −
@@ -638,7 +659,10 @@ export default function TableMenu() {
                 <span className="text-[16px] font-bold">{qtyInCart}</span>
                 <button
                   type="button"
-                  onClick={() => handleIncreaseQty(item.id, qtyInCart)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleIncreaseQty(item.id, qtyInCart);
+                  }}
                   className="grid h-9 w-9 place-items-center rounded-full bg-[#FF7A00] text-xl transition hover:bg-[#FF7A00]/90 active:scale-90"
                 >
                   +
@@ -648,7 +672,10 @@ export default function TableMenu() {
               <button
                 type="button"
                 disabled={isAdding || !item.is_available || !sessionReady}
-                onClick={() => handleAddToCart(item.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToCart(item.id);
+                }}
                 className={`flex h-[48px] w-full items-center justify-center gap-2 rounded-[16px] text-[16px] font-semibold transition-all duration-300 active:scale-[0.98] disabled:opacity-40 ${
                   recentlyAddedItemId === item.id
                     ? "bg-emerald-500 text-white"
@@ -937,15 +964,20 @@ export default function TableMenu() {
 
       <QuickServiceDrawer
         isOpen={serviceDrawerOpen}
-        onClose={() => {
-          setServiceDrawerOpen(false);
-          setLastRequestedService(null);
-        }}
+        onClose={() => setServiceDrawerOpen(false)}
         onRequestService={handleRequestService}
         isSubmitting={isRequestingService}
         lastRequestedType={lastRequestedService}
       />
 
+      <ItemDetailSheet
+        item={selectedItem?.item ?? null}
+        isOpen={!!selectedItem}
+        onClose={() => setSelectedItem(null)}
+        onAddToCart={handleAddToCartWithQty}
+        qtyInCart={cart?.items.find(i => i.item_id === selectedItem?.item.id)?.quantity ?? 0}
+        formatPrice={formatPrice}
+      />
 
       {/* Profile drawer */}
       {profileDrawerOpen && (
