@@ -686,24 +686,23 @@ export default function TableMenu() {
         <div className="h-[env(safe-area-inset-top,0px)]" />
         <div className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-              <SafeMenuAsset
-                path={menu.restaurant.logo_url}
-                alt={menu.restaurant.name}
-                className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200"
-                fallback={<Store className="h-5 w-5" />}
-              />
-              <div className="min-w-0">
-                <p className="truncate text-base font-black text-slate-900">{menu.restaurant.name}</p>
-                <p className="text-[10px] font-bold text-slate-500">Table {displayTableNumber}</p>
-              </div>
+            <SafeMenuAsset
+              path={menu.restaurant.logo_url}
+              alt={menu.restaurant.name}
+              className="h-10 w-10 rounded-xl object-cover ring-1 ring-slate-200"
+              fallback={<Store className="h-5 w-5" />}
+            />
+            <div className="min-w-0">
+              <p className="truncate text-base font-black text-slate-900">{menu.restaurant.name}</p>
+              <p className="text-[10px] font-bold text-slate-500">Table {displayTableNumber}</p>
             </div>
-            <button
-              onClick={() => setProfileDrawerOpen(true)}
-              className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200"
-            >
-              <UserRound className="h-5 w-5" />
-            </button>
           </div>
+          <button
+            onClick={() => setProfileDrawerOpen(true)}
+            className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+          >
+            <UserRound className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Search Panel */}
@@ -782,9 +781,7 @@ export default function TableMenu() {
             )}
           </div>
         </div>
-
       </header>
-
 
       <main
         id="menu-content"
