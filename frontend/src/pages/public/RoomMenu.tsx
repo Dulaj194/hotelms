@@ -690,29 +690,43 @@ export default function RoomMenu() {
       {/* Item grid */}
       <main
         id="menu-list"
-        className="mx-auto box-border w-full max-w-[min(42rem,100%)] min-w-0 flex-1 touch-pan-y space-y-6 overflow-y-auto overscroll-contain px-4 py-4 pb-40 no-scrollbar"
+        className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-40 no-scrollbar"
         {...menuSwipeHandlers}
       >
-        {renderedCategories.length === 0 ? (
-          <p className="text-center text-gray-400 py-12">No categories available.</p>
-        ) : (
-          renderedCategories.map((category) => (
-            <section key={category.id} className="box-border w-full max-w-full min-w-0">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">{category.name}</h2>
-              {category.description && (
-                <p className="text-sm text-gray-500 mb-4">{category.description}</p>
-              )}
+        <div className="mx-auto w-full max-w-[min(42rem,100%)] space-y-8">
+          {navigationItems.map((navItem) => {
+            const catId = navItem?.id ?? null;
 
-              {category.items.length === 0 ? (
-                <p className="text-center text-gray-400 py-10">No items in this category.</p>
-              ) : (
-                <div className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-                  {category.items.map(renderItemCard)}
-                </div>
-              )}
-              </section>
-          ))
-        )}
+            // Only show the active category, or all if "All" is selected
+            if (activeCategoryId !== null && catId !== activeCategoryId) return null;
+
+            const category = visibleCategories.find((c) => c.id === catId);
+            const items = catId === null 
+              ? visibleCategories.flatMap(c => c.items) 
+              : category?.items ?? [];
+
+            if (items.length === 0 && catId !== null) return null;
+
+            return (
+              <div key={catId ?? "all"} className="space-y-4">
+                <h2 className="text-lg font-bold text-gray-900">
+                  {catId === null ? "All items" : navItem?.name}
+                </h2>
+                
+                {items.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-white py-12 text-center">
+                    <ChefHat className="mb-2 h-8 w-8 text-gray-300" />
+                    <p className="text-sm font-medium text-gray-400">No items found</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 min-[380px]:grid-cols-2">
+                    {items.map(renderItemCard)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </main>
 
       <nav className="shrink-0 border-t border-slate-200/60 bg-white/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl min-[360px]:px-4">

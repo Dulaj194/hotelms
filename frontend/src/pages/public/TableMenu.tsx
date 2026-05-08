@@ -817,115 +817,68 @@ export default function TableMenu() {
 
       <main
         id="menu-content"
-        className="mx-auto box-border flex w-full max-w-full flex-1 flex-col overflow-hidden"
+        className="flex-1 overflow-y-auto overscroll-contain no-scrollbar"
+        onScroll={handleContentScroll}
       >
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className={`no-scrollbar flex h-full w-full overflow-x-auto overflow-y-hidden ${
-            searchQuery ? "pointer-events-none opacity-0" : "snap-x snap-mandatory"
-          }`}
-        >
-          {navigationItems.map((navItem) => {
-            const catId = navItem?.id ?? null;
-            const categoryTiles =
-              catId === null
-                ? visibleCategories.flatMap((c) =>
-                    c.items.map((item) => ({
-                      item,
-                      categoryId: c.id,
-                      categoryName: c.name,
-                    })),
-                  )
-                : visibleCategories
-                    .filter((c) => c.id === catId)
-                    .flatMap((c) =>
-                      c.items.map((item) => ({
-                        item,
-                        categoryId: c.id,
-                        categoryName: c.name,
-                      })),
-                    );
-
-            return (
-              <div
-                key={catId ?? "all"}
-                onScroll={handleContentScroll}
-                className="box-border h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 py-3 pb-40 no-scrollbar sm:px-3 lg:px-0"
-              >
-                <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
-                  {/* Banner Only on "All" View */}
-                  {catId === null && (
-                    <section className="box-border w-full max-w-full min-w-0">
-                      <div className="relative box-border min-h-[12.75rem] w-full max-w-full min-w-0 overflow-hidden rounded-2xl bg-slate-950 px-5 py-5 text-white shadow-[0_14px_34px_rgba(15,23,42,0.16)] sm:min-h-[13.5rem] sm:px-6 sm:py-6 lg:min-h-[15rem]">
-                        {featuredBannerPaths.length > 0 && (
-                          <SafeMenuAsset
-                            path={featuredBannerPaths[activeBannerIndex]}
-                            alt="Featured menu banner"
-                            loading="eager"
-                            className="absolute inset-0 h-full w-full object-cover"
-                            fallbackClassName="absolute inset-0 bg-slate-950"
-                            fallback={null}
-                          />
-                        )}
-                        <div className="absolute inset-0 bg-slate-950/65" />
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(251,146,60,0.28),_transparent_36%),linear-gradient(180deg,rgba(15,23,42,0.1)_0%,rgba(15,23,42,0.55)_100%)]" />
-                        <div className="relative z-10 flex h-full min-h-[calc(12.75rem-2.5rem)] flex-col justify-between gap-4 sm:min-h-[calc(13.5rem-3rem)] sm:gap-5 lg:min-h-[calc(15rem-3rem)]">
-                          <div className="min-w-0">
-                            <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 sm:text-xs">
-                              <Sparkles className="h-3.5 w-3.5" />
-                              Featured picks
-                            </p>
-                            <h2 className="mt-4 max-w-full break-words text-[1.65rem] font-black leading-tight tracking-tight sm:max-w-xl sm:text-3xl">
-                              Order faster from your table.
-                            </h2>
-                            <p className="mt-2 max-w-full break-words text-sm leading-6 text-white/80 sm:max-w-2xl">
-                              Choose favorites, update quantities, and place your order without leaving the menu.
-                            </p>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-white/80 sm:text-xs">
-                            <span className="rounded-full bg-white/10 px-3 py-1.5">Fast add</span>
-                            <span className="rounded-full bg-white/10 px-3 py-1.5">Table session</span>
-                            <span className="rounded-full bg-white/10 px-3 py-1.5">Live cart</span>
-                          </div>
-                        </div>
-                      </div>
-                    </section>
-                  )}
-
-                  <section className="box-border w-full max-w-full min-w-0 space-y-3">
-                    <div className="flex min-w-0 items-end justify-between gap-2">
-                      <div className="min-w-0">
-                        <h2 className="text-xl font-black tracking-tight text-slate-900">
-                          {catId === null ? "All items" : navItem?.name}
-                        </h2>
-                        {catId !== null && navItem?.description && (
-                          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-                            {navItem.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {categoryTiles.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-white px-6 py-16 text-center">
-                        <div className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-slate-50 text-slate-300">
-                          <ChefHat className="h-8 w-8" />
-                        </div>
-                        <h3 className="text-sm font-bold text-slate-900">No items found</h3>
-                        <p className="mt-1 text-xs font-medium text-slate-400">This category is currently being updated. Check back soon!</p>
-                      </div>
-                    ) : (
-                      <div className="grid w-full grid-cols-2 gap-[10px] p-0 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-                        {categoryTiles.map(renderItemCard)}
-                      </div>
-                    )}
-                  </section>
+        <div className="mx-auto w-full max-w-[min(72rem,100%)] px-4 py-4 pb-40">
+          {/* Featured Banner */}
+          {activeCategoryId === null && featuredBannerPaths.length > 0 && (
+            <section className="mb-8 overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-xl">
+              <div className="relative aspect-[21/9] w-full overflow-hidden sm:aspect-[21/7]">
+                <SafeMenuAsset
+                  path={featuredBannerPaths[activeBannerIndex]}
+                  alt="Featured banner"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+                <div className="absolute bottom-6 left-6 right-6">
+                  <h2 className="text-2xl font-black tracking-tight sm:text-3xl">Deliciousness delivered.</h2>
+                  <p className="mt-1 text-sm font-medium text-white/80">Select your favorites and order in seconds.</p>
                 </div>
               </div>
-            );
-          })}
+            </section>
+          )}
+
+          {/* Product Grid */}
+          <section className="space-y-8">
+            {navigationItems.map((navItem) => {
+              const catId = navItem?.id ?? null;
+              
+              // Only show the active category, or all if "All" is selected
+              if (activeCategoryId !== null && catId !== activeCategoryId) return null;
+
+              const categoryTiles = visibleCategories
+                .filter((c) => catId === null || c.id === catId)
+                .flatMap((c) =>
+                  c.items.map((item) => ({
+                    item,
+                    categoryId: c.id,
+                    categoryName: c.name,
+                  })),
+                );
+
+              if (categoryTiles.length === 0 && catId !== null) return null;
+
+              return (
+                <div key={catId ?? "all"} id={catId ? `category-section-${catId}` : "all-section"} className="space-y-4">
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <h2 className="text-xl font-black tracking-tight text-slate-900">
+                        {catId === null ? "All items" : navItem?.name}
+                      </h2>
+                      {navItem?.description && (
+                        <p className="mt-1 text-xs font-medium text-slate-400">{navItem.description}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {categoryTiles.map(renderItemCard)}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
         </div>
       </main>
 
