@@ -11,8 +11,8 @@
  * 5. Guest places the order with X-Room-Key or X-Room-Session.
  * 6. Confirmation shown with order number.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, ChevronRight, Menu as MenuIcon, Search, ShoppingCart } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bell, ChefHat, ChevronRight, Menu as MenuIcon, Search, ShoppingCart } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
@@ -339,8 +339,9 @@ export default function RoomMenu() {
     selectNextCategory,
     selectPreviousCategory,
     visibleCategories,
-    selectedCategory,
   } = usePublicMenuBrowser(menu);
+
+  const navigationItems = useMemo(() => [null, ...visibleCategories], [visibleCategories]);
 
   const menuSwipeHandlers = useSwipeNavigation<HTMLDivElement>({
     onSwipeLeft: selectNextCategory,
@@ -510,8 +511,7 @@ export default function RoomMenu() {
     );
   }
 
-  const renderedCategories =
-    activeCategoryId === null ? visibleCategories : selectedCategory ? [selectedCategory] : [];
+
 
   const renderItemCard = (item: PublicItemSummaryResponse) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
@@ -694,7 +694,7 @@ export default function RoomMenu() {
         {...menuSwipeHandlers}
       >
         <div className="mx-auto w-full max-w-[min(42rem,100%)] space-y-8">
-          {navigationItems.map((navItem) => {
+          {navigationItems.map((navItem: any) => {
             const catId = navItem?.id ?? null;
 
             // Only show the active category, or all if "All" is selected

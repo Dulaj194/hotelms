@@ -4,7 +4,6 @@ import {
   AlertCircle,
   Bell,
   Check,
-  ChefHat,
   ChevronRight,
   LogOut,
   Menu as MenuIcon,
@@ -12,7 +11,6 @@ import {
   RefreshCcw,
   Search,
   ShoppingCart,
-  Sparkles,
   Store,
   UserRound,
   UtensilsCrossed,
@@ -123,17 +121,7 @@ export default function TableMenu() {
 
   const navigationItems = useMemo(() => [null, ...visibleCategories], [visibleCategories]);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (isScrollingRef.current || searchPanelOpen || searchQuery) return;
-    const scrollLeft = e.currentTarget.scrollLeft;
-    const width = e.currentTarget.clientWidth;
-    if (width === 0) return;
-    const index = Math.round(scrollLeft / width);
-    const targetId = navigationItems[index]?.id ?? null;
-    if (targetId !== activeCategoryId) {
-      setActiveCategoryId(targetId);
-    }
-  };
+
 
   const handleCategorySelect = (categoryId: number | null) => {
     setActiveCategoryId(categoryId);
@@ -829,6 +817,7 @@ export default function TableMenu() {
                   path={featuredBannerPaths[activeBannerIndex]}
                   alt="Featured banner"
                   className="absolute inset-0 h-full w-full object-cover"
+                  fallback={null}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
                 <div className="absolute bottom-6 left-6 right-6">
