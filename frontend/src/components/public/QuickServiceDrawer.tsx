@@ -47,14 +47,15 @@ export default function QuickServiceDrawer({
   lastRequestedType,
 }: QuickServiceDrawerProps) {
   const [customMessage, setCustomMessage] = useState("");
-  const touchStartRef = useRef<number | null>(null);
-  const touchMoveRef = useRef<number | null>(null);
-  const drawerRef = useRef<HTMLDivElement>(null);
+  const [dragY, setDragY] = useState(0);
+  const startY = useRef(0);
+  const isDragging = useRef(false);
 
   // Clear message when drawer closes or after successful request
   useEffect(() => {
     if (!isOpen) {
       setCustomMessage("");
+      setDragY(0);
     }
   }, [isOpen]);
 
@@ -63,67 +64,53 @@ export default function QuickServiceDrawer({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartRef.current = e.touches[0].clientY;
+    startY.current = e.touches[0].clientY;
+    isDragging.current = true;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStartRef.current === null) return;
-    const currentY = e.touches[0].clientY;
-    const deltaY = currentY - touchStartRef.current;
-
-    // If swiping down, we can optionally move the drawer for visual feedback
-    if (deltaY > 0 && drawerRef.current) {
-      drawerRef.current.style.transform = `translateY(${deltaY}px)`;
+    if (!isDragging.current) return;
+    const deltaY = e.touches[0].clientY - startY.current;
+    if (deltaY > 0) {
+      setDragY(deltaY);
     }
-
-    touchMoveRef.current = currentY;
   };
 
   const handleTouchEnd = () => {
-    if (touchStartRef.current === null || touchMoveRef.current === null) {
-      touchStartRef.current = null;
-      touchMoveRef.current = null;
-      return;
-    }
-
-    const deltaY = touchMoveRef.current - touchStartRef.current;
-    const threshold = 100; // swipe distance required to close
-
-    if (deltaY > threshold) {
+    isDragging.current = false;
+    if (dragY > 150) {
       onClose();
-    } else if (drawerRef.current) {
-      // Reset position if threshold not met
-      drawerRef.current.style.transform = isOpen ? "translateY(0)" : "translateY(100%)";
+    } else {
+      setDragY(0);
     }
-
-    touchStartRef.current = null;
-    touchMoveRef.current = null;
   };
 
   return (
     <div
-      className={`fixed inset-0 z-[100] overflow-hidden transition-all duration-300 ${isOpen ? "visible" : "invisible"}`}
-      style={{ overscrollBehaviorY: 'contain' }} // Prevent system refresh
+      className={`fixed inset-0 z-[100] flex flex-col justify-end bg-black/60 backdrop-blur-sm transition-opacity duration-500 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      style={{ overscrollBehaviorY: 'contain' }}
     >
       {/* Backdrop */}
       <div
-        className={`absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? "opacity-100" : "opacity-0"
-          }`}
+        className="absolute inset-0"
         onClick={onClose}
       />
 
       {/* Drawer */}
       <div
-        ref={drawerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className={`absolute inset-x-0 bottom-0 z-10 flex w-full max-h-[92dvh] flex-col rounded-t-[2.5rem] bg-white pt-3 shadow-2xl transition-transform duration-500 ease-out ${isOpen ? "translate-y-0" : "translate-y-full"
+        className={`relative w-full max-w-xl mx-auto bg-white rounded-t-[2.5rem] shadow-2xl overflow-hidden transition-transform duration-500 ease-out h-[66dvh] flex flex-col ${isOpen ? "translate-y-0" : "translate-y-full"
           }`}
-        style={{ touchAction: 'pan-y' }} // Allow vertical panning but prevent default pull-to-refresh
+        style={{ 
+          transform: isOpen ? `translateY(${dragY}px)` : undefined,
+          transition: isDragging.current ? 'none' : 'transform 0.5s cubic-bezier(0.32, 0.72, 0, 1)',
+          touchAction: 'pan-y' 
+        }}
       >
         {/* Handle */}
-        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200 shrink-0" />
+        <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-slate-200 shrink-0" />
 
         <div className="px-6 mb-4 flex items-center justify-between shrink-0">
           <div>

@@ -36,8 +36,6 @@ export default function PublicMenuDropdown({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const handleTouchStart = (e: React.TouchEvent) => {
     startY.current = e.touches[0].clientY;
     isDragging.current = true;
@@ -47,14 +45,15 @@ export default function PublicMenuDropdown({
     if (!isDragging.current) return;
     const deltaY = e.touches[0].clientY - startY.current;
     if (deltaY > 0) {
-      // Add resistance to make it feel more deliberate (less "fast")
-      setDragY(deltaY * 0.6);
+      // Add resistance to make it feel more deliberate
+      setDragY(deltaY);
     }
   };
 
   const handleTouchEnd = () => {
     isDragging.current = false;
-    if (dragY > 180) { // Increased threshold for a more deliberate swipe
+    // Dismiss if dragged more than 150px
+    if (dragY > 150) {
       onClose();
     } else {
       setDragY(0);
@@ -62,24 +61,24 @@ export default function PublicMenuDropdown({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col justify-end bg-black/50 backdrop-blur-[2px] transition-opacity duration-300">
+    <div className={`fixed inset-0 z-[100] flex flex-col justify-end bg-black/60 backdrop-blur-sm transition-opacity duration-500 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
       <div 
         className="absolute inset-0" 
         onClick={onClose} 
       />
       
       <div 
-        className="relative w-full max-w-xl mx-auto bg-white rounded-t-[2rem] shadow-2xl overflow-hidden animate-slide-up"
+        className={`relative w-full max-w-xl mx-auto bg-white rounded-t-[2.5rem] shadow-2xl overflow-hidden transition-transform duration-500 ease-out h-[66dvh] flex flex-col ${isOpen ? "translate-y-0" : "translate-y-full"}`}
         style={{ 
-          transform: `translateY(${dragY}px)`, 
-          transition: isDragging.current ? 'none' : 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)' 
+          transform: isOpen ? `translateY(${dragY}px)` : undefined, 
+          transition: isDragging.current ? 'none' : 'transform 0.5s cubic-bezier(0.32, 0.72, 0, 1)' 
         }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
         {/* Drag Handle */}
-        <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-slate-200" />
+        <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-slate-200 shrink-0" />
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-4 pb-3">
@@ -96,7 +95,7 @@ export default function PublicMenuDropdown({
         </div>
 
         {/* Menu List */}
-        <div className="px-5 pb-10 max-h-[75vh] overflow-y-auto no-scrollbar">
+        <div className="flex-1 overflow-y-auto no-scrollbar px-5 pb-10">
           <div className="space-y-2.5 mt-2">
              {/* "All" Option */}
              <button
