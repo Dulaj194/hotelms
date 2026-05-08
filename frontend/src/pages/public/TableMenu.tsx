@@ -565,6 +565,18 @@ export default function TableMenu() {
   const displayTableNumber =
     tableNumber && /^\d+$/.test(tableNumber) ? tableNumber.padStart(2, "0") : tableNumber;
 
+  const handleDecreaseQty = useCallback((itemId: number, qtyInCart: number) => {
+    if (qtyInCart > 1) {
+      updateItem(itemId, qtyInCart - 1);
+      return;
+    }
+    removeItem(itemId);
+  }, [removeItem, updateItem]);
+
+  const handleIncreaseQty = useCallback((itemId: number, qtyInCart: number) => {
+    updateItem(itemId, qtyInCart + 1);
+  }, [updateItem]);
+
   const renderItemCard = ({ item, categoryName }: MenuTile) => {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
@@ -572,14 +584,14 @@ export default function TableMenu() {
     const metaLabel = categoryName;
 
     return (
-      <div
+      <article
         key={item.id}
         id={`item-${item.id}`}
-        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white p-1.5 transition-all duration-300 hover:border-orange-200 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)] ${
-          !item.is_available ? "opacity-60 grayscale-[0.5]" : ""
+        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-1.5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)] ${
+          !item.is_available ? "opacity-70" : ""
         }`}
       >
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.65rem]">
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.65rem] bg-slate-100">
           <SafeMenuAsset
             path={item.image_path}
             alt={item.name}
@@ -596,14 +608,17 @@ export default function TableMenu() {
         </div>
 
         <div className="flex flex-1 flex-col gap-3 p-3.5 pt-4">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="min-w-0 flex-1 break-words text-base font-bold leading-tight text-slate-900 line-clamp-2">
-              {item.name}
-            </h3>
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="flex items-center justify-between gap-2">
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[0.12em] ${item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+              {item.is_available ? "Available" : "Sold out"}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
               {metaLabel}
             </span>
           </div>
+          <h3 className="min-w-0 break-words text-lg font-extrabold leading-tight text-slate-900 line-clamp-2">
+            {item.name}
+          </h3>
 
           <p className="text-[11px] leading-relaxed text-slate-500 line-clamp-2">
             {item.description || "Freshly prepared with premium ingredients."}
@@ -617,24 +632,30 @@ export default function TableMenu() {
             {qtyInCart > 0 ? (
               <div className="flex items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-lg">
                 <button
-                  onClick={() => qtyInCart > 1 ? updateItem(item.id, qtyInCart - 1) : removeItem(item.id)}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90"
+                  type="button"
+                  aria-label={`Decrease ${item.name} quantity`}
+                  onClick={() => handleDecreaseQty(item.id, qtyInCart)}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-white/10 text-lg leading-none transition hover:bg-white/20 active:scale-90"
                 >
-                  -
+                  −
                 </button>
                 <span className="min-w-[1ch] text-xs font-black">{qtyInCart}</span>
                 <button
-                  onClick={() => updateItem(item.id, qtyInCart + 1)}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 transition hover:bg-orange-600 active:scale-90"
+                  type="button"
+                  aria-label={`Increase ${item.name} quantity`}
+                  onClick={() => handleIncreaseQty(item.id, qtyInCart)}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-lg leading-none transition hover:bg-orange-600 active:scale-90"
                 >
                   +
                 </button>
               </div>
             ) : (
               <button
+                type="button"
+                aria-label={`Add ${item.name} to cart`}
                 disabled={isAdding || !item.is_available || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className={`relative flex h-10 items-center justify-center gap-2 rounded-full px-5 transition-all duration-300 active:scale-95 disabled:opacity-50 ${
+                className={`relative flex h-10 items-center justify-center gap-2 rounded-full px-5 font-semibold transition-all duration-300 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
                   recentlyAddedItemId === item.id
                     ? "bg-emerald-500 text-white"
                     : "bg-slate-100 text-slate-900 hover:bg-orange-500 hover:text-white"
@@ -654,7 +675,7 @@ export default function TableMenu() {
             )}
           </div>
         </div>
-      </div>
+      </article>
     );
   };
 
