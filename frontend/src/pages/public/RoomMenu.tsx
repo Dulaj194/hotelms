@@ -640,16 +640,6 @@ export default function RoomMenu() {
           </div>
         </div>
 
-        {/* Category rail */}
-        <div className="mx-auto box-border flex h-16 shrink-0 w-full max-w-[min(42rem,100%)] min-w-0 items-center px-4 py-2">
-          <div className="w-full">
-            <MenuBrowserRail
-              visibleCategories={visibleCategories}
-              activeCategoryId={activeCategoryId}
-              onSelectCategory={setActiveCategoryId}
-            />
-          </div>
-        </div>
       </header>
 
 
@@ -661,6 +651,17 @@ export default function RoomMenu() {
         className="flex-1 overflow-y-auto px-4 py-4 pb-40 no-scrollbar vertical-scroll"
         {...menuSwipeHandlers}
       >
+        {/* Sticky Category Bar */}
+        <div className="sticky -mx-4 -mt-4 top-0 z-40 mb-6 w-[calc(100%+2rem)] border-b bg-white/95 backdrop-blur-md px-4">
+          <div className="mx-auto flex h-16 w-full max-w-[min(42rem,100%)] items-center">
+            <MenuBrowserRail
+              visibleCategories={visibleCategories}
+              activeCategoryId={activeCategoryId}
+              onSelectCategory={setActiveCategoryId}
+            />
+          </div>
+        </div>
+
         <div className="mx-auto w-full max-w-[min(42rem,100%)] space-y-8">
           {navigationItems.map((navItem: any) => {
             const catId = navItem?.id ?? null;
