@@ -63,7 +63,7 @@
     margin: 0;
     padding: 0;
     /* Allow standard pull-to-refresh and smooth scrolling */
-    overscroll-behavior-y: auto;
+    overscroll-behavior-y: none;
   }
 
   /* Senior Engineer Approach: Custom Sleek Scrollbar */

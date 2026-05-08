@@ -844,7 +844,7 @@ export default function TableMenu() {
             return (
               <div
                 key={catId ?? "all"}
-                className="box-border h-full w-full shrink-0 snap-start overflow-y-auto px-4 py-3 pb-32 no-scrollbar sm:px-5 lg:px-6"
+                className="box-border h-full w-full shrink-0 snap-start overflow-y-auto overscroll-contain px-4 py-3 pb-40 no-scrollbar sm:px-5 lg:px-6"
               >
                 <div className="mx-auto w-full max-w-[min(72rem,100%)] space-y-4">
                   {/* Banner Only on "All" View */}
