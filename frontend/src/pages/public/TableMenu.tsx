@@ -676,20 +676,16 @@ export default function TableMenu() {
   const cartItemCount = cart?.item_count ?? 0;
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-slate-50 text-slate-900">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-slate-50 text-slate-900">
       <header
         id="menu-top"
-        className="shrink-0 border-b border-slate-200/60 bg-white/95 shadow-sm backdrop-blur-md"
+        className={`absolute left-0 right-0 top-0 z-50 border-b border-slate-200/60 bg-white/95 shadow-sm backdrop-blur-md transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${
+          headerVisible ? "translate-y-0" : "-translate-y-full"
+        }`}
       >
-        {/* iOS Safe Area Spacer */}
         <div className="h-[env(safe-area-inset-top,0px)]" />
-
-        {/* Top Bar */}
-        <div className={`transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) ${
-          headerVisible ? "h-16 opacity-100 translate-y-0" : "h-0 opacity-0 -translate-y-full overflow-hidden"
-        }`}>
-          <div className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center justify-between gap-3 px-4 sm:px-6">
-            <div className="flex min-w-0 items-center gap-3">
+        <div className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center justify-between gap-3 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
               <SafeMenuAsset
                 path={menu.restaurant.logo_url}
                 alt={menu.restaurant.name}
@@ -795,6 +791,9 @@ export default function TableMenu() {
         className="flex-1 overflow-y-auto no-scrollbar vertical-scroll"
         onScroll={handleContentScroll}
       >
+        {/* Fixed Spacer for the Absolute Header */}
+        <div className="h-[calc(4rem+env(safe-area-inset-top,0px))] shrink-0" />
+
         {/* Sticky Category Bar */}
         <div className="sticky top-0 z-40 w-full border-b border-slate-200/60 bg-white/95 backdrop-blur-md">
           <div className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center px-4 sm:px-6">

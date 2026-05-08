@@ -565,12 +565,12 @@ export default function RoomMenu() {
   };
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-gray-50">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-gray-50">
       {/* Top bar */}
       <header
         id="menu-top"
-        className={`shrink-0 border-b bg-white/95 shadow-sm backdrop-blur-md transition-transform duration-500 ease-in-out ${
-          headerVisible ? "translate-y-0" : "-translate-y-16"
+        className={`absolute left-0 right-0 top-0 z-50 border-b bg-white/95 shadow-sm backdrop-blur-md transition-transform duration-500 ease-in-out ${
+          headerVisible ? "translate-y-0" : "-translate-y-full"
         }`}
       >
         <div className="h-[env(safe-area-inset-top,0px)]" />
@@ -651,6 +651,9 @@ export default function RoomMenu() {
         className="flex-1 overflow-y-auto px-4 py-4 pb-40 no-scrollbar vertical-scroll"
         {...menuSwipeHandlers}
       >
+        {/* Fixed Spacer for the Absolute Header */}
+        <div className="h-[calc(4rem+env(safe-area-inset-top,0px))] shrink-0" />
+
         {/* Sticky Category Bar */}
         <div className="sticky -mx-4 -mt-4 top-0 z-40 mb-6 w-[calc(100%+2rem)] border-b bg-white/95 backdrop-blur-md px-4">
           <div className="mx-auto flex h-16 w-full max-w-[min(42rem,100%)] items-center">
