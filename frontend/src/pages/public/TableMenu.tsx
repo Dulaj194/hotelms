@@ -572,12 +572,13 @@ export default function TableMenu() {
     const metaLabel = categoryName;
 
     return (
-      <div
+      <article
         key={item.id}
         id={`item-${item.id}`}
-        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white p-1.5 transition-all duration-300 hover:border-orange-200 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)] ${
+        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white p-1.5 transition-all duration-300 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)] ${
           !item.is_available ? "opacity-60 grayscale-[0.5]" : ""
         }`}
+        aria-label={`${item.name} menu card`}
       >
         <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.65rem]">
           <SafeMenuAsset
@@ -597,10 +598,10 @@ export default function TableMenu() {
 
         <div className="flex flex-1 flex-col gap-3 p-3.5 pt-4">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="min-w-0 flex-1 break-words text-base font-bold leading-tight text-slate-900 line-clamp-2">
+            <h3 className="min-w-0 flex-1 break-words text-lg font-extrabold leading-tight text-slate-900 line-clamp-2">
               {item.name}
             </h3>
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               {metaLabel}
             </span>
           </div>
@@ -610,22 +611,33 @@ export default function TableMenu() {
           </p>
 
           <div className="mt-auto flex items-center justify-between pt-2">
-            <span className="text-lg font-black text-slate-900">
+            <div className="flex flex-col">
+              <span
+                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${
+                  item.is_available ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                }`}
+              >
+                {item.is_available ? "Available" : "Unavailable"}
+              </span>
+              <span className="mt-1 text-lg font-black text-slate-900">
               ${item.price.toFixed(2)}
-            </span>
+              </span>
+            </div>
             
             {qtyInCart > 0 ? (
-              <div className="flex items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-lg">
+              <div className="flex items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-lg" role="group" aria-label={`${item.name} quantity controls`}>
                 <button
                   onClick={() => qtyInCart > 1 ? updateItem(item.id, qtyInCart - 1) : removeItem(item.id)}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 active:scale-90"
+                  aria-label={qtyInCart > 1 ? `Decrease ${item.name} quantity` : `Remove ${item.name} from cart`}
                 >
                   -
                 </button>
                 <span className="min-w-[1ch] text-xs font-black">{qtyInCart}</span>
                 <button
                   onClick={() => updateItem(item.id, qtyInCart + 1)}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 transition hover:bg-orange-600 active:scale-90"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-200 active:scale-90"
+                  aria-label={`Increase ${item.name} quantity`}
                 >
                   +
                 </button>
@@ -634,10 +646,11 @@ export default function TableMenu() {
               <button
                 disabled={isAdding || !item.is_available || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className={`relative flex h-10 items-center justify-center gap-2 rounded-full px-5 transition-all duration-300 active:scale-95 disabled:opacity-50 ${
+                aria-label={`Add ${item.name} to cart`}
+                className={`relative flex h-11 min-w-[7.5rem] items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
                   recentlyAddedItemId === item.id
-                    ? "bg-emerald-500 text-white"
-                    : "bg-slate-100 text-slate-900 hover:bg-orange-500 hover:text-white"
+                    ? "bg-emerald-500 text-white focus-visible:ring-emerald-300"
+                    : "bg-slate-100 text-slate-900 hover:bg-orange-500 hover:text-white focus-visible:ring-orange-300"
                 }`}
               >
                 {isAdding ? (
@@ -646,7 +659,7 @@ export default function TableMenu() {
                   <Check className="h-4 w-4 animate-in zoom-in-50" />
                 ) : (
                   <>
-                    <span className="text-xs font-bold">Add</span>
+                    <span className="text-xs font-bold">Add to cart</span>
                     <ShoppingCart className="h-3.5 w-3.5" />
                   </>
                 )}
@@ -654,7 +667,7 @@ export default function TableMenu() {
             )}
           </div>
         </div>
-      </div>
+      </article>
     );
   };
 
