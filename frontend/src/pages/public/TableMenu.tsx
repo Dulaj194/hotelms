@@ -298,13 +298,32 @@ export default function TableMenu() {
     void fetchMenu();
   }, [restaurantId]);
 
+  const formatPrice = useCallback((price: number) => `$${price.toFixed(2)}`, []);
+
+  const handleDecreaseQty = useCallback((itemId: number, qtyInCart: number) => {
+    if (qtyInCart > 1) {
+      updateItem(itemId, qtyInCart - 1);
+    } else {
+      removeItem(itemId);
+    }
+    // Haptic feedback for removal
+    if (window.navigator.vibrate) window.navigator.vibrate(5);
+  }, [removeItem, updateItem]);
+
+  const handleIncreaseQty = useCallback((itemId: number, qtyInCart: number) => {
+    updateItem(itemId, qtyInCart + 1);
+    // Haptic feedback for addition
+    if (window.navigator.vibrate) window.navigator.vibrate(10);
+  }, [updateItem]);
+
   const handleAddToCart = useCallback(
     async (itemId: number) => {
       setAddingItemId(itemId);
       try {
         await addItem(itemId, 1);
-        // Senior Engineer Approach: Show a brief success state
         setRecentlyAddedItemId(itemId);
+        // Haptic feedback
+        if (window.navigator.vibrate) window.navigator.vibrate([10, 30, 10]);
         setTimeout(() => setRecentlyAddedItemId(null), 1500);
       } finally {
         setAddingItemId(null);
@@ -572,89 +591,102 @@ export default function TableMenu() {
     const metaLabel = categoryName;
 
     return (
-      <div
+      <article
         key={item.id}
         id={`item-${item.id}`}
-        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white p-1.5 transition-all duration-300 hover:border-orange-200 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.08)] ${
-          !item.is_available ? "opacity-60 grayscale-[0.5]" : ""
+        className={`group relative flex h-full w-full flex-col overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white p-2 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:border-orange-200 hover:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.08)] ${
+          !item.is_available ? "opacity-75 grayscale-[0.3]" : ""
         }`}
       >
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[1.65rem]">
+        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[2rem] bg-slate-100">
           <SafeMenuAsset
             path={item.image_path}
             alt={item.name}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
             fallback={<UtensilsCrossed className="h-8 w-8 text-slate-200" />}
           />
           {!item.is_available && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]">
-              <span className="rounded-full bg-white/90 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-900 shadow-xl">
+              <span className="rounded-full bg-white/95 px-4 py-2 text-[10px] font-black uppercase tracking-wider text-slate-900 shadow-2xl">
                 Sold Out
               </span>
             </div>
           )}
+          {item.is_available && (
+            <div className="absolute right-3 top-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur-md">
+                <Sparkles className="h-4 w-4 text-orange-500" />
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-1 flex-col gap-3 p-3.5 pt-4">
+        <div className="flex flex-1 flex-col gap-3 p-4 pt-5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="min-w-0 flex-1 break-words text-base font-bold leading-tight text-slate-900 line-clamp-2">
+            <h3 className="min-w-0 flex-1 break-words text-lg font-black leading-tight text-slate-900 line-clamp-2">
               {item.name}
             </h3>
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
               {metaLabel}
             </span>
           </div>
 
-          <p className="text-[11px] leading-relaxed text-slate-500 line-clamp-2">
-            {item.description || "Freshly prepared with premium ingredients."}
+          <p className="text-xs leading-relaxed text-slate-500 line-clamp-2">
+            {item.description || "Chef's special selection prepared with the finest seasonal ingredients."}
           </p>
 
-          <div className="mt-auto flex items-center justify-between pt-2">
-            <span className="text-lg font-black text-slate-900">
-              ${item.price.toFixed(2)}
-            </span>
+          <div className="mt-auto flex items-center justify-between pt-3">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Price</span>
+              <span className="text-xl font-black text-slate-900">{formatPrice(item.price)}</span>
+            </div>
             
             {qtyInCart > 0 ? (
-              <div className="flex items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-lg">
+              <div className="flex items-center gap-3 rounded-full bg-slate-900 p-1 pr-3 text-white shadow-xl animate-in zoom-in-95 duration-300">
                 <button
-                  onClick={() => qtyInCart > 1 ? updateItem(item.id, qtyInCart - 1) : removeItem(item.id)}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-white/10 transition hover:bg-white/20 active:scale-90"
+                  type="button"
+                  onClick={() => handleDecreaseQty(item.id, qtyInCart)}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-lg transition hover:bg-white/20 active:scale-90"
+                  aria-label="Decrease quantity"
                 >
-                  -
+                  −
                 </button>
-                <span className="min-w-[1ch] text-xs font-black">{qtyInCart}</span>
+                <span className="min-w-[1.5ch] text-center text-sm font-black">{qtyInCart}</span>
                 <button
-                  onClick={() => updateItem(item.id, qtyInCart + 1)}
-                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 transition hover:bg-orange-600 active:scale-90"
+                  type="button"
+                  onClick={() => handleIncreaseQty(item.id, qtyInCart)}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-lg transition hover:bg-orange-600 active:scale-90"
+                  aria-label="Increase quantity"
                 >
                   +
                 </button>
               </div>
             ) : (
               <button
+                type="button"
                 disabled={isAdding || !item.is_available || !sessionReady}
                 onClick={() => handleAddToCart(item.id)}
-                className={`relative flex h-10 items-center justify-center gap-2 rounded-full px-5 transition-all duration-300 active:scale-95 disabled:opacity-50 ${
+                className={`group/btn relative flex h-11 items-center justify-center gap-2 rounded-full px-6 font-bold transition-all duration-300 active:scale-95 disabled:opacity-40 ${
                   recentlyAddedItemId === item.id
-                    ? "bg-emerald-500 text-white"
-                    : "bg-slate-100 text-slate-900 hover:bg-orange-500 hover:text-white"
+                    ? "bg-emerald-500 text-white shadow-[0_12px_24px_rgba(16,185,129,0.3)]"
+                    : "bg-slate-100 text-slate-900 hover:bg-orange-500 hover:text-white hover:shadow-[0_12px_24px_rgba(249,115,22,0.3)]"
                 }`}
               >
                 {isAdding ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
                 ) : recentlyAddedItemId === item.id ? (
-                  <Check className="h-4 w-4 animate-in zoom-in-50" />
+                  <Check className="h-5 w-5 animate-in zoom-in-50" />
                 ) : (
                   <>
-                    <span className="text-xs font-bold">Add</span>
-                    <ShoppingCart className="h-3.5 w-3.5" />
+                    <span className="text-xs">Add to Cart</span>
+                    <ShoppingCart className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
                   </>
                 )}
               </button>
             )}
           </div>
         </div>
-      </div>
+      </article>
     );
   };
 
