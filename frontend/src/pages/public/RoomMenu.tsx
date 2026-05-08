@@ -608,7 +608,6 @@ export default function RoomMenu() {
       >
         <div className="h-[env(safe-area-inset-top,0px)]" />
         <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4">
-        <div className="mx-auto box-border flex h-16 w-full max-w-[min(42rem,100%)] min-w-0 items-center justify-between px-4">
           <div className="flex min-w-0 items-center gap-3">
             {menu.restaurant.logo_url && (
               <img
