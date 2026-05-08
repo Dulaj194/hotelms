@@ -28,6 +28,13 @@ class PublicItemSummaryResponse(BaseModel):
     description: str | None
     price: float
     image_path: str | None
+    image_path_2: str | None = None
+    image_path_3: str | None = None
+    image_path_4: str | None = None
+    image_path_5: str | None = None
+    video_path: str | None = None
+    more_details: str | None = None
+    blog_link: str | None = None
     is_available: bool
     category_id: int
 
@@ -40,6 +47,13 @@ class PublicItemDetailResponse(BaseModel):
     description: str | None
     price: float
     image_path: str | None
+    image_path_2: str | None = None
+    image_path_3: str | None = None
+    image_path_4: str | None = None
+    image_path_5: str | None = None
+    video_path: str | None = None
+    more_details: str | None = None
+    blog_link: str | None = None
     is_available: bool
     category_id: int
     category_name: str | None

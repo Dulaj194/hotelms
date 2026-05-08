@@ -1,7 +1,7 @@
-import { ShoppingCart, X, Plus, Minus, Check, UtensilsCrossed, Info } from "lucide-react";
+import { ShoppingCart, X, Plus, Minus, Check, UtensilsCrossed, Info, ChevronRight, Play, ExternalLink } from "lucide-react";
 import SafeMenuAsset from "./SafeMenuAsset";
 import { PublicItemSummaryResponse } from "@/types/publicMenu";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 
 interface ItemDetailSheetProps {
   item: PublicItemSummaryResponse | null;
@@ -60,6 +60,23 @@ export default function ItemDetailSheet({
     if (window.navigator.vibrate) window.navigator.vibrate(5);
   };
 
+  const images = useMemo(() => {
+    if (!item) return [];
+    return [
+      item.image_path,
+      item.image_path_2,
+      item.image_path_3,
+      item.image_path_4,
+      item.image_path_5,
+    ].filter(Boolean) as string[];
+  }, [item]);
+
+  const [activeImage, setActiveImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (item) setActiveImage(item.image_path);
+  }, [item]);
+
   return (
     <>
       {/* Backdrop */}
@@ -93,9 +110,9 @@ export default function ItemDetailSheet({
           {/* Image Header */}
           <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100 sm:aspect-square">
             <SafeMenuAsset
-              path={item.image_path}
+              path={activeImage}
               alt={item.name}
-              className="h-full w-full object-cover transition-transform duration-700 hover:scale-110"
+              className="h-full w-full object-cover transition-all duration-700 hover:scale-110"
               fallback={
                 <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-slate-300">
                   <div className="grid h-20 w-20 place-items-center rounded-3xl bg-slate-50">
@@ -105,7 +122,24 @@ export default function ItemDetailSheet({
                 </div>
               }
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+
+            {/* Bubble Overlay */}
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="group flex items-center gap-3 rounded-2xl bg-slate-900/80 px-5 py-3.5 shadow-2xl backdrop-blur-md ring-1 ring-white/20 transition-all hover:bg-slate-900">
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-400/80 mb-0.5">Signature Dish</span>
+                  <span className="text-sm font-black uppercase tracking-widest text-white whitespace-nowrap">
+                    {item.name}
+                  </span>
+                </div>
+                <div className="ml-2 grid h-7 w-7 place-items-center rounded-full bg-white/10 text-white transition-transform group-hover:translate-x-1">
+                  <ChevronRight className="h-4 w-4" />
+                </div>
+              </div>
+              <div className="mx-auto mt-[-1px] h-3 w-3 -translate-y-1/2 rotate-45 bg-slate-900/80 shadow-2xl" />
+            </div>
+
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
             {!item.is_available && (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-[2px]">
                 <div className="rounded-2xl bg-white/95 px-6 py-3 text-center shadow-xl">
@@ -115,6 +149,39 @@ export default function ItemDetailSheet({
               </div>
             )}
           </div>
+
+          {/* Multiple Images Gallery */}
+          {images.length > 1 && (
+            <div className="flex gap-3 overflow-x-auto no-scrollbar px-6 py-4 bg-white/50 backdrop-blur-sm border-b border-slate-100">
+              {images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveImage(img)}
+                  className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 transition-all ${
+                    activeImage === img
+                      ? "border-orange-500 ring-4 ring-orange-500/10 scale-95"
+                      : "border-slate-100 hover:border-slate-200"
+                  }`}
+                >
+                  <SafeMenuAsset
+                    path={img}
+                    alt={`${item.name} gallery ${idx + 1}`}
+                    className="h-full w-full object-cover"
+                    fallback={<UtensilsCrossed className="h-4 w-4 text-slate-300" />}
+                  />
+                </button>
+              ))}
+              {item.video_path && (
+                <button
+                  onClick={() => setActiveImage(null)} // Or handle video display
+                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-slate-100 bg-slate-900 flex flex-col items-center justify-center gap-1 text-white hover:bg-slate-800 transition-colors"
+                >
+                  <Play className="h-5 w-5 fill-current" />
+                  <span className="text-[8px] font-black uppercase tracking-tighter">Watch</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Content */}
           <div className="p-6 sm:p-10">
@@ -149,6 +216,38 @@ export default function ItemDetailSheet({
                   {item.description || "This signature dish is crafted using time-honored techniques and the freshest ingredients available. Every element is designed to provide a sophisticated and memorable dining experience."}
                 </p>
               </div>
+
+              {item.more_details && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <UtensilsCrossed className="h-4 w-4" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">Chef's Special Notes</span>
+                  </div>
+                  <p className="text-sm font-semibold leading-relaxed text-slate-600 bg-orange-50/50 p-4 rounded-2xl border border-orange-100/50">
+                    {item.more_details}
+                  </p>
+                </div>
+              )}
+
+              {item.blog_link && (
+                <a
+                  href={item.blog_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-4 rounded-2xl bg-slate-900 p-4 text-white transition hover:bg-slate-800"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/10">
+                      <ExternalLink className="h-5 w-5 text-orange-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">Want to know the secret?</p>
+                      <p className="text-[10px] text-slate-400">Read the story behind this recipe</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-500" />
+                </a>
+              )}
               
               <div className="grid grid-cols-2 gap-4 rounded-3xl bg-slate-50 p-5">
                 <div className="space-y-1">

@@ -18,6 +18,13 @@ export interface PublicItemSummaryResponse {
   description: string | null;
   price: number;
   image_path: string | null;
+  image_path_2?: string | null;
+  image_path_3?: string | null;
+  image_path_4?: string | null;
+  image_path_5?: string | null;
+  video_path?: string | null;
+  more_details?: string | null;
+  blog_link?: string | null;
   is_available: boolean;
   category_id: number;
 }
@@ -28,6 +35,13 @@ export interface PublicItemDetailResponse {
   description: string | null;
   price: number;
   image_path: string | null;
+  image_path_2?: string | null;
+  image_path_3?: string | null;
+  image_path_4?: string | null;
+  image_path_5?: string | null;
+  video_path?: string | null;
+  more_details?: string | null;
+  blog_link?: string | null;
   is_available: boolean;
   category_id: number;
   category_name: string | null;
