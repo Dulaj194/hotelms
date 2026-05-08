@@ -53,10 +53,20 @@ export default function QuickServiceDrawer({
 
   // Clear message when drawer closes or after successful request
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      setDragY(0);
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none"; // Extra safety for Safari
+    } else {
       setCustomMessage("");
       setDragY(0);
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
     }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    };
   }, [isOpen]);
 
   const handleServiceClick = (serviceId: string) => {
@@ -88,7 +98,7 @@ export default function QuickServiceDrawer({
   return (
     <div
       className={`fixed inset-0 z-[100] flex flex-col justify-end bg-black/60 backdrop-blur-sm transition-opacity duration-500 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-      style={{ overscrollBehaviorY: 'contain' }}
+      style={{ overscrollBehavior: 'contain' }}
     >
       {/* Backdrop */}
       <div
@@ -106,7 +116,8 @@ export default function QuickServiceDrawer({
         style={{ 
           transform: isOpen ? `translateY(${dragY}px)` : undefined,
           transition: isDragging.current ? 'none' : 'transform 0.5s cubic-bezier(0.32, 0.72, 0, 1)',
-          touchAction: 'pan-y' 
+          touchAction: 'pan-y', 
+          overscrollBehavior: 'contain'
         }}
       >
         {/* Handle */}
