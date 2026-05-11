@@ -33,7 +33,7 @@ export default function BillConfirmationOverlay({
       await publicPatch(
         "/table-sessions/my/confirm-bill",
         {},
-        { headers: { "X-Guest-Session": token } }
+        { headers: { "X-Guest-Session": token || "" } }
       );
       onConfirm();
     } catch (err) {
