@@ -1481,7 +1481,7 @@ def get_folio_detail(
             room_id=bill.room_id,
             room_number=bill.room_number,
             session_is_active=session.is_active if session is not None else False,
-            session_status=session.session_status if session is not None else "CLOSED",
+            session_status="active" if session and session.is_active else "closed",
         )
     else:
         session = table_session_repo.get_session_by_id_and_restaurant(db, bill.session_id, restaurant_id)
