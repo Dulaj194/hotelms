@@ -12,7 +12,8 @@ import {
   User,
   Coffee,
   Loader2,
-  Plus
+  Plus,
+  ArrowLeftRight
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
@@ -402,6 +403,20 @@ export default function Billing() {
     }
   }, [loadSummary, mode, summary]);
 
+  const onChangeTable = useCallback(async () => {
+    if (!summary || mode !== "table") return;
+    const newTable = window.prompt("Enter the new Table Number:", summary.table_number || "");
+    if (!newTable || newTable === summary.table_number) return;
+    
+    try {
+      await api.patch(`/table-sessions/${summary.session_id}/change-table`, { new_table_number: newTable });
+      // Refresh summary
+      await loadSummary(mode, summary.session_id);
+    } catch (error) {
+      setSettleError(errorText(error, "Failed to move table."));
+    }
+  }, [loadSummary, mode, summary]);
+
   const onPresentBill = useCallback(async () => {
     if (!summary || mode !== "table") return;
     setIsPresenting(true);
@@ -555,13 +570,24 @@ export default function Billing() {
                         </span>
                         
                         {!summary.is_settled && (
-                           <button 
-                             onClick={() => setIsAddDrawerOpen(true)}
-                             className="ml-4 h-10 px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all flex items-center gap-2"
-                           >
-                             <Plus className="h-3.5 w-3.5" />
-                             Add Item
-                           </button>
+                           <div className="flex items-center">
+                              {mode === 'table' && (
+                                 <button 
+                                   onClick={onChangeTable}
+                                   className="ml-4 h-10 px-4 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+                                 >
+                                   <ArrowLeftRight className="h-3.5 w-3.5" />
+                                   Move Table
+                                 </button>
+                              )}
+                              <button 
+                                onClick={() => setIsAddDrawerOpen(true)}
+                                className="ml-3 h-10 px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all flex items-center gap-2"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                Add Item
+                              </button>
+                           </div>
                         )}
                      </div>
 

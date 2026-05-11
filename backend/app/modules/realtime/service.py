@@ -306,3 +306,31 @@ def publish_bill_confirmed(
         },
     }
     realtime_repo.publish_global_event(r, channel, event)
+
+
+def publish_table_changed(
+    r: redis_lib.Redis,
+    *,
+    restaurant_id: int,
+    session_id: str,
+    old_table: str,
+    new_table: str,
+) -> None:
+    """Notify staff and the guest that a table change has occurred."""
+    # 1. Notify staff (Billing and Steward channels)
+    billing_channel = realtime_repo.get_billing_channel(restaurant_id)
+    event = {
+        "event": "table_changed",
+        "restaurant_id": restaurant_id,
+        "data": {
+            "session_id": session_id,
+            "old_table": old_table,
+            "new_table": new_table,
+            "timestamp": datetime.now(UTC),
+        },
+    }
+    realtime_repo.publish_global_event(r, billing_channel, event)
+    
+    # 2. Notify the specific guest
+    guest_channel = realtime_repo.get_guest_session_channel(session_id)
+    realtime_repo.publish_global_event(r, guest_channel, event)

@@ -358,3 +358,50 @@ def confirm_bill(
     except Exception:
         db.rollback()
         raise
+
+
+def change_table(
+    db: Session,
+    r: redis_lib.Redis,
+    session_id: str,
+    restaurant_id: int,
+    new_table_number: str,
+) -> bool:
+    """Move an active session and all its associated orders to a new table."""
+    try:
+        session = repository.get_session_by_id_and_restaurant(db, session_id, restaurant_id)
+        if not session:
+            return False
+            
+        old_table = session.table_number
+        session.table_number = new_table_number
+        session.updated_at = datetime.now(UTC)
+        
+        # Update all orders in this session so kitchen/steward knows where to go
+        from app.modules.orders.model import OrderHeader
+        db.query(OrderHeader).filter(
+            OrderHeader.session_id == session_id,
+            OrderHeader.restaurant_id == restaurant_id
+        ).update({"table_number": new_table_number}, synchronize_session=False)
+        
+        # Update any active service requests
+        from app.modules.table_sessions.model import TableServiceRequest
+        db.query(TableServiceRequest).filter(
+            TableServiceRequest.session_id == session_id,
+            TableServiceRequest.restaurant_id == restaurant_id
+        ).update({"table_number": new_table_number}, synchronize_session=False)
+        
+        db.commit()
+        
+        # Broadcast real-time event
+        realtime_service.publish_table_changed(
+            r,
+            restaurant_id=restaurant_id,
+            session_id=session_id,
+            old_table=old_table,
+            new_table=new_table_number,
+        )
+        return True
+    except Exception:
+        db.rollback()
+        raise

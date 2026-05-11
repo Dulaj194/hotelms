@@ -18,6 +18,7 @@ from app.modules.table_sessions.schemas import (
     TableSessionStartResponse,
     TableServiceRequestPayload,
     ServiceRequestListResponse,
+    ChangeTableRequest,
 )
 
 router = APIRouter()
@@ -189,3 +190,19 @@ def resolve_service_request(
     if not success:
         return {"error": "Request not found"}, 404
     return {"message": "Request marked as resolved."}
+
+
+@router.patch("/{session_id}/change-table")
+def change_table(
+    session_id: str,
+    payload: ChangeTableRequest,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+):
+    """Staff moves a guest session to a new table."""
+    success = service.change_table(db, r, session_id, restaurant_id, payload.new_table_number)
+    if not success:
+        return {"error": "Session not found"}, 404
+    return {"message": f"Session moved to table {payload.new_table_number}"}

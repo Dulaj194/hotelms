@@ -87,4 +87,8 @@ class ServiceRequestListResponse(BaseModel):
     requests: list[ServiceRequestResponse]
 
 
+class ChangeTableRequest(BaseModel):
+    new_table_number: str = Field(..., min_length=1, max_length=50)
+
+
 
