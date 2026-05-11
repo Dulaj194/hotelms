@@ -349,7 +349,9 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
     const allOrders = Array.from(orders.values()).sort((a, b) => 
       new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
     );
-    const allRequests = Array.from(requests.values());
+    const allRequests = Array.from(requests.values()).sort((a, b) => 
+      new Date(a.requested_at).getTime() - new Date(b.requested_at).getTime()
+    );
 
     const groupOrders = (ordersToGroup: KitchenOrderCard[]) => {
       const groups = new Map<string, KitchenOrderCard[]>();
@@ -782,6 +784,31 @@ function TableGroupedRequestCard({
             </div>
           </div>
         </div>
+
+        {!isExpanded && (
+           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+             <div className="flex -space-x-2">
+               {requests.slice(0, 4).map((r, idx) => {
+                 const config = SERVICE_CONFIG[r.type] || { icon: Bell, color: "bg-slate-600" };
+                 const Icon = config.icon;
+                 return (
+                   <div key={idx} className={`h-7 w-7 rounded-full ${config.color} border-2 border-white flex items-center justify-center text-white shadow-sm`} title={config.label}>
+                     <Icon className="h-3.5 w-3.5" />
+                   </div>
+                 );
+               })}
+               {totalRequests > 4 && (
+                 <div className="h-7 w-7 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-[8px] font-black text-slate-500 shadow-sm">
+                   +{totalRequests - 4}
+                 </div>
+               )}
+             </div>
+             <div className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+               <Clock className="h-3 w-3" />
+               {oldestTime}m ago
+             </div>
+           </div>
+        )}
       </div>
 
       {isExpanded && (
