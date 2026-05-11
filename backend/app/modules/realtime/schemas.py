@@ -21,6 +21,7 @@ class EventOrderItem(BaseModel):
     item_name_snapshot: str
     quantity: int
     line_total: float
+    notes: str | None = None
 
 
 # ── new_order event ───────────────────────────────────────────────────────────

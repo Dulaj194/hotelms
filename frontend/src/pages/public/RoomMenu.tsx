@@ -213,6 +213,12 @@ function RoomCartDrawer({
                           {!item.is_available && (
                             <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-wider">Unavailable</p>
                           )}
+                          {item.note && (
+                            <p className="mt-1.5 flex items-start gap-1 text-[10px] font-semibold text-orange-600 bg-orange-50 p-1.5 rounded-lg border border-orange-100">
+                              <span className="shrink-0 mt-0.5">Note:</span>
+                              <span className="line-clamp-2">{item.note}</span>
+                            </p>
+                          )}
                         </div>
                         <button
                           onClick={() => onRemoveItem(item.item_id)}
@@ -403,10 +409,13 @@ export default function RoomMenu() {
   );
   
   const handleAddToCartWithQty = useCallback(
-    async (itemId: number, quantity: number) => {
+    async (itemId: number, quantity: number, note?: string) => {
       setAddingItemId(itemId);
       try {
-        await addItem(itemId, quantity);
+        await addItem(itemId, quantity, note);
+        setRecentlyAddedItemId(itemId);
+        if (window.navigator.vibrate) window.navigator.vibrate([10, 30, 10]);
+        setTimeout(() => setRecentlyAddedItemId(null), 1500);
       } finally {
         setAddingItemId(null);
       }
@@ -810,7 +819,7 @@ export default function RoomMenu() {
         isOpen={!!selectedItem}
         onClose={() => setSelectedItem(null)}
         onAddToCart={handleAddToCartWithQty}
-        qtyInCart={cart?.items.find(i => i.item_id === selectedItem?.id)?.quantity ?? 0}
+        qtyInCart={cart?.items.find((i) => i.item_id === selectedItem?.id)?.quantity ?? 0}
         formatPrice={(p) => `$${p.toFixed(2)}`}
       />
 

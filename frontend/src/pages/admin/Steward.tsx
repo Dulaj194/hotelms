@@ -656,11 +656,18 @@ function OperationCard({ order, onAction, loading, renderActions }: {
           {(expanded || order.items.length <= 3) && (
             <ul className="space-y-1.5">
               {order.items.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2 text-sm">
-                  <span className="bg-slate-100 text-slate-700 font-bold px-1.5 py-0.5 rounded text-xs min-w-[24px] text-center">
-                    {item.quantity}
-                  </span>
-                  <span className="text-slate-800 font-medium">{item.item_name_snapshot}</span>
+                <li key={idx} className="flex flex-col gap-0.5 text-sm">
+                  <div className="flex items-start gap-2">
+                    <span className="bg-slate-100 text-slate-700 font-bold px-1.5 py-0.5 rounded text-xs min-w-[24px] text-center">
+                      {item.quantity}
+                    </span>
+                    <span className="text-slate-800 font-medium">{item.item_name_snapshot}</span>
+                  </div>
+                  {item.notes && (
+                    <p className="ml-8 text-[10px] font-medium text-orange-600 italic">
+                      “{item.notes}”
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

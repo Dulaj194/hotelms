@@ -77,6 +77,7 @@ class RoomCartItemResponse(BaseModel):
     quantity: int
     line_total: float
     is_available: bool
+    note: str | None = None
 
 
 class RoomCartResponse(BaseModel):

@@ -1,13 +1,13 @@
-import { ShoppingCart, X, Plus, Minus, Check, UtensilsCrossed, Info, ChevronRight, Play, ExternalLink } from "lucide-react";
+import { ShoppingCart, X, Plus, Minus, Check, UtensilsCrossed, Info, ChevronRight, Play, ExternalLink, MessageSquareText } from "lucide-react";
 import SafeMenuAsset from "./SafeMenuAsset";
 import { PublicItemSummaryResponse } from "@/types/publicMenu";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 
 interface ItemDetailSheetProps {
   item: PublicItemSummaryResponse | null;
   isOpen: boolean;
   onClose: () => void;
-  onAddToCart: (itemId: number, quantity: number) => Promise<void>;
+  onAddToCart: (itemId: number, quantity: number, note?: string) => Promise<void>;
   qtyInCart: number;
   formatPrice: (price: number) => string;
 }
@@ -23,6 +23,12 @@ export default function ItemDetailSheet({
   const [adding, setAdding] = useState(false);
   const [success, setSuccess] = useState(false);
   const [localQty, setLocalQty] = useState(1);
+  const [note, setNote] = useState("");
+  const [activeImage, setActiveImage] = useState<string | null>(null);
+  const [showVideo, setShowVideo] = useState(false);
+  const [headerScrolled, setHeaderScrolled] = useState(false);
+  
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const images = useMemo(() => {
     if (!item) return [];
@@ -35,12 +41,13 @@ export default function ItemDetailSheet({
     ].filter(Boolean) as string[];
   }, [item]);
 
-  const [activeImage, setActiveImage] = useState<string | null>(null);
-
   useEffect(() => {
     if (isOpen) {
       setLocalQty(qtyInCart > 0 ? qtyInCart : 1);
       setSuccess(false);
+      setNote("");
+      setShowVideo(false);
+      setHeaderScrolled(false);
     }
   }, [isOpen, qtyInCart]);
 
@@ -48,12 +55,17 @@ export default function ItemDetailSheet({
     if (item) setActiveImage(item.image_path);
   }, [item]);
 
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const scrollTop = e.currentTarget.scrollTop;
+    setHeaderScrolled(scrollTop > 20);
+  };
+
   if (!item) return null;
 
   const handleAdd = async () => {
     setAdding(true);
     try {
-      await onAddToCart(item.id, localQty);
+      await onAddToCart(item.id, localQty, note.trim() || undefined);
       setSuccess(true);
       if (window.navigator.vibrate) window.navigator.vibrate([10, 30, 10]);
       setTimeout(() => {
@@ -89,55 +101,88 @@ export default function ItemDetailSheet({
 
       {/* Sheet */}
       <div
-        className={`fixed inset-x-0 bottom-0 z-[101] flex max-h-[95dvh] flex-col overflow-hidden rounded-t-[2.5rem] bg-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-[440px] sm:rounded-[2.5rem] ${
+        className={`fixed inset-x-0 bottom-0 z-[101] flex h-[92dvh] max-h-[92dvh] flex-col overflow-hidden rounded-t-[2.5rem] bg-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] sm:inset-x-auto sm:right-6 sm:bottom-6 sm:h-auto sm:max-h-[85dvh] sm:w-[440px] sm:rounded-[2.5rem] ${
           isOpen ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        {/* Handle for mobile */}
-        <div className="flex h-8 w-full shrink-0 items-center justify-center sm:hidden">
-          <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+        {/* Header Bar - Appears on Scroll */}
+        <div className={`absolute top-0 left-0 right-0 z-20 flex h-16 items-center justify-between px-6 transition-all duration-300 ${
+          headerScrolled ? "bg-white/90 backdrop-blur-md border-b border-slate-100 opacity-100" : "opacity-0 pointer-events-none"
+        }`}>
+          <span className="text-sm font-black uppercase tracking-widest text-slate-900 truncate pr-10">
+            {item.name}
+          </span>
         </div>
 
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute right-5 top-5 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/80 text-slate-900 shadow-sm backdrop-blur-md transition hover:bg-white active:scale-90"
+          className={`absolute right-5 top-5 z-30 grid h-10 w-10 place-items-center rounded-full transition-all duration-300 ${
+            headerScrolled 
+              ? "bg-slate-100 text-slate-900" 
+              : "bg-white/80 text-slate-900 shadow-sm backdrop-blur-md"
+          } hover:bg-white active:scale-90`}
         >
           <X className="h-5 w-5" />
         </button>
 
-        <div className="overflow-y-auto no-scrollbar pb-[env(safe-area-inset-bottom,24px)]">
+        {/* Scrollable Content */}
+        <div 
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto no-scrollbar"
+        >
           {/* Image Header */}
           <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100 sm:aspect-square">
-            <SafeMenuAsset
-              path={activeImage}
-              alt={item.name}
-              className="h-full w-full object-cover transition-all duration-700 hover:scale-110"
-              fallback={
-                <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-slate-300">
-                  <div className="grid h-20 w-20 place-items-center rounded-3xl bg-slate-50">
-                    <UtensilsCrossed className="h-10 w-10" />
+            {showVideo && item.video_path ? (
+              <div className="absolute inset-0 bg-black">
+                <video 
+                  src={item.video_path} 
+                  autoPlay 
+                  controls 
+                  className="h-full w-full object-contain"
+                  onEnded={() => setShowVideo(false)}
+                />
+                <button 
+                  onClick={() => setShowVideo(false)}
+                  className="absolute bottom-4 right-4 rounded-full bg-white/20 px-3 py-1 text-[10px] font-bold text-white backdrop-blur-md"
+                >
+                  Close Video
+                </button>
+              </div>
+            ) : (
+              <SafeMenuAsset
+                path={activeImage}
+                alt={item.name}
+                className="h-full w-full object-cover transition-all duration-700 hover:scale-110"
+                fallback={
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-slate-300">
+                    <div className="grid h-20 w-20 place-items-center rounded-3xl bg-slate-50">
+                      <UtensilsCrossed className="h-10 w-10" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">Flavor Insight</span>
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em]">Flavor Insight</span>
-                </div>
-              }
-            />
+                }
+              />
+            )}
 
             {/* Bubble Overlay */}
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <div className="group flex items-center gap-3 rounded-2xl bg-slate-900/80 px-5 py-3.5 shadow-2xl backdrop-blur-md ring-1 ring-white/20 transition-all hover:bg-slate-900">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-400/80 mb-0.5">Signature Dish</span>
-                  <span className="text-sm font-black uppercase tracking-widest text-white whitespace-nowrap">
-                    {item.name}
-                  </span>
+            {!showVideo && (
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="group flex items-center gap-3 rounded-2xl bg-slate-900/80 px-5 py-3.5 shadow-2xl backdrop-blur-md ring-1 ring-white/20 transition-all hover:bg-slate-900">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-400/80 mb-0.5">Signature Dish</span>
+                    <span className="text-sm font-black uppercase tracking-widest text-white whitespace-nowrap">
+                      {item.name}
+                    </span>
+                  </div>
+                  <div className="ml-2 grid h-7 w-7 place-items-center rounded-full bg-white/10 text-white transition-transform group-hover:translate-x-1">
+                    <ChevronRight className="h-4 w-4" />
+                  </div>
                 </div>
-                <div className="ml-2 grid h-7 w-7 place-items-center rounded-full bg-white/10 text-white transition-transform group-hover:translate-x-1">
-                  <ChevronRight className="h-4 w-4" />
-                </div>
+                <div className="mx-auto mt-[-1px] h-3 w-3 -translate-y-1/2 rotate-45 bg-slate-900/80 shadow-2xl" />
               </div>
-              <div className="mx-auto mt-[-1px] h-3 w-3 -translate-y-1/2 rotate-45 bg-slate-900/80 shadow-2xl" />
-            </div>
+            )}
 
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
             {!item.is_available && (
@@ -152,13 +197,16 @@ export default function ItemDetailSheet({
 
           {/* Multiple Images Gallery */}
           {images.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto no-scrollbar px-6 py-4 bg-white/50 backdrop-blur-sm border-b border-slate-100">
+            <div className="flex gap-3 overflow-x-auto no-scrollbar px-6 py-4 bg-white border-b border-slate-100">
               {images.map((img, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setActiveImage(img)}
+                  onClick={() => {
+                    setActiveImage(img);
+                    setShowVideo(false);
+                  }}
                   className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 transition-all ${
-                    activeImage === img
+                    activeImage === img && !showVideo
                       ? "border-orange-500 ring-4 ring-orange-500/10 scale-95"
                       : "border-slate-100 hover:border-slate-200"
                   }`}
@@ -173,10 +221,14 @@ export default function ItemDetailSheet({
               ))}
               {item.video_path && (
                 <button
-                  onClick={() => setActiveImage(null)} // Or handle video display
-                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 border-slate-100 bg-slate-900 flex flex-col items-center justify-center gap-1 text-white hover:bg-slate-800 transition-colors"
+                  onClick={() => setShowVideo(true)}
+                  className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${
+                    showVideo 
+                      ? "border-orange-500 ring-4 ring-orange-500/10 bg-slate-900 text-orange-400 scale-95" 
+                      : "border-slate-100 bg-slate-900 text-white hover:bg-slate-800"
+                  }`}
                 >
-                  <Play className="h-5 w-5 fill-current" />
+                  <Play className={`h-5 w-5 ${showVideo ? "fill-orange-400" : "fill-current"}`} />
                   <span className="text-[8px] font-black uppercase tracking-tighter">Watch</span>
                 </button>
               )}
@@ -206,7 +258,7 @@ export default function ItemDetailSheet({
               </div>
             </div>
 
-            <div className="mt-8 space-y-6">
+            <div className="mt-8 space-y-8">
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-slate-400">
                   <Info className="h-4 w-4" />
@@ -228,6 +280,23 @@ export default function ItemDetailSheet({
                   </p>
                 </div>
               )}
+
+              {/* Special Instructions - Uber Eats Style */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-slate-900">
+                    <MessageSquareText className="h-4 w-4 text-orange-500" />
+                    <span className="text-sm font-black uppercase tracking-widest">Special Instructions</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Optional</span>
+                </div>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="e.g. No onions, extra spicy, etc."
+                  className="w-full min-h-[100px] rounded-2xl border-2 border-slate-100 bg-slate-50 p-4 text-sm font-medium outline-none transition focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/10 resize-none placeholder:text-slate-300"
+                />
+              </div>
 
               {item.blog_link && (
                 <a
@@ -260,57 +329,59 @@ export default function ItemDetailSheet({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            {/* Action Bar */}
-            <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="flex h-16 items-center justify-between rounded-2xl bg-slate-100 p-1.5 sm:w-44">
-                <button
-                  onClick={decrement}
-                  className="grid h-12 w-12 place-items-center rounded-xl bg-white text-slate-900 shadow-sm transition active:scale-90 disabled:opacity-30"
-                  disabled={localQty <= 1}
-                >
-                  <Minus className="h-5 w-5" />
-                </button>
-                <span className="text-xl font-black text-slate-900">
-                  {localQty}
-                </span>
-                <button
-                  onClick={increment}
-                  className="grid h-12 w-12 place-items-center rounded-xl bg-white text-slate-900 shadow-sm transition active:scale-90"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-              </div>
-
+        {/* Sticky Action Bar */}
+        <div className="shrink-0 border-t border-slate-100 bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom,24px))] shadow-[0_-10px_40px_rgba(0,0,0,0.04)]">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex h-16 items-center justify-between rounded-2xl bg-slate-100 p-1.5 sm:w-44">
               <button
-                onClick={handleAdd}
-                disabled={adding || !item.is_available}
-                className={`group relative flex h-16 flex-1 items-center justify-center gap-3 overflow-hidden rounded-2xl text-base font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] ${
-                  success
-                    ? "bg-emerald-500 text-white shadow-emerald-500/20"
-                    : "bg-orange-500 text-white hover:bg-orange-600 active:bg-orange-700"
-                } disabled:opacity-40 disabled:shadow-none`}
+                onClick={decrement}
+                className="grid h-12 w-12 place-items-center rounded-xl bg-white text-slate-900 shadow-sm transition active:scale-90 disabled:opacity-30"
+                disabled={localQty <= 1}
               >
-                {adding ? (
-                  <div className="h-6 w-6 animate-spin rounded-full border-3 border-white border-t-transparent" />
-                ) : success ? (
-                  <>
-                    <Check className="h-6 w-6 animate-in zoom-in-50" />
-                    <span>Added Successfully</span>
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="h-5 w-5" />
-                    <span>Add to Cart — {formatPrice(item.price * localQty)}</span>
-                  </>
-                )}
-                
-                {/* Shine effect */}
-                {!success && !adding && (
-                  <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
-                )}
+                <Minus className="h-5 w-5" />
+              </button>
+              <span className="text-xl font-black text-slate-900">
+                {localQty}
+              </span>
+              <button
+                onClick={increment}
+                className="grid h-12 w-12 place-items-center rounded-xl bg-white text-slate-900 shadow-sm transition active:scale-90"
+              >
+                <Plus className="h-5 w-5" />
               </button>
             </div>
+
+            <button
+              onClick={handleAdd}
+              disabled={adding || !item.is_available}
+              className={`group relative flex h-16 flex-1 items-center justify-center gap-3 overflow-hidden rounded-2xl text-base font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] ${
+                success
+                  ? "bg-emerald-500 text-white shadow-emerald-500/20"
+                  : "bg-orange-500 text-white hover:bg-orange-600 active:bg-orange-700"
+              } disabled:opacity-40 disabled:shadow-none`}
+            >
+              {adding ? (
+                <div className="h-6 w-6 animate-spin rounded-full border-3 border-white border-t-transparent" />
+              ) : success ? (
+                <>
+                  <Check className="h-6 w-6 animate-in zoom-in-50" />
+                  <span>Added Successfully</span>
+                </>
+              ) : (
+                <>
+                  <ShoppingCart className="h-5 w-5" />
+                  <span>Add to Cart — {formatPrice(item.price * localQty)}</span>
+                </>
+              )}
+              
+              {/* Shine effect */}
+              {!success && !adding && (
+                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
+              )}
+            </button>
           </div>
         </div>
       </div>

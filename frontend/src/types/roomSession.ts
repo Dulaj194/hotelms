@@ -35,6 +35,7 @@ export interface RoomCartItemResponse {
   line_total: number;
   is_available: boolean;
   image_path?: string | null;
+  note: string | null;
 }
 
 export interface RoomCartResponse {
@@ -65,6 +66,7 @@ export interface PlaceRoomOrderRequest {
   items?: Array<{
     item_id: number;
     quantity: number;
+    note?: string;
   }>;
 }
 

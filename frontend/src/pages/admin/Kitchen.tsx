@@ -278,9 +278,16 @@ function KitchenCard({ order, currentTime, onAction, loading }: {
               <div className="h-6 min-w-[24px] bg-slate-900 text-white rounded-lg flex items-center justify-center text-xs font-black">
                 {item.quantity}
               </div>
-              <p className="text-base font-bold text-slate-800 leading-tight">
-                {item.item_name_snapshot}
-              </p>
+              <div>
+                <p className="text-base font-bold text-slate-800 leading-tight">
+                  {item.item_name_snapshot}
+                </p>
+                {item.notes && (
+                  <p className="mt-1 text-[11px] font-medium text-orange-600 italic">
+                    Instr: {item.notes}
+                  </p>
+                )}
+              </div>
             </li>
           ))}
         </ul>

@@ -119,6 +119,7 @@ def _build_order_header(order) -> OrderHeaderResponse:
             unit_price_snapshot=float(oi.unit_price_snapshot),
             quantity=oi.quantity,
             line_total=float(oi.line_total),
+            notes=oi.notes,
         )
         for oi in order.items
     ]
@@ -179,6 +180,7 @@ def _build_kitchen_order_card(order) -> KitchenOrderCard:
                 quantity=oi.quantity,
                 unit_price_snapshot=float(oi.unit_price_snapshot),
                 line_total=float(oi.line_total),
+                notes=oi.notes,
             )
             for oi in order.items
         ],
@@ -220,13 +222,6 @@ def _stage_promo_usage_increment(
     promo.used_count += 1
 
 
-def _quantities_from_payload(payload: PlaceOrderRequest) -> dict[int, int]:
-    quantities: dict[int, int] = {}
-    for line in payload.items:
-        quantities[line.item_id] = quantities.get(line.item_id, 0) + line.quantity
-    return quantities
-
-
 def _quantities_from_redis_cart(
     r: redis_lib.Redis,
     session: TableSession,
@@ -235,13 +230,13 @@ def _quantities_from_redis_cart(
     return {int(item_id): int(quantity) for item_id, quantity in raw_cart.items()}
 
 
-def _build_line_items_from_quantities(
+def _build_line_items_from_payload(
     db: Session,
     *,
     restaurant_id: int,
-    quantities: dict[int, int],
+    items: list[PlaceOrderItemRequest],
 ) -> tuple[list[dict], float]:
-    if not quantities:
+    if not items:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Cart is empty. Add items before placing an order.",
@@ -249,8 +244,11 @@ def _build_line_items_from_quantities(
 
     line_items: list[dict] = []
     subtotal = 0.0
-
-    for item_id, quantity in quantities.items():
+    
+    for item_req in items:
+        item_id = item_req.item_id
+        quantity = item_req.quantity
+        note = item_req.note
         item = get_item(db, item_id, restaurant_id)
         if item is None:
             raise HTTPException(
@@ -275,6 +273,7 @@ def _build_line_items_from_quantities(
                 "unit_price_snapshot": unit_price,
                 "quantity": quantity,
                 "line_total": line_total,
+                "note": note,
             }
         )
 
@@ -336,20 +335,32 @@ def _create_table_session_from_qr_key(
     return session, guest_token
 
 
-def _place_order_from_quantities(
+def _create_and_persist_order(
     db: Session,
     r: redis_lib.Redis | None,
     session: TableSession,
     payload: PlaceOrderRequest,
-    quantities: dict[int, int],
     *,
     clear_redis_cart: bool,
     guest_token: str | None = None,
 ) -> PlaceOrderResponse:
-    line_items, subtotal = _build_line_items_from_quantities(
+    # If client-side payload is provided, use it. Otherwise, pull from Redis cart.
+    # We always use the PlaceOrderItemRequest schema internally for consistency.
+    items_to_process: list[PlaceOrderItemRequest] = []
+
+    if payload.items:
+        items_to_process = payload.items
+    elif r is not None:
+        redis_quantities = _quantities_from_redis_cart(r, session)
+        items_to_process = [
+            PlaceOrderItemRequest(item_id=iid, quantity=q)
+            for iid, q in redis_quantities.items()
+        ]
+
+    line_items, subtotal = _build_line_items_from_payload(
         db,
         restaurant_id=session.restaurant_id,
-        quantities=quantities,
+        items=items_to_process,
     )
 
     tax_amount = 0.0
@@ -440,6 +451,7 @@ def _place_order_from_quantities(
                         "item_name_snapshot": oi.item_name_snapshot,
                         "quantity": oi.quantity,
                         "line_total": float(oi.line_total),
+                        "notes": oi.notes,
                     }
                     for oi in placed.items
                 ],
@@ -456,25 +468,12 @@ def place_order(
     session: TableSession,
     payload: PlaceOrderRequest,
 ) -> PlaceOrderResponse:
-    """Convert the guest's Redis cart into a persisted order.
-
-    SECURITY:
-    - restaurant_id and session_id come from the validated TableSession object,
-      never from the client request body.
-    - All prices are loaded from the DB; client totals are not accepted.
-    - The full create/flush/commit is wrapped so cart is only cleared on success.
-    """
-    quantities = (
-        _quantities_from_payload(payload)
-        if payload.items
-        else _quantities_from_redis_cart(r, session)
-    )
-    return _place_order_from_quantities(
+    """Convert the guest's Redis/payload cart into a persisted order."""
+    return _create_and_persist_order(
         db,
         r,
         session,
         payload,
-        quantities,
         clear_redis_cart=not payload.items,
     )
 
@@ -496,12 +495,11 @@ def place_order_from_qr_key(
         qr_access_key=qr_access_key,
         customer_name=payload.customer_name,
     )
-    return _place_order_from_quantities(
+    return _create_and_persist_order(
         db,
         r,
         session,
         payload,
-        _quantities_from_payload(payload),
         clear_redis_cart=False,
         guest_token=guest_token,
     )

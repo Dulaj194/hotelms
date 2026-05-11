@@ -20,6 +20,7 @@ class PlaceOrderItemRequest(BaseModel):
 
     item_id: int = Field(..., gt=0)
     quantity: int = Field(..., ge=1, le=99)
+    note: str | None = Field(default=None, max_length=500)
 
 
 class PlaceOrderRequest(BaseModel):
@@ -61,6 +62,7 @@ class OrderItemPreviewResponse(BaseModel):
     unit_price_snapshot: float
     quantity: int
     line_total: float
+    notes: str | None
 
 
 class OrderHeaderResponse(BaseModel):
@@ -139,6 +141,7 @@ class KitchenOrderItemSummary(BaseModel):
     quantity: int
     unit_price_snapshot: float
     line_total: float
+    notes: str | None
 
     model_config = {"from_attributes": True}
 

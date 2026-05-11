@@ -347,10 +347,10 @@ export default function TableMenu() {
   );
 
   const handleAddToCartWithQty = useCallback(
-    async (itemId: number, quantity: number) => {
+    async (itemId: number, quantity: number, note?: string) => {
       setAddingItemId(itemId);
       try {
-        await addItem(itemId, quantity);
+        await addItem(itemId, quantity, note);
         setRecentlyAddedItemId(itemId);
         if (window.navigator.vibrate) window.navigator.vibrate([10, 30, 10]);
         setTimeout(() => setRecentlyAddedItemId(null), 1500);

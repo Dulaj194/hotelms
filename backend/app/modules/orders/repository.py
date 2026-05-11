@@ -102,6 +102,7 @@ def create_order_items(
             unit_price_snapshot=round(item_data["unit_price_snapshot"], 2),
             quantity=item_data["quantity"],
             line_total=round(item_data["line_total"], 2),
+            notes=item_data.get("note"),
         )
         db.add(oi)
         order_items.append(oi)

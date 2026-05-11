@@ -19,6 +19,7 @@ export interface PlaceOrderRequest {
   items?: Array<{
     item_id: number;
     quantity: number;
+    note?: string;
   }>;
 }
 
@@ -43,6 +44,7 @@ export interface OrderItemPreviewResponse {
   unit_price_snapshot: number;
   quantity: number;
   line_total: number;
+  notes: string | null;
 }
 
 export interface PaymentResponse {
@@ -143,6 +145,7 @@ export interface KitchenOrderItemSummary {
   quantity: number;
   unit_price_snapshot: number;
   line_total: number;
+  notes: string | null;
 }
 
 export interface KitchenOrderCard {

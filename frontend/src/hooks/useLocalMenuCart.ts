@@ -20,7 +20,12 @@ import type {
   RoomCartResponse,
 } from "@/types/roomSession";
 
-type CartQuantities = Record<string, number>;
+type CartItemData = {
+  quantity: number;
+  note?: string;
+};
+
+type CartQuantities = Record<string, CartItemData>;
 
 type MenuItemWithCategory = PublicItemSummaryResponse & {
   categoryName: string | null;
@@ -30,11 +35,16 @@ function readQuantities(storageKey: string): CartQuantities {
   const raw = sessionStorage.getItem(storageKey);
   if (!raw) return {};
   try {
-    const parsed = JSON.parse(raw) as CartQuantities;
+    const parsed = JSON.parse(raw) as Record<string, number | CartItemData>;
     return Object.fromEntries(
       Object.entries(parsed)
-        .map(([itemId, quantity]) => [itemId, Number(quantity)] as const)
-        .filter(([itemId, quantity]) => Number(itemId) > 0 && quantity > 0),
+        .map(([itemId, data]) => {
+          const itemData: CartItemData = typeof data === "number" 
+            ? { quantity: data } 
+            : data;
+          return [itemId, itemData] as const;
+        })
+        .filter(([itemId, data]) => Number(itemId) > 0 && data.quantity > 0),
     );
   } catch {
     return {};
@@ -87,20 +97,29 @@ function useLocalQuantities(storageKey: string) {
     sessionStorage.setItem(storageKey, JSON.stringify(quantities));
   }, [quantities, storageKey]);
 
-  const addItem = useCallback(async (itemId: number, quantity = 1) => {
-    setQuantities((current) => ({
-      ...current,
-      [itemId]: Math.min((current[itemId] ?? 0) + quantity, 99),
-    }));
+  const addItem = useCallback(async (itemId: number, quantity = 1, note?: string) => {
+    setQuantities((current) => {
+      const existing = current[itemId];
+      return {
+        ...current,
+        [itemId]: {
+          quantity: Math.min((existing?.quantity ?? 0) + quantity, 99),
+          note: note ?? existing?.note,
+        },
+      };
+    });
   }, []);
 
-  const updateItem = useCallback(async (itemId: number, quantity: number) => {
+  const updateItem = useCallback(async (itemId: number, quantity: number, note?: string) => {
     setQuantities((current) => {
       const next = { ...current };
       if (quantity <= 0) {
         delete next[itemId];
       } else {
-        next[itemId] = Math.min(quantity, 99);
+        next[itemId] = {
+          quantity: Math.min(quantity, 99),
+          note: note ?? next[itemId]?.note,
+        };
       }
       return next;
     });
@@ -140,7 +159,8 @@ export function useLocalTableCart(params: {
   const cart = useMemo<CartResponse | null>(() => {
     if (!restaurantId || !tableNumber) return null;
     const cartItems = Object.entries(quantities)
-      .map(([itemId, quantity]) => {
+      .map(([itemId, data]) => {
+        const { quantity, note } = data;
         const item = itemById.get(Number(itemId));
         if (!item) return null;
         const unitPrice = Number(item.price);
@@ -152,6 +172,7 @@ export function useLocalTableCart(params: {
           line_total: Math.round(unitPrice * quantity * 100) / 100,
           is_available: item.is_available,
           image_path: item.image_path,
+          note: note, // Include the note in the cart response
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -170,9 +191,10 @@ export function useLocalTableCart(params: {
       if (!restaurantId || !tableNumber) {
         throw new Error("Invalid table context. Please scan the QR code again.");
       }
-      const orderItems = Object.entries(quantities).map(([itemId, quantity]) => ({
+      const orderItems = Object.entries(quantities).map(([itemId, data]) => ({
         item_id: Number(itemId),
-        quantity,
+        quantity: data.quantity,
+        note: data.note,
       }));
       if (orderItems.length === 0) {
         throw new Error("Cart is empty. Add items before placing an order.");
@@ -274,7 +296,8 @@ export function useLocalRoomCart(params: {
   const cart = useMemo<RoomCartResponse | null>(() => {
     if (!restaurantId || !roomNumber) return null;
     const cartItems = Object.entries(quantities)
-      .map(([itemId, quantity]) => {
+      .map(([itemId, data]) => {
+        const { quantity, note } = data;
         const item = itemById.get(Number(itemId));
         if (!item) return null;
         const unitPrice = Number(item.price);
@@ -286,6 +309,7 @@ export function useLocalRoomCart(params: {
           line_total: Math.round(unitPrice * quantity * 100) / 100,
           is_available: item.is_available,
           image_path: item.image_path,
+          note: note,
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
@@ -305,9 +329,10 @@ export function useLocalRoomCart(params: {
       if (!restaurantId || !roomNumber) {
         throw new Error("Invalid room context. Please scan the QR code again.");
       }
-      const orderItems = Object.entries(quantities).map(([itemId, quantity]) => ({
+      const orderItems = Object.entries(quantities).map(([itemId, data]) => ({
         item_id: Number(itemId),
-        quantity,
+        quantity: data.quantity,
+        note: data.note,
       }));
       if (orderItems.length === 0) {
         throw new Error("Cart is empty. Add items before placing an order.");

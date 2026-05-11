@@ -12,6 +12,7 @@ import {
   Tag,
   Trash2,
   UtensilsCrossed,
+  MessageSquareText,
 } from "lucide-react";
 
 import {
@@ -257,6 +258,12 @@ export default function TableCartCheckout() {
                 <p className="mt-1 text-xs font-semibold text-slate-500">
                   {formatCurrency(item.unit_price)} each
                 </p>
+                {item.note && (
+                  <p className="mt-1.5 flex items-start gap-1.5 text-[11px] font-medium leading-relaxed text-orange-600 bg-orange-50/50 p-2 rounded-lg border border-orange-100/50">
+                    <MessageSquareText className="h-3 w-3 mt-0.5 shrink-0" />
+                    <span className="line-clamp-2">Note: {item.note}</span>
+                  </p>
+                )}
               </div>
               <button
                 type="button"
@@ -581,8 +588,8 @@ export default function TableCartCheckout() {
         item={selectedItem}
         isOpen={!!selectedItem}
         onClose={() => setSelectedItem(null)}
-        onAddToCart={async (id, qty) => {
-          await addItem(id, qty);
+        onAddToCart={async (id, qty, note) => {
+          await addItem(id, qty, note);
         }}
         qtyInCart={cart?.items.find(i => i.item_id === selectedItem?.id)?.quantity ?? 0}
         formatPrice={formatCurrency}

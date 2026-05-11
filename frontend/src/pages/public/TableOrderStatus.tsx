@@ -237,8 +237,13 @@ export default function TableOrderStatus() {
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-slate-900">{item.item_name_snapshot}</p>
+                  {item.notes && (
+                    <p className="mt-0.5 text-[10px] font-medium text-orange-600 italic">
+                      “{item.notes}”
+                    </p>
+                  )}
                   <p className="text-xs text-slate-500">
-                  {item.quantity} x ${item.unit_price_snapshot.toFixed(2)}
+                    {item.quantity} x ${item.unit_price_snapshot.toFixed(2)}
                   </p>
                 </div>
                 <p className="ml-2 shrink-0 font-semibold text-slate-900">${item.line_total.toFixed(2)}</p>
