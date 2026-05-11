@@ -48,7 +48,7 @@ from app.modules.promo_codes.service import validate_promo_for_restaurant
 from app.modules.realtime import service as realtime_service
 from app.modules.restaurants.repository import get_by_id as get_restaurant
 from app.modules.table_sessions import repository as table_session_repo
-from app.modules.table_sessions.model import TableSession
+from app.modules.table_sessions.model import TableSession, TableSessionStatus
 
 
 GUEST_CANCEL_WINDOW_SECONDS = 10
