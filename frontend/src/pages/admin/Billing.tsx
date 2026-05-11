@@ -152,7 +152,7 @@ function Alert({ tone, children }: { tone: "error" | "info" | "warning"; childre
   return <div className={`rounded-2xl border p-4 text-sm font-medium ${cls}`}>{children}</div>;
 }
 
-function OrderCard({ order }: { order: BillOrder }) {
+function OrderCard({ order, onReject, isSettled }: { order: BillOrder, onReject?: () => void, isSettled: boolean }) {
   return (
     <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
       <div className="mb-4 flex items-center justify-between">
@@ -165,8 +165,19 @@ function OrderCard({ order }: { order: BillOrder }) {
             <p className="text-xs font-bold text-slate-500">{new Date(order.placed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
           </div>
         </div>
-        <div className="text-right">
-           <p className="text-lg font-black text-slate-900 tabular-nums">{cur(order.total_amount)}</p>
+        <div className="flex items-center gap-4">
+           {!isSettled && onReject && (
+              <button 
+                onClick={onReject}
+                className="h-8 px-3 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100"
+                title="Reject this order due to dispute"
+              >
+                Void Order
+              </button>
+           )}
+           <div className="text-right">
+              <p className="text-lg font-black text-slate-900 tabular-nums">{cur(order.total_amount)}</p>
+           </div>
         </div>
       </div>
       <div className="space-y-2">
@@ -380,6 +391,17 @@ export default function Billing() {
     }
   }, [loadFolios, method, mode, notes, summary, transactionRef]);
 
+  const onRejectOrder = useCallback(async (orderId: number) => {
+    if (!summary || !window.confirm("Are you sure you want to REJECT and VOID this order from the bill? This cannot be undone.")) return;
+    try {
+      await api.patch(`/orders/${orderId}/status`, { status: "rejected" });
+      // Refresh summary
+      await loadSummary(mode, summary.session_id);
+    } catch (error) {
+      setSettleError(errorText(error, "Failed to reject order."));
+    }
+  }, [loadSummary, mode, summary]);
+
   const onPresentBill = useCallback(async () => {
     if (!summary || mode !== "table") return;
     setIsPresenting(true);
@@ -544,7 +566,14 @@ export default function Billing() {
                      </div>
 
                      <div className="space-y-4">
-                        {summary.orders.map((order) => <OrderCard key={order.id} order={order} />)}
+                        {summary.orders.map((order) => (
+                          <OrderCard 
+                            key={order.id} 
+                            order={order} 
+                            isSettled={summary.is_settled}
+                            onReject={() => onRejectOrder(order.id)}
+                          />
+                        ))}
                         {summary.orders.length === 0 && (
                           <div className="p-20 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100 text-center">
                              <Coffee className="h-12 w-12 text-slate-100 mx-auto mb-4" />

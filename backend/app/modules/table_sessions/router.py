@@ -11,7 +11,7 @@ from app.core.dependencies import (
 )
 from app.modules.access import role_catalog
 from app.modules.table_sessions import service
-from app.modules.table_sessions.model import TableSession
+from app.modules.table_sessions.model import TableSession, TableSessionStatus
 from app.modules.table_sessions.schemas import (
     BillRequestListResponse,
     TableSessionStartRequest,
