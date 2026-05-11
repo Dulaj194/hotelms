@@ -12,7 +12,7 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, ChefHat, ChevronRight, Menu as MenuIcon, Search, ShoppingCart, X } from "lucide-react";
+import { Bell, Check, ChefHat, ChevronRight, Menu as MenuIcon, Search, ShoppingCart, X } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
@@ -315,6 +315,7 @@ export default function RoomMenu() {
   const [sessionReady, setSessionReady] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
+  const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<number | null>(null);
   const [placedOrder, setPlacedOrder] = useState<RoomOrderDetailResponse | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
@@ -581,10 +582,25 @@ export default function RoomMenu() {
                 e.stopPropagation();
                 handleAddToCart(item.id);
               }}
-              className="box-border flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full bg-orange-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-orange-600 disabled:opacity-50"
+              className={`box-border flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-semibold text-white transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
+                recentlyAddedItemId === item.id
+                  ? "bg-emerald-500 shadow-md shadow-emerald-500/20"
+                  : "bg-orange-500 hover:bg-orange-600"
+              }`}
             >
-              {isAdding ? "Adding..." : "Add to Cart"}
-              {!isAdding && <ChevronRight className="h-3.5 w-3.5" />}
+              {isAdding ? (
+                "Adding..."
+              ) : recentlyAddedItemId === item.id ? (
+                <>
+                  <Check className="h-4 w-4 animate-in zoom-in-50" />
+                  Added!
+                </>
+              ) : (
+                <>
+                  <span>Add to Cart</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </>
+              )}
             </button>
           )}
         </div>

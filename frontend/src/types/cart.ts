@@ -8,7 +8,7 @@ export interface CartItemResponse {
   line_total: number;
   is_available: boolean;
   image_path?: string | null;
-  note?: string;
+  note: string | null;
 }
 
 export interface CartResponse {
