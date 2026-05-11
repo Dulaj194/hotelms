@@ -263,3 +263,46 @@ def publish_service_resolved(
         },
     }
     realtime_repo.publish_event(r, restaurant_id, event)
+def publish_bill_presented(
+    r: redis_lib.Redis,
+    *,
+    restaurant_id: int,
+    session_id: str,
+    table_number: str,
+    total_amount: float,
+) -> None:
+    """Notify a specific guest that their bill is ready for confirmation."""
+    channel = realtime_repo.get_guest_session_channel(session_id)
+    event = {
+        "event": "bill_presented",
+        "restaurant_id": restaurant_id,
+        "data": {
+            "session_id": session_id,
+            "table_number": table_number,
+            "total_amount": total_amount,
+            "timestamp": datetime.now(UTC),
+        },
+    }
+    realtime_repo.publish_global_event(r, channel, event)
+
+
+def publish_bill_confirmed(
+    r: redis_lib.Redis,
+    *,
+    restaurant_id: int,
+    session_id: str,
+    customer_name: str,
+) -> None:
+    """Notify staff that a guest has confirmed their bill."""
+    # This goes to the staff billing channel
+    channel = realtime_repo.get_billing_channel(restaurant_id)
+    event = {
+        "event": "bill_confirmed",
+        "restaurant_id": restaurant_id,
+        "data": {
+            "session_id": session_id,
+            "customer_name": customer_name,
+            "timestamp": datetime.now(UTC),
+        },
+    }
+    realtime_repo.publish_global_event(r, channel, event)

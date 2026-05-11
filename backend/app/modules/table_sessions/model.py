@@ -21,6 +21,8 @@ class TableSessionStatus(str, enum.Enum):
     CLOSED = "CLOSED"
     BILL_REQUESTED = "BILL_REQUESTED"
     BILL_ACKNOWLEDGED = "BILL_ACKNOWLEDGED"
+    BILL_PRESENTED = "BILL_PRESENTED"
+    BILL_CONFIRMED = "BILL_CONFIRMED"
 
 
 class TableSession(Base):

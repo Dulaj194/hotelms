@@ -34,6 +34,7 @@ class TableSessionStartResponse(BaseModel):
     customer_name: str
     order_source: str
     session_status: str
+    bill_total: float | None = None
     expires_at: datetime
 
     model_config = {"from_attributes": True}

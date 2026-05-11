@@ -89,12 +89,13 @@ def start_table_session(
     expires_at = datetime.now(UTC) + timedelta(minutes=expire_minutes)
 
     try:
-        # Keep a single active session per restaurant table.
-        repository.deactivate_active_sessions_for_table(
-            db,
-            restaurant_id=data.restaurant_id,
-            table_number=table_number,
-        )
+        # We no longer deactivate other sessions for the table to support separate billing
+        # for multiple guests at the same table (Standard Hospitality Pattern).
+        # repository.deactivate_active_sessions_for_table(
+        #     db,
+        #     restaurant_id=data.restaurant_id,
+        #     table_number=table_number,
+        # )
 
         # Persist session record — does NOT store the raw token
         repository.create_session(
@@ -295,6 +296,65 @@ def acknowledge_bill(
             )
             return True
         return False
+    except Exception:
+        db.rollback()
+        raise
+
+
+def present_bill(
+    db: Session,
+    r: redis_lib.Redis,
+    session_id: str,
+    restaurant_id: int,
+) -> bool:
+    """Mark a bill as presented to the customer and notify them."""
+    try:
+        session = repository.get_session_by_id_and_restaurant(db, session_id, restaurant_id)
+        if not session:
+            return False
+            
+        # Transition status
+        session.session_status = TableSessionStatus.BILL_PRESENTED
+        session.updated_at = datetime.now(UTC)
+        db.commit()
+        
+        # Calculate current total for the notification
+        from app.modules.orders.repository import list_billable_orders_by_session
+        billable = list_billable_orders_by_session(db, session_id)
+        total = sum(order.total_amount for order in billable)
+        
+        # Notify guest via real-time channel
+        realtime_service.publish_bill_presented(
+            r,
+            restaurant_id=restaurant_id,
+            session_id=session_id,
+            table_number=session.table_number,
+            total_amount=float(total),
+        )
+        return True
+    except Exception:
+        db.rollback()
+        raise
+
+
+def confirm_bill(
+    db: Session,
+    r: redis_lib.Redis,
+    session: TableSession,
+) -> None:
+    """Mark a bill as confirmed by the guest and notify staff."""
+    try:
+        session.session_status = TableSessionStatus.BILL_CONFIRMED
+        session.updated_at = datetime.now(UTC)
+        db.commit()
+        
+        # Notify staff via billing channel
+        realtime_service.publish_bill_confirmed(
+            r,
+            restaurant_id=session.restaurant_id,
+            session_id=session.session_id,
+            customer_name=session.customer_name or "Guest",
+        )
     except Exception:
         db.rollback()
         raise

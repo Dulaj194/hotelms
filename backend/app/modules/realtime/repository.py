@@ -27,6 +27,11 @@ def get_billing_channel(restaurant_id: int) -> str:
     return f"billing:{restaurant_id}"
 
 
+def get_guest_session_channel(session_id: str) -> str:
+    """Return the Redis pub/sub channel for a specific guest session."""
+    return f"guest_session:{session_id}"
+
+
 def _json_default(obj: object) -> str:
     if isinstance(obj, datetime):
         return obj.isoformat()

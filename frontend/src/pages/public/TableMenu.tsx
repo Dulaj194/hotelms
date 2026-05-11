@@ -21,6 +21,7 @@ import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import QuickServiceDrawer from "@/components/public/QuickServiceDrawer";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
+import BillConfirmationOverlay from "@/components/public/BillConfirmationOverlay";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { getGuestToken } from "@/hooks/useGuestSession";
 import {
@@ -98,6 +99,10 @@ export default function TableMenu() {
   const [isRequestingService, setIsRequestingService] = useState(false);
   const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuTile | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<string>("OPEN");
+  const [billTotal, setBillTotal] = useState<number>(0);
+  const isLocked = sessionStatus === "BILL_REQUESTED" || sessionStatus === "BILL_ACKNOWLEDGED" || sessionStatus === "BILL_PRESENTED" || sessionStatus === "BILL_CONFIRMED";
+  const isBillPresented = sessionStatus === "BILL_PRESENTED";
 
   const [isMenuSelectionActive, setIsMenuSelectionActive] = useState(false);
   const lastMenuScrollYRef = useRef(0);
@@ -294,6 +299,30 @@ export default function TableMenu() {
     setSessionReady(true);
   }, [restaurantId, tableNumber, qrAccessKey, guestName]);
 
+  // 1.5 Fetch session status periodically
+  useEffect(() => {
+    if (!sessionReady) return;
+
+    const fetchSession = async () => {
+      try {
+        const guestToken = getGuestToken();
+        if (!guestToken) return;
+        const data = await publicGet<{ session_status: string, bill_total?: number }>(
+          "/table-sessions/my",
+          { headers: { "X-Guest-Session": guestToken } }
+        );
+        setSessionStatus(data.session_status);
+        if (data.bill_total) setBillTotal(data.bill_total);
+      } catch (err) {
+        console.error("Failed to fetch session status", err);
+      }
+    };
+
+    void fetchSession();
+    const interval = setInterval(fetchSession, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, [sessionReady]);
+
   // 2. Fetch public menu
   useEffect(() => {
     if (!restaurantId) return;
@@ -332,6 +361,10 @@ export default function TableMenu() {
 
   const handleAddToCart = useCallback(
     async (itemId: number) => {
+      if (isLocked) {
+        if (window.navigator.vibrate) window.navigator.vibrate([50, 50, 50]);
+        return;
+      }
       setAddingItemId(itemId);
       try {
         await addItem(itemId, 1);
@@ -348,6 +381,10 @@ export default function TableMenu() {
 
   const handleAddToCartWithQty = useCallback(
     async (itemId: number, quantity: number, note?: string) => {
+      if (isLocked) {
+        if (window.navigator.vibrate) window.navigator.vibrate([50, 50, 50]);
+        return;
+      }
       setAddingItemId(itemId);
       try {
         await addItem(itemId, quantity, note);
@@ -437,6 +474,11 @@ export default function TableMenu() {
         headers: { "X-Guest-Session": guestToken },
       });
       
+      // Update session status locally if bill requested
+      if (isBill) {
+        setSessionStatus("BILL_REQUESTED");
+      }
+
       // Haptic feedback for successful request
       if (window.navigator.vibrate) window.navigator.vibrate(25);
 
@@ -849,6 +891,12 @@ export default function TableMenu() {
 
         {/* Sticky Category Bar */}
         <div className="sticky top-0 z-40 w-full border-b border-slate-200/60 bg-white/95 backdrop-blur-md">
+          {isLocked && (
+            <div className="flex items-center justify-center gap-2 bg-slate-900 px-4 py-2 text-[11px] font-bold text-white animate-in slide-in-from-top duration-500">
+              <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
+              <span>BILLING IN PROGRESS — ORDERING LOCKED</span>
+            </div>
+          )}
           <div className="mx-auto flex h-16 w-full max-w-[min(72rem,100%)] items-center px-4 sm:px-6">
             <MenuBrowserRail
               visibleCategories={sortedCategories}
@@ -999,6 +1047,20 @@ export default function TableMenu() {
         onRequestService={handleRequestService}
         isSubmitting={isRequestingService}
         lastRequestedType={lastRequestedService}
+      />
+
+      <BillConfirmationOverlay
+        isOpen={isBillPresented}
+        totalAmount={billTotal}
+        tableNumber={tableNumber ?? ""}
+        customerName={guestName ?? "Guest"}
+        onConfirm={() => {
+          setSessionStatus("BILL_CONFIRMED");
+        }}
+        onRaiseIssue={() => {
+          // Trigger a service request for help
+          void handleRequestService("ORDER_UPDATE", "I have an issue with my presented bill.");
+        }}
       />
 
       <ItemDetailSheet

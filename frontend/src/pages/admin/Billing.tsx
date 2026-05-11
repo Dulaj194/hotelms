@@ -10,7 +10,8 @@ import {
   FileText, 
   CheckCircle2, 
   User,
-  Coffee
+  Coffee,
+  Loader2
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
@@ -275,6 +276,8 @@ export default function Billing() {
   const [method, setMethod] = useState<BillPaymentMethod>("cash");
   const [transactionRef, setTransactionRef] = useState("");
   const [notes, setNotes] = useState("");
+  const [isPresenting, setIsPresenting] = useState(false);
+  const [presentSuccess, setPresentSuccess] = useState(false);
   const [filter, setFilter] = useState<"all" | BillHandoffStatus>("all");
   const [folios, setFolios] = useState<BillRecord[]>([]);
   const [folioLoading, setFolioLoading] = useState(false);
@@ -373,6 +376,22 @@ export default function Billing() {
       setSettling(false);
     }
   }, [loadFolios, method, mode, notes, summary, transactionRef]);
+
+  const onPresentBill = useCallback(async () => {
+    if (!summary || mode !== "table") return;
+    setIsPresenting(true);
+    setPresentSuccess(false);
+    try {
+      await api.patch(`/table-sessions/bill-requests/${summary.session_id}/present`, {});
+      setPresentSuccess(true);
+      // Small timeout to reset the success state
+      setTimeout(() => setPresentSuccess(false), 3000);
+    } catch (err) {
+      setSettleError("Failed to present bill to guest.");
+    } finally {
+      setIsPresenting(false);
+    }
+  }, [mode, summary]);
 
   const onFolioAction = useCallback(async (billId: number, action: "cashier" | "accountant" | "complete") => {
     const path =
@@ -531,8 +550,30 @@ export default function Billing() {
                            <div className="flex justify-between text-rose-400 text-xs font-bold"><span>Discount</span><span className="tabular-nums">-{cur(summary.discount_amount)}</span></div>
                            <div className="h-px bg-slate-800 my-2" />
                            <div className="flex justify-between items-center pt-2">
-                              <span className="text-xs font-black uppercase tracking-widest text-slate-500">Total Due</span>
-                              <span className="text-3xl font-black tabular-nums">{cur(summary.grand_total)}</span>
+                              <div>
+                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Total Due</p>
+                                 <p className="text-3xl font-black tabular-nums">{cur(summary.grand_total)}</p>
+                              </div>
+                              {mode === "table" && (
+                                <div className="text-right">
+                                  <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Guest Status</p>
+                                  {summary.session_status === "BILL_CONFIRMED" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      Confirmed
+                                    </span>
+                                  ) : summary.session_status === "BILL_PRESENTED" ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-[9px] font-black uppercase tracking-widest border border-amber-500/20">
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                      Waiting...
+                                    </span>
+                                  ) : (
+                                    <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-500 text-[9px] font-black uppercase tracking-widest">
+                                      Not Sent
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                            </div>
                         </div>
 
@@ -569,6 +610,21 @@ export default function Billing() {
                             />
 
                             {settleError && <Alert tone="error">{settleError}</Alert>}
+
+                            {mode === "table" && (
+                              <button
+                                type="button"
+                                onClick={onPresentBill}
+                                disabled={isPresenting || settling}
+                                className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest border-2 transition-all flex items-center justify-center gap-2 ${
+                                  presentSuccess 
+                                    ? "bg-emerald-50 border-emerald-500 text-emerald-700" 
+                                    : "bg-slate-800 border-slate-700 text-white hover:bg-slate-700"
+                                }`}
+                              >
+                                {isPresenting ? "Presenting..." : presentSuccess ? "Bill Sent to Guest" : "Present Bill to Guest"}
+                              </button>
+                            )}
 
                             <button
                               disabled={settling}

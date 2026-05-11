@@ -25,6 +25,34 @@ router = APIRouter()
 _STAFF_ROLES = role_catalog.BILLING_STAFF_ROLES
 
 
+@router.get("/my", response_model=TableSessionStartResponse)
+def get_my_session(
+    session: TableSession = Depends(get_current_guest_session),
+    db: Session = Depends(get_db),
+) -> TableSessionStartResponse:
+    """Return the current guest session info.
+    
+    Used by the frontend to check session_status and expires_at.
+    """
+    bill_total = None
+    if session.session_status in {TableSessionStatus.BILL_PRESENTED, TableSessionStatus.BILL_CONFIRMED}:
+        from app.modules.orders.repository import list_billable_orders_by_session
+        billable = list_billable_orders_by_session(db, session.session_id)
+        bill_total = float(sum(order.total_amount for order in billable))
+
+    return TableSessionStartResponse(
+        session_id=session.session_id,
+        guest_token="",
+        restaurant_id=session.restaurant_id,
+        table_number=session.table_number,
+        customer_name=session.customer_name or "Guest",
+        order_source=session.order_source,
+        session_status=session.session_status,
+        bill_total=bill_total,
+        expires_at=session.expires_at,
+    )
+
+
 @router.post("/start", response_model=TableSessionStartResponse)
 def start_session(
     payload: TableSessionStartRequest,
@@ -120,6 +148,32 @@ def acknowledge_bill(
     if not success:
         return {"error": "Bill request not found or already acknowledged"}, 404
     return {"message": "Bill request acknowledged."}
+
+
+@router.patch("/bill-requests/{session_id}/present")
+def present_bill(
+    session_id: str,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*_STAFF_ROLES)),
+):
+    """Present the bill to the customer (triggers popup on their phone)."""
+    success = service.present_bill(db, r, session_id, restaurant_id)
+    if not success:
+        return {"error": "Session not found"}, 404
+    return {"message": "Bill presented to customer."}
+
+
+@router.patch("/my/confirm-bill")
+def confirm_bill(
+    session: TableSession = Depends(get_current_guest_session),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+):
+    """Guest confirms the presented bill."""
+    service.confirm_bill(db, r, session)
+    return {"message": "Bill confirmed."}
 
 
 @router.delete("/service-requests/{request_id}")

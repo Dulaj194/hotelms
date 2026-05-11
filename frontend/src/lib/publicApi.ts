@@ -45,3 +45,20 @@ export async function publicPost<T>(path: string, body: unknown, options?: Publi
   if (!response.ok) throw new Error(`POST ${path} failed — ${response.status}`);
   return response.json() as Promise<T>;
 }
+
+export async function publicPatch<T>(path: string, body: unknown, options?: PublicApiOptions): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (options?.headers) {
+    Object.assign(headers, options.headers);
+  }
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`PATCH ${path} failed — ${response.status}`);
+  return response.json() as Promise<T>;
+}

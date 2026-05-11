@@ -344,6 +344,13 @@ def _create_and_persist_order(
     clear_redis_cart: bool,
     guest_token: str | None = None,
 ) -> PlaceOrderResponse:
+    # 1. Block ordering if bill is already requested (Cart Locking)
+    if session.session_status in {TableSessionStatus.BILL_REQUESTED, TableSessionStatus.BILL_ACKNOWLEDGED}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ordering is locked because a bill has been requested. Please contact staff to add more items.",
+        )
+
     # If client-side payload is provided, use it. Otherwise, pull from Redis cart.
     # We always use the PlaceOrderItemRequest schema internally for consistency.
     items_to_process: list[PlaceOrderItemRequest] = []
@@ -495,6 +502,11 @@ def place_order_from_qr_key(
         qr_access_key=qr_access_key,
         customer_name=payload.customer_name,
     )
+    if session.session_status in {TableSessionStatus.BILL_REQUESTED, TableSessionStatus.BILL_ACKNOWLEDGED}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ordering is locked because a bill has been requested. Please contact staff to add more items.",
+        )
     return _create_and_persist_order(
         db,
         r,
