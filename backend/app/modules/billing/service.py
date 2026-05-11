@@ -933,8 +933,8 @@ def _settle_context_session(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
-                "No billable orders found. "
-                "All orders must reach 'completed' status before settlement."
+                "No billable orders found for this session. "
+                "Ensure there are active orders that haven't been paid or rejected yet."
             ),
         )
 

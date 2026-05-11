@@ -341,17 +341,24 @@ def list_billable_orders_by_session(
 ) -> list[OrderHeader]:
     """Return completed, not-yet-paid orders for a session.
 
-    'Billable' == status is exactly OrderStatus.completed.
-    Orders in paid/rejected/pending/confirmed/processing states are excluded.
+    'Billable' == status is any active status except paid or rejected.
+    Orders in pending, confirmed, processing, served, and completed states are included.
     Items are eagerly loaded so the caller can build line-item breakdowns.
     """
+    billable_statuses = {
+        OrderStatus.pending,
+        OrderStatus.confirmed,
+        OrderStatus.processing,
+        OrderStatus.served,
+        OrderStatus.completed,
+    }
     return (
         db.query(OrderHeader)
         .options(joinedload(OrderHeader.items))
         .filter(
             OrderHeader.session_id == session_id,
             OrderHeader.restaurant_id == restaurant_id,
-            OrderHeader.status.in_({OrderStatus.completed, OrderStatus.served}),
+            OrderHeader.status.in_(billable_statuses),
         )
         .order_by(OrderHeader.placed_at.asc())
         .all()
