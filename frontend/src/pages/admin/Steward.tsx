@@ -344,14 +344,27 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
     };
   }, [orders, requests]);
 
-  const columns = useMemo(() => {
-    const allOrders = Array.from(orders.values());
+  const groupedColumns = useMemo(() => {
+    const allOrders = Array.from(orders.values()).sort((a, b) => 
+      new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
+    );
     const allRequests = Array.from(requests.values());
+
+    const groupOrders = (ordersToGroup: KitchenOrderCard[]) => {
+      const groups = new Map<string, KitchenOrderCard[]>();
+      ordersToGroup.forEach(order => {
+        const key = order.order_source === 'room' ? `room-${order.room_number}` : `table-${order.table_number}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(order);
+      });
+      return Array.from(groups.values());
+    };
+
     return {
       orders: {
-        new: allOrders.filter(o => o.status === 'pending'),
-        cooking: allOrders.filter(o => o.status === 'confirmed' || o.status === 'processing'),
-        ready: allOrders.filter(o => o.status === 'completed')
+        new: groupOrders(allOrders.filter(o => o.status === 'pending')),
+        cooking: groupOrders(allOrders.filter(o => o.status === 'confirmed' || o.status === 'processing')),
+        ready: groupOrders(allOrders.filter(o => o.status === 'completed'))
       },
       requests: {
         new: allRequests.filter(r => !r.acknowledged_by),
@@ -433,7 +446,7 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
             }`}
           >
             <Bell className="h-4 w-4" />
-            Service Requests
+            Requests
             {metrics.activeRequestsCount > 0 && (
               <span className="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{metrics.activeRequestsCount}</span>
             )}
@@ -452,36 +465,36 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
           {activeTab === 'orders' ? (
             /* Orders Kanban Board */
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
-              <KanbanColumn title="New Orders" count={columns.orders.new.length} color="amber">
-                {columns.orders.new.map(order => (
-                  <OperationCard 
-                    key={order.id} 
-                    order={order} 
-                    onAction={handleAction} 
-                    loading={actionLoadingId === order.id}
-                  />
-                ))}
-              </KanbanColumn>
-
-              <KanbanColumn title="Cooking" count={columns.orders.cooking.length} color="blue">
-                {columns.orders.cooking.map(order => (
-                  <OperationCard 
-                    key={order.id} 
-                    order={order} 
-                    onAction={handleAction} 
-                    loading={actionLoadingId === order.id}
-                  />
-                ))}
-              </KanbanColumn>
-
-              <KanbanColumn title="Ready" count={columns.orders.ready.length} color="green">
-                {columns.orders.ready.map(order => (
-                  <OperationCard 
-                    key={order.id} 
-                    order={order} 
-                    loading={actionLoadingId === order.id}
+              <KanbanColumn title="New Orders" count={groupedColumns.orders.new.length} color="amber">
+                {groupedColumns.orders.new.map((group, idx) => (
+                  <TableGroupedOrderCard 
+                    key={`new-${idx}`}
+                    orders={group}
                     onAction={handleAction}
-                    renderActions={() => (
+                    actionLoadingId={actionLoadingId}
+                  />
+                ))}
+              </KanbanColumn>
+
+              <KanbanColumn title="Cooking" count={groupedColumns.orders.cooking.length} color="blue">
+                {groupedColumns.orders.cooking.map((group, idx) => (
+                  <TableGroupedOrderCard 
+                    key={`cooking-${idx}`}
+                    orders={group}
+                    onAction={handleAction}
+                    actionLoadingId={actionLoadingId}
+                  />
+                ))}
+              </KanbanColumn>
+
+              <KanbanColumn title="Ready" count={groupedColumns.orders.ready.length} color="green">
+                {groupedColumns.orders.ready.map((group, idx) => (
+                  <TableGroupedOrderCard 
+                    key={`ready-${idx}`}
+                    orders={group}
+                    onAction={handleAction}
+                    actionLoadingId={actionLoadingId}
+                    renderActions={(order) => (
                       <button 
                         onClick={() => markServed(order.id)}
                         className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-95"
@@ -497,8 +510,8 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
           ) : (
             /* Service Requests Kanban Board */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
-              <KanbanColumn title="New Requests" count={columns.requests.new.length} color="rose">
-                {columns.requests.new.map(req => (
+              <KanbanColumn title="New Requests" count={groupedColumns.requests.new.length} color="rose">
+                {groupedColumns.requests.new.map(req => (
                   <RequestOperationCard 
                     key={`${req.type}:${req.id}`} 
                     request={req} 
@@ -508,8 +521,8 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
                 ))}
               </KanbanColumn>
 
-              <KanbanColumn title="In-Progress" count={columns.requests.active.length} color="blue">
-                {columns.requests.active.map(req => (
+              <KanbanColumn title="In-Progress" count={groupedColumns.requests.active.length} color="blue">
+                {groupedColumns.requests.active.map(req => (
                   <RequestOperationCard 
                     key={`${req.type}:${req.id}`} 
                     request={req} 
@@ -607,6 +620,109 @@ function KanbanColumn({ title, count, color, children }: { title: string, count:
   );
 }
 
+function TableGroupedOrderCard({ 
+  orders, 
+  onAction, 
+  actionLoadingId,
+  renderActions
+}: { 
+  orders: KitchenOrderCard[], 
+  onAction: (id: number, status: string) => void, 
+  actionLoadingId: number | string | null,
+  renderActions?: (order: KitchenOrderCard) => React.ReactNode
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const firstOrder = orders[0];
+  const totalOrders = orders.length;
+  
+  // Overall table urgency based on oldest order
+  const oldestOrderTime = Math.floor((Date.now() - new Date(firstOrder.placed_at).getTime()) / 60000);
+  const isUrgent = oldestOrderTime > 15;
+
+  return (
+    <div className={`relative transition-all duration-300 ${isExpanded ? 'space-y-3' : ''}`}>
+      {/* Table Header Card */}
+      <div 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`cursor-pointer bg-white rounded-2xl border-2 shadow-md hover:shadow-lg transition-all p-4 ${
+          isUrgent ? 'border-rose-400 ring-4 ring-rose-50' : 'border-slate-200'
+        } ${isExpanded ? 'bg-slate-50 border-blue-400 shadow-blue-50' : ''}`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-black text-xl shadow-inner ${
+              isUrgent ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-900'
+            }`}>
+              {firstOrder.order_source === 'room' ? 'R' : firstOrder.table_number}
+            </div>
+            <div>
+              <h3 className="font-black text-slate-900 text-lg">
+                {firstOrder.order_source === 'room' ? `Room ${firstOrder.room_number}` : `Table ${firstOrder.table_number}`}
+              </h3>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {totalOrders === 1 ? '1 Active Order' : `${totalOrders} Active Orders`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {totalOrders > 1 && (
+              <div className="bg-blue-600 text-white h-7 w-7 rounded-full flex items-center justify-center text-xs font-black shadow-lg animate-in zoom-in duration-300">
+                {totalOrders}
+              </div>
+            )}
+            <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+              <Activity className="h-5 w-5 text-slate-300" />
+            </div>
+          </div>
+        </div>
+
+        {!isExpanded && (
+           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+             <div className="flex -space-x-2">
+               {orders.slice(0, 3).map((o, idx) => (
+                 <div key={o.id} className="h-6 w-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[8px] font-black shadow-sm" title={`Order #${o.order_number}`}>
+                   #{o.order_number.slice(-2)}
+                 </div>
+               ))}
+               {totalOrders > 3 && (
+                 <div className="h-6 w-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[8px] font-black text-slate-500">
+                   +{totalOrders - 3}
+                 </div>
+               )}
+             </div>
+             <div className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+               <Clock className="h-3 w-3" />
+               {oldestOrderTime}m ago
+             </div>
+           </div>
+        )}
+      </div>
+
+      {/* Expanded Orders List */}
+      {isExpanded && (
+        <div className="pl-4 border-l-4 border-blue-100 space-y-4 animate-in slide-in-from-top-4 duration-300">
+          {orders.map(order => (
+            <OperationCard 
+              key={order.id} 
+              order={order} 
+              onAction={onAction} 
+              loading={actionLoadingId === order.id}
+              renderActions={renderActions ? () => renderActions(order) : undefined}
+            />
+          ))}
+          <button 
+            onClick={() => setIsExpanded(false)}
+            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all"
+          >
+            Collapse Table View
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OperationCard({ order, onAction, loading, renderActions }: { 
   order: KitchenOrderCard, 
   onAction: (id: number, status: string) => void, 
@@ -627,8 +743,8 @@ function OperationCard({ order, onAction, loading, renderActions }: {
               <h4 className="font-black text-slate-900">#{order.order_number}</h4>
               {isUrgent && <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-black uppercase animate-pulse">Late</span>}
             </div>
-            <p className="text-sm font-bold text-slate-600 mt-0.5">
-              {order.order_source === 'room' ? `Room ${order.room_number}` : `Table ${order.table_number}`}
+            <p className="text-xs font-bold text-slate-400 mt-0.5">
+              {new Date(order.placed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">

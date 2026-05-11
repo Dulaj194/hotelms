@@ -104,13 +104,24 @@ function KitchenQueue({ restaurantId }: { restaurantId: number | null }) {
     }
   };
 
-  const columns = useMemo(() => {
+  const groupedColumns = useMemo(() => {
     const all = Array.from(orders.values()).sort((a, b) => 
       new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime()
     );
+
+    const groupOrders = (ordersToGroup: KitchenOrderCard[]) => {
+      const groups = new Map<string, KitchenOrderCard[]>();
+      ordersToGroup.forEach(order => {
+        const key = order.order_source === 'room' ? `room-${order.room_number}` : `table-${order.table_number}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(order);
+      });
+      return Array.from(groups.values());
+    };
+
     return {
-      toDo: all.filter(o => o.status === 'pending' || o.status === 'confirmed'),
-      doing: all.filter(o => o.status === 'processing')
+      toDo: groupOrders(all.filter(o => o.status === 'pending' || o.status === 'confirmed')),
+      doing: groupOrders(all.filter(o => o.status === 'processing'))
     };
   }, [orders]);
 
@@ -166,20 +177,20 @@ function KitchenQueue({ restaurantId }: { restaurantId: number | null }) {
               Incoming / To Cook
             </h2>
             <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-black">
-              {columns.toDo.length}
+              {groupedColumns.toDo.length} Tables
             </span>
           </div>
           <div className="flex-1 p-4 grid grid-cols-1 xl:grid-cols-2 gap-4 auto-rows-start overflow-y-auto no-scrollbar">
-            {columns.toDo.map(order => (
-              <KitchenCard 
-                key={order.id} 
-                order={order} 
+            {groupedColumns.toDo.map((group, idx) => (
+              <TableGroupedKitchenCard 
+                key={`todo-${idx}`} 
+                orders={group} 
                 currentTime={currentTime} 
                 onAction={handleAction}
-                loading={actionLoadingId === order.id}
+                loadingId={actionLoadingId}
               />
             ))}
-            {columns.toDo.length === 0 && (
+            {groupedColumns.toDo.length === 0 && (
               <div className="col-span-full h-full flex flex-col items-center justify-center opacity-20 py-20">
                 <Flame className="h-16 w-16 mb-4" />
                 <p className="font-black uppercase tracking-widest">Kitchen Clear</p>
@@ -196,20 +207,20 @@ function KitchenQueue({ restaurantId }: { restaurantId: number | null }) {
               On The Fire
             </h2>
             <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-black">
-              {columns.doing.length}
+              {groupedColumns.doing.length} Tables
             </span>
           </div>
           <div className="flex-1 p-4 grid grid-cols-1 xl:grid-cols-2 gap-4 auto-rows-start overflow-y-auto no-scrollbar">
-             {columns.doing.map(order => (
-              <KitchenCard 
-                key={order.id} 
-                order={order} 
+             {groupedColumns.doing.map((group, idx) => (
+              <TableGroupedKitchenCard 
+                key={`doing-${idx}`} 
+                orders={group} 
                 currentTime={currentTime} 
                 onAction={handleAction}
-                loading={actionLoadingId === order.id}
+                loadingId={actionLoadingId}
               />
             ))}
-            {columns.doing.length === 0 && (
+            {groupedColumns.doing.length === 0 && (
               <div className="col-span-full h-full flex flex-col items-center justify-center opacity-20 py-20">
                 <Flame className="h-16 w-16 mb-4" />
                 <p className="font-black uppercase tracking-widest">Nothing Cooking</p>
@@ -218,6 +229,97 @@ function KitchenQueue({ restaurantId }: { restaurantId: number | null }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+function TableGroupedKitchenCard({ 
+  orders, 
+  currentTime, 
+  onAction, 
+  loadingId 
+}: { 
+  orders: KitchenOrderCard[], 
+  currentTime: number, 
+  onAction: (id: number, status: string) => void, 
+  loadingId: number | null 
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const firstOrder = orders[0];
+  const totalOrders = orders.length;
+  
+  const oldestOrderTime = Math.floor((currentTime - new Date(firstOrder.placed_at).getTime()) / 60000);
+  const isUrgent = oldestOrderTime >= 15;
+  const isCritical = oldestOrderTime >= 25;
+
+  return (
+    <div className={`flex flex-col transition-all duration-300 ${isExpanded ? 'col-span-full space-y-4' : ''}`}>
+      <div 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`cursor-pointer bg-white rounded-[2rem] border-4 shadow-lg p-5 flex items-center justify-between transition-all hover:scale-[1.02] active:scale-95 ${
+          isCritical ? 'border-rose-500 bg-rose-50' : 
+          isUrgent ? 'border-amber-500 bg-amber-50' : 'border-slate-200'
+        } ${isExpanded ? 'ring-4 ring-blue-500/20 border-blue-500' : ''}`}
+      >
+        <div className="flex items-center gap-5">
+          <div className={`h-16 w-16 rounded-2xl flex items-center justify-center font-black text-2xl shadow-xl ${
+            isCritical ? 'bg-rose-600 text-white' : 
+            isUrgent ? 'bg-amber-600 text-white' : 'bg-slate-900 text-white'
+          }`}>
+            {firstOrder.order_source === 'room' ? 'R' : firstOrder.table_number}
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">
+              {firstOrder.order_source === 'room' ? `Room ${firstOrder.room_number}` : `Table ${firstOrder.table_number}`}
+            </h3>
+            <div className="flex items-center gap-2 mt-1">
+               <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                 isUrgent || isCritical ? 'bg-white text-slate-900' : 'bg-slate-100 text-slate-500'
+               }`}>
+                 {totalOrders} Order{totalOrders > 1 ? 's' : ''}
+               </span>
+               <div className="flex items-center gap-1 text-xs font-black tabular-nums text-slate-400">
+                 <Clock className="h-3 w-3" />
+                 {oldestOrderTime}m
+               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+           {totalOrders > 1 && (
+             <div className="flex -space-x-3">
+               {orders.slice(0, 3).map((o, idx) => (
+                 <div key={o.id} className="h-8 w-8 rounded-full bg-blue-600 text-white border-2 border-white flex items-center justify-center text-[10px] font-black shadow-lg">
+                   #{o.order_number.slice(-2)}
+                 </div>
+               ))}
+             </div>
+           )}
+           <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+             <Package className={`h-6 w-6 ${isExpanded ? 'text-blue-500' : 'text-slate-300'}`} />
+           </div>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 animate-in zoom-in-95 duration-300">
+          {orders.map(order => (
+            <KitchenCard 
+              key={order.id} 
+              order={order} 
+              currentTime={currentTime} 
+              onAction={onAction}
+              loading={loadingId === order.id}
+            />
+          ))}
+          <div 
+            onClick={() => setIsExpanded(false)}
+            className="flex flex-col items-center justify-center border-4 border-dashed border-slate-200 rounded-[2rem] p-8 text-slate-400 hover:text-slate-600 hover:border-slate-400 cursor-pointer transition-all"
+          >
+            <Clock className="h-8 w-8 mb-2" />
+            <span className="font-black uppercase tracking-widest text-xs">Collapse View</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -236,7 +338,7 @@ function KitchenCard({ order, currentTime, onAction, loading }: {
   const isCritical = minutes >= 25;
 
   return (
-    <div className={`bg-white rounded-3xl border-2 shadow-sm flex flex-col transition-all ${
+    <div className={`bg-white rounded-3xl border-2 shadow-sm flex flex-col transition-all h-full ${
       isCritical ? 'border-rose-500 ring-4 ring-rose-50 animate-pulse' : 
       isUrgent ? 'border-amber-500 shadow-amber-100' : 'border-slate-100'
     }`}>
@@ -249,16 +351,16 @@ function KitchenCard({ order, currentTime, onAction, loading }: {
           <div className={`h-10 w-10 rounded-xl flex items-center justify-center font-black text-lg ${
             isUrgent || isCritical ? 'bg-white/20' : 'bg-white text-slate-900 border border-slate-200'
           }`}>
-            #{order.order_number}
+            #{order.order_number.slice(-3)}
           </div>
           <div>
             <p className={`text-[10px] font-black uppercase tracking-widest ${
               isUrgent || isCritical ? 'text-white/80' : 'text-slate-400'
             }`}>
-              {order.order_source === 'room' ? 'Room Service' : 'Restaurant'}
+              at {new Date(order.placed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
-            <p className="text-sm font-black leading-tight">
-               {order.order_source === 'room' ? `ROOM ${order.room_number}` : `TABLE ${order.table_number}`}
+            <p className="text-sm font-black leading-tight uppercase">
+               Order #{order.order_number}
             </p>
           </div>
         </div>
