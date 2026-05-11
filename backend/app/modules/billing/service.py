@@ -521,6 +521,7 @@ def _build_summary_response(
     room_id: int | None,
     room_number: str | None,
     session_is_active: bool,
+    session_status: str,
 ) -> BillSummaryResponse:
     existing_bill = billing_repo.get_bill_by_session(db, session_id, restaurant_id)
     is_settled = existing_bill is not None and existing_bill.payment_status == BillStatus.paid
@@ -559,7 +560,8 @@ def _build_summary_response(
         subtotal=round(subtotal, 2),
         tax_amount=round(tax_amount, 2),
         discount_amount=round(discount_amount, 2),
-        grand_total=round(grand_total, 2),
+        grand_total=grand_total,
+        session_status=session_status,
         session_is_active=session_is_active,
         is_settled=is_settled,
         bill=_to_bill_record(existing_bill) if existing_bill is not None else None,
@@ -1271,6 +1273,7 @@ def get_bill_summary(
         room_id=None,
         room_number=None,
         session_is_active=session.is_active,
+        session_status=session.status.value if hasattr(session.status, 'value') else str(session.status),
     )
 
 
@@ -1289,6 +1292,7 @@ def get_room_bill_summary(
         room_id=session.room_id,
         room_number=session.room_number_snapshot,
         session_is_active=session.is_active,
+        session_status="active" if session.is_active else "closed",
     )
 
 

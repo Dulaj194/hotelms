@@ -217,3 +217,16 @@ def update_order_status(
     so connected kitchen clients receive the update instantly.
     """
     return service.update_order_status(db, order_id, restaurant_id, payload.status, r)
+
+
+@router.post("/staff/place-order", response_model=PlaceOrderResponse, status_code=201)
+def staff_place_order(
+    payload: PlaceOrderRequest,
+    session_id: str,
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    _current_user=Depends(require_roles(*role_catalog.QR_MENU_STAFF_ROLES)),
+) -> PlaceOrderResponse:
+    """Place an order for a guest session as a staff member."""
+    return service.place_staff_order(db, r, restaurant_id, session_id, payload)

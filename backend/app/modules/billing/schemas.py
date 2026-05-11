@@ -82,6 +82,7 @@ class BillSummaryResponse(BaseModel):
     tax_amount: float
     discount_amount: float
     grand_total: float
+    session_status: str
     session_is_active: bool
     is_settled: bool
     bill: BillRecordResponse | None = None

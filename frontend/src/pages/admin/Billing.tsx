@@ -11,10 +11,12 @@ import {
   CheckCircle2, 
   User,
   Coffee,
-  Loader2
+  Loader2,
+  Plus
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
+import ManualItemAddDrawer from "@/components/admin/ManualItemAddDrawer";
 import { getUser, normalizeRole } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import type {
@@ -284,6 +286,7 @@ export default function Billing() {
   const [folioError, setFolioError] = useState<string | null>(null);
   const [folioActionError, setFolioActionError] = useState<string | null>(null);
   const [folioActionId, setFolioActionId] = useState<number | null>(null);
+  const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
 
   const mode: Mode = tab === "room" ? "room" : "table";
   const lookup = mode === "room" ? roomLookup : tableLookup;
@@ -528,6 +531,16 @@ export default function Billing() {
                         <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${summary.is_settled ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                            {summary.is_settled ? 'Settled' : 'Unpaid Session'}
                         </span>
+                        
+                        {!summary.is_settled && (
+                           <button 
+                             onClick={() => setIsAddDrawerOpen(true)}
+                             className="ml-4 h-10 px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all flex items-center gap-2"
+                           >
+                             <Plus className="h-3.5 w-3.5" />
+                             Add Item
+                           </button>
+                        )}
                      </div>
 
                      <div className="space-y-4">
@@ -652,6 +665,15 @@ export default function Billing() {
                   </div>
                 </div>
               )}
+
+              <ManualItemAddDrawer 
+                isOpen={isAddDrawerOpen}
+                onClose={() => setIsAddDrawerOpen(false)}
+                sessionId={summary?.session_id ?? ""}
+                onSuccess={() => {
+                  if (summary) void loadSummary(mode, summary.session_id);
+                }}
+              />
 
               {!summary && !receipt && (
                  <div className="py-40 flex flex-col items-center justify-center bg-white rounded-[3rem] border border-slate-100 shadow-sm opacity-60">

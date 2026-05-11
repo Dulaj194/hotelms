@@ -76,6 +76,7 @@ export interface BillSummaryResponse {
   tax_amount: number;
   discount_amount: number;
   grand_total: number;
+  session_status: string;
   session_is_active: boolean;
   is_settled: boolean;
   bill: BillRecord | null;

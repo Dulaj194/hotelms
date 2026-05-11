@@ -469,6 +469,100 @@ def _create_and_persist_order(
     return PlaceOrderResponse(order=_build_order_detail(placed), guest_token=guest_token)
 
 
+def place_staff_order(
+    db: Session,
+    r: redis_lib.Redis,
+    restaurant_id: int,
+    session_id: str,
+    payload: PlaceOrderRequest,
+) -> PlaceOrderResponse:
+    """Place an order for a guest session from the staff dashboard.
+
+    Bypasses cart locking and does NOT clear the guest's Redis cart.
+    """
+    session = table_session_repo.get_session_by_id_and_restaurant(db, session_id, restaurant_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Guest session not found.")
+
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="No items provided in order.")
+
+    line_items, subtotal = _build_line_items_from_payload(
+        db,
+        restaurant_id=restaurant_id,
+        items=payload.items,
+    )
+
+    tax_amount = 0.0
+    discount_amount = 0.0
+    total_amount = subtotal + tax_amount - discount_amount
+
+    try:
+        order = order_repo.create_order_header(
+            db,
+            session_id=session.session_id,
+            restaurant_id=restaurant_id,
+            table_number=session.table_number,
+            subtotal_amount=subtotal,
+            tax_amount=tax_amount,
+            discount_amount=discount_amount,
+            total_amount=total_amount,
+            notes=payload.notes,
+            customer_name=payload.customer_name,
+            customer_phone=payload.customer_phone,
+        )
+
+        order_repo.create_order_items(
+            db,
+            order_id=order.id,
+            restaurant_id=restaurant_id,
+            items=line_items,
+        )
+
+        payment_repo.create_payment_record(
+            db,
+            order_id=order.id,
+            restaurant_id=restaurant_id,
+            amount=total_amount,
+        )
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    db.refresh(order)
+    placed = order_repo.get_order_by_id_and_session(
+        db, order.id, session.session_id, restaurant_id
+    )
+
+    try:
+        if r is not None:
+            realtime_service.publish_new_order(
+                r,
+                restaurant_id=restaurant_id,
+                order_id=placed.id,
+                order_number=placed.order_number,
+                table_number=placed.table_number,
+                order_source=placed.order_source.value,
+                room_id=placed.room_id,
+                room_number=placed.room_number,
+                status=placed.status.value,
+                total_amount=float(placed.total_amount),
+                placed_at=placed.placed_at,
+                items=[{"item_name": oi.item_name_snapshot, "quantity": oi.quantity} for oi in placed.items],
+            )
+    except Exception:
+        pass
+
+    return PlaceOrderResponse(
+        order_id=placed.id,
+        order_number=placed.order_number,
+        status=placed.status,
+        total_amount=float(placed.total_amount),
+    )
+
+
 def place_order(
     db: Session,
     r: redis_lib.Redis,
