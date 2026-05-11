@@ -1273,7 +1273,7 @@ def get_bill_summary(
         room_id=None,
         room_number=None,
         session_is_active=session.is_active,
-        session_status=session.status.value if hasattr(session.status, 'value') else str(session.status),
+        session_status=session.session_status.value if hasattr(session.session_status, 'value') else str(session.session_status),
     )
 
 
