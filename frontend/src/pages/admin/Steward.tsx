@@ -21,7 +21,8 @@ import {
   Wifi,
   Star,
   Bell,
-  User
+  User,
+  ChevronDown
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
@@ -360,6 +361,16 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
       return Array.from(groups.values());
     };
 
+    const groupRequests = (requestsToGroup: UnifiedRequest[]) => {
+      const groups = new Map<string, UnifiedRequest[]>();
+      requestsToGroup.forEach(req => {
+        const key = req.order_source === 'room' ? `room-${req.table_number}` : `table-${req.table_number}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(req);
+      });
+      return Array.from(groups.values());
+    };
+
     return {
       orders: {
         new: groupOrders(allOrders.filter(o => o.status === 'pending')),
@@ -367,8 +378,8 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
         ready: groupOrders(allOrders.filter(o => o.status === 'completed'))
       },
       requests: {
-        new: allRequests.filter(r => !r.acknowledged_by),
-        active: allRequests.filter(r => !!r.acknowledged_by)
+        new: groupRequests(allRequests.filter(r => !r.acknowledged_by)),
+        active: groupRequests(allRequests.filter(r => !!r.acknowledged_by))
       }
     };
   }, [orders, requests]);
@@ -460,8 +471,8 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-6">
-        <div className="min-h-[600px]">
+      <div className="grid grid-cols-1 lg:grid-cols-1 xl:grid-cols-[1fr_320px] gap-6 items-start">
+        <div className="min-h-[600px] w-full overflow-hidden">
           {activeTab === 'orders' ? (
             /* Orders Kanban Board */
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
@@ -511,23 +522,23 @@ function LiveOperationsDashboard({ restaurantId }: { restaurantId: number | null
             /* Service Requests Kanban Board */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
               <KanbanColumn title="New Requests" count={groupedColumns.requests.new.length} color="rose">
-                {groupedColumns.requests.new.map(req => (
-                  <RequestOperationCard 
-                    key={`${req.type}:${req.id}`} 
-                    request={req} 
+                {groupedColumns.requests.new.map((group, idx) => (
+                  <TableGroupedRequestCard 
+                    key={`new-req-${idx}`}
+                    requests={group}
                     onAction={handleRequestAction}
-                    loading={actionLoadingId === req.id}
+                    loadingId={actionLoadingId}
                   />
                 ))}
               </KanbanColumn>
 
               <KanbanColumn title="In-Progress" count={groupedColumns.requests.active.length} color="blue">
-                {groupedColumns.requests.active.map(req => (
-                  <RequestOperationCard 
-                    key={`${req.type}:${req.id}`} 
-                    request={req} 
+                {groupedColumns.requests.active.map((group, idx) => (
+                  <TableGroupedRequestCard 
+                    key={`active-req-${idx}`}
+                    requests={group}
                     onAction={handleRequestAction}
-                    loading={actionLoadingId === req.id}
+                    loadingId={actionLoadingId}
                   />
                 ))}
               </KanbanColumn>
@@ -593,7 +604,6 @@ function MetricBadge({ label, value, color }: { label: string, value: number, co
   );
 }
 
-
 function KanbanColumn({ title, count, color, children }: { title: string, count: number, color: string, children: React.ReactNode }) {
   const colors: Record<string, string> = {
     amber: "border-amber-500",
@@ -635,13 +645,11 @@ function TableGroupedOrderCard({
   const firstOrder = orders[0];
   const totalOrders = orders.length;
   
-  // Overall table urgency based on oldest order
   const oldestOrderTime = Math.floor((Date.now() - new Date(firstOrder.placed_at).getTime()) / 60000);
   const isUrgent = oldestOrderTime > 15;
 
   return (
     <div className={`relative transition-all duration-300 ${isExpanded ? 'space-y-3' : ''}`}>
-      {/* Table Header Card */}
       <div 
         onClick={() => setIsExpanded(!isExpanded)}
         className={`cursor-pointer bg-white rounded-2xl border-2 shadow-md hover:shadow-lg transition-all p-4 ${
@@ -672,7 +680,7 @@ function TableGroupedOrderCard({
               </div>
             )}
             <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
-              <Activity className="h-5 w-5 text-slate-300" />
+              <ChevronDown className="h-5 w-5 text-slate-300" />
             </div>
           </div>
         </div>
@@ -699,7 +707,6 @@ function TableGroupedOrderCard({
         )}
       </div>
 
-      {/* Expanded Orders List */}
       {isExpanded && (
         <div className="pl-4 border-l-4 border-blue-100 space-y-4 animate-in slide-in-from-top-4 duration-300">
           {orders.map(order => (
@@ -723,6 +730,82 @@ function TableGroupedOrderCard({
   );
 }
 
+function TableGroupedRequestCard({ 
+  requests, 
+  onAction, 
+  loadingId 
+}: { 
+  requests: UnifiedRequest[], 
+  onAction: (req: UnifiedRequest, action: 'acknowledge' | 'resolve') => void, 
+  loadingId: number | string | null 
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const firstReq = requests[0];
+  const totalRequests = requests.length;
+  
+  const oldestTime = Math.floor((Date.now() - new Date(firstReq.requested_at).getTime()) / 60000);
+  const isUrgent = oldestTime > 5;
+
+  return (
+    <div className={`relative transition-all duration-300 ${isExpanded ? 'space-y-3' : ''}`}>
+      <div 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`cursor-pointer bg-white rounded-2xl border-2 shadow-md hover:shadow-lg transition-all p-4 ${
+          isUrgent ? 'border-rose-400 ring-4 ring-rose-50' : 'border-slate-200'
+        } ${isExpanded ? 'bg-slate-50 border-blue-400 shadow-blue-50' : ''}`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-black text-xl shadow-inner ${
+              isUrgent ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-900'
+            }`}>
+              {firstReq.order_source === 'room' ? 'R' : firstReq.table_number}
+            </div>
+            <div>
+              <h3 className="font-black text-slate-900 text-lg">
+                {firstReq.order_source === 'room' ? `Room ${firstReq.table_number}` : `Table ${firstReq.table_number}`}
+              </h3>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {totalRequests === 1 ? '1 Pending Request' : `${totalRequests} Pending Requests`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {totalRequests > 1 && (
+              <div className="bg-rose-600 text-white h-7 w-7 rounded-full flex items-center justify-center text-xs font-black shadow-lg animate-in zoom-in duration-300">
+                {totalRequests}
+              </div>
+            )}
+            <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+              <ChevronDown className="h-5 w-5 text-slate-300" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="pl-4 space-y-3 border-l-2 border-slate-200 ml-6 animate-in slide-in-from-top-2 duration-300">
+          {requests.map(req => (
+            <RequestOperationCard 
+              key={`${req.type}:${req.id}`} 
+              request={req} 
+              onAction={onAction}
+              loading={loadingId === req.id}
+            />
+          ))}
+          <button 
+            onClick={() => setIsExpanded(false)}
+            className="w-full py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            Collapse Requests
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OperationCard({ order, onAction, loading, renderActions }: { 
   order: KitchenOrderCard, 
   onAction: (id: number, status: string) => void, 
@@ -732,7 +815,6 @@ function OperationCard({ order, onAction, loading, renderActions }: {
   const [expanded, setExpanded] = useState(false);
   const timeInQueue = Math.floor((Date.now() - new Date(order.placed_at).getTime()) / 60000);
   const isUrgent = timeInQueue > 15 && order.status !== 'completed';
-
 
   return (
     <div className={`bg-white rounded-xl border shadow-sm transition-all overflow-hidden ${isUrgent ? 'border-red-300 ring-2 ring-red-50' : 'border-slate-200'}`}>
