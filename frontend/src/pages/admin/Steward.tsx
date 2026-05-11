@@ -680,7 +680,7 @@ function TableGroupedOrderCard({
         {!isExpanded && (
            <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
              <div className="flex -space-x-2">
-               {orders.slice(0, 3).map((o, idx) => (
+               {orders.slice(0, 3).map((o) => (
                  <div key={o.id} className="h-6 w-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-[8px] font-black shadow-sm" title={`Order #${o.order_number}`}>
                    #{o.order_number.slice(-2)}
                  </div>

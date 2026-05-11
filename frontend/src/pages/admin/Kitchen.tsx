@@ -231,6 +231,8 @@ function KitchenQueue({ restaurantId }: { restaurantId: number | null }) {
       </div>
     </div>
   );
+}
+
 function TableGroupedKitchenCard({ 
   orders, 
   currentTime, 
@@ -287,7 +289,7 @@ function TableGroupedKitchenCard({
         <div className="flex items-center gap-4">
            {totalOrders > 1 && (
              <div className="flex -space-x-3">
-               {orders.slice(0, 3).map((o, idx) => (
+               {orders.slice(0, 3).map((o) => (
                  <div key={o.id} className="h-8 w-8 rounded-full bg-blue-600 text-white border-2 border-white flex items-center justify-center text-[10px] font-black shadow-lg">
                    #{o.order_number.slice(-2)}
                  </div>
