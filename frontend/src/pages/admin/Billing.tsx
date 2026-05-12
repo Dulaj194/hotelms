@@ -282,6 +282,7 @@ export default function Billing() {
   const [tab, setTab] = useState<Tab>("table");
   const [tableLookup, setTableLookup] = useState("");
   const [roomLookup, setRoomLookup] = useState("");
+  const [recentLookups, setRecentLookups] = useState<{mode: string, raw: string, label: string}[]>([]);
   const [summary, setSummary] = useState<BillSummaryResponse | null>(null);
   const [receipt, setReceipt] = useState<ReceiptState | null>(null);
   const [fetching, setFetching] = useState(false);
@@ -324,12 +325,27 @@ export default function Billing() {
     setReceipt(null);
     try {
       setSummary(await api.get<BillSummaryResponse>(summaryPath(nextMode, candidate)));
+      // Save to recent lookups
+      setRecentLookups(prev => {
+        const newEntry = { mode: nextMode, raw: candidate, label: nextMode === "room" ? `R-${candidate}` : `T-${candidate}` };
+        const filtered = prev.filter(item => !(item.mode === nextMode && item.raw === candidate));
+        const updated = [newEntry, ...filtered].slice(0, 5);
+        localStorage.setItem("hotelms_recent_lookups", JSON.stringify(updated));
+        return updated;
+      });
     } catch (error) {
       setSummary(null);
       setFetchError(errorText(error, `Failed to load ${nextMode} summary.`));
     } finally {
       setFetching(false);
     }
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("hotelms_recent_lookups");
+      if (stored) setRecentLookups(JSON.parse(stored));
+    } catch (e) {}
   }, []);
 
   const loadFolios = useCallback(async () => {
@@ -522,14 +538,27 @@ export default function Billing() {
                   {fetching ? "Syncing..." : (lookup.trim() ? "Load Summary" : "Enter a number to continue")}
                 </button>
                 
-                <div className="mt-6 pt-6 border-t border-slate-100">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Recent Sessions</p>
-                   <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => mode === "room" ? setRoomLookup("101") : setTableLookup("1")} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">{mode === "room" ? "R-101" : "T-01"}</button>
-                      <button type="button" onClick={() => mode === "room" ? setRoomLookup("102") : setTableLookup("4")} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">{mode === "room" ? "R-102" : "T-04"}</button>
-                      <button type="button" onClick={() => mode === "room" ? setRoomLookup("205") : setTableLookup("12")} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">{mode === "room" ? "R-205" : "T-12"}</button>
-                   </div>
-                </div>
+                {recentLookups.filter(r => r.mode === mode).length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-slate-100">
+                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Recent Sessions</p>
+                     <div className="flex flex-wrap gap-2">
+                        {recentLookups.filter(r => r.mode === mode).map((recent, idx) => (
+                           <button 
+                             key={idx}
+                             type="button" 
+                             onClick={() => {
+                               if (mode === "room") setRoomLookup(recent.raw);
+                               else setTableLookup(recent.raw);
+                               void loadSummary(mode as Mode, recent.raw);
+                             }} 
+                             className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors border border-slate-100 shadow-sm"
+                           >
+                             {recent.label}
+                           </button>
+                        ))}
+                     </div>
+                  </div>
+                )}
               </form>
 
               {fetchError && <Alert tone="error">{fetchError}</Alert>}
