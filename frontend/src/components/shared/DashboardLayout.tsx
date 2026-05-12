@@ -697,44 +697,51 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-56 h-dvh bg-gray-900 text-white flex flex-col overflow-hidden transform transition-transform duration-300 md:static md:translate-x-0 md:z-auto ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 h-dvh bg-[#0B0F19] text-slate-300 flex flex-col overflow-hidden transform transition-transform duration-300 md:static md:translate-x-0 md:z-auto border-r border-white/5 shadow-2xl ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="px-4 py-5 border-b border-gray-700">
-          <span className="text-lg font-bold tracking-tight">HotelMS</span>
-          {user && (
-            <p className="text-xs text-gray-400 mt-0.5 truncate">{user.full_name}</p>
-          )}
+        <div className="px-6 py-6 border-b border-white/5 bg-white/5 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+             <div className="h-8 w-8 bg-blue-600 rounded-xl flex items-center justify-center font-black text-white shadow-lg shadow-blue-500/20">
+               H
+             </div>
+             <div>
+               <span className="text-xl font-black tracking-tight text-white leading-none">HotelMS</span>
+               {user && (
+                 <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest mt-0.5 truncate">{user.full_name}</p>
+               )}
+             </div>
+          </div>
         </div>
         <nav
           ref={sidebarNavRef}
           onScroll={handleSidebarScroll}
-          className="flex-1 overflow-y-auto py-4 space-y-0.5 px-2"
+          className="flex-1 overflow-y-auto py-6 space-y-1.5 px-3 no-scrollbar"
         >
           {isMenuGroupVisible && (
-            <div className="mb-1">
+            <div className="mb-2">
               <button
                 type="button"
                 onClick={() => toggleGroup("menusOpen")}
                 aria-expanded={menusOpen}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   isMenuGroupActive
-                    ? "bg-slate-700 text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
                 <span className="flex items-center">
-                  <SquareMenu className="h-4 w-4 mr-2 shrink-0" />
+                  <SquareMenu className={`h-4 w-4 mr-3 shrink-0 ${isMenuGroupActive ? "text-blue-400" : ""}`} />
                   Menus
                 </span>
                 <ChevronDown
-                  className={`h-4 w-4 transition-transform ${menusOpen ? "rotate-180" : ""}`}
+                  className={`h-4 w-4 transition-transform duration-300 ${menusOpen ? "rotate-180 text-white" : "text-slate-500"}`}
                 />
               </button>
 
               {menusOpen && (
-                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                <div className="mt-2 ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
                   {menuSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
@@ -743,13 +750,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         key={subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
-                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                        className={`flex items-center px-4 py-2 text-sm font-medium transition-all rounded-xl border-l-2 ${
                           subActive
-                            ? "bg-blue-950 text-white"
-                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500"
+                            : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
                         {subItem.label}
                       </Link>
                     );
@@ -760,28 +767,28 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
 
           {isOpsGroupVisible && (
-            <div className="mb-1">
+            <div className="mb-2">
               <button
                 type="button"
                 onClick={() => toggleGroup("opsOpen")}
                 aria-expanded={opsOpen}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   isOpsGroupActive
-                    ? "bg-slate-700 text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
                 <span className="flex items-center">
-                  <CookingPot className="h-4 w-4 mr-2 shrink-0" />
+                  <CookingPot className={`h-4 w-4 mr-3 shrink-0 ${isOpsGroupActive ? "text-blue-400" : ""}`} />
                   Kitchen Operations
                 </span>
                 <ChevronDown
-                  className={`h-4 w-4 transition-transform ${opsOpen ? "rotate-180" : ""}`}
+                  className={`h-4 w-4 transition-transform duration-300 ${opsOpen ? "rotate-180 text-white" : "text-slate-500"}`}
                 />
               </button>
 
               {opsOpen && (
-                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                <div className="mt-2 ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
                   {visibleOpsSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
@@ -790,16 +797,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         key={subItem.label + subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
-                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors relative ${
+                        className={`flex items-center px-4 py-2 text-sm font-medium transition-all rounded-xl border-l-2 ${
                           subActive
-                            ? "bg-blue-950 text-white"
-                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500"
+                            : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
                         <span>{subItem.label}</span>
-                        {subItem.label === "Live Orders" && badgeCounts.awaiting > 0 && (
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-black text-white shadow-sm animate-pulse">
+                        {subItem.label === "Kitchen Queue" && badgeCounts.awaiting > 0 && (
+                          <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-black text-white shadow-sm shadow-blue-500/30 animate-pulse">
                             {badgeCounts.awaiting}
                           </span>
                         )}
@@ -812,28 +819,28 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
 
           {isCommGroupVisible && (
-            <div className="mb-1">
+            <div className="mb-2">
               <button
                 type="button"
                 onClick={() => toggleGroup("commOpen")}
                 aria-expanded={commOpen}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   isCommGroupActive
-                    ? "bg-slate-700 text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
                 <span className="flex items-center">
-                  <MessageSquare className="h-4 w-4 mr-2 shrink-0" />
+                  <MessageSquare className={`h-4 w-4 mr-3 shrink-0 ${isCommGroupActive ? "text-blue-400" : ""}`} />
                   Communication
                 </span>
                 <ChevronDown
-                  className={`h-4 w-4 transition-transform ${commOpen ? "rotate-180" : ""}`}
+                  className={`h-4 w-4 transition-transform duration-300 ${commOpen ? "rotate-180 text-white" : "text-slate-500"}`}
                 />
               </button>
 
               {commOpen && (
-                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                <div className="mt-2 ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
                   {visibleCommSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
@@ -842,16 +849,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         key={subItem.label + subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
-                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors relative ${
+                        className={`flex items-center px-4 py-2 text-sm font-medium transition-all rounded-xl border-l-2 ${
                           subActive
-                            ? "bg-blue-950 text-white"
-                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500"
+                            : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
                         <span>{subItem.label}</span>
                         {subItem.label === "Guest Requests" && badgeCounts.requests > 0 && (
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-black text-white shadow-sm animate-pulse">
+                          <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white shadow-sm shadow-rose-500/30 animate-pulse">
                             {badgeCounts.requests}
                           </span>
                         )}
@@ -864,28 +871,28 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
 
           {isFinanceGroupVisible && (
-            <div className="mb-1">
+            <div className="mb-2">
               <button
                 type="button"
                 onClick={() => toggleGroup("financeOpen")}
                 aria-expanded={financeOpen}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   isFinanceGroupActive
-                    ? "bg-slate-700 text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
                 <span className="flex items-center">
-                  <Ticket className="h-4 w-4 mr-2 shrink-0" />
+                  <Ticket className={`h-4 w-4 mr-3 shrink-0 ${isFinanceGroupActive ? "text-blue-400" : ""}`} />
                   Finance
                 </span>
                 <ChevronDown
-                  className={`h-4 w-4 transition-transform ${financeOpen ? "rotate-180" : ""}`}
+                  className={`h-4 w-4 transition-transform duration-300 ${financeOpen ? "rotate-180 text-white" : "text-slate-500"}`}
                 />
               </button>
 
               {financeOpen && (
-                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                <div className="mt-2 ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
                   {visibleFinanceSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path || location.pathname.startsWith(subItem.path);
                     const SubIcon = subItem.icon;
@@ -894,13 +901,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         key={subItem.label + subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
-                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors relative ${
+                        className={`flex items-center px-4 py-2 text-sm font-medium transition-all rounded-xl border-l-2 ${
                           subActive
-                            ? "bg-blue-950 text-white"
-                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500"
+                            : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
                         <span>{subItem.label}</span>
                       </Link>
                     );
@@ -911,28 +918,28 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
 
           {isSettingsGroupVisible && (
-            <div className="mb-1">
+            <div className="mb-2">
               <button
                 type="button"
                 onClick={() => toggleGroup("settingsOpen")}
                 aria-expanded={settingsOpen}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   isSettingsGroupActive
-                    ? "bg-slate-700 text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
                 <span className="flex items-center">
-                  <Settings className="h-4 w-4 mr-2 shrink-0" />
+                  <Settings className={`h-4 w-4 mr-3 shrink-0 ${isSettingsGroupActive ? "text-blue-400" : ""}`} />
                   Settings
                 </span>
                 <ChevronDown
-                  className={`h-4 w-4 transition-transform ${settingsOpen ? "rotate-180" : ""}`}
+                  className={`h-4 w-4 transition-transform duration-300 ${settingsOpen ? "rotate-180 text-white" : "text-slate-500"}`}
                 />
               </button>
 
               {settingsOpen && (
-                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                <div className="mt-2 ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
                   {visibleSettingsSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
@@ -941,13 +948,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         key={subItem.label + subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
-                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors relative ${
+                        className={`flex items-center px-4 py-2 text-sm font-medium transition-all rounded-xl border-l-2 ${
                           subActive
-                            ? "bg-blue-950 text-white"
-                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500"
+                            : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
                         <span>{subItem.label}</span>
                       </Link>
                     );
@@ -958,30 +965,28 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
 
           {isQrGroupVisible && (
-            <div className="mb-1">
+            <div className="mb-2">
               <button
                 type="button"
                 onClick={() => toggleGroup("qrOpen")}
                 aria-expanded={qrOpen}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   isQrGroupActive
-                    ? "bg-slate-700 text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
                 <span className="flex items-center">
-                  <QrCode className="h-4 w-4 mr-2 shrink-0" />
+                  <QrCode className={`h-4 w-4 mr-3 shrink-0 ${isQrGroupActive ? "text-blue-400" : ""}`} />
                   QR Codes
                 </span>
-                <div className="flex items-center gap-2">
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform ${qrOpen ? "rotate-180" : ""}`}
-                  />
-                </div>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform duration-300 ${qrOpen ? "rotate-180 text-white" : "text-slate-500"}`}
+                />
               </button>
 
               {qrOpen && (
-                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                <div className="mt-2 ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
                   {visibleQrSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
@@ -990,13 +995,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         key={subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
-                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                        className={`flex items-center px-4 py-2 text-sm font-medium transition-all rounded-xl border-l-2 ${
                           subActive
-                            ? "bg-blue-950 text-white"
-                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500"
+                            : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
                         {subItem.label}
                       </Link>
                     );
@@ -1007,33 +1012,33 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
 
           {isHousekeepingGroupVisible && (
-            <div className="mb-1">
+            <div className="mb-2">
               <button
                 type="button"
                 onClick={() => toggleGroup("housekeepingOpen")}
                 aria-expanded={housekeepingOpen}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   isHousekeepingGroupActive
-                    ? "bg-slate-700 text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
                 <span className="flex items-center">
-                  <Handshake className="h-4 w-4 mr-2 shrink-0" />
+                  <Handshake className={`h-4 w-4 mr-3 shrink-0 ${isHousekeepingGroupActive ? "text-blue-400" : ""}`} />
                   Housekeeping
                 </span>
                 {housekeepingPendingCount > 0 && (
-                  <span className="ml-auto mr-2 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-orange-500 text-white text-[11px] font-semibold">
+                  <span className="ml-auto mr-3 inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-orange-500 text-white text-[11px] font-black shadow-lg shadow-orange-500/30">
                     {housekeepingPendingCount}
                   </span>
                 )}
                 <ChevronDown
-                  className={`h-4 w-4 transition-transform ${housekeepingOpen ? "rotate-180" : ""}`}
+                  className={`h-4 w-4 transition-transform duration-300 ${housekeepingOpen ? "rotate-180 text-white" : "text-slate-500"}`}
                 />
               </button>
 
               {housekeepingOpen && (
-                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                <div className="mt-2 ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
                   {visibleHousekeepingSubItems.map((subItem) => {
                     const subActive = location.pathname === subItem.path;
                     const SubIcon = subItem.icon;
@@ -1042,16 +1047,16 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         key={subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
-                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                        className={`flex items-center px-4 py-2 text-sm font-medium transition-all rounded-xl border-l-2 ${
                           subActive
-                            ? "bg-blue-950 text-white"
-                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                            ? "bg-blue-500/10 text-blue-400 border-blue-500"
+                            : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
                         <span>{subItem.label}</span>
                         {subItem.path === "/admin/housekeeping" && housekeepingPendingCount > 0 && (
-                          <span className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-orange-500 text-white text-[11px] font-semibold">
+                          <span className="ml-auto flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-orange-500 text-white text-[11px] font-black shadow-lg shadow-orange-500/30">
                             {housekeepingPendingCount}
                           </span>
                         )}
@@ -1077,48 +1082,48 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 key={item.path}
                 to={resolvedPath}
                 onClick={handleSidebarNavigate}
-                className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`flex items-center px-3 py-2.5 rounded-xl text-sm font-bold transition-all mb-2 ${
                   active
-                    ? "bg-slate-700 text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
-                <Icon className="h-4 w-4 mr-2 shrink-0" />
+                <Icon className={`h-4 w-4 mr-3 shrink-0 ${active ? "text-blue-400" : ""}`} />
                 {item.label}
               </Link>
             );
           })}
 
           {isOfferGroupVisible && (
-            <div className="mt-2 mb-1">
+            <div className="mt-4 mb-2 pt-4 border-t border-white/5">
               <button
                 type="button"
                 onClick={() => toggleGroup("offersOpen")}
                 aria-expanded={offersOpen}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm font-medium transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                   isOfferGroupActive
-                    ? "bg-slate-700 text-white"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
                 <span className="flex items-center">
-                  <ShieldCheck className="h-4 w-4 mr-2 shrink-0" />
+                  <ShieldCheck className={`h-4 w-4 mr-3 shrink-0 ${isOfferGroupActive ? "text-amber-400" : ""}`} />
                   Offers
                 </span>
                 {!privilegesLoading && !offerPrivilegeEnabled && (
-                  <span className="ml-auto mr-2 inline-flex items-center justify-center rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="ml-auto mr-3 inline-flex items-center justify-center rounded-lg bg-amber-500/10 px-2 py-0.5 text-[10px] font-black text-amber-500 border border-amber-500/20 uppercase tracking-widest">
                     Locked
                   </span>
                 )}
                 <div className="flex items-center gap-2">
                   <ChevronDown
-                    className={`h-4 w-4 transition-transform ${offersOpen ? "rotate-180" : ""}`}
+                    className={`h-4 w-4 transition-transform duration-300 ${offersOpen ? "rotate-180 text-white" : "text-slate-500"}`}
                   />
                 </div>
               </button>
 
               {offersOpen && (
-                <div className="mt-1 ml-2 border-l border-slate-700 pl-2 space-y-0.5">
+                <div className="mt-2 ml-4 space-y-1 animate-in slide-in-from-top-2 duration-200">
                   {visibleOfferSubItems.map((subItem) => {
                     const subActive =
                       subItem.path === "/admin/offers"
@@ -1132,31 +1137,37 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         key={subItem.path}
                         to={subItem.path}
                         onClick={handleSidebarNavigate}
-                        className={`flex items-center px-3 py-2 rounded text-sm font-medium transition-colors ${
+                        className={`flex items-center px-4 py-2 text-sm font-medium transition-all rounded-xl border-l-2 ${
                           subActive
-                            ? "bg-blue-950 text-white"
-                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                            ? "bg-amber-500/10 text-amber-400 border-amber-500"
+                            : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-2 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
                         {subItem.label}
                       </Link>
                     );
                   })}
                   {!privilegesLoading && !offerPrivilegeEnabled && (
-                    <p className="px-3 py-2 text-xs text-gray-400">
-                      Unlock the Offers module from package access to open these tools.
-                    </p>
+                    <div className="mt-3 mx-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
+                      <ShieldCheck className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-1">Module Locked</p>
+                        <p className="text-[11px] text-amber-500/80 font-medium leading-snug">
+                          Unlock the Offers module from package access to open these tools.
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
             </div>
           )}
         </nav>
-        <div className="px-4 py-4 border-t border-gray-700">
+        <div className="p-4 border-t border-white/5 bg-white/5 backdrop-blur-sm">
           <button
             onClick={handleLogout}
-            className="w-full text-left text-xs text-gray-400 hover:text-red-400 transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
           >
             Logout
           </button>

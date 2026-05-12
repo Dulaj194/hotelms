@@ -182,7 +182,7 @@ async def upload_item_media(
         file=file,
         upload_root=settings.upload_dir,
         subdir=folder,
-        allowed_content_types=all`owed_content_types,
+        allowed_content_types=allowed_content_types,
         ext_map=ext_map,
         max_size_mb=max_mb,
     )
