@@ -153,7 +153,12 @@ def list_bills(
 
     total = query.count()
     items = (
-        query.order_by(Bill.settled_at.desc().nullslast(), Bill.created_at.desc(), Bill.id.desc())
+        query.order_by(
+            Bill.settled_at.is_(None),
+            Bill.settled_at.desc(),
+            Bill.created_at.desc(),
+            Bill.id.desc()
+        )
         .offset(offset)
         .limit(limit)
         .all()
