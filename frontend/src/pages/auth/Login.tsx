@@ -13,7 +13,7 @@ import SeoHead from "@/components/public/SeoHead";
 import { trackAnalyticsEvent } from "@/features/public/analytics";
 import { buildTrackedPath } from "@/features/public/attribution";
 import { ApiError, api } from "@/lib/api";
-import { getRoleRedirect, setAccessToken, setUser } from "@/lib/auth";
+import { clearAuth, getRoleRedirect, setAccessToken, setUser } from "@/lib/auth";
 import type { TokenResponse, UserMeResponse } from "@/types/auth";
 
 const TOO_MANY_REQUESTS_FALLBACK =
@@ -109,6 +109,14 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Clear any stale auth state when the login page mounts.
+  // This prevents a race condition where an expired access token in localStorage
+  // triggers a background /auth/me → token-refresh → clearAuth() → redirect loop
+  // that kicks the user off the login page while they are trying to sign in.
+  useEffect(() => {
+    clearAuth();
+  }, []);
 
   useEffect(() => {
     const noticeKey = searchParams.get("notice");

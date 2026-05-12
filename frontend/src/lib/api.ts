@@ -31,11 +31,25 @@ const INITIAL_RETRY_DELAY_MS = 100; // Start with 100ms
 
 let refreshPromise: Promise<string | null> | null = null;
 
+function _inferLoginRedirectPath(): string {
+  if (typeof window === "undefined") return "/login";
+  const path = window.location.pathname;
+  // If already on a login sub-path, no redirect needed (handled by caller guard).
+  // For known staff pages, redirect to the staff portal login so users don't
+  // have to navigate there manually after a session expiry.
+  if (path.startsWith("/admin/billing") || path.startsWith("/admin/kitchen") || path.startsWith("/admin/housekeeping") || path.startsWith("/admin/steward") || path.startsWith("/admin/chat")) {
+    return "/login/staff";
+  }
+  return "/login";
+}
+
 function redirectToLoginIfNeeded(): void {
   if (typeof window === "undefined") return;
+  // Cover /login, /login/staff, /login/cashier, /login/restaurant-admin, etc.
   if (window.location.pathname.startsWith("/login")) return;
-  window.location.replace("/login");
+  window.location.replace(_inferLoginRedirectPath());
 }
+
 
 export interface ApiRequestOptions {
   headers?: Record<string, string>;
