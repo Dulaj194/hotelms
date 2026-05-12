@@ -775,9 +775,9 @@ export default function Billing() {
               />
 
               {!summary && !receipt && (
-                 <div className="py-40 flex flex-col items-center justify-center bg-white rounded-[3rem] border border-slate-100 shadow-sm opacity-60">
-                    <div className="h-24 w-24 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-8">
-                       <Ticket className="h-10 w-10 text-slate-200" />
+                 <div className="py-20 flex flex-col items-center justify-center bg-white rounded-[3rem] border border-slate-100 shadow-sm opacity-60">
+                    <div className="h-20 w-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-6">
+                       <Ticket className="h-8 w-8 text-slate-200" />
                     </div>
                     <p className="text-2xl font-black text-slate-900 tracking-tight text-center px-6">Search for a table or room to begin billing</p>
                     <p className="text-sm text-slate-400 mt-2 font-medium text-center">Use the lookup panel to load a session or scan a QR code</p>
@@ -817,9 +817,9 @@ export default function Billing() {
             {folioActionError && <Alert tone="error">{folioActionError}</Alert>}
 
             {folios.length === 0 && !folioLoading ? (
-              <div className="py-40 flex flex-col items-center justify-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
-                <div className="h-24 w-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mb-8">
-                   <History className="h-10 w-10 text-slate-200" />
+              <div className="py-20 flex flex-col items-center justify-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
+                <div className="h-20 w-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-6">
+                   <History className="h-8 w-8 text-slate-200" />
                 </div>
                 <p className="text-2xl font-black text-slate-900 tracking-tight">Folio queue is empty</p>
                 <p className="text-sm text-slate-400 mt-2 font-medium px-6 text-center">Settled room invoices will appear here for processing</p>
