@@ -618,17 +618,17 @@ export default function Billing() {
                               {mode === 'table' && (
                                  <button 
                                    onClick={onChangeTable}
-                                   className="h-10 px-4 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+                                   className="h-11 px-5 bg-white border-2 border-slate-200 text-slate-700 shadow-sm rounded-xl text-xs font-bold hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all flex items-center gap-2.5"
                                  >
-                                   <ArrowLeftRight className="h-3.5 w-3.5" />
+                                   <ArrowLeftRight className="h-4 w-4" />
                                    Move Table
                                  </button>
                               )}
                               <button 
                                 onClick={() => setIsAddDrawerOpen(true)}
-                                className="h-10 px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all flex items-center gap-2"
+                                className="h-11 px-5 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-900/20 border-2 border-slate-900 hover:bg-slate-800 transition-all flex items-center gap-2.5"
                               >
-                                <Plus className="h-3.5 w-3.5" />
+                                <Plus className="h-4 w-4" />
                                 Add Item
                               </button>
                            </div>
