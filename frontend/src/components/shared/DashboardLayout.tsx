@@ -1164,8 +1164,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       </aside>
 
       {/* Main content */}
-      <main className="h-dvh overflow-y-auto">
-        <div className="app-content-container py-8">
+      <main className="h-dvh overflow-y-auto bg-gray-50/30">
+        <div 
+          key={location.pathname}
+          className="app-content-container py-8 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out"
+        >
           {children}
         </div>
       </main>
