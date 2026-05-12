@@ -54,6 +54,40 @@ const PORTAL_LOGIN_CONFIG: Record<string, LoginFlowConfig> = {
     submitLabel: "Start Shift",
     badge: "Staff Portal",
   },
+  // Role-specific aliases — all resolve to the /auth/login/staff endpoint
+  // which enforces restaurant context and returns a full module_access snapshot.
+  cashier: {
+    title: "Cashier Terminal",
+    subtitle: "Folio review & billing transfer queue",
+    endpoint: "/auth/login/staff",
+    invalidCredentialsMessage: "Invalid cashier credentials.",
+    submitLabel: "Open Cashier Queue",
+    badge: "Cashier Portal",
+  },
+  accountant: {
+    title: "Accountant Terminal",
+    subtitle: "Finance reconciliation & folio sign-off",
+    endpoint: "/auth/login/staff",
+    invalidCredentialsMessage: "Invalid accountant credentials.",
+    submitLabel: "Open Finance Desk",
+    badge: "Accountant Portal",
+  },
+  steward: {
+    title: "Steward Hub",
+    subtitle: "Live guest orders & service execution",
+    endpoint: "/auth/login/staff",
+    invalidCredentialsMessage: "Invalid steward credentials.",
+    submitLabel: "Start Shift",
+    badge: "Steward Portal",
+  },
+  housekeeper: {
+    title: "Housekeeping Hub",
+    subtitle: "Room readiness & task management",
+    endpoint: "/auth/login/staff",
+    invalidCredentialsMessage: "Invalid housekeeper credentials.",
+    submitLabel: "Start Shift",
+    badge: "Housekeeping Portal",
+  },
   "super-admin": {
     title: "Global Controller",
     subtitle: "System-wide administrative access",
