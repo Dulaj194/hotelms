@@ -13,7 +13,8 @@ import {
   Coffee,
   Loader2,
   Plus,
-  ArrowLeftRight
+  ArrowLeftRight,
+  QrCode
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
@@ -505,17 +506,30 @@ export default function Billing() {
                    <input
                     type="text"
                     value={lookup}
+                    autoFocus
                     onChange={(e) => mode === "room" ? setRoomLookup(e.target.value) : setTableLookup(e.target.value)}
                     placeholder={mode === "room" ? "e.g. 101 or Room Session ID" : "e.g. 4 or Table Session ID"}
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 outline-none ring-2 ring-transparent focus:ring-slate-200 focus:bg-white transition-all"
+                    className="w-full pl-12 pr-12 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-700 outline-none ring-2 ring-transparent focus:ring-slate-200 focus:bg-white transition-all"
                   />
+                  <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors" title="Scan QR Code">
+                    <QrCode className="h-4 w-4" />
+                  </button>
                 </div>
                 <button 
                   disabled={fetching || !lookup.trim()}
                   className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-[0.98] disabled:opacity-50"
                 >
-                  {fetching ? "Syncing..." : "Load Summary"}
+                  {fetching ? "Syncing..." : (lookup.trim() ? "Load Summary" : "Enter a number to continue")}
                 </button>
+                
+                <div className="mt-6 pt-6 border-t border-slate-100">
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Recent Sessions</p>
+                   <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => mode === "room" ? setRoomLookup("101") : setTableLookup("1")} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">{mode === "room" ? "R-101" : "T-01"}</button>
+                      <button type="button" onClick={() => mode === "room" ? setRoomLookup("102") : setTableLookup("4")} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">{mode === "room" ? "R-102" : "T-04"}</button>
+                      <button type="button" onClick={() => mode === "room" ? setRoomLookup("205") : setTableLookup("12")} className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">{mode === "room" ? "R-205" : "T-12"}</button>
+                   </div>
+                </div>
               </form>
 
               {fetchError && <Alert tone="error">{fetchError}</Alert>}
@@ -737,8 +751,8 @@ export default function Billing() {
                     <div className="h-24 w-24 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-8">
                        <Ticket className="h-10 w-10 text-slate-200" />
                     </div>
-                    <p className="text-2xl font-black text-slate-900 tracking-tight">Financial Terminal Idle</p>
-                    <p className="text-sm text-slate-400 mt-2 font-medium">Load a session to start billing operations</p>
+                    <p className="text-2xl font-black text-slate-900 tracking-tight text-center px-6">Search for a table or room to begin billing</p>
+                    <p className="text-sm text-slate-400 mt-2 font-medium text-center">Use the lookup panel to load a session or scan a QR code</p>
                  </div>
               )}
             </div>
