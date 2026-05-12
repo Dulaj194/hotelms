@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, date, datetime, time
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 import redis as redis_lib
@@ -256,13 +257,14 @@ def _to_cents(amount: float) -> int:
     return int(round(float(amount) * 100))
 
 
-def _compute_adjustment_amount(*, base: float, mode: str, value: float) -> float:
+def _compute_adjustment_amount(*, base: Decimal, mode: str, value: Decimal) -> Decimal:
     if mode == "none":
-        return 0.0
+        return Decimal("0.00")
     if mode == "percentage":
-        return round((base * float(value)) / 100.0, 2)
+        calc = (base * value) / Decimal("100")
+        return calc.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     if mode == "fixed":
-        return round(min(float(value), base), 2)
+        return min(value, base).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     raise HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         detail="Unsupported adjustment rule mode.",
@@ -270,23 +272,28 @@ def _compute_adjustment_amount(*, base: float, mode: str, value: float) -> float
 
 
 def _calculate_totals(subtotal: float, payload: SettleSessionSplitRequest) -> tuple[float, float, float]:
-    tax_amount = _compute_adjustment_amount(
-        base=subtotal,
+    d_subtotal = Decimal(str(subtotal))
+    d_tax_value = Decimal(str(payload.tax_rule_value))
+    d_discount_value = Decimal(str(payload.discount_rule_value))
+
+    d_tax_amount = _compute_adjustment_amount(
+        base=d_subtotal,
         mode=payload.tax_rule_mode,
-        value=payload.tax_rule_value,
+        value=d_tax_value,
     )
-    discount_amount = _compute_adjustment_amount(
-        base=subtotal,
+    d_discount_amount = _compute_adjustment_amount(
+        base=d_subtotal,
         mode=payload.discount_rule_mode,
-        value=payload.discount_rule_value,
+        value=d_discount_value,
     )
-    total_amount = round(subtotal + tax_amount - discount_amount, 2)
-    if total_amount < 0:
+    d_total_amount = (d_subtotal + d_tax_amount - d_discount_amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    
+    if d_total_amount < Decimal("0.00"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Discount cannot exceed subtotal plus tax.",
         )
-    return round(tax_amount, 2), round(discount_amount, 2), total_amount
+    return float(d_tax_amount), float(d_discount_amount), float(d_total_amount)
 
 
 def _normalize_idempotency_key(value: str | None) -> str | None:
@@ -543,10 +550,10 @@ def _build_summary_response(
             session_id,
             restaurant_id,
         )
-        subtotal = sum(float(order.total_amount) for order in summary_orders)
+        subtotal = float(sum(Decimal(str(order.total_amount)) for order in summary_orders))
         tax_amount = 0.0
         discount_amount = 0.0
-        grand_total = subtotal + tax_amount - discount_amount
+        grand_total = float((Decimal(str(subtotal)) + Decimal("0.00") - Decimal("0.00")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
     return BillSummaryResponse(
         context_type=context_type,
@@ -592,7 +599,8 @@ def _build_status_response(
         grand_total = float(existing_bill.total_amount)
     else:
         relevant_orders = order_repo.list_billable_orders_by_session(db, session_id, restaurant_id)
-        grand_total = sum(float(order.total_amount) for order in relevant_orders)
+        d_grand_total = sum((Decimal(str(order.total_amount)) for order in relevant_orders), Decimal("0.00"))
+        grand_total = float(d_grand_total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
     return SessionBillingStatusResponse(
         context_type=context_type,

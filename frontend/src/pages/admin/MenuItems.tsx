@@ -226,7 +226,7 @@ export default function MenuItems() {
       return;
     }
 
-    const priceNum = parseFloat(formData.price);
+    const priceNum = Math.round(parseFloat(formData.price) * 100) / 100;
     if (isNaN(priceNum) || priceNum <= 0) {
       setFormError("Price must be greater than 0.");
       return;
