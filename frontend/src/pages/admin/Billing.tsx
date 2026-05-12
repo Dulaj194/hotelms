@@ -171,7 +171,7 @@ function OrderCard({ order, onReject, isSettled }: { order: BillOrder, onReject?
            {!isSettled && onReject && (
               <button 
                 onClick={onReject}
-                className="h-8 px-3 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 shrink-0"
+                className="h-8 px-4 bg-red-50 text-red-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all border border-red-200 shrink-0"
                 title="Reject this order due to dispute"
               >
                 Void Order
@@ -186,10 +186,10 @@ function OrderCard({ order, onReject, isSettled }: { order: BillOrder, onReject?
         {order.items.map((item) => (
           <div key={item.id} className="flex items-center justify-between gap-4 p-3 bg-slate-50 rounded-2xl border border-white">
             <div className="flex items-center gap-3">
-              <span className="h-6 w-6 bg-white border border-slate-100 text-slate-400 rounded-lg flex items-center justify-center text-[10px] font-black">{item.quantity}</span>
-              <p className="text-sm font-bold text-slate-700">{item.item_name_snapshot}</p>
+              <span className="h-8 w-8 bg-white border border-slate-100 text-slate-500 rounded-lg flex items-center justify-center text-xs font-black shrink-0">{item.quantity}×</span>
+              <p className="text-base font-bold text-slate-700 capitalize break-words">{item.item_name_snapshot}</p>
             </div>
-            <span className="text-sm font-black text-slate-900 tabular-nums">{cur(item.line_total)}</span>
+            <span className="text-base font-black text-slate-900 tabular-nums text-right shrink-0">{cur(item.line_total)}</span>
           </div>
         ))}
       </div>
@@ -471,7 +471,7 @@ export default function Billing() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 pb-20">
+      <div className="space-y-4 pb-20">
         {/* Workspace Header */}
         <div className="rounded-[3rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-8 text-white shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
@@ -530,10 +530,9 @@ export default function Billing() {
                   <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center rounded-xl hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors" title="Scan QR Code">
                     <QrCode className="h-4 w-4" />
                   </button>
-                </div>
-                <button 
+                </div>                <button 
                   disabled={fetching || !lookup.trim()}
-                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-[0.98] disabled:opacity-50"
+                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-200 hover:bg-blue-700 transition-all active:scale-[0.98] disabled:opacity-50 disabled:bg-slate-800 disabled:shadow-none flex items-center justify-center gap-2"
                 >
                   {fetching ? "Syncing..." : (lookup.trim() ? "Load Summary" : "Enter a number to continue")}
                 </button>
@@ -609,7 +608,7 @@ export default function Billing() {
                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">{summary.session_id}</p>
                               </div>
                            </div>
-                           <span className={`self-start sm:self-auto px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0 ${summary.is_settled ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                           <span className={`self-start sm:self-auto px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0 border ${summary.is_settled ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-orange-100 text-orange-700 border-orange-200'}`}>
                               {summary.is_settled ? 'Settled' : 'Unpaid Session'}
                            </span>
                         </div>
@@ -665,7 +664,7 @@ export default function Billing() {
                            <div className="flex justify-between items-center pt-2">
                               <div>
                                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Total Due</p>
-                                 <p className="text-3xl font-black tabular-nums">{cur(summary.grand_total)}</p>
+                                 <p className="text-4xl lg:text-5xl font-black tabular-nums text-emerald-400">{cur(summary.grand_total)}</p>
                               </div>
                               {mode === "table" && (
                                 <div className="text-right">

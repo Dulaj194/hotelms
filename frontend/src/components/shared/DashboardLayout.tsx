@@ -674,13 +674,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="h-dvh overflow-hidden bg-gray-50 md:grid md:grid-cols-[14rem_1fr]">
+    <div className="h-dvh overflow-hidden bg-gray-50 lg:grid lg:grid-cols-[16rem_1fr]">
       <button
         type="button"
         onClick={toggleMobileSidebar}
         aria-label={mobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
         title={mobileSidebarOpen ? "Close sidebar" : "Open sidebar"}
-        className={`fixed top-4 z-[70] inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-100 md:hidden ${
+        className={`fixed top-4 z-[70] inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition-all hover:bg-slate-100 lg:hidden ${
           mobileSidebarOpen ? "left-[13.75rem]" : "left-3"
         }`}
       >
@@ -689,7 +689,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       <div
         onClick={closeMobileSidebar}
-        className={`fixed inset-0 z-40 bg-black/40 transition-opacity md:hidden ${
+        className={`fixed inset-0 z-40 bg-black/40 transition-opacity lg:hidden ${
           mobileSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         aria-hidden="true"
@@ -697,7 +697,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 h-dvh bg-[#0B0F19] text-slate-300 flex flex-col overflow-hidden transform transition-transform duration-300 md:static md:translate-x-0 md:z-auto border-r border-white/5 shadow-2xl ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 h-dvh bg-[#0B0F19] text-slate-300 flex flex-col overflow-hidden transform transition-transform duration-300 lg:static lg:translate-x-0 lg:z-auto border-r border-white/5 shadow-2xl ${
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -732,7 +732,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 }`}
               >
                 <span className="flex items-center">
-                  <SquareMenu className={`h-4 w-4 mr-3 shrink-0 ${isMenuGroupActive ? "text-blue-400" : ""}`} />
+                  <SquareMenu className={`h-4 w-4 mr-4 shrink-0 ${isMenuGroupActive ? "text-blue-400" : ""}`} />
                   Menus
                 </span>
                 <ChevronDown
@@ -756,7 +756,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-4 shrink-0" />
                         {subItem.label}
                       </Link>
                     );
@@ -779,7 +779,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 }`}
               >
                 <span className="flex items-center">
-                  <CookingPot className={`h-4 w-4 mr-3 shrink-0 ${isOpsGroupActive ? "text-blue-400" : ""}`} />
+                  <CookingPot className={`h-4 w-4 mr-4 shrink-0 ${isOpsGroupActive ? "text-blue-400" : ""}`} />
                   Kitchen Operations
                 </span>
                 <ChevronDown
@@ -803,7 +803,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-4 shrink-0" />
                         <span>{subItem.label}</span>
                         {subItem.label === "Kitchen Queue" && badgeCounts.awaiting > 0 && (
                           <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-black text-white shadow-sm shadow-blue-500/30 animate-pulse">
@@ -831,7 +831,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 }`}
               >
                 <span className="flex items-center">
-                  <MessageSquare className={`h-4 w-4 mr-3 shrink-0 ${isCommGroupActive ? "text-blue-400" : ""}`} />
+                  <MessageSquare className={`h-4 w-4 mr-4 shrink-0 ${isCommGroupActive ? "text-blue-400" : ""}`} />
                   Communication
                 </span>
                 <ChevronDown
@@ -855,7 +855,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-4 shrink-0" />
                         <span>{subItem.label}</span>
                         {subItem.label === "Guest Requests" && badgeCounts.requests > 0 && (
                           <span className="ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white shadow-sm shadow-rose-500/30 animate-pulse">
@@ -883,7 +883,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 }`}
               >
                 <span className="flex items-center">
-                  <Ticket className={`h-4 w-4 mr-3 shrink-0 ${isFinanceGroupActive ? "text-blue-400" : ""}`} />
+                  <Ticket className={`h-4 w-4 mr-4 shrink-0 ${isFinanceGroupActive ? "text-blue-400" : ""}`} />
                   Finance
                 </span>
                 <ChevronDown
@@ -907,7 +907,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-4 shrink-0" />
                         <span>{subItem.label}</span>
                       </Link>
                     );
@@ -930,7 +930,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 }`}
               >
                 <span className="flex items-center">
-                  <Settings className={`h-4 w-4 mr-3 shrink-0 ${isSettingsGroupActive ? "text-blue-400" : ""}`} />
+                  <Settings className={`h-4 w-4 mr-4 shrink-0 ${isSettingsGroupActive ? "text-blue-400" : ""}`} />
                   Settings
                 </span>
                 <ChevronDown
@@ -954,7 +954,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-4 shrink-0" />
                         <span>{subItem.label}</span>
                       </Link>
                     );
@@ -977,7 +977,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 }`}
               >
                 <span className="flex items-center">
-                  <QrCode className={`h-4 w-4 mr-3 shrink-0 ${isQrGroupActive ? "text-blue-400" : ""}`} />
+                  <QrCode className={`h-4 w-4 mr-4 shrink-0 ${isQrGroupActive ? "text-blue-400" : ""}`} />
                   QR Codes
                 </span>
                 <ChevronDown
@@ -1001,7 +1001,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-4 shrink-0" />
                         {subItem.label}
                       </Link>
                     );
@@ -1024,7 +1024,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 }`}
               >
                 <span className="flex items-center">
-                  <Handshake className={`h-4 w-4 mr-3 shrink-0 ${isHousekeepingGroupActive ? "text-blue-400" : ""}`} />
+                  <Handshake className={`h-4 w-4 mr-4 shrink-0 ${isHousekeepingGroupActive ? "text-blue-400" : ""}`} />
                   Housekeeping
                 </span>
                 {housekeepingPendingCount > 0 && (
@@ -1053,7 +1053,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-4 shrink-0" />
                         <span>{subItem.label}</span>
                         {subItem.path === "/admin/housekeeping" && housekeepingPendingCount > 0 && (
                           <span className="ml-auto flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-orange-500 text-white text-[11px] font-black shadow-lg shadow-orange-500/30">
@@ -1088,7 +1088,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
                 }`}
               >
-                <Icon className={`h-4 w-4 mr-3 shrink-0 ${active ? "text-blue-400" : ""}`} />
+                <Icon className={`h-4 w-4 mr-4 shrink-0 ${active ? "text-blue-400" : ""}`} />
                 {item.label}
               </Link>
             );
@@ -1107,7 +1107,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 }`}
               >
                 <span className="flex items-center">
-                  <ShieldCheck className={`h-4 w-4 mr-3 shrink-0 ${isOfferGroupActive ? "text-amber-400" : ""}`} />
+                  <ShieldCheck className={`h-4 w-4 mr-4 shrink-0 ${isOfferGroupActive ? "text-amber-400" : ""}`} />
                   Offers
                 </span>
                 {!privilegesLoading && !offerPrivilegeEnabled && (
@@ -1143,7 +1143,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             : "border-transparent text-slate-400 hover:bg-white/5 hover:text-slate-200"
                         }`}
                       >
-                        <SubIcon className="h-4 w-4 mr-3 shrink-0" />
+                        <SubIcon className="h-4 w-4 mr-4 shrink-0" />
                         {subItem.label}
                       </Link>
                     );
