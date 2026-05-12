@@ -156,27 +156,27 @@ function Alert({ tone, children }: { tone: "error" | "info" | "warning"; childre
 function OrderCard({ order, onReject, isSettled }: { order: BillOrder, onReject?: () => void, isSettled: boolean }) {
   return (
     <article className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xs">
+          <div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-xs shrink-0">
              #{order.order_number}
           </div>
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order Reference</p>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">Order Reference</p>
             <p className="text-xs font-bold text-slate-500">{new Date(order.placed_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
            {!isSettled && onReject && (
               <button 
                 onClick={onReject}
-                className="h-8 px-3 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100"
+                className="h-8 px-3 bg-rose-50 text-rose-600 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 shrink-0"
                 title="Reject this order due to dispute"
               >
                 Void Order
               </button>
            )}
-           <div className="text-right">
+           <div className="text-right shrink-0">
               <p className="text-lg font-black text-slate-900 tabular-nums">{cur(order.total_amount)}</p>
            </div>
         </div>
@@ -492,7 +492,7 @@ export default function Billing() {
         </div>
 
         {tab !== "folios" && (
-          <div className="grid grid-cols-1 xl:grid-cols-[400px_1fr] gap-8 items-start">
+          <div className="grid grid-cols-1 2xl:grid-cols-[360px_1fr] gap-8 items-start">
             {/* Lookup Section */}
             <div className="space-y-6">
               <form onSubmit={onLookup} className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
@@ -550,31 +550,32 @@ export default function Billing() {
               )}
             </div>
 
-            {/* Details Section */}
-            <div className="space-y-8">
+            <div className="space-y-8 w-full min-w-0">
               {summary && !receipt && (
-                <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 animate-in slide-in-from-right-8 duration-700">
-                  <div className="space-y-6">
-                     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm flex items-center justify-between">
-                        <div className="flex items-center gap-5">
-                           <div className="h-14 w-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400">
-                              {mode === 'room' ? <User className="h-6 w-6" /> : <Coffee className="h-6 w-6" />}
+                <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8 animate-in slide-in-from-right-8 duration-700">
+                  <div className="space-y-6 min-w-0">
+                     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                           <div className="flex items-center gap-5">
+                              <div className="h-14 w-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                                 {mode === 'room' ? <User className="h-6 w-6" /> : <Coffee className="h-6 w-6" />}
+                              </div>
+                              <div className="min-w-0">
+                                 <h3 className="text-2xl font-black text-slate-900 tracking-tight">{contextLabel(summary.context_type, summary.table_number, summary.room_number)}</h3>
+                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">{summary.session_id}</p>
+                              </div>
                            </div>
-                           <div>
-                              <h3 className="text-2xl font-black text-slate-900 tracking-tight">{contextLabel(summary.context_type, summary.table_number, summary.room_number)}</h3>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{summary.session_id}</p>
-                           </div>
+                           <span className={`self-start sm:self-auto px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0 ${summary.is_settled ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                              {summary.is_settled ? 'Settled' : 'Unpaid Session'}
+                           </span>
                         </div>
-                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${summary.is_settled ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                           {summary.is_settled ? 'Settled' : 'Unpaid Session'}
-                        </span>
                         
                         {!summary.is_settled && (
-                           <div className="flex items-center">
+                           <div className="flex flex-wrap items-center gap-3">
                               {mode === 'table' && (
                                  <button 
                                    onClick={onChangeTable}
-                                   className="ml-4 h-10 px-4 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+                                   className="h-10 px-4 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
                                  >
                                    <ArrowLeftRight className="h-3.5 w-3.5" />
                                    Move Table
@@ -582,7 +583,7 @@ export default function Billing() {
                               )}
                               <button 
                                 onClick={() => setIsAddDrawerOpen(true)}
-                                className="ml-3 h-10 px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all flex items-center gap-2"
+                                className="h-10 px-4 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all flex items-center gap-2"
                               >
                                 <Plus className="h-3.5 w-3.5" />
                                 Add Item
