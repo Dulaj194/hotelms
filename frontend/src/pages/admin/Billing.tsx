@@ -492,9 +492,9 @@ export default function Billing() {
         </div>
 
         {tab !== "folios" && (
-          <div className="grid grid-cols-1 2xl:grid-cols-[360px_1fr] gap-8 items-start">
+          <div className="flex flex-col xl:flex-row gap-8 items-start">
             {/* Lookup Section */}
-            <div className="space-y-6">
+            <div className={`w-full xl:w-[320px] shrink-0 space-y-6 ${(summary || receipt) ? 'hidden xl:block' : 'block'}`}>
               <form onSubmit={onLookup} className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
                 <div className="mb-6">
                   <h2 className="text-xl font-black text-slate-900 tracking-tight">Lookup Session</h2>
@@ -550,9 +550,10 @@ export default function Billing() {
               )}
             </div>
 
-            <div className="space-y-8 w-full min-w-0">
+            {/* Details Section */}
+            <div className={`flex-1 space-y-8 w-full min-w-0 ${(!summary && !receipt) ? 'hidden xl:block' : 'block'}`}>
               {summary && !receipt && (
-                <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-8 animate-in slide-in-from-right-8 duration-700">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_360px] gap-8 animate-in slide-in-from-right-8 duration-700">
                   <div className="space-y-6 min-w-0">
                      <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-5">
@@ -602,7 +603,7 @@ export default function Billing() {
                           />
                         ))}
                         {summary.orders.length === 0 && (
-                          <div className="p-20 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100 text-center">
+                          <div className="py-16 px-6 sm:p-20 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100 text-center">
                              <Coffee className="h-12 w-12 text-slate-100 mx-auto mb-4" />
                              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No orders found for this session</p>
                           </div>
