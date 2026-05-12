@@ -597,7 +597,7 @@ export default function Billing() {
               {summary && !receipt && (
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_360px] gap-8 animate-in slide-in-from-right-8 duration-700">
                   <div className="space-y-6 min-w-0">
-                     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+                     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 sm:p-8 shadow-sm flex flex-wrap items-center justify-between gap-6">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-5">
                            <div className="flex items-center gap-5">
                               <div className="h-14 w-14 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
