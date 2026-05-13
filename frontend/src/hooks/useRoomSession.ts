@@ -15,14 +15,15 @@ export function getRoomToken(): string | null {
 /** Persists the room session token with its room context. */
 export function setRoomSession(response: RoomSessionStartResponse): void {
   sessionStorage.setItem(ROOM_SESSION_KEY, response.room_session_token);
-  sessionStorage.setItem(
-    ROOM_SESSION_PROFILE_KEY,
-    JSON.stringify({
-      restaurant_id: response.restaurant_id,
-      room_id: response.room_id,
-      room_number: response.room_number,
-    } satisfies RoomSessionProfile),
-  );
+  const profile: RoomSessionProfile = {
+    restaurant_id: response.restaurant_id,
+    room_id: response.room_id,
+    room_number: response.room_number,
+  };
+  sessionStorage.setItem(ROOM_SESSION_PROFILE_KEY, JSON.stringify(profile));
+
+  localStorage.setItem("LAST_KNOWN_ROOM_TOKEN", response.room_session_token);
+  localStorage.setItem("LAST_KNOWN_ROOM_PROFILE", JSON.stringify(profile));
 }
 
 export function setRoomSessionToken(roomSessionToken: string): void {
@@ -36,20 +37,60 @@ export function setRoomSessionTokenForContext(params: {
   roomNumber: string;
 }): void {
   sessionStorage.setItem(ROOM_SESSION_KEY, params.roomSessionToken);
-  sessionStorage.setItem(
-    ROOM_SESSION_PROFILE_KEY,
-    JSON.stringify({
-      restaurant_id: params.restaurantId,
-      room_id: params.roomId,
-      room_number: params.roomNumber,
-    } satisfies RoomSessionProfile),
-  );
+  const profile: RoomSessionProfile = {
+    restaurant_id: params.restaurantId,
+    room_id: params.roomId,
+    room_number: params.roomNumber,
+  };
+  sessionStorage.setItem(ROOM_SESSION_PROFILE_KEY, JSON.stringify(profile));
+
+  localStorage.setItem("LAST_KNOWN_ROOM_TOKEN", params.roomSessionToken);
+  localStorage.setItem("LAST_KNOWN_ROOM_PROFILE", JSON.stringify(profile));
 }
 
 /** Clears the room session token from storage. */
 export function clearRoomSession(): void {
   sessionStorage.removeItem(ROOM_SESSION_KEY);
   sessionStorage.removeItem(ROOM_SESSION_PROFILE_KEY);
+}
+
+export type LastKnownRoomSession = {
+  restaurantId: number;
+  roomId: number;
+  roomNumber: string;
+  roomToken: string;
+};
+
+export function getLastKnownRoomSession(): LastKnownRoomSession | null {
+  const token = localStorage.getItem("LAST_KNOWN_ROOM_TOKEN");
+  const profileRaw = localStorage.getItem("LAST_KNOWN_ROOM_PROFILE");
+  if (!token || !profileRaw) return null;
+
+  try {
+    const profile = JSON.parse(profileRaw) as RoomSessionProfile;
+    return {
+      restaurantId: profile.restaurant_id,
+      roomId: profile.room_id,
+      roomNumber: profile.room_number,
+      roomToken: token,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function restoreLastKnownRoomSession(): LastKnownRoomSession | null {
+  const lastKnown = getLastKnownRoomSession();
+  if (!lastKnown) return null;
+
+  setRoomSessionTokenForContext({
+    roomSessionToken: lastKnown.roomToken,
+    restaurantId: lastKnown.restaurantId,
+    roomId: lastKnown.roomId,
+    roomNumber: lastKnown.roomNumber,
+  });
+
+  return lastKnown;
 }
 
 /** Returns true when a room session token is stored. */

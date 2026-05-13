@@ -8,11 +8,14 @@ import {
   QrCode,
   ShieldCheck,
   Sparkles,
+  UtensilsCrossed,
   X,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
+import { getLastKnownGuestSession, restoreLastKnownGuestSession } from "@/hooks/useGuestSession";
+import { getLastKnownRoomSession, restoreLastKnownRoomSession } from "@/hooks/useRoomSession";
 import { trackAnalyticsEvent } from "@/features/public/analytics";
 import { buildPortalLoginPath, NAVBAR_LOGIN_PORTALS } from "@/features/public/authEntry";
 import { buildTrackedPath } from "@/features/public/attribution";
@@ -154,12 +157,33 @@ export function SectionHeader({ title, subtitle }: { title: string; subtitle?: s
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const lastTableSession = getLastKnownGuestSession();
+  const lastRoomSession = getLastKnownRoomSession();
 
   function handlePortalClick(label: string, entryPoint: string) {
     trackAnalyticsEvent("login_portal_click", {
       label,
       entry_point: entryPoint,
     });
+  }
+
+  function handleResumeSession() {
+    if (lastTableSession) {
+      const session = restoreLastKnownGuestSession();
+      if (session) {
+        const targetUrl = session.qrAccessKey
+          ? `/menu/${session.restaurantId}/table/${session.tableNumber}?k=${encodeURIComponent(session.qrAccessKey)}`
+          : `/menu/${session.restaurantId}/table/${session.tableNumber}`;
+        navigate(targetUrl);
+      }
+    } else if (lastRoomSession) {
+      const session = restoreLastKnownRoomSession();
+      if (session) {
+        navigate(`/menu/${session.restaurantId}/room/${session.roomNumber}`);
+      }
+    }
   }
 
   return (
@@ -197,6 +221,16 @@ export function Navbar() {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
+          {(lastTableSession || lastRoomSession) && (
+            <button
+              type="button"
+              onClick={handleResumeSession}
+              className="inline-flex items-center gap-2 rounded-full bg-orange-50 border border-orange-200 px-4 py-2 text-sm font-bold text-orange-600 hover:bg-orange-100 transition animate-pulse"
+            >
+              <UtensilsCrossed className="h-4 w-4" />
+              <span>Active Session</span>
+            </button>
+          )}
           <Link
             to={buildTrackedPath("/register", { entry_point: "navbar_register" })}
             className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-base font-semibold text-slate-700 hover:bg-slate-100"
@@ -214,14 +248,26 @@ export function Navbar() {
           </Link>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setMobileOpen((prev) => !prev)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 text-slate-700 lg:hidden"
-          aria-label="Toggle menu"
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-2 lg:hidden">
+          {(lastTableSession || lastRoomSession) && (
+            <button
+              type="button"
+              onClick={handleResumeSession}
+              className="inline-flex items-center gap-1.5 rounded-full bg-orange-50 border border-orange-200 px-3 py-1.5 text-xs font-bold text-orange-600 hover:bg-orange-100 transition animate-pulse"
+            >
+              <UtensilsCrossed className="h-3.5 w-3.5" />
+              <span>Resume</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setMobileOpen((prev) => !prev)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-300 text-slate-700"
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {mobileOpen && (
