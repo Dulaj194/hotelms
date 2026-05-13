@@ -927,7 +927,7 @@ export default function TableMenu() {
           )}
 
           {/* Featured Picks Section */}
-          {activeCategoryId === null && menu.offers && menu.offers.filter(o => o.is_featured).length > 0 && (
+          {activeCategoryId === null && menu.offers && menu.offers.length > 0 && (
             <section className="mb-8 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -941,7 +941,7 @@ export default function TableMenu() {
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {menu.offers.filter(o => o.is_featured).map((offer) => (
+                {(menu.offers.some(o => o.is_featured) ? menu.offers.filter(o => o.is_featured) : menu.offers).map((offer) => (
                   <div
                     key={offer.id}
                     onClick={() => {
