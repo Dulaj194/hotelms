@@ -952,7 +952,7 @@ export default function TableMenu() {
 
           {/* Featured Picks Section */}
           {activeCategoryId === null && menu.offers && menu.offers.length > 0 && (
-            <section className="mb-8 space-y-4">
+            <section className="mb-8 space-y-4 overflow-hidden">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-orange-600">
@@ -964,7 +964,7 @@ export default function TableMenu() {
                   </h2>
                 </div>
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="flex gap-4 overflow-x-auto pb-4 pt-1 px-1 -mx-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
                 {(menu.offers.some(o => o.is_featured) ? menu.offers.filter(o => o.is_featured) : menu.offers).map((offer) => (
                   <div
                     key={offer.id}
@@ -976,33 +976,39 @@ export default function TableMenu() {
                         handleCategorySelect(offer.product_id);
                       }
                     }}
-                    className="group relative flex flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 text-white shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-pointer border border-slate-800"
+                    className="shrink-0 w-[85%] sm:w-[65%] lg:w-[45%] snap-center cursor-pointer transition-transform duration-300 active:scale-[0.98]"
                   >
-                    {offer.image_path && (
-                      <div className="relative h-40 w-full overflow-hidden sm:h-48">
-                        <SafeMenuAsset
-                          path={offer.image_path}
-                          alt={offer.title}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 opacity-90 group-hover:opacity-100"
-                          fallback={<UtensilsCrossed className="h-8 w-8 text-slate-600" />}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+                    <div className="flex h-44 sm:h-48 w-full overflow-hidden rounded-[24px] bg-[#EBE7E0] shadow-sm hover:shadow-md transition-shadow border border-slate-200/60 text-slate-900">
+                      {/* Left Info Area */}
+                      <div className="flex flex-1 flex-col justify-between p-4 sm:p-5 min-w-0">
+                        <div className="min-w-0">
+                          <span className="inline-flex w-fit items-center gap-1 rounded bg-slate-900/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-700">
+                            Special Offer
+                          </span>
+                          <h3 className="mt-2 text-base sm:text-lg font-black leading-tight text-slate-900 line-clamp-2">
+                            {offer.title}
+                          </h3>
+                          <p className="mt-1 text-xs font-medium text-slate-600 line-clamp-2">
+                            {offer.description}
+                          </p>
+                        </div>
+                        <div className="pt-2">
+                          <button className="rounded-full bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800">
+                            {offer.product_type === "item" ? "Order now" : "Explore"}
+                          </button>
+                        </div>
                       </div>
-                    )}
-                    <div className={`flex flex-1 flex-col p-5 ${offer.image_path ? "-mt-10 relative z-10" : ""}`}>
-                      <span className="w-fit rounded-lg bg-orange-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">
-                        Limited Time Offer
-                      </span>
-                      <h3 className="mt-2 text-lg font-bold leading-tight text-white sm:text-xl">
-                        {offer.title}
-                      </h3>
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-300 line-clamp-2">
-                        {offer.description}
-                      </p>
-                      <div className="mt-4 flex items-center gap-1 text-xs font-bold text-orange-400 group-hover:underline">
-                        <span>{offer.product_type === "item" ? "Order Now" : "View Menu Section"}</span>
-                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                      </div>
+                      {/* Right Image Area */}
+                      {offer.image_path && (
+                        <div className="relative w-[45%] shrink-0 h-full overflow-hidden bg-slate-100">
+                          <SafeMenuAsset
+                            path={offer.image_path}
+                            alt={offer.title}
+                            className="h-full w-full object-cover"
+                            fallback={<div className="flex h-full w-full items-center justify-center text-slate-400"><UtensilsCrossed className="h-6 w-6" /></div>}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
