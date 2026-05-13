@@ -108,6 +108,7 @@ export default function TableMenu() {
   const lastMenuScrollYRef = useRef(0);
   const isHeaderTransitioningRef = useRef(false);
   const headerTransitionTimeoutRef = useRef<number | null>(null);
+  const [activeOfferIndex, setActiveOfferIndex] = useState(0);
 
   const { cart, addItem, updateItem, removeItem } = useLocalTableCart({
     restaurantId: restaurantContextId,
@@ -951,70 +952,112 @@ export default function TableMenu() {
           )}
 
           {/* Featured Picks Section */}
-          {activeCategoryId === null && menu.offers && menu.offers.length > 0 && (
-            <section className="mb-8 space-y-4 overflow-hidden">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-orange-600">
-                    <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                    Featured Picks
-                  </div>
-                  <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-                    Handcrafted Specials
-                  </h2>
-                </div>
-              </div>
-              <div className="flex gap-4 overflow-x-auto pb-4 pt-1 px-1 -mx-1 no-scrollbar snap-x snap-mandatory scroll-smooth">
-                {(menu.offers.some(o => o.is_featured) ? menu.offers.filter(o => o.is_featured) : menu.offers).map((offer) => (
-                  <div
-                    key={offer.id}
-                    onClick={() => {
-                      if (offer.product_type === "item") {
-                        const tile = flattenedTiles.find(t => t.item.id === offer.product_id);
-                        if (tile) setSelectedItem(tile);
-                      } else if (offer.product_type === "category") {
-                        handleCategorySelect(offer.product_id);
-                      }
-                    }}
-                    className="shrink-0 w-[85%] sm:w-[65%] lg:w-[45%] snap-center cursor-pointer transition-transform duration-300 active:scale-[0.98]"
-                  >
-                    <div className="flex h-44 sm:h-48 w-full overflow-hidden rounded-[24px] bg-[#EBE7E0] shadow-sm hover:shadow-md transition-shadow border border-slate-200/60 text-slate-900">
-                      {/* Left Info Area */}
-                      <div className="flex flex-1 flex-col justify-between p-4 sm:p-5 min-w-0">
-                        <div className="min-w-0">
-                          <span className="inline-flex w-fit items-center gap-1 rounded bg-slate-900/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-700">
-                            Special Offer
-                          </span>
-                          <h3 className="mt-2 text-base sm:text-lg font-black leading-tight text-slate-900 line-clamp-2">
-                            {offer.title}
-                          </h3>
-                          <p className="mt-1 text-xs font-medium text-slate-600 line-clamp-2">
-                            {offer.description}
-                          </p>
-                        </div>
-                        <div className="pt-2">
-                          <button className="rounded-full bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800">
-                            {offer.product_type === "item" ? "Order now" : "Explore"}
-                          </button>
-                        </div>
-                      </div>
-                      {/* Right Image Area */}
-                      {offer.image_path && (
-                        <div className="relative w-[45%] shrink-0 h-full overflow-hidden bg-slate-100">
-                          <SafeMenuAsset
-                            path={offer.image_path}
-                            alt={offer.title}
-                            className="h-full w-full object-cover"
-                            fallback={<div className="flex h-full w-full items-center justify-center text-slate-400"><UtensilsCrossed className="h-6 w-6" /></div>}
-                          />
-                        </div>
-                      )}
+          {activeCategoryId === null && menu.offers && menu.offers.length > 0 && (() => {
+            const displayedOffers = menu.offers.some(o => o.is_featured) ? menu.offers.filter(o => o.is_featured) : menu.offers;
+            if (displayedOffers.length === 0) return null;
+
+            return (
+              <section className="mb-8 space-y-4 overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-orange-600">
+                      <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                      Featured Picks
                     </div>
+                    <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                      Handcrafted Specials
+                    </h2>
                   </div>
-                ))}
-              </div>
-            </section>
-          )}
+                </div>
+                <div 
+                  onScroll={(e) => {
+                    const container = e.currentTarget;
+                    const scrollLeft = container.scrollLeft;
+                    const width = container.clientWidth;
+                    const children = container.children;
+                    let closestIndex = 0;
+                    let minDistance = Infinity;
+                    const containerCenter = scrollLeft + width / 2;
+
+                    for (let i = 0; i < children.length; i++) {
+                      const child = children[i] as HTMLElement;
+                      const childCenter = child.offsetLeft + child.clientWidth / 2;
+                      const distance = Math.abs(containerCenter - childCenter);
+                      if (distance < minDistance) {
+                        minDistance = distance;
+                        closestIndex = i;
+                      }
+                    }
+                    setActiveOfferIndex(closestIndex);
+                  }}
+                  className="flex gap-4 overflow-x-auto pb-2 pt-1 px-1 -mx-1 no-scrollbar snap-x snap-mandatory scroll-smooth"
+                >
+                  {displayedOffers.map((offer) => (
+                    <div
+                      key={offer.id}
+                      onClick={() => {
+                        if (offer.product_type === "item") {
+                          const tile = flattenedTiles.find(t => t.item.id === offer.product_id);
+                          if (tile) setSelectedItem(tile);
+                        } else if (offer.product_type === "category") {
+                          handleCategorySelect(offer.product_id);
+                        }
+                      }}
+                      className="shrink-0 w-[85%] sm:w-[65%] lg:w-[45%] snap-center cursor-pointer transition-transform duration-300 active:scale-[0.98]"
+                    >
+                      <div className="flex h-44 sm:h-48 w-full overflow-hidden rounded-[24px] bg-[#EBE7E0] shadow-sm hover:shadow-md transition-shadow border border-slate-200/60 text-slate-900">
+                        {/* Left Info Area */}
+                        <div className="flex flex-1 flex-col justify-between p-4 sm:p-5 min-w-0">
+                          <div className="min-w-0">
+                            <span className="inline-flex w-fit items-center gap-1 rounded bg-slate-900/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-700">
+                              Special Offer
+                            </span>
+                            <h3 className="mt-2 text-base sm:text-lg font-black leading-tight text-slate-900 line-clamp-2">
+                              {offer.title}
+                            </h3>
+                            <p className="mt-1 text-xs font-medium text-slate-600 line-clamp-2">
+                              {offer.description}
+                            </p>
+                          </div>
+                          <div className="pt-2">
+                            <button className="rounded-full bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800">
+                              {offer.product_type === "item" ? "Order now" : "Explore"}
+                            </button>
+                          </div>
+                        </div>
+                        {/* Right Image Area */}
+                        {offer.image_path && (
+                          <div className="relative w-[45%] shrink-0 h-full overflow-hidden bg-slate-100">
+                            <SafeMenuAsset
+                              path={offer.image_path}
+                              alt={offer.title}
+                              className="h-full w-full object-cover"
+                              fallback={<div className="flex h-full w-full items-center justify-center text-slate-400"><UtensilsCrossed className="h-6 w-6" /></div>}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Active Scroll Dot Indicators */}
+                {displayedOffers.length > 1 && (
+                  <div className="flex items-center justify-center gap-1.5 pt-2">
+                    {displayedOffers.map((_, index) => (
+                      <span
+                        key={index}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${
+                          index === activeOfferIndex
+                            ? "w-6 bg-orange-600"
+                            : "w-1.5 bg-slate-200"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })()}
 
           {/* Product Grid */}
           <section className="space-y-8">
