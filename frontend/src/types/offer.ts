@@ -11,6 +11,7 @@ export interface OfferResponse {
   start_date: string;
   end_date: string;
   is_active: boolean;
+  is_featured: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +29,7 @@ export interface OfferCreateRequest {
   start_date: string;
   end_date: string;
   is_active: boolean;
+  is_featured: boolean;
 }
 
 export interface OfferUpdateRequest {
@@ -38,6 +40,7 @@ export interface OfferUpdateRequest {
   start_date?: string;
   end_date?: string;
   is_active?: boolean;
+  is_featured?: boolean;
 }
 
 export interface OfferImageUploadResponse {

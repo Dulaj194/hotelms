@@ -10,6 +10,18 @@ export interface PublicRestaurantInfoResponse {
   is_active: boolean;
 }
 
+// --- Offers ------------------------------------------------------------------
+
+export interface PublicOfferResponse {
+  id: number;
+  title: string;
+  description: string;
+  image_path: string | null;
+  product_type: "menu" | "category" | "item";
+  product_id: number;
+  is_featured: boolean;
+}
+
 // --- Items -------------------------------------------------------------------
 
 export interface PublicItemSummaryResponse {
@@ -75,6 +87,7 @@ export interface PublicMenuResponse {
   menus: PublicMenuSectionResponse[];
   uncategorized_categories: PublicCategoryResponse[];
   categories: PublicCategoryResponse[];
+  offers?: PublicOfferResponse[];
 }
 
 // --- QR ----------------------------------------------------------------------

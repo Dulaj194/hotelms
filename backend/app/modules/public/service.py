@@ -10,6 +10,7 @@ from app.modules.public.schemas import (
     PublicItemSummaryResponse,
     PublicMenuResponse,
     PublicMenuSectionResponse,
+    PublicOfferResponse,
     PublicRestaurantInfoResponse,
 )
 
@@ -52,6 +53,7 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
 
     categories = repository.list_public_categories_by_restaurant(db, restaurant_id)
     all_items = repository.list_public_items_by_restaurant(db, restaurant_id)
+    offers = repository.list_public_offers_by_restaurant(db, restaurant_id)
 
     menus = repository.list_public_menus_by_restaurant(db, restaurant_id)
     items_by_category: dict[int, list[PublicItemSummaryResponse]] = {}
@@ -97,11 +99,16 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
         _build_category(cat) for cat in categories if cat.menu_id is None
     ]
 
+    offer_responses = [
+        PublicOfferResponse.model_validate(o) for o in offers
+    ]
+
     return PublicMenuResponse(
         restaurant=restaurant_info,
         menus=menu_sections,
         uncategorized_categories=uncategorized_list,
         categories=flat_categories + uncategorized_list,
+        offers=offer_responses,
     )
 
 

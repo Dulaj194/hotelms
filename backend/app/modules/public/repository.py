@@ -1,8 +1,10 @@
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 
 from app.modules.categories.model import Category
 from app.modules.items.model import Item
 from app.modules.menus.model import Menu
+from app.modules.offers.model import Offer
 from app.modules.restaurants.model import Restaurant
 
 
@@ -53,5 +55,20 @@ def list_public_menus_by_restaurant(db: Session, restaurant_id: int) -> list[Men
         db.query(Menu)
         .filter(Menu.restaurant_id == restaurant_id, Menu.is_active.is_(True))
         .order_by(Menu.sort_order.asc(), Menu.id.asc())
+        .all()
+    )
+
+
+def list_public_offers_by_restaurant(db: Session, restaurant_id: int) -> list[Offer]:
+    """Return currently active and valid offers for a restaurant."""
+    return (
+        db.query(Offer)
+        .filter(
+            Offer.restaurant_id == restaurant_id,
+            Offer.is_active.is_(True),
+            Offer.start_date <= func.current_date(),
+            Offer.end_date >= func.current_date(),
+        )
+        .order_by(Offer.id.desc())
         .all()
     )

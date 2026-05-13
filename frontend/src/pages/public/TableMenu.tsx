@@ -926,6 +926,66 @@ export default function TableMenu() {
             </section>
           )}
 
+          {/* Featured Picks Section */}
+          {activeCategoryId === null && menu.offers && menu.offers.filter(o => o.is_featured).length > 0 && (
+            <section className="mb-8 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-orange-600">
+                    <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                    Featured Picks
+                  </div>
+                  <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                    Handcrafted Specials
+                  </h2>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {menu.offers.filter(o => o.is_featured).map((offer) => (
+                  <div
+                    key={offer.id}
+                    onClick={() => {
+                      if (offer.product_type === "item") {
+                        const tile = flattenedTiles.find(t => t.item.id === offer.product_id);
+                        if (tile) setSelectedItem(tile);
+                      } else if (offer.product_type === "category") {
+                        handleCategorySelect(offer.product_id);
+                      }
+                    }}
+                    className="group relative flex flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 text-white shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-pointer border border-slate-800"
+                  >
+                    {offer.image_path && (
+                      <div className="relative h-40 w-full overflow-hidden sm:h-48">
+                        <SafeMenuAsset
+                          path={offer.image_path}
+                          alt={offer.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 opacity-90 group-hover:opacity-100"
+                          fallback={<UtensilsCrossed className="h-8 w-8 text-slate-600" />}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
+                      </div>
+                    )}
+                    <div className={`flex flex-1 flex-col p-5 ${offer.image_path ? "-mt-10 relative z-10" : ""}`}>
+                      <span className="w-fit rounded-lg bg-orange-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-sm">
+                        Limited Time Offer
+                      </span>
+                      <h3 className="mt-2 text-lg font-bold leading-tight text-white sm:text-xl">
+                        {offer.title}
+                      </h3>
+                      <p className="mt-1.5 text-xs leading-relaxed text-slate-300 line-clamp-2">
+                        {offer.description}
+                      </p>
+                      <div className="mt-4 flex items-center gap-1 text-xs font-bold text-orange-400 group-hover:underline">
+                        <span>{offer.product_type === "item" ? "Order Now" : "View Menu Section"}</span>
+                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Product Grid */}
           <section className="space-y-8">
             {navigationItems.map((navItem) => {

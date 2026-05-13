@@ -8,6 +8,7 @@ export interface OfferFormData {
   start_date: string;
   end_date: string;
   is_active: boolean;
+  is_featured: boolean;
 }
 
 export interface ProductOption {
@@ -23,4 +24,5 @@ export const EMPTY_OFFER_FORM: OfferFormData = {
   start_date: "",
   end_date: "",
   is_active: true,
+  is_featured: false,
 };

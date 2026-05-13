@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Literal
 from pydantic import BaseModel, Field
 
 # ─── Restaurant ───────────────────────────────────────────────────────────────
@@ -15,6 +16,21 @@ class PublicRestaurantInfoResponse(BaseModel):
     logo_url: str | None
     public_menu_banner_urls: list[str] = Field(default_factory=list)
     is_active: bool
+
+    model_config = {"from_attributes": True}
+
+
+# ─── Offers ───────────────────────────────────────────────────────────────────
+
+
+class PublicOfferResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    image_path: str | None
+    product_type: Literal["menu", "category", "item"]
+    product_id: int
+    is_featured: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -97,3 +113,4 @@ class PublicMenuResponse(BaseModel):
     uncategorized_categories: list[PublicCategoryResponse]
     # Backward compatibility for existing clients expecting a flat category list.
     categories: list[PublicCategoryResponse]
+    offers: list[PublicOfferResponse] = Field(default_factory=list)

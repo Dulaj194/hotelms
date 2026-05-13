@@ -50,6 +50,7 @@ def create(db: Session, restaurant_id: int, data: OfferCreateRequest) -> Offer:
         start_date=data.start_date,
         end_date=data.end_date,
         is_active=data.is_active,
+        is_featured=data.is_featured,
     )
     db.add(offer)
     db.commit()

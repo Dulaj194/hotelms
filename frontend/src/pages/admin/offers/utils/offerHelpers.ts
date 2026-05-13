@@ -68,6 +68,7 @@ export function buildOfferPayload(
     start_date: formData.start_date,
     end_date: formData.end_date,
     is_active: formData.is_active,
+    is_featured: formData.is_featured,
   };
 }
 
@@ -136,5 +137,6 @@ export function mapOfferToFormData(offer: OfferResponse): OfferFormData {
     start_date: offer.start_date,
     end_date: offer.end_date,
     is_active: offer.is_active,
+    is_featured: offer.is_featured,
   };
 }

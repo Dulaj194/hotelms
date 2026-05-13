@@ -232,20 +232,43 @@ export default function OfferForm({
             </div>
           </div>
 
-          <label className="md:col-span-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={formData.is_active}
-              onChange={(event) =>
-                setFormData((current) => ({
-                  ...current,
-                  is_active: event.target.checked,
-                }))
-              }
-              className="rounded"
-            />
-            Keep this offer active
-          </label>
+          <div className="md:col-span-2 grid gap-3 sm:grid-cols-2">
+            <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold text-slate-700 cursor-pointer transition hover:bg-slate-100/60">
+              <input
+                type="checkbox"
+                checked={formData.is_active}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    is_active: event.target.checked,
+                  }))
+                }
+                className="h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+              />
+              <div>
+                <p>Active Status</p>
+                <p className="text-xs font-normal text-slate-500">Enable this offer for general viewing</p>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-orange-50/40 p-4 text-sm font-semibold text-slate-700 cursor-pointer transition hover:bg-orange-50">
+              <input
+                type="checkbox"
+                checked={formData.is_featured}
+                onChange={(event) =>
+                  setFormData((current) => ({
+                    ...current,
+                    is_featured: event.target.checked,
+                  }))
+                }
+                className="h-4 w-4 rounded border-orange-300 text-orange-500 focus:ring-orange-500"
+              />
+              <div>
+                <p className="text-orange-950">Featured Picks</p>
+                <p className="text-xs font-normal text-orange-700">Highlight in customer menu page top section</p>
+              </div>
+            </label>
+          </div>
         </div>
 
         {formError && (

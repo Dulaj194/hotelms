@@ -16,6 +16,7 @@ class OfferCreateRequest(BaseModel):
     start_date: date
     end_date: date
     is_active: bool = True
+    is_featured: bool = False
 
 
 class OfferUpdateRequest(BaseModel):
@@ -26,6 +27,7 @@ class OfferUpdateRequest(BaseModel):
     start_date: date | None = None
     end_date: date | None = None
     is_active: bool | None = None
+    is_featured: bool | None = None
 
 
 class OfferImageUploadResponse(BaseModel):
@@ -43,6 +45,7 @@ class OfferResponse(BaseModel):
     start_date: date
     end_date: date
     is_active: bool
+    is_featured: bool
     created_at: datetime
     updated_at: datetime
 

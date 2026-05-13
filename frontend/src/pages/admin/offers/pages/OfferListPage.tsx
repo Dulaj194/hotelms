@@ -79,10 +79,27 @@ export default function OfferListPage() {
         />
 
         {!privilegeLoading && !offersEnabled && (
-          <OfferNotice
-            tone="warning"
-            message="Offers are locked for this restaurant because the current subscription does not include the OFFERS privilege."
-          />
+          <div className="space-y-4">
+            <OfferNotice
+              tone="warning"
+              message="Offers are locked for this restaurant because the current subscription does not include the OFFERS privilege."
+            />
+            <div className="rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50/50 to-amber-50/50 p-6 shadow-sm">
+              <h3 className="text-base font-semibold text-slate-900">
+                Alternative: Display Custom Promotional Images
+              </h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Even without an active Offers subscription, you can display custom full-width promotional images that automatically rotate at the top of your public customer menu.
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/admin/restaurant-profile")}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-orange-600 shadow-sm ring-1 ring-inset ring-orange-200 transition hover:bg-orange-50"
+              >
+                Configure Menu Banner Images
+              </button>
+            </div>
+          </div>
         )}
 
         {message && <OfferNotice tone="success" message={message} />}
