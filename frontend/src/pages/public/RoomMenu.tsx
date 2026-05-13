@@ -503,6 +503,7 @@ export default function RoomMenu() {
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
     const metaLabel = item.description ?? "";
+    const activeOffer = menu?.offers?.find(o => o.product_type === "item" && o.product_id === item.id);
 
     return (
       <div
@@ -510,7 +511,7 @@ export default function RoomMenu() {
         onClick={() => setSelectedItem(item)}
         className={`box-border flex h-full w-full max-w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition-all hover:shadow-md ${
           !item.is_available ? "opacity-60" : ""
-        }`}
+        } ${activeOffer ? "ring-2 ring-orange-500/30 border-orange-200" : ""}`}
       >
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-50">
           <SafeMenuAsset
@@ -523,6 +524,14 @@ export default function RoomMenu() {
               </div>
             }
           />
+          {activeOffer && (
+            <div className="absolute top-2 left-2 z-10">
+              <span className="inline-flex items-center gap-1 rounded-md bg-orange-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white shadow-sm">
+                <span className="h-1 w-1 rounded-full bg-amber-300 animate-pulse" />
+                Offer
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
           <div className="flex min-w-0 items-start justify-between gap-2">
@@ -534,10 +543,23 @@ export default function RoomMenu() {
             )}
           </div>
 
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-            <span className="min-w-0 text-sm font-bold text-orange-600">
-              ${item.price.toFixed(2)}
-            </span>
+          <div className="flex min-w-0 flex-wrap items-end justify-between gap-2">
+            <div className="flex flex-col leading-none">
+              {activeOffer ? (
+                <>
+                  <span className="text-[11px] font-bold text-slate-400 line-through mb-0.5">
+                    ${(item.price * 1.25).toFixed(2)}
+                  </span>
+                  <span className="min-w-0 text-sm font-bold text-orange-600">
+                    ${item.price.toFixed(2)}
+                  </span>
+                </>
+              ) : (
+                <span className="min-w-0 text-sm font-bold text-orange-600">
+                  ${item.price.toFixed(2)}
+                </span>
+              )}
+            </div>
             {item.is_available ? (
               <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
                 Available

@@ -667,13 +667,16 @@ export default function TableMenu() {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
+    const activeOffer = menu?.offers?.find(o => o.product_type === "item" && o.product_id === item.id);
 
     return (
       <article
         key={item.id}
         id={`item-${item.id}`}
         onClick={() => setSelectedItem({ item, categoryId, categoryName })}
-        className="group relative flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-[24px] bg-white p-3 shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)]"
+        className={`group relative flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-[24px] bg-white p-3 shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(0,0,0,0.1)] ${
+          activeOffer ? "ring-2 ring-orange-500/30" : ""
+        }`}
       >
         {/* 1. Image Section */}
         <div className="relative w-full overflow-hidden rounded-[16px] bg-[#F8F9FB] h-[140px] sm:h-[160px] lg:h-[180px]">
@@ -683,6 +686,14 @@ export default function TableMenu() {
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             fallback={<UtensilsCrossed className="h-8 w-8 text-[#94A3B8]" />}
           />
+          {activeOffer && (
+            <div className="absolute top-2.5 left-2.5 z-10">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-md backdrop-blur-sm">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-300 animate-pulse" />
+                Special Offer
+              </span>
+            </div>
+          )}
           {!item.is_available && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]">
               <span className="rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#0F172A]">
@@ -703,9 +714,22 @@ export default function TableMenu() {
             <h3 className="min-w-0 flex-1 break-words text-[18px] font-bold leading-tight text-[#0F172A] line-clamp-1 min-[380px]:text-[20px]">
               {item.name}
             </h3>
-            <span className="shrink-0 text-[18px] font-extrabold text-orange-600 min-[380px]:text-[20px]">
-              {formatPrice(item.price)}
-            </span>
+            <div className="flex flex-col items-end shrink-0 leading-none">
+              {activeOffer ? (
+                <>
+                  <span className="text-[12px] font-bold text-slate-400 line-through mb-0.5">
+                    {formatPrice(item.price * 1.25)}
+                  </span>
+                  <span className="text-[18px] font-extrabold text-orange-600 min-[380px]:text-[20px]">
+                    {formatPrice(item.price)}
+                  </span>
+                </>
+              ) : (
+                <span className="text-[18px] font-extrabold text-orange-600 min-[380px]:text-[20px]">
+                  {formatPrice(item.price)}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* 4. Description Section */}
