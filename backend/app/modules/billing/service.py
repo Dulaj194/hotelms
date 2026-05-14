@@ -693,20 +693,14 @@ def _count_room_folios(
     accountant_status: BillReviewStatus | None = None,
     settled_to: datetime | None = None,
 ) -> int:
-    query = db.query(Bill).filter(
-        Bill.restaurant_id == restaurant_id,
-        Bill.context_type == BillContextType.room,
-        Bill.payment_status == BillStatus.paid,
+    return billing_repo.count_room_folios(
+        db,
+        restaurant_id=restaurant_id,
+        handoff_status=handoff_status,
+        cashier_status=cashier_status,
+        accountant_status=accountant_status,
+        settled_to=settled_to,
     )
-    if handoff_status is not None:
-        query = query.filter(Bill.handoff_status == handoff_status)
-    if cashier_status is not None:
-        query = query.filter(Bill.cashier_status == cashier_status)
-    if accountant_status is not None:
-        query = query.filter(Bill.accountant_status == accountant_status)
-    if settled_to is not None:
-        query = query.filter(Bill.settled_at <= settled_to)
-    return query.count()
 
 
 def _count_workflow_actions(
@@ -717,15 +711,12 @@ def _count_workflow_actions(
     created_from: datetime,
     created_to: datetime,
 ) -> int:
-    return (
-        db.query(BillWorkflowEvent)
-        .filter(
-            BillWorkflowEvent.restaurant_id == restaurant_id,
-            BillWorkflowEvent.action_type.in_(action_types),
-            BillWorkflowEvent.created_at >= created_from,
-            BillWorkflowEvent.created_at <= created_to,
-        )
-        .count()
+    return billing_repo.count_workflow_events_by_types(
+        db,
+        restaurant_id=restaurant_id,
+        action_types=action_types,
+        created_from=created_from,
+        created_to=created_to,
     )
 
 
@@ -2148,47 +2139,16 @@ def get_daily_reconciliation(
     start_dt, end_dt = _day_bounds(business_date)
     target_date = business_date or start_dt.date()
 
-    paid_bills = (
-        db.query(Bill)
-        .filter(
-            Bill.restaurant_id == restaurant_id,
-            Bill.payment_status == BillStatus.paid,
-            Bill.settled_at >= start_dt,
-            Bill.settled_at <= end_dt,
-        )
-        .order_by(Bill.settled_at.desc(), Bill.id.desc())
-        .all()
+    paid_bills = billing_repo.list_paid_bills_in_range(
+        db, restaurant_id=restaurant_id, start_dt=start_dt, end_dt=end_dt
     )
 
-    payment_method_rows = (
-        db.query(
-            Bill.payment_method,
-            func.count(Bill.id),
-            func.coalesce(func.sum(Bill.total_amount), 0),
-        )
-        .filter(
-            Bill.restaurant_id == restaurant_id,
-            Bill.payment_status == BillStatus.paid,
-            Bill.settled_at >= start_dt,
-            Bill.settled_at <= end_dt,
-        )
-        .group_by(Bill.payment_method)
-        .order_by(func.coalesce(func.sum(Bill.total_amount), 0).desc())
-        .all()
+    payment_method_rows = billing_repo.get_payment_method_summary_in_range(
+        db, restaurant_id=restaurant_id, start_dt=start_dt, end_dt=end_dt
     )
 
-    recent_completed = (
-        db.query(Bill)
-        .filter(
-            Bill.restaurant_id == restaurant_id,
-            Bill.context_type == BillContextType.room,
-            Bill.handoff_status == BillHandoffStatus.completed,
-            Bill.handoff_completed_at >= start_dt,
-            Bill.handoff_completed_at <= end_dt,
-        )
-        .order_by(Bill.handoff_completed_at.desc(), Bill.id.desc())
-        .limit(_RECENT_COMPLETED_LIMIT)
-        .all()
+    recent_completed = billing_repo.list_recent_completed_room_folios(
+        db, restaurant_id=restaurant_id, start_dt=start_dt, end_dt=end_dt, limit=_RECENT_COMPLETED_LIMIT
     )
 
     total_paid_amount = sum(float(bill.total_amount) for bill in paid_bills)
@@ -2205,40 +2165,14 @@ def get_daily_reconciliation(
         total_paid_amount=round(total_paid_amount, 2),
         room_paid_amount=round(room_paid_amount, 2),
         table_paid_amount=round(table_paid_amount, 2),
-        completed_room_folios=(
-            db.query(Bill)
-            .filter(
-                Bill.restaurant_id == restaurant_id,
-                Bill.context_type == BillContextType.room,
-                Bill.handoff_status == BillHandoffStatus.completed,
-                Bill.handoff_completed_at >= start_dt,
-                Bill.handoff_completed_at <= end_dt,
-            )
-            .count()
+        completed_room_folios=billing_repo.count_completed_room_folios_in_range(
+            db, restaurant_id=restaurant_id, start_dt=start_dt, end_dt=end_dt
         ),
-        outstanding_cashier_folios=(
-            db.query(Bill)
-            .filter(
-                Bill.restaurant_id == restaurant_id,
-                Bill.context_type == BillContextType.room,
-                Bill.payment_status == BillStatus.paid,
-                Bill.settled_at <= end_dt,
-                Bill.handoff_status.in_(
-                    [BillHandoffStatus.none, BillHandoffStatus.sent_to_cashier],
-                ),
-            )
-            .count()
+        outstanding_cashier_folios=billing_repo.count_outstanding_folios(
+            db, restaurant_id=restaurant_id, end_dt=end_dt, target_queue="cashier"
         ),
-        outstanding_accountant_folios=(
-            db.query(Bill)
-            .filter(
-                Bill.restaurant_id == restaurant_id,
-                Bill.context_type == BillContextType.room,
-                Bill.payment_status == BillStatus.paid,
-                Bill.settled_at <= end_dt,
-                Bill.handoff_status == BillHandoffStatus.sent_to_accountant,
-            )
-            .count()
+        outstanding_accountant_folios=billing_repo.count_outstanding_folios(
+            db, restaurant_id=restaurant_id, end_dt=end_dt, target_queue="accountant"
         ),
         printed_today_count=_count_workflow_actions(
             db,

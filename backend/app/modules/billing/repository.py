@@ -420,3 +420,165 @@ def get_users_by_ids(
     from app.modules.users.model import User
     users = db.query(User).filter(User.id.in_(user_ids)).all()
     return {user.id: user for user in users}
+
+
+def count_room_folios(
+    db: Session,
+    *,
+    restaurant_id: int,
+    handoff_status: BillHandoffStatus | None = None,
+    cashier_status: BillReviewStatus | None = None,
+    accountant_status: BillReviewStatus | None = None,
+    settled_to: datetime | None = None,
+) -> int:
+    """Count settled room folios based on handoff and review statuses."""
+    query = db.query(Bill).filter(
+        Bill.restaurant_id == restaurant_id,
+        Bill.context_type == BillContextType.room,
+        Bill.payment_status == BillStatus.paid,
+    )
+    if handoff_status is not None:
+        query = query.filter(Bill.handoff_status == handoff_status)
+    if cashier_status is not None:
+        query = query.filter(Bill.cashier_status == cashier_status)
+    if accountant_status is not None:
+        query = query.filter(Bill.accountant_status == accountant_status)
+    if settled_to is not None:
+        query = query.filter(Bill.settled_at <= settled_to)
+    return query.count()
+
+
+def count_workflow_events_by_types(
+    db: Session,
+    *,
+    restaurant_id: int,
+    action_types: tuple[str, ...],
+    created_from: datetime,
+    created_to: datetime,
+) -> int:
+    """Count specific workflow events within a given time range."""
+    return (
+        db.query(BillWorkflowEvent)
+        .filter(
+            BillWorkflowEvent.restaurant_id == restaurant_id,
+            BillWorkflowEvent.action_type.in_(action_types),
+            BillWorkflowEvent.created_at >= created_from,
+            BillWorkflowEvent.created_at <= created_to,
+        )
+        .count()
+    )
+
+
+def list_paid_bills_in_range(
+    db: Session,
+    *,
+    restaurant_id: int,
+    start_dt: datetime,
+    end_dt: datetime,
+) -> list[Bill]:
+    """List paid bills within a settled_at timestamp range."""
+    return (
+        db.query(Bill)
+        .filter(
+            Bill.restaurant_id == restaurant_id,
+            Bill.payment_status == BillStatus.paid,
+            Bill.settled_at >= start_dt,
+            Bill.settled_at <= end_dt,
+        )
+        .order_by(Bill.settled_at.desc(), Bill.id.desc())
+        .all()
+    )
+
+
+def get_payment_method_summary_in_range(
+    db: Session,
+    *,
+    restaurant_id: int,
+    start_dt: datetime,
+    end_dt: datetime,
+) -> list[tuple[str | None, int, float]]:
+    """Group paid bills by payment method and return counts and sums."""
+    return (
+        db.query(
+            Bill.payment_method,
+            func.count(Bill.id),
+            func.coalesce(func.sum(Bill.total_amount), 0),
+        )
+        .filter(
+            Bill.restaurant_id == restaurant_id,
+            Bill.payment_status == BillStatus.paid,
+            Bill.settled_at >= start_dt,
+            Bill.settled_at <= end_dt,
+        )
+        .group_by(Bill.payment_method)
+        .order_by(func.coalesce(func.sum(Bill.total_amount), 0).desc())
+        .all()
+    )
+
+
+def list_recent_completed_room_folios(
+    db: Session,
+    *,
+    restaurant_id: int,
+    start_dt: datetime,
+    end_dt: datetime,
+    limit: int = 10,
+) -> list[Bill]:
+    """List recently completed room folios in handoff workflow."""
+    return (
+        db.query(Bill)
+        .filter(
+            Bill.restaurant_id == restaurant_id,
+            Bill.context_type == BillContextType.room,
+            Bill.handoff_status == BillHandoffStatus.completed,
+            Bill.handoff_completed_at >= start_dt,
+            Bill.handoff_completed_at <= end_dt,
+        )
+        .order_by(Bill.handoff_completed_at.desc(), Bill.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def count_completed_room_folios_in_range(
+    db: Session,
+    *,
+    restaurant_id: int,
+    start_dt: datetime,
+    end_dt: datetime,
+) -> int:
+    """Count completed room folios within a given time range."""
+    return (
+        db.query(Bill)
+        .filter(
+            Bill.restaurant_id == restaurant_id,
+            Bill.context_type == BillContextType.room,
+            Bill.handoff_status == BillHandoffStatus.completed,
+            Bill.handoff_completed_at >= start_dt,
+            Bill.handoff_completed_at <= end_dt,
+        )
+        .count()
+    )
+
+
+def count_outstanding_folios(
+    db: Session,
+    *,
+    restaurant_id: int,
+    end_dt: datetime,
+    target_queue: str,
+) -> int:
+    """Count outstanding room folios pending cashier or accountant review."""
+    query = db.query(Bill).filter(
+        Bill.restaurant_id == restaurant_id,
+        Bill.context_type == BillContextType.room,
+        Bill.payment_status == BillStatus.paid,
+        Bill.settled_at <= end_dt,
+    )
+    if target_queue == "cashier":
+        query = query.filter(
+            Bill.handoff_status.in_([BillHandoffStatus.none, BillHandoffStatus.sent_to_cashier])
+        )
+    elif target_queue == "accountant":
+        query = query.filter(Bill.handoff_status == BillHandoffStatus.sent_to_accountant)
+    return query.count()
