@@ -16,13 +16,21 @@ def get_by_id(db: Session, offer_id: int, restaurant_id: int) -> Offer | None:
     )
 
 
-def list_by_restaurant(db: Session, restaurant_id: int) -> list[Offer]:
-    return (
-        db.query(Offer)
-        .filter(Offer.restaurant_id == restaurant_id)
-        .order_by(Offer.start_date.desc(), Offer.id.desc())
+def list_by_restaurant(
+    db: Session,
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+) -> tuple[list[Offer], int]:
+    query = db.query(Offer).filter(Offer.restaurant_id == restaurant_id)
+    total = query.count()
+    items = (
+        query.order_by(Offer.start_date.desc(), Offer.id.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
     )
+    return items, total
 
 
 def count_by_start_date(

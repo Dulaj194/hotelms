@@ -103,11 +103,23 @@ def _safe_delete_file(path: Path | None) -> None:
         return
 
 
-def list_offers(db: Session, restaurant_id: int) -> OfferListResponse:
-    items = repository.list_by_restaurant(db, restaurant_id)
+def list_offers(
+    db: Session,
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+) -> OfferListResponse:
+    items, total = repository.list_by_restaurant(db, restaurant_id, skip=skip, limit=limit)
+    page = (skip // limit) + 1 if limit > 0 else 1
+    total_pages = max(1, (total + limit - 1) // limit) if limit > 0 else 1
     return OfferListResponse(
         items=[OfferResponse.model_validate(item) for item in items],
-        total=len(items),
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=total_pages,
+        has_next=page < total_pages,
+        has_previous=page > 1,
     )
 
 

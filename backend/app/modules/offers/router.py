@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_module_access, require_roles
+from app.core.pagination import PaginationParams, pagination_depends
 from app.modules.access import role_catalog
 from app.modules.offers import service
 from app.modules.offers.schemas import (
@@ -30,9 +31,10 @@ def _require_offers_restaurant_id(
 @router.get("", response_model=OfferListResponse)
 def list_offers(
     restaurant_id: int = Depends(_require_offers_restaurant_id),
+    pagination: PaginationParams = Depends(pagination_depends),
     db: Session = Depends(get_db),
 ) -> OfferListResponse:
-    return service.list_offers(db, restaurant_id)
+    return service.list_offers(db, restaurant_id, skip=pagination.skip, limit=pagination.limit)
 
 
 @router.post("", response_model=OfferResponse, status_code=status.HTTP_201_CREATED)
