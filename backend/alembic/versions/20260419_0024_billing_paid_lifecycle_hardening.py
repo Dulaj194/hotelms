@@ -3,6 +3,16 @@
 Revision ID: 20260419_0024
 Revises: 20260416_0023
 Create Date: 2026-04-19 11:40:00
+
+Business Rationale:
+- Introduces robust support for multi-tender split payments (e.g., cash + credit card combined) during billing settlement.
+- Implements strict database-backed idempotency mechanisms to eliminate accidental duplicate billing captures from background network retries or webhooks.
+- Extends reversal lifecycle auditing to ensure complete regulatory compliance for accountant reviews.
+
+Schema Changes:
+- Creates tables `bill_payment_allocations` and `bill_settle_idempotency_keys` with optimized indices.
+- Extends `bills` table with `reversed_at` and `reversal_reason` tracking.
+- Updates MySQL native enums safely to include `partially_paid` and `reversed` states.
 """
 
 from __future__ import annotations

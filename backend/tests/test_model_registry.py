@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -8,6 +9,7 @@ import app.db.init_models  # noqa: F401
 from app.db.base import Base
 
 
+@pytest.mark.unit
 class ModelRegistryTests(unittest.TestCase):
     def test_reports_history_table_is_registered(self) -> None:
         self.assertIn("reports_history", Base.metadata.tables.keys())
