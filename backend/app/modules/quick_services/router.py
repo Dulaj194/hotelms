@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.modules.auth.dependencies import get_current_user
+from app.core.dependencies import get_current_user
 from app.modules.quick_services.schemas import (
     QuickServiceCreate,
     QuickServiceResponse,
