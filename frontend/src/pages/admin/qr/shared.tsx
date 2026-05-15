@@ -89,57 +89,117 @@ export function QRCodeCard({
 }: QRCodeCardProps) {
   const imageUrl = buildQrImageUrl(qr.qr_image_url);
 
-  return (
-    <div className="rounded-xl border bg-gray-50 p-4">
-      <img
-        src={imageUrl}
-        alt={`QR for ${labelPrefix} ${qr.target_number}`}
-        className="mx-auto h-40 w-40 rounded border bg-white"
-      />
+  const handleDownload = async (format: "PNG" | "PDF") => {
+    if (format === "PNG") {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${labelPrefix}_${qr.target_number}_QR.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } else {
+      // PDF via Print strategy
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) return;
 
-      <div className="mt-4 space-y-2 text-sm">
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>${labelPrefix} ${qr.target_number} QR</title>
+            <style>
+              body { 
+                margin: 0; 
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                justify-content: center; 
+                height: 100vh; 
+                font-family: sans-serif;
+              }
+              .container { text-align: center; border: 2px solid #f3f4f6; padding: 40px; border-radius: 40px; }
+              img { width: 400px; height: 400px; }
+              h1 { margin-top: 20px; color: #111827; font-size: 24px; }
+              p { color: #6b7280; font-size: 14px; margin-top: 8px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <img src="${imageUrl}" />
+              <h1>${labelPrefix} ${qr.target_number}</h1>
+              <p>Scan to view our digital menu</p>
+            </div>
+            <script>
+              window.onload = () => {
+                window.print();
+                // window.close();
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
+  return (
+    <div className="group relative rounded-3xl border border-slate-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-orange-100 hover:shadow-xl hover:shadow-orange-500/5">
+      <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-slate-50 ring-1 ring-slate-100">
+        <img
+          src={imageUrl}
+          alt={`QR for ${labelPrefix} ${qr.target_number}`}
+          className="h-full w-full object-cover p-2"
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-white/60 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+          <button
+            onClick={() => window.open(imageUrl, "_blank")}
+            className="rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:bg-black active:scale-95"
+          >
+            Preview Large
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="font-semibold text-gray-900">
+            <p className="text-base font-black tracking-tight text-slate-900">
               {labelPrefix} {qr.target_number}
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               Generated {formatQrCreatedAt(qr.created_at)}
             </p>
           </div>
         </div>
 
-        <p className="break-all text-xs text-gray-500">{qr.frontend_url}</p>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <a
-            href={imageUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="app-btn-compact border border-gray-300 bg-white text-gray-700 hover:bg-white"
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => void handleDownload("PNG")}
+            className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-[11px] font-bold text-white transition hover:bg-black active:scale-95"
           >
-            Open
-          </a>
-
-          <a
-            href={imageUrl}
-            download
-            className="app-btn-compact bg-gray-900 text-white hover:bg-black"
+            PNG Image
+          </button>
+          <button
+            onClick={() => void handleDownload("PDF")}
+            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-2.5 text-[11px] font-bold text-slate-700 transition hover:bg-slate-50 active:scale-95"
           >
-            Download
-          </a>
-
-          {onDelete && (
-            <button
-              type="button"
-              onClick={() => onDelete(qr.target_number)}
-              disabled={working}
-              className="app-btn-compact border border-red-200 text-red-700 hover:bg-red-50"
-            >
-              Delete
-            </button>
-          )}
+            PDF Print
+          </button>
         </div>
+
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete(qr.target_number)}
+            disabled={working}
+            className="w-full rounded-xl border border-rose-100 bg-rose-50/50 py-2 text-[11px] font-bold text-rose-500 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+          >
+            Remove QR Code
+          </button>
+        )}
       </div>
     </div>
   );

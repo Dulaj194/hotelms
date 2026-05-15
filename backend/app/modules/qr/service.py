@@ -5,6 +5,10 @@ from urllib.parse import quote, urlparse
 
 import qrcode
 import qrcode.image.pil
+from qrcode.image.styledpil import StyledPilImage
+from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
+from qrcode.image.styles.colormasks import SolidFillColorMask
+from PIL import Image
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -183,18 +187,62 @@ def _normalize_target_number(target_number: str, qr_type: str) -> str:
     return normalized
 
 
-def _generate_qr_image(frontend_url: str, file_path: Path) -> None:
-    """Render a QR PNG to disk using the qrcode library."""
+def _generate_qr_image(frontend_url: str, file_path: Path, logo_path: Path | None = None) -> None:
+    """Render a high-quality Branded QR PNG to disk.
+    
+    Features:
+    - Rounded modules for modern aesthetics
+    - Logo overlay in center (if provided)
+    - Level H (High) error correction for reliability with logo
+    - High resolution (box_size=20)
+    """
     qr = qrcode.QRCode(
-        version=None,          # auto-size
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=10,
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_H,
+        box_size=20, # High resolution
         border=4,
     )
     qr.add_data(frontend_url)
     qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-    img.save(str(file_path))
+
+    # Generate styled QR image with rounded modules
+    img = qr.make_image(
+        image_factory=StyledPilImage,
+        module_drawer=RoundedModuleDrawer(),
+        color_mask=SolidFillColorMask(front_color=(0, 0, 0), back_color=(255, 255, 255)),
+    ).convert("RGBA")
+
+    # Add logo if provided and exists
+    if logo_path and logo_path.exists():
+        try:
+            logo = Image.open(logo_path).convert("RGBA")
+            
+            qr_w, qr_h = img.size
+            
+            # Logo size should be around 22-25% for Level H correction
+            logo_size = int(qr_w * 0.22)
+            logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+            
+            # Create a white background "overlay" for the logo with padding
+            # This ensures the QR code behind the logo is covered cleanly
+            padding = int(qr_w * 0.04)
+            overlay_size = logo_size + padding
+            overlay = Image.new("RGBA", (overlay_size, overlay_size), (255, 255, 255, 255))
+            
+            # Paste logo on white overlay
+            logo_pos = (padding // 2, padding // 2)
+            overlay.paste(logo, logo_pos, logo)
+            
+            # Paste overlay on QR center
+            pos = ((qr_w - overlay_size) // 2, (qr_h - overlay_size) // 2)
+            img.paste(overlay, pos, overlay)
+            
+        except Exception as e:
+            # Fallback to plain QR if logo processing fails
+            print(f"Branded QR Error: Failed to overlay logo: {e}")
+
+    # Save as high-quality PNG
+    img.save(str(file_path), "PNG", quality=100)
 
 
 def _to_response(qr_record, restaurant_id: int) -> QRCodeResponse:
@@ -262,7 +310,16 @@ def _regenerate_and_upsert_qr(
     file_path: Path,
     frontend_url: str,
 ):
-    _generate_qr_image(frontend_url, file_path)
+    # Fetch restaurant to get logo
+    restaurant = get_restaurant(db, restaurant_id)
+    logo_path = None
+    if restaurant and restaurant.logo_url:
+        # Resolve logo_url (e.g. /uploads/logos/...) to local path
+        if restaurant.logo_url.startswith("/uploads/"):
+            rel_path = restaurant.logo_url.replace("/uploads/", "")
+            logo_path = Path(settings.upload_dir) / rel_path
+
+    _generate_qr_image(frontend_url, file_path, logo_path=logo_path)
     return repository.upsert_qr(
         db,
         restaurant_id=restaurant_id,
