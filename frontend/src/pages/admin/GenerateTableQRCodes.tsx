@@ -9,8 +9,7 @@ import {
   Download, 
   Printer, 
   ChevronRight,
-  CheckCircle2,
-  AlertCircle
+  CheckCircle2
 } from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
