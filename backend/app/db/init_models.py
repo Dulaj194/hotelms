@@ -35,3 +35,4 @@ from app.modules.room_sessions.model import RoomSession  # noqa: F401
 from app.modules.rooms.model import Room  # noqa: F401
 from app.modules.table_sessions.model import TableSession, TableServiceRequest  # noqa: F401
 from app.modules.users.model import User  # noqa: F401
+from app.modules.quick_services.model import QuickService  # noqa: F401

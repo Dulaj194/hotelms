@@ -256,6 +256,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         icon: User,
         roles: RESTAURANT_ADMIN_ROLES,
       },
+      {
+        path: "/admin/settings/quick-services",
+        label: "Service Management",
+        icon: Settings,
+        roles: RESTAURANT_ADMIN_ROLES,
+        privilege: "QR_MENU",
+        moduleKey: "steward_ops",
+      },
     ],
     []
   );

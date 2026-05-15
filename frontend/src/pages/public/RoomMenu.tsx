@@ -23,7 +23,7 @@ import { toAssetUrl } from "@/lib/assets";
 import { publicGet, publicPost } from "@/lib/publicApi";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
-import QuickServiceDrawer from "@/components/public/QuickServiceDrawer";
+import QuickServiceDrawer, { type QuickServiceItem } from "@/components/public/QuickServiceDrawer";
 import { getRoomToken } from "@/hooks/useRoomSession";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
 import type { RoomOrderDetailResponse } from "@/types/roomSession";
@@ -324,9 +324,10 @@ export default function RoomMenu() {
 
   
   const [isRequestingService, setIsRequestingService] = useState(false);
-  const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
+  const [lastRequestedServiceId, setLastRequestedServiceId] = useState<number | null>(null);
   const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PublicItemSummaryResponse | null>(null);
+  const [quickServices, setQuickServices] = useState<QuickServiceItem[]>([]);
 
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing } =
     useLocalRoomCart({
@@ -378,6 +379,24 @@ export default function RoomMenu() {
     };
 
     void fetchMenu();
+  }, [restaurantId]);
+
+  // 2.1 Fetch quick services
+  useEffect(() => {
+    if (!restaurantId) return;
+
+    const fetchQuickServices = async () => {
+      try {
+        const data = await publicGet<QuickServiceItem[]>(
+          `/public/quick-services/${restaurantId}`
+        );
+        setQuickServices(data);
+      } catch (err) {
+        console.error("Failed to load quick services:", err);
+      }
+    };
+
+    void fetchQuickServices();
   }, [restaurantId]);
 
   // 3. Scroll visibility logic
@@ -465,10 +484,13 @@ export default function RoomMenu() {
           headers: { "X-Room-Session": token || "" },
         });
 
-        setLastRequestedService(type);
+        // Find the service ID if available to show success state
+        const service = quickServices.find(s => s.label === type);
+        if (service) setLastRequestedServiceId(service.id);
+        
         setTimeout(() => {
           setServiceDrawerOpen(false);
-          setLastRequestedService(null);
+          setLastRequestedServiceId(null);
         }, 2000);
       } catch (err) {
         console.error("Failed to request service:", err);
@@ -952,13 +974,11 @@ export default function RoomMenu() {
 
       <QuickServiceDrawer
         isOpen={serviceDrawerOpen}
-        onClose={() => {
-          setServiceDrawerOpen(false);
-          setLastRequestedService(null);
-        }}
+        onClose={() => setServiceDrawerOpen(false)}
         onRequestService={handleRequestService}
         isSubmitting={isRequestingService}
-        lastRequestedType={lastRequestedService}
+        lastRequestedId={lastRequestedServiceId}
+        services={quickServices}
       />
 
       <ItemDetailSheet
