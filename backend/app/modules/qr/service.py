@@ -15,6 +15,8 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+_BACKEND_ROOT = Path(__file__).resolve().parents[3]
+
 from app.core.config import settings
 from app.core.security import (
     create_room_qr_access_token,
@@ -203,7 +205,7 @@ def _generate_qr_image(frontend_url: str, file_path: Path, logo_path: Path | Non
         version=None,
         error_correction=qrcode.constants.ERROR_CORRECT_H,
         box_size=20, # High resolution
-        border=4,
+        border=5,    # Slightly larger border for better logo contrast
     )
     qr.add_data(frontend_url)
     qr.make(fit=True)
@@ -222,27 +224,34 @@ def _generate_qr_image(frontend_url: str, file_path: Path, logo_path: Path | Non
             
             qr_w, qr_h = img.size
             
-            # Logo size should be around 22-25% for Level H correction
-            logo_size = int(qr_w * 0.22)
+            # Logo size should be around 22-24% for Level H correction
+            logo_size = int(qr_w * 0.23)
             logo = logo.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
             
-            # Create a white background "overlay" for the logo with padding
-            # This ensures the QR code behind the logo is covered cleanly
-            padding = int(qr_w * 0.04)
-            overlay_size = logo_size + padding
-            overlay = Image.new("RGBA", (overlay_size, overlay_size), (255, 255, 255, 255))
+            # Create a circular white background for the logo to make it pop
+            # This is more premium than a square box
+            padding = int(qr_w * 0.05)
+            mask_size = logo_size + padding
             
-            # Paste logo on white overlay
+            # Create high-res circular mask
+            mask = Image.new("L", (mask_size, mask_size), 0)
+            from PIL import ImageDraw
+            draw = ImageDraw.Draw(mask)
+            draw.ellipse((0, 0, mask_size, mask_size), fill=255)
+            
+            # White background layer
+            bg = Image.new("RGBA", (mask_size, mask_size), (255, 255, 255, 255))
+            
+            # Position logo in center of bg
             logo_pos = (padding // 2, padding // 2)
-            overlay.paste(logo, logo_pos, logo)
+            bg.paste(logo, logo_pos, logo)
             
-            # Paste overlay on QR center
-            pos = ((qr_w - overlay_size) // 2, (qr_h - overlay_size) // 2)
-            img.paste(overlay, pos, overlay)
+            # Paste the circular logo assembly on QR center
+            pos = ((qr_w - mask_size) // 2, (qr_h - mask_size) // 2)
+            img.paste(bg, pos, mask)
             
         except Exception as e:
-            # Fallback to plain QR if logo processing fails
-            logger.error("Branded QR Error: Failed to overlay logo for restaurant %s: %s", restaurant_id if 'restaurant_id' in locals() else 'unknown', e)
+            logger.error("Branded QR Error: Logo processing failed: %s", e)
 
     # Save as high-quality PNG
     img.save(str(file_path), "PNG", quality=100)
@@ -320,16 +329,31 @@ def _regenerate_and_upsert_qr(
     restaurant = get_restaurant(db, restaurant_id)
     logo_path = None
     if restaurant and restaurant.logo_url:
-        # Resolve logo_url (e.g. /uploads/logos/...) to local path
+        # Improved bulletproof logo resolution
         logo_url = restaurant.logo_url
-        if logo_url.startswith("/uploads/"):
-            rel_path = logo_url.replace("/uploads/", "")
-            # Ensure we use the correct base dir for resolution
-            logo_path = Path(settings.upload_dir).parent / "uploads" / rel_path
-        elif logo_url.startswith("uploads/"):
-            logo_path = Path(settings.upload_dir).parent / logo_url
+        
+        # Candidate 1: Direct relative path from uploads dir
+        # e.g. logo_url = "/uploads/logos/..." or "logos/..."
+        clean_path = logo_url.lstrip("/")
+        if clean_path.startswith("uploads/"):
+            clean_path = clean_path.replace("uploads/", "", 1)
             
-        logger.info("Branded QR: Restaurant %s logo resolved to %s", restaurant_id, logo_path)
+        # Try finding it in the configured uploads directory
+        candidates = [
+            Path(settings.upload_dir) / clean_path,
+            Path(settings.upload_dir).resolve() / clean_path,
+            _BACKEND_ROOT / "uploads" / clean_path, # Project root fallback
+        ]
+        
+        for cand in candidates:
+            if cand.exists() and cand.is_file():
+                logo_path = cand
+                break
+            
+        if logo_path:
+            logger.info("Branded QR: Logo identified at %s", logo_path)
+        else:
+            logger.warning("Branded QR: Logo URL %s defined but file not found on disk", logo_url)
 
     _generate_qr_image(frontend_url, file_path, logo_path=logo_path)
     return repository.upsert_qr(
