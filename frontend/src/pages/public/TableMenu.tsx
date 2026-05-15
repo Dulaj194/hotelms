@@ -525,7 +525,7 @@ export default function TableMenu() {
         endpoint: endpoint
       });
       setIsRequestingService(false);
-      setLastRequestedService(null);
+      setLastRequestedServiceId(null);
     }
   }, [restaurantId, tableNumber]);
 

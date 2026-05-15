@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { 
   Bell, 
-  ChevronDown, 
-  ChevronUp, 
-  LayoutGrid, 
   MessageSquare, 
   Plus, 
-  Save, 
-  Settings, 
   Trash2, 
   X,
   Droplets,
@@ -73,7 +68,7 @@ const ICON_OPTIONS = [
 ];
 
 export default function ServiceManagement() {
-  const { tenantContext, error: tenantContextError } = useTenantContext();
+  const { tenantContext } = useTenantContext();
 
   const [services, setServices] = useState<QuickService[]>([]);
   const [loading, setLoading] = useState(true);
