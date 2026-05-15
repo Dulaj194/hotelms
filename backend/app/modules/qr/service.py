@@ -295,9 +295,12 @@ def _has_secure_qr_key(frontend_url: str | None) -> bool:
 
 
 def _should_refresh_qr(file_path: Path, stored_frontend_url: str | None, expected_frontend_url: str) -> bool:
+    # Force refresh if file is missing (to apply new branded design)
+    if not file_path.exists():
+        return True
+        
     return (
-        not file_path.exists()
-        or not _has_secure_qr_key(stored_frontend_url)
+        not _has_secure_qr_key(stored_frontend_url)
         or (stored_frontend_url or "") != expected_frontend_url
     )
 
@@ -315,9 +318,15 @@ def _regenerate_and_upsert_qr(
     logo_path = None
     if restaurant and restaurant.logo_url:
         # Resolve logo_url (e.g. /uploads/logos/...) to local path
-        if restaurant.logo_url.startswith("/uploads/"):
-            rel_path = restaurant.logo_url.replace("/uploads/", "")
-            logo_path = Path(settings.upload_dir) / rel_path
+        logo_url = restaurant.logo_url
+        if logo_url.startswith("/uploads/"):
+            rel_path = logo_url.replace("/uploads/", "")
+            # Ensure we use the correct base dir for resolution
+            logo_path = Path(settings.upload_dir).parent / "uploads" / rel_path
+        elif logo_url.startswith("uploads/"):
+            logo_path = Path(settings.upload_dir).parent / logo_url
+            
+        print(f"Branded QR: Restaurant {restaurant_id} logo_url={logo_url} resolved to {logo_path}")
 
     _generate_qr_image(frontend_url, file_path, logo_path=logo_path)
     return repository.upsert_qr(
