@@ -11,6 +11,9 @@ from qrcode.image.styles.colormasks import SolidFillColorMask
 from PIL import Image
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 from app.core.config import settings
 from app.core.security import (
@@ -239,7 +242,7 @@ def _generate_qr_image(frontend_url: str, file_path: Path, logo_path: Path | Non
             
         except Exception as e:
             # Fallback to plain QR if logo processing fails
-            print(f"Branded QR Error: Failed to overlay logo: {e}")
+            logger.error("Branded QR Error: Failed to overlay logo for restaurant %s: %s", restaurant_id if 'restaurant_id' in locals() else 'unknown', e)
 
     # Save as high-quality PNG
     img.save(str(file_path), "PNG", quality=100)
@@ -326,7 +329,7 @@ def _regenerate_and_upsert_qr(
         elif logo_url.startswith("uploads/"):
             logo_path = Path(settings.upload_dir).parent / logo_url
             
-        print(f"Branded QR: Restaurant {restaurant_id} logo_url={logo_url} resolved to {logo_path}")
+        logger.info("Branded QR: Restaurant %s logo resolved to %s", restaurant_id, logo_path)
 
     _generate_qr_image(frontend_url, file_path, logo_path=logo_path)
     return repository.upsert_qr(
