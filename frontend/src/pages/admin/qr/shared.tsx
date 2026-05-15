@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { 
   Download, 
   Printer, 
@@ -147,14 +146,12 @@ export function QRCodeCard({
   };
 
   return (
-    <motion.div 
-      layout
+    <div 
       className="group relative flex flex-col rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm transition-all duration-500 hover:-translate-y-2 hover:border-orange-100 hover:shadow-2xl hover:shadow-orange-500/10"
     >
       {/* Image Container */}
       <div className="relative aspect-square w-full overflow-hidden rounded-[2rem] bg-slate-50 ring-1 ring-slate-100">
-        <motion.img
-          layoutId={`qr-${qr.target_number}`}
+        <img
           src={imageUrl}
           alt={`QR for ${labelPrefix} ${qr.target_number}`}
           className="h-full w-full object-cover p-4 transition-transform duration-700 group-hover:scale-105"
@@ -233,6 +230,6 @@ export function QRCodeCard({
           </button>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

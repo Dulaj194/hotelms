@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, 
   Layers, 
@@ -180,18 +179,18 @@ export default function GenerateTableQRCodes() {
         </div>
 
         {/* Global Feedback */}
-        <AnimatePresence>
+        <div className="space-y-4">
           {error && (
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+            <div className="animate-in fade-in slide-in-from-top-4 duration-300">
               <FeedbackAlert type="error" message={error} onClose={() => setError(null)} />
-            </motion.div>
+            </div>
           )}
           {notice && (
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+            <div className="animate-in fade-in slide-in-from-top-4 duration-300">
               <FeedbackAlert type="success" message={notice} onClose={() => setNotice(null)} />
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           {/* Configuration Card */}
@@ -220,11 +219,7 @@ export default function GenerateTableQRCodes() {
 
               <div className="p-8">
                 {activeTab === "bulk" ? (
-                  <motion.div 
-                    initial={{ opacity: 0, x: -10 }} 
-                    animate={{ opacity: 1, x: 0 }}
-                    className="space-y-6"
-                  >
+                  <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-500">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Start Table</label>
@@ -278,13 +273,9 @@ export default function GenerateTableQRCodes() {
                         </>
                       )}
                     </button>
-                  </motion.div>
+                  </div>
                 ) : (
-                  <motion.div 
-                    initial={{ opacity: 0, x: 10 }} 
-                    animate={{ opacity: 1, x: 0 }}
-                    className="space-y-6"
-                  >
+                  <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Table Number / Label</label>
                       <input
@@ -314,7 +305,7 @@ export default function GenerateTableQRCodes() {
                         </>
                       )}
                     </button>
-                  </motion.div>
+                  </div>
                 )}
               </div>
             </div>
@@ -339,15 +330,8 @@ export default function GenerateTableQRCodes() {
 
           {/* Results Area */}
           <div className="lg:col-span-7">
-            <AnimatePresence mode="wait">
               {result ? (
-                <motion.div
-                  key="results"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="space-y-6"
-                >
+                <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
                   <div className="flex items-center justify-between px-2">
                     <h2 className="text-xl font-black text-slate-900">Generated Results</h2>
                     <button 
@@ -360,17 +344,16 @@ export default function GenerateTableQRCodes() {
 
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     {sortQRCodes(result.generated).map((qr, index) => (
-                      <motion.div
+                      <div
                         key={`${qr.qr_type}-${qr.target_number}`}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
+                        className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both"
+                        style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <QRCodeCard qr={qr} labelPrefix="Table" />
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
-                </motion.div>
+                </div>
               ) : (
                 <div className="flex h-full min-h-[500px] flex-col items-center justify-center rounded-[3rem] border-2 border-dashed border-slate-100 bg-slate-50/50 p-12 text-center">
                   <div className="mb-6 grid h-24 w-24 place-items-center rounded-[2.5rem] bg-white shadow-xl shadow-slate-200/30">
@@ -382,7 +365,6 @@ export default function GenerateTableQRCodes() {
                   </p>
                 </div>
               )}
-            </AnimatePresence>
           </div>
         </div>
       </div>
