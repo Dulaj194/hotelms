@@ -36,6 +36,7 @@ from app.modules.site_content.router import (
 from app.modules.subscriptions.router import router as subscriptions_router
 from app.modules.table_sessions.router import router as table_sessions_router
 from app.modules.users.router import router as users_router
+from app.modules.quick_services.router import router as quick_services_router, public_router as public_quick_services_router
 
 
 router = APIRouter(prefix=settings.api_v1_prefix)
@@ -55,6 +56,7 @@ router.include_router(reference_data_router, prefix="/reference-data", tags=["re
 
 # Public and guest ordering
 router.include_router(public_router, prefix="/public", tags=["public"])
+router.include_router(public_quick_services_router, prefix="/public/quick-services", tags=["public-quick-services"])
 router.include_router(site_content_router, prefix="/public/site", tags=["site-content"])
 router.include_router(site_content_admin_router, prefix="/site-content/admin", tags=["site-content-admin"])
 router.include_router(qr_router, prefix="/qr", tags=["qr"])
@@ -80,6 +82,7 @@ router.include_router(billing_router, prefix="/billing", tags=["billing"])
 router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 router.include_router(reports_router, prefix="/reports", tags=["reports"])
 router.include_router(settings_router, prefix="/settings", tags=["settings"])
+router.include_router(quick_services_router, prefix="/quick-services", tags=["quick-services"])
 router.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
 router.include_router(realtime_router, prefix="/ws", tags=["websocket"])
 

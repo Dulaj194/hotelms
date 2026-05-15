@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
-import QuickServiceDrawer from "@/components/public/QuickServiceDrawer";
+import QuickServiceDrawer, { type QuickServiceItem } from "@/components/public/QuickServiceDrawer";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import BillConfirmationOverlay from "@/components/public/BillConfirmationOverlay";
@@ -97,8 +97,9 @@ export default function TableMenu() {
   const [headerVisible, setHeaderVisible] = useState(true);
   const [serviceDrawerOpen, setServiceDrawerOpen] = useState(false);
   const [isRequestingService, setIsRequestingService] = useState(false);
-  const [lastRequestedService, setLastRequestedService] = useState<string | null>(null);
+  const [lastRequestedServiceId, setLastRequestedServiceId] = useState<number | null>(null);
   const [selectedItem, setSelectedItem] = useState<MenuTile | null>(null);
+  const [quickServices, setQuickServices] = useState<QuickServiceItem[]>([]);
   const [sessionStatus, setSessionStatus] = useState<string>("OPEN");
   const [billTotal, setBillTotal] = useState<number>(0);
   const isLocked = sessionStatus === "BILL_REQUESTED" || sessionStatus === "BILL_ACKNOWLEDGED" || sessionStatus === "BILL_PRESENTED" || sessionStatus === "BILL_CONFIRMED";
@@ -342,6 +343,24 @@ export default function TableMenu() {
     void fetchMenu();
   }, [restaurantId]);
 
+  // 2.1 Fetch quick services
+  useEffect(() => {
+    if (!restaurantId) return;
+
+    const fetchQuickServices = async () => {
+      try {
+        const data = await publicGet<QuickServiceItem[]>(
+          `/public/quick-services/${restaurantId}`
+        );
+        setQuickServices(data);
+      } catch (err) {
+        console.error("Failed to load quick services:", err);
+      }
+    };
+
+    void fetchQuickServices();
+  }, [restaurantId]);
+
   const formatPrice = useCallback((price: number) => `$${price.toFixed(2)}`, []);
 
   const handleDecreaseQty = useCallback((itemId: number, qtyInCart: number) => {
@@ -462,7 +481,10 @@ export default function TableMenu() {
     const body = isBill ? {} : { service_type: serviceType, message: message?.trim() || undefined };
 
     setIsRequestingService(true);
-    setLastRequestedService(serviceType);
+    
+    // Find the service ID if available to show success state
+    const service = quickServices.find(s => s.label === serviceType);
+    if (service) setLastRequestedServiceId(service.id);
 
     try {
       const guestToken = getGuestToken();
@@ -489,10 +511,10 @@ export default function TableMenu() {
         if (isBill) {
           setServiceDrawerOpen(false);
           // Small delay before resetting the success icon state so it's visible
-          setTimeout(() => setLastRequestedService(null), 500);
+          setTimeout(() => setLastRequestedServiceId(null), 500);
         } else {
           // For other services, keep it open but reset after a bit
-          setTimeout(() => setLastRequestedService(null), 1500);
+          setTimeout(() => setLastRequestedServiceId(null), 1500);
         }
       }, 1500);
 
@@ -1179,7 +1201,8 @@ export default function TableMenu() {
         onClose={() => setServiceDrawerOpen(false)}
         onRequestService={handleRequestService}
         isSubmitting={isRequestingService}
-        lastRequestedType={lastRequestedService}
+        lastRequestedId={lastRequestedServiceId}
+        services={quickServices}
       />
 
       <BillConfirmationOverlay
