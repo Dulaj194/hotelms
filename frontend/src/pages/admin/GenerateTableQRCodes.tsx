@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Plus, 
+  Layers, 
+  RefreshCw, 
+  ArrowLeft, 
+  Download, 
+  Printer, 
+  ChevronRight,
+  CheckCircle2,
+  AlertCircle
+} from "lucide-react";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
@@ -16,7 +28,10 @@ import {
   sortQRCodes,
 } from "./qr/shared";
 
+type ActiveTab = "bulk" | "single";
+
 export default function GenerateTableQRCodes() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>("bulk");
   const [singleTableNumber, setSingleTableNumber] = useState("");
   const [start, setStart] = useState("1");
   const [end, setEnd] = useState("10");
@@ -84,7 +99,7 @@ export default function GenerateTableQRCodes() {
 
       setResult(data);
       setNotice(
-        `${data.count} table QR code${data.count === 1 ? "" : "s"} ready for print or download.`,
+        `${data.count} table QR codes generated successfully.`
       );
       await loadExistingSummary();
     } catch (generateError) {
@@ -97,7 +112,7 @@ export default function GenerateTableQRCodes() {
   const handleGenerateSingle = useCallback(async () => {
     const normalizedTable = singleTableNumber.trim();
     if (!normalizedTable) {
-      setError("Enter a table number to generate one QR code.");
+      setError("Enter a table number.");
       return;
     }
 
@@ -111,7 +126,7 @@ export default function GenerateTableQRCodes() {
       });
 
       setResult({ generated: [qr], count: 1 });
-      setNotice(`Table ${normalizedTable} QR code is ready for print or download.`);
+      setNotice(`Table ${normalizedTable} QR code generated.`);
       setSingleTableNumber("");
       await loadExistingSummary();
     } catch (generateError) {
@@ -123,197 +138,254 @@ export default function GenerateTableQRCodes() {
 
   return (
     <DashboardLayout>
-      <div className="app-page-stack mx-auto max-w-6xl">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="app-page-title text-gray-900">
-              Generate Table QR Codes
+      <div className="mx-auto max-w-6xl space-y-8 pb-12">
+        {/* Modern Header */}
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-orange-500">
+              <Link to="/admin/qr/tables" className="flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.2em] hover:text-orange-600">
+                <ArrowLeft className="h-3 w-3" />
+                Back to Tables
+              </Link>
+            </div>
+            <h1 className="text-4xl font-black tracking-tight text-slate-900">
+              QR Generation Studio
             </h1>
-            <p className="app-muted-text mt-1 text-gray-500">
-              Create or reuse a clean table QR range for dine-in ordering and guest onboarding.
+            <p className="text-sm font-medium text-slate-500 max-w-lg">
+              Create premium, branded QR codes with your hotel logo and modern rounded modules. 
+              Optimized for high-quality printing.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              to="/admin/qr/tables"
-              className="app-btn-base border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-            >
-              Manage Existing
-            </Link>
-
-            <button
-              type="button"
-              onClick={() => void loadExistingSummary()}
-              disabled={loading || working}
-              className="app-btn-base border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-            >
-              Refresh Summary
-            </button>
+          <div className="flex items-center gap-3">
+             <div className="hidden rounded-2xl bg-white border border-slate-100 p-3 shadow-sm md:flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Active</p>
+                  <p className="text-xl font-black text-slate-900">{loading ? "..." : existingTotal}</p>
+                </div>
+                <div className="h-8 w-px bg-slate-100" />
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Last Table</p>
+                  <p className="text-xl font-black text-slate-900">{loading ? "..." : highestTable ?? "None"}</p>
+                </div>
+             </div>
+             <button
+                type="button"
+                onClick={() => void loadExistingSummary()}
+                disabled={loading || working}
+                className="grid h-12 w-12 place-items-center rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-orange-500 transition-colors shadow-sm active:scale-95 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-5 w-5 ${loading ? "animate-spin" : ""}`} />
+              </button>
           </div>
         </div>
 
-        {error && (
-          <FeedbackAlert
-            type="error"
-            message={error}
-            onClose={() => setError(null)}
-          />
-        )}
+        {/* Global Feedback */}
+        <AnimatePresence>
+          {error && (
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+              <FeedbackAlert type="error" message={error} onClose={() => setError(null)} />
+            </motion.div>
+          )}
+          {notice && (
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+              <FeedbackAlert type="success" message={notice} onClose={() => setNotice(null)} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {notice && (
-          <FeedbackAlert
-            type="success"
-            message={notice}
-            onClose={() => setNotice(null)}
-          />
-        )}
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-          <div className="space-y-4 rounded-xl border bg-white p-6">
-            <div>
-              <h2 className="app-section-title text-gray-900">Single Table</h2>
-              <p className="app-muted-text mt-1 text-gray-500">
-                Generate or refresh one table QR when onboarding individual tables.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Table Number
-                </label>
-                <input
-                  type="text"
-                  value={singleTableNumber}
-                  onChange={(event) => setSingleTableNumber(event.target.value)}
-                  placeholder="e.g. 12 or VIP-1"
-                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                />
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+          {/* Configuration Card */}
+          <div className="lg:col-span-5 space-y-6">
+            <div className="overflow-hidden rounded-[2.5rem] border border-slate-100 bg-white shadow-2xl shadow-slate-200/50">
+              <div className="flex border-b border-slate-100 p-2">
+                <button
+                  onClick={() => setActiveTab("bulk")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+                    activeTab === "bulk" ? "bg-slate-900 text-white shadow-lg" : "text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  <Layers className="h-4 w-4" />
+                  Bulk Range
+                </button>
+                <button
+                  onClick={() => setActiveTab("single")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
+                    activeTab === "single" ? "bg-slate-900 text-white shadow-lg" : "text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  <Plus className="h-4 w-4" />
+                  Single Table
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={() => void handleGenerateSingle()}
-                disabled={working}
-                className="app-btn-base bg-orange-500 text-white hover:bg-orange-600"
-              >
-                {working ? "Generating..." : "Generate Single QR"}
-              </button>
-            </div>
+              <div className="p-8">
+                {activeTab === "bulk" ? (
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10 }} 
+                    animate={{ opacity: 1, x: 0 }}
+                    className="space-y-6"
+                  >
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Start Table</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={start}
+                          onChange={(e) => setStart(e.target.value)}
+                          className="w-full rounded-2xl border-2 border-slate-50 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition-all focus:border-orange-500/20 focus:bg-white focus:ring-4 focus:ring-orange-500/10"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">End Table</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={end}
+                          onChange={(e) => setEnd(e.target.value)}
+                          className="w-full rounded-2xl border-2 border-slate-50 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition-all focus:border-orange-500/20 focus:bg-white focus:ring-4 focus:ring-orange-500/10"
+                        />
+                      </div>
+                    </div>
 
-            <div className="h-px bg-gray-100" />
+                    <div className="rounded-2xl bg-orange-50/50 border border-orange-100 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-10 w-10 place-items-center rounded-xl bg-orange-500 text-white">
+                          <CheckCircle2 className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-orange-900">
+                            {parsedRange.valid ? `${parsedRange.count} Codes Ready` : "Invalid Range"}
+                          </p>
+                          <p className="text-[10px] font-bold text-orange-700/60 uppercase tracking-widest">
+                            From Table {parsedRange.start} to {parsedRange.end}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
-            <div>
-              <h2 className="app-section-title text-gray-900">Bulk Generate</h2>
-              <p className="app-muted-text mt-1 text-gray-500">
-                Use a continuous range when your floor uses numeric table numbering.
-              </p>
-            </div>
+                    <button
+                      onClick={handleGenerate}
+                      disabled={working || !parsedRange.valid}
+                      className="group w-full flex items-center justify-center gap-3 rounded-[1.5rem] bg-slate-900 py-4 text-sm font-black text-white shadow-xl transition-all hover:bg-black active:scale-[0.98] disabled:opacity-40"
+                    >
+                      {working ? (
+                        <RefreshCw className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <>
+                          <Download className="h-5 w-5 transition-transform group-hover:-translate-y-1" />
+                          Generate Range
+                        </>
+                      )}
+                    </button>
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    initial={{ opacity: 0, x: 10 }} 
+                    animate={{ opacity: 1, x: 0 }}
+                    className="space-y-6"
+                  >
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Table Number / Label</label>
+                      <input
+                        type="text"
+                        value={singleTableNumber}
+                        onChange={(e) => setSingleTableNumber(e.target.value)}
+                        placeholder="e.g. VIP-01"
+                        className="w-full rounded-2xl border-2 border-slate-50 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition-all focus:border-orange-500/20 focus:bg-white focus:ring-4 focus:ring-orange-500/10"
+                      />
+                    </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-end">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Start Table
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={start}
-                  onChange={(event) => setStart(event.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                />
+                    <p className="text-[11px] font-medium text-slate-400 leading-relaxed italic">
+                      Individual QR generation is useful for replacing lost stickers or adding custom VIP zones.
+                    </p>
+
+                    <button
+                      onClick={handleGenerateSingle}
+                      disabled={working || !singleTableNumber.trim()}
+                      className="group w-full flex items-center justify-center gap-3 rounded-[1.5rem] bg-slate-900 py-4 text-sm font-black text-white shadow-xl transition-all hover:bg-black active:scale-[0.98] disabled:opacity-40"
+                    >
+                      {working ? (
+                        <RefreshCw className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <>
+                          <Plus className="h-5 w-5 transition-transform group-hover:scale-125" />
+                          Generate Table QR
+                        </>
+                      )}
+                    </button>
+                  </motion.div>
+                )}
               </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  End Table
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={end}
-                  onChange={(event) => setEnd(event.target.value)}
-                  className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => void handleGenerate()}
-                disabled={working}
-                className="app-btn-base bg-orange-500 text-white hover:bg-orange-600"
-              >
-                {working ? "Generating..." : "Generate QR Codes"}
-              </button>
             </div>
 
-            <div className="rounded-xl border border-orange-100 bg-orange-50 p-4 text-sm text-orange-900">
-              <p className="font-semibold">Current request</p>
-              <p className="mt-1">
-                {parsedRange.valid
-                  ? `Tables ${parsedRange.start} to ${parsedRange.end} (${parsedRange.count} total)`
-                  : "Enter a valid start and end table number."}
-              </p>
+            {/* Print Help Card */}
+            <div className="rounded-[2.5rem] bg-gradient-to-br from-orange-500 to-amber-600 p-8 text-white shadow-xl">
+               <div className="flex items-center gap-4 mb-4">
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 backdrop-blur-md">
+                    <Printer className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-xl font-black tracking-tight">Printing Guide</h3>
+               </div>
+               <p className="text-sm font-medium text-white/80 leading-relaxed mb-6">
+                 For best results, use gloss stickers or acrylic stands. Branded QR codes include 15% error correction to ensure logos don't block scanners.
+               </p>
+               <Link to="/admin/qr/tables" className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-orange-600 transition hover:bg-orange-50 active:scale-95">
+                 View All Existing
+                 <ChevronRight className="h-3.5 w-3.5" />
+               </Link>
             </div>
           </div>
 
-          <div className="space-y-4 rounded-xl border bg-white p-6">
-            <div>
-              <h2 className="app-section-title text-gray-900">Current Coverage</h2>
-              <p className="app-muted-text mt-1 text-gray-500">
-                Snapshot of the QR codes already generated for this restaurant.
-              </p>
-            </div>
+          {/* Results Area */}
+          <div className="lg:col-span-7">
+            <AnimatePresence mode="wait">
+              {result ? (
+                <motion.div
+                  key="results"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="space-y-6"
+                >
+                  <div className="flex items-center justify-between px-2">
+                    <h2 className="text-xl font-black text-slate-900">Generated Results</h2>
+                    <button 
+                      onClick={() => setResult(null)}
+                      className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <div className="rounded-xl border bg-gray-50 p-4">
-                <p className="text-sm text-gray-500">Generated tables</p>
-                <p className="mt-2 text-3xl font-semibold text-gray-900">
-                  {loading ? "..." : existingTotal}
-                </p>
-              </div>
-
-              <div className="rounded-xl border bg-gray-50 p-4">
-                <p className="text-sm text-gray-500">Highest table currently available</p>
-                <p className="mt-2 text-2xl font-semibold text-gray-900">
-                  {loading ? "..." : highestTable ?? "Not generated yet"}
-                </p>
-              </div>
-            </div>
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    {sortQRCodes(result.generated).map((qr, index) => (
+                      <motion.div
+                        key={`${qr.qr_type}-${qr.target_number}`}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <QRCodeCard qr={qr} labelPrefix="Table" />
+                      </motion.div>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="flex h-full min-h-[500px] flex-col items-center justify-center rounded-[3rem] border-2 border-dashed border-slate-100 bg-slate-50/50 p-12 text-center">
+                  <div className="mb-6 grid h-24 w-24 place-items-center rounded-[2.5rem] bg-white shadow-xl shadow-slate-200/30">
+                    <Layers className="h-10 w-10 text-slate-200" />
+                  </div>
+                  <h3 className="text-2xl font-black tracking-tight text-slate-900">Ready for Launch</h3>
+                  <p className="mt-2 max-w-xs text-sm font-medium text-slate-400">
+                    Configure your table range on the left to generate premium QR codes for your floor.
+                  </p>
+                </div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
-
-        {result && (
-          <div className="space-y-4 rounded-xl border bg-white p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="app-section-title text-gray-900">Generated QRs</h2>
-                <p className="app-muted-text mt-1 text-gray-500">
-                  {result.count} table QR code{result.count !== 1 ? "s" : ""} ready.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setResult(null)}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Clear
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {sortQRCodes(result.generated).map((qr) => (
-                <QRCodeCard
-                  key={`${qr.qr_type}-${qr.target_number}`}
-                  qr={qr}
-                  labelPrefix="Table"
-                />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </DashboardLayout>
   );

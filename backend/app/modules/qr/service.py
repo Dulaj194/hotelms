@@ -6,7 +6,7 @@ from urllib.parse import quote, urlparse
 import qrcode
 import qrcode.image.pil
 from qrcode.image.styledpil import StyledPilImage
-from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
+from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer, CircleModuleDrawer
 from qrcode.image.styles.colormasks import SolidFillColorMask
 from PIL import Image
 from fastapi import HTTPException, status
@@ -208,10 +208,10 @@ def _generate_qr_image(frontend_url: str, file_path: Path, logo_path: Path | Non
     qr.add_data(frontend_url)
     qr.make(fit=True)
 
-    # Generate styled QR image with rounded modules
+    # Generate styled QR image with modern circular modules
     img = qr.make_image(
         image_factory=StyledPilImage,
-        module_drawer=RoundedModuleDrawer(),
+        module_drawer=CircleModuleDrawer(),
         color_mask=SolidFillColorMask(front_color=(0, 0, 0), back_color=(255, 255, 255)),
     ).convert("RGBA")
 
