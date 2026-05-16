@@ -24,6 +24,7 @@ import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import BillConfirmationOverlay from "@/components/public/BillConfirmationOverlay";
 import LanguageSwitcher from "@/components/public/LanguageSwitcher";
+import { translateError } from "@/lib/errorHelper";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { getGuestToken } from "@/hooks/useGuestSession";
 import {
@@ -342,8 +343,8 @@ export default function TableMenu() {
           `/public/restaurants/${restaurantId}/menu`
         );
         setMenu(data);
-      } catch {
-        setPageError(t("menu:load_error"));
+      } catch (error: any) {
+        setPageError(translateError(error.message || t("menu:load_error")));
       }
     };
 
@@ -434,7 +435,7 @@ export default function TableMenu() {
   const handleNameSubmit = useCallback(() => {
     const trimmed = guestNameInput.trim();
     if (!trimmed) {
-      setNameError(t("menu:name_error"));
+      setNameError(translateError(t("menu:name_error")));
       if (window.navigator.vibrate) window.navigator.vibrate([30, 100, 30]);
       return;
     }
@@ -496,7 +497,7 @@ export default function TableMenu() {
     try {
       const guestToken = getGuestToken();
       if (!guestToken) {
-        setPageError("Session expired. Please scan the QR code again.");
+        setPageError(translateError("Invalid or expired guest session."));
         return;
       }
 
@@ -525,6 +526,8 @@ export default function TableMenu() {
         }
       }, 1500);
 
+      setIsRequestingService(false);
+      setLastRequestedServiceId(null);
     } catch (error: any) {
       console.error("Service request error details:", {
         error: error.message,
@@ -533,6 +536,7 @@ export default function TableMenu() {
       });
       setIsRequestingService(false);
       setLastRequestedServiceId(null);
+      // Optional: show a small toast or inline error
     }
   }, [restaurantId, tableNumber]);
 
@@ -929,7 +933,7 @@ export default function TableMenu() {
                           <div className="mt-0.5 flex items-center gap-2">
                             <span className="text-xs font-black text-orange-600">${tile.item.price.toFixed(2)}</span>
                             <span className="truncate text-[10px] font-medium text-slate-400">
-                                {i18n.language === "si" && tile.item.category_name_si ? tile.item.category_name_si : tile.categoryName}
+                                {tile.categoryName}
                             </span>
                           </div>
                         </div>

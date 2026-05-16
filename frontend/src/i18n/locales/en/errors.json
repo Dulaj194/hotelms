@@ -1,0 +1,21 @@
+{
+  "item_not_found": "Item not found.",
+  "item_unavailable": "This item is currently unavailable.",
+  "cart_empty_coupon": "Add items before applying a coupon.",
+  "invalid_access_token": "Invalid or expired access token.",
+  "invalid_token_type": "Invalid token type.",
+  "user_not_found": "User not found.",
+  "account_inactive": "Account is inactive.",
+  "restaurant_unavailable": "Your restaurant account is unavailable.",
+  "registration_pending": "Your registration is pending super admin approval.",
+  "registration_rejected": "Your registration was rejected. Please contact support.",
+  "restaurant_inactive": "Your restaurant account is inactive.",
+  "password_change_required": "Password change required before accessing this resource.",
+  "permission_denied": "You do not have permission to perform this action.",
+  "no_restaurant_context": "No restaurant context available.",
+  "active_subscription_required": "An active subscription is required for this feature.",
+  "invalid_guest_session": "Invalid or expired guest session.",
+  "invalid_room_session": "Invalid or expired room session.",
+  "unable_to_connect": "Unable to connect to the server. Please check your internet connection.",
+  "generic_error": "Something went wrong. Please try again."
+}

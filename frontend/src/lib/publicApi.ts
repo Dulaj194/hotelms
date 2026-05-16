@@ -15,6 +15,20 @@ export interface PublicApiOptions {
   headers?: Record<string, string>;
 }
 
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let detail = `Error ${response.status}`;
+    try {
+      const payload = await response.json();
+      if (payload?.detail) detail = payload.detail;
+    } catch {
+      detail = response.statusText || `Error ${response.status}`;
+    }
+    throw new Error(detail);
+  }
+  return response.json() as Promise<T>;
+}
+
 export async function publicGet<T>(path: string, options?: PublicApiOptions): Promise<T> {
   const headers: Record<string, string> = {};
   if (options?.headers) {
@@ -25,8 +39,7 @@ export async function publicGet<T>(path: string, options?: PublicApiOptions): Pr
     method: "GET",
     headers,
   });
-  if (!response.ok) throw new Error(`GET ${path} failed — ${response.status}`);
-  return response.json() as Promise<T>;
+  return handleResponse<T>(response);
 }
 
 export async function publicPost<T>(path: string, body: unknown, options?: PublicApiOptions): Promise<T> {
@@ -42,8 +55,7 @@ export async function publicPost<T>(path: string, body: unknown, options?: Publi
     headers,
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`POST ${path} failed — ${response.status}`);
-  return response.json() as Promise<T>;
+  return handleResponse<T>(response);
 }
 
 export async function publicPatch<T>(path: string, body: unknown, options?: PublicApiOptions): Promise<T> {
@@ -59,6 +71,5 @@ export async function publicPatch<T>(path: string, body: unknown, options?: Publ
     headers,
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`PATCH ${path} failed — ${response.status}`);
-  return response.json() as Promise<T>;
+  return handleResponse<T>(response);
 }

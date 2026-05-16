@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import LanguageSwitcher from "@/components/public/LanguageSwitcher";
+import { translateError } from "@/lib/errorHelper";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { useLocalRoomCart } from "@/hooks/useLocalMenuCart";
@@ -85,8 +86,8 @@ function RoomCartDrawer({
     setPlaceError(null);
     try {
       await onPlaceOrder();
-    } catch (err) {
-      setPlaceError(err instanceof Error ? err.message : "Failed to place order.");
+    } catch (err: any) {
+      setPlaceError(translateError(err.message || "Failed to place order."));
     }
   };
 
@@ -378,8 +379,8 @@ export default function RoomMenu() {
           `/public/restaurants/${restaurantId}/menu`
         );
         setMenu(data);
-      } catch {
-        setPageError("Failed to load the menu. Please try again.");
+      } catch (error: any) {
+        setPageError(translateError(error.message || t("menu:load_error")));
       }
     };
 
