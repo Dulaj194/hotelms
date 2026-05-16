@@ -10,7 +10,9 @@ OfferTargetTypeValue = Literal["menu", "category", "item"]
 
 class OfferCreateRequest(BaseModel):
     title: str = Field(..., min_length=3, max_length=100)
+    title_si: str | None = Field(None, max_length=100)
     description: str = Field(..., min_length=10, max_length=500)
+    description_si: str | None = Field(None, max_length=500)
     product_type: OfferTargetTypeValue
     product_id: int = Field(..., gt=0)
     start_date: date
@@ -21,7 +23,9 @@ class OfferCreateRequest(BaseModel):
 
 class OfferUpdateRequest(BaseModel):
     title: str | None = Field(None, min_length=3, max_length=100)
+    title_si: str | None = Field(None, max_length=100)
     description: str | None = Field(None, min_length=10, max_length=500)
+    description_si: str | None = Field(None, max_length=500)
     product_type: OfferTargetTypeValue | None = None
     product_id: int | None = Field(None, gt=0)
     start_date: date | None = None
@@ -38,7 +42,9 @@ class OfferResponse(BaseModel):
     id: int
     restaurant_id: int
     title: str
+    title_si: str | None
     description: str
+    description_si: str | None
     image_path: str | None
     product_type: OfferTargetTypeValue
     product_id: int

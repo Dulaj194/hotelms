@@ -31,10 +31,10 @@ export default function OfferCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="line-clamp-1 text-lg font-semibold leading-tight text-slate-900">
-              {offer.title}
+              {offer.title} {offer.title_si && <span className="text-slate-400 font-normal">({offer.title_si})</span>}
             </h2>
             <p className="mt-1 line-clamp-1 text-sm leading-5 text-slate-600">
-              {offer.description}
+              {offer.description} {offer.description_si && <span className="text-slate-400">| {offer.description_si}</span>}
             </p>
           </div>
 

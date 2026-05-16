@@ -15,7 +15,9 @@ export interface PublicRestaurantInfoResponse {
 export interface PublicOfferResponse {
   id: number;
   title: string;
+  title_si?: string | null;
   description: string;
+  description_si?: string | null;
   image_path: string | null;
   product_type: "menu" | "category" | "item";
   product_id: number;

@@ -62,7 +62,9 @@ export function buildOfferPayload(
 ): OfferCreateRequest | OfferUpdateRequest {
   return {
     title: formData.title.trim(),
+    title_si: formData.title_si.trim() || null,
     description: formData.description.trim(),
+    description_si: formData.description_si.trim() || null,
     product_type: formData.product_type as OfferTargetType,
     product_id: Number(formData.product_id),
     start_date: formData.start_date,
@@ -131,7 +133,9 @@ export function validateOfferForm(params: {
 export function mapOfferToFormData(offer: OfferResponse): OfferFormData {
   return {
     title: offer.title,
+    title_si: offer.title_si ?? "",
     description: offer.description,
+    description_si: offer.description_si ?? "",
     product_type: offer.product_type,
     product_id: offer.product_id,
     start_date: offer.start_date,

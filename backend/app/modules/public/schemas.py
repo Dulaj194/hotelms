@@ -26,7 +26,9 @@ class PublicRestaurantInfoResponse(BaseModel):
 class PublicOfferResponse(BaseModel):
     id: int
     title: str
+    title_si: str | None = None
     description: str
+    description_si: str | None = None
     image_path: str | None
     product_type: Literal["menu", "category", "item"]
     product_id: int

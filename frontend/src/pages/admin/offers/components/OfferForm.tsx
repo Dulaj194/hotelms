@@ -92,6 +92,28 @@ export default function OfferForm({
 
           <div className="md:col-span-2">
             <label className="mb-1 block text-sm font-semibold text-slate-700">
+              Offer Title (Sinhala)
+            </label>
+            <input
+              type="text"
+              value={formData.title_si}
+              onChange={(event) =>
+                setFormData((current) => ({
+                  ...current,
+                  title_si: event.target.value.slice(0, TITLE_MAX_LENGTH),
+                }))
+              }
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              placeholder="සිංහලෙන් දීමනාවේ නම ඇතුළත් කරන්න"
+            />
+            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+              <span>Maximum 100 characters</span>
+              <span>{TITLE_MAX_LENGTH - formData.title_si.length} characters remaining</span>
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-semibold text-slate-700">
               Offer Description
             </label>
             <textarea
@@ -110,6 +132,31 @@ export default function OfferForm({
               <span>Minimum 10, maximum 500 characters</span>
               <span>
                 {DESCRIPTION_MAX_LENGTH - formData.description.length} characters
+                remaining
+              </span>
+            </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-semibold text-slate-700">
+              Offer Description (Sinhala)
+            </label>
+            <textarea
+              value={formData.description_si}
+              onChange={(event) =>
+                setFormData((current) => ({
+                  ...current,
+                  description_si: event.target.value.slice(0, DESCRIPTION_MAX_LENGTH),
+                }))
+              }
+              rows={4}
+              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-100"
+              placeholder="සිංහලෙන් දීමනාවේ විස්තරය ඇතුළත් කරන්න"
+            />
+            <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+              <span>Maximum 500 characters</span>
+              <span>
+                {DESCRIPTION_MAX_LENGTH - formData.description_si.length} characters
                 remaining
               </span>
             </div>

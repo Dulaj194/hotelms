@@ -4,7 +4,9 @@ export interface OfferResponse {
   id: number;
   restaurant_id: number;
   title: string;
+  title_si: string | null;
   description: string;
+  description_si: string | null;
   image_path: string | null;
   product_type: OfferTargetType;
   product_id: number;
@@ -23,7 +25,9 @@ export interface OfferListResponse {
 
 export interface OfferCreateRequest {
   title: string;
+  title_si: string | null;
   description: string;
+  description_si: string | null;
   product_type: OfferTargetType;
   product_id: number;
   start_date: string;
@@ -34,7 +38,9 @@ export interface OfferCreateRequest {
 
 export interface OfferUpdateRequest {
   title?: string;
+  title_si?: string | null;
   description?: string;
+  description_si?: string | null;
   product_type?: OfferTargetType;
   product_id?: number;
   start_date?: string;
