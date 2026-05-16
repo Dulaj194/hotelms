@@ -30,5 +30,11 @@
   "guest_name": "අමුත්තාගේ නම",
   "my_orders": "මගේ ඇණවුම්",
   "search_menu": "මෙනුව සොයන්න",
-  "back_to_top": "ඉහළට යන්න"
+  "back_to_top": "ඉහළට යන්න",
+  "all": "සියල්ල",
+  "all_categories": "සියලුම වර්ගීකරණයන්",
+  "other_categories": "අනෙකුත් වර්ගීකරණයන්",
+  "browse_menus": "මෙනුව පරීක්ෂා කරන්න",
+  "select_category": "වර්ගයක් තෝරන්න",
+  "items": "වර්ග"
 }

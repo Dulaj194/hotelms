@@ -1,7 +1,9 @@
 export interface Category {
   id: number;
   name: string;
+  name_si: string | null;
   description: string | null;
+  description_si: string | null;
   image_path: string | null;
   sort_order: number;
   is_active: boolean;
@@ -14,8 +16,11 @@ export interface Category {
 export interface Item {
   id: number;
   name: string;
+  name_si: string | null;
   description: string | null;
+  description_si: string | null;
   more_details: string | null;
+  more_details_si: string | null;
   price: number;
   currency: string;
   image_path: string | null;

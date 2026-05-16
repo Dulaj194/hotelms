@@ -7,7 +7,9 @@ class CategoryCreateRequest(BaseModel):
     """SECURITY: restaurant_id intentionally absent — assigned from authenticated context."""
 
     name: str = Field(..., min_length=1, max_length=255)
+    name_si: str | None = Field(None, max_length=255)
     description: str | None = None
+    description_si: str | None = None
     image_path: str | None = None
     sort_order: int = 0
     is_active: bool = True
@@ -16,7 +18,9 @@ class CategoryCreateRequest(BaseModel):
 
 class CategoryUpdateRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
+    name_si: str | None = Field(None, max_length=255)
     description: str | None = None
+    description_si: str | None = None
     image_path: str | None = None
     sort_order: int | None = None
     is_active: bool | None = None
@@ -30,7 +34,9 @@ class CategoryImageUploadResponse(BaseModel):
 class CategoryResponse(BaseModel):
     id: int
     name: str
+    name_si: str | None
     description: str | None
+    description_si: str | None
     image_path: str | None
     sort_order: int
     is_active: bool

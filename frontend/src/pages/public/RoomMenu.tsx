@@ -530,8 +530,10 @@ export default function RoomMenu() {
     const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
-    const metaLabel = item.description ?? "";
     const activeOffer = menu?.offers?.find(o => o.product_type === "item" && o.product_id === item.id);
+    const isSi = i18n.language === "si";
+    const displayName = isSi && item.name_si ? item.name_si : item.name;
+    const displayDesc = isSi && item.description_si ? item.description_si : (item.description || "");
 
     return (
       <div
@@ -544,7 +546,7 @@ export default function RoomMenu() {
         <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-50">
           <SafeMenuAsset
             path={item.image_path}
-            alt={item.name}
+            alt={displayName}
             className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
             fallback={
               <div className="flex h-full w-full items-center justify-center text-slate-300">
@@ -556,17 +558,17 @@ export default function RoomMenu() {
             <div className="absolute top-2 left-2 z-10">
               <span className="inline-flex items-center gap-1 rounded-md bg-orange-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white shadow-sm">
                 <span className="h-1 w-1 rounded-full bg-amber-300 animate-pulse" />
-                Offer
+                {t("menu:offer")}
               </span>
             </div>
           )}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
           <div className="flex min-w-0 items-start justify-between gap-2">
-            <p className="min-w-0 break-words text-sm font-semibold leading-tight line-clamp-2">{item.name}</p>
-            {metaLabel && (
+            <p className="min-w-0 break-words text-sm font-semibold leading-tight line-clamp-2">{displayName}</p>
+            {displayDesc && (
               <span className="min-w-0 max-w-[45%] truncate text-right text-[11px] text-gray-400">
-                {metaLabel}
+                {displayDesc}
               </span>
             )}
           </div>
@@ -590,11 +592,11 @@ export default function RoomMenu() {
             </div>
             {item.is_available ? (
               <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
-                Available
+                {t("menu:available")}
               </span>
             ) : (
               <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500">
-                Sold out
+                {t("menu:sold_out")}
               </span>
             )}
           </div>
@@ -647,7 +649,7 @@ export default function RoomMenu() {
                 </>
               ) : (
                 <>
-                  <span>Add to Cart</span>
+                  <span>{t("menu:add_to_cart")}</span>
                   <ChevronRight className="h-3.5 w-3.5" />
                 </>
               )}
@@ -683,7 +685,7 @@ export default function RoomMenu() {
                 {menu.restaurant.name}
               </p>
               {roomNumber && (
-                <p className="text-xs text-gray-500">Room {roomNumber}</p>
+                <p className="text-xs text-gray-500">{t("menu:room")} {roomNumber}</p>
               )}
             </div>
           </div>

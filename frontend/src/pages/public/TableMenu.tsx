@@ -192,11 +192,14 @@ export default function TableMenu() {
         ? visibleCategories
         : visibleCategories.filter((category) => category.id === activeCategoryId);
 
+    const isSi = i18n.language === "si";
+
     return categorySource.flatMap((category) => {
+      const catName = isSi && category.name_si ? category.name_si : category.name;
       return category.items.map((item) => ({
         item,
         categoryId: category.id,
-        categoryName: category.name,
+        categoryName: catName,
       }));
     });
   }, [activeCategoryId, menu, visibleCategories]);
@@ -690,10 +693,9 @@ export default function TableMenu() {
 
 
   const renderItemCard = ({ item, categoryId, categoryName }: MenuTile) => {
-    const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
-    const qtyInCart = cartItem?.quantity ?? 0;
-    const isAdding = addingItemId === item.id;
-    const activeOffer = menu?.offers?.find(o => o.product_type === "item" && o.product_id === item.id);
+    const isSi = i18n.language === "si";
+    const displayName = isSi && item.name_si ? item.name_si : item.name;
+    const displayDesc = isSi && item.description_si ? item.description_si : (item.description || t("menu:default_description"));
 
     return (
       <article
@@ -708,7 +710,7 @@ export default function TableMenu() {
         <div className="relative w-full overflow-hidden rounded-[16px] bg-[#F8F9FB] h-[140px] sm:h-[160px] lg:h-[180px]">
           <SafeMenuAsset
             path={item.image_path}
-            alt={item.name}
+            alt={displayName}
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             fallback={<UtensilsCrossed className="h-8 w-8 text-[#94A3B8]" />}
           />
@@ -738,7 +740,7 @@ export default function TableMenu() {
           {/* 3. Item Name and Price Section */}
           <div className="mt-1 flex items-start justify-between gap-2">
             <h3 className="min-w-0 flex-1 break-words text-[18px] font-bold leading-tight text-[#0F172A] line-clamp-1 min-[380px]:text-[20px]">
-              {item.name}
+              {displayName}
             </h3>
             <div className="flex flex-col items-end shrink-0 leading-none">
               {activeOffer ? (
@@ -760,7 +762,7 @@ export default function TableMenu() {
 
           {/* 4. Description Section */}
           <p className="mt-2 text-[14px] font-normal leading-relaxed text-[#94A3B8] line-clamp-2">
-            {item.description || t("menu:default_description")}
+            {displayDesc}
           </p>
 
           {/* 5. Add Button Section */}

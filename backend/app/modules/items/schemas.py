@@ -7,8 +7,11 @@ class ItemCreateRequest(BaseModel):
     """SECURITY: restaurant_id intentionally absent — assigned from authenticated context."""
 
     name: str = Field(..., min_length=1, max_length=255)
+    name_si: str | None = Field(None, max_length=255)
     description: str | None = None
+    description_si: str | None = None
     more_details: str | None = None
+    more_details_si: str | None = None
     price: float = Field(..., gt=0)
     currency: str | None = None
     image_path: str | None = None
@@ -24,8 +27,11 @@ class ItemCreateRequest(BaseModel):
 
 class ItemUpdateRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=255)
+    name_si: str | None = Field(None, max_length=255)
     description: str | None = None
+    description_si: str | None = None
     more_details: str | None = None
+    more_details_si: str | None = None
     price: float | None = Field(None, gt=0)
     currency: str | None = None
     image_path: str | None = None
@@ -51,8 +57,11 @@ class ItemMediaUploadResponse(BaseModel):
 class ItemResponse(BaseModel):
     id: int
     name: str
+    name_si: str | None
     description: str | None
+    description_si: str | None
     more_details: str | None
+    more_details_si: str | None
     price: float
     currency: str
     image_path: str | None

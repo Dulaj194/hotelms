@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronRight, Menu as MenuIcon, X, Tag } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import type { PublicMenuResponse } from "@/types/publicMenu";
 
@@ -18,6 +19,7 @@ export default function PublicMenuDropdown({
   isOpen,
   onClose,
 }: PublicMenuDropdownProps) {
+  const { t, i18n } = useTranslation(["common", "menu"]);
   const [expandedMenuId, setExpandedMenuId] = useState<number | null>(null);
   const [dragY, setDragY] = useState(0);
   const startY = useRef(0);
@@ -83,8 +85,8 @@ export default function PublicMenuDropdown({
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-4 pb-3">
           <div>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">Browse Menus</h2>
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-0.5">Select a category</p>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">{t("menu:browse_menus")}</h2>
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mt-0.5">{t("menu:select_category")}</p>
           </div>
           <button 
             onClick={onClose}
@@ -113,7 +115,7 @@ export default function PublicMenuDropdown({
                 <div className={`grid h-10 w-10 place-items-center rounded-xl ${activeCategoryId === null ? "bg-orange-500 text-white" : "bg-white text-slate-400 border border-slate-100 shadow-sm"}`}>
                   <MenuIcon className="w-4.5 h-4.5" />
                 </div>
-                <span className="font-bold text-[14px]">All Categories</span>
+                <span className="font-bold text-[14px]">{t("menu:all_categories")}</span>
               </div>
               <ChevronRight className={`w-4 h-4 transition-transform ${activeCategoryId === null ? "translate-x-1" : "text-slate-300"}`} />
             </button>
@@ -132,7 +134,7 @@ export default function PublicMenuDropdown({
                     <div className={`p-2.5 rounded-xl ${expandedMenuId === menuSection.id ? "bg-white/10 text-white" : "bg-white text-slate-400 border border-slate-100 shadow-sm"}`}>
                       <MenuIcon className="w-4.5 h-4.5" />
                     </div>
-                    <span className="font-bold text-[15px]">{menuSection.name}</span>
+                    <span className="font-bold text-[15px]">{i18n.language === "si" && menuSection.name_si ? menuSection.name_si : menuSection.name}</span>
                   </div>
                   <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${expandedMenuId === menuSection.id ? "rotate-180" : "text-slate-300"}`} />
                 </button>
@@ -162,9 +164,11 @@ export default function PublicMenuDropdown({
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="block font-bold text-[14px] leading-tight text-slate-700 truncate">{category.name}</span>
+                          <span className="block font-bold text-[14px] leading-tight text-slate-700 truncate">
+                            {i18n.language === "si" && category.name_si ? category.name_si : category.name}
+                          </span>
                           <span className="block mt-0.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                            {category.items?.length ?? 0} items
+                            {category.items?.length ?? 0} {t("menu:items")}
                           </span>
                         </div>
                         <ChevronRight className="w-4 h-4 text-slate-300" />
@@ -178,7 +182,7 @@ export default function PublicMenuDropdown({
             {/* Uncategorized Categories (if any) */}
             {menu.uncategorized_categories && menu.uncategorized_categories.length > 0 && (
                 <div className="space-y-2 pt-3 border-t border-slate-100">
-                    <h3 className="px-2 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Other Categories</h3>
+                    <h3 className="px-2 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{t("menu:other_categories")}</h3>
                     <div className="flex flex-col gap-1.5">
                         {menu.uncategorized_categories.map((category) => (
                             <button
@@ -203,9 +207,11 @@ export default function PublicMenuDropdown({
                                   />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <span className="block font-bold text-[14px] leading-tight text-slate-700 truncate">{category.name}</span>
+                                  <span className="block font-bold text-[14px] leading-tight text-slate-700 truncate">
+                                    {i18n.language === "si" && category.name_si ? category.name_si : category.name}
+                                  </span>
                                   <span className="block mt-0.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                                    {category.items?.length ?? 0} items
+                                    {category.items?.length ?? 0} {t("menu:items")}
                                   </span>
                                 </div>
                                 <ChevronRight className="w-4 h-4 text-slate-300" />

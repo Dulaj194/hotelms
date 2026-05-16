@@ -40,8 +40,11 @@ const SLOT_TO_ITEM_FIELD: Record<MediaSlot, keyof Item> = {
 
 interface FormData {
   name: string;
+  name_si: string;
   description: string;
+  description_si: string;
   more_details: string;
+  more_details_si: string;
   price: string;
   category_id: number | "";
   blog_link: string;
@@ -50,8 +53,11 @@ interface FormData {
 
 const EMPTY_FORM: FormData = {
   name: "",
+  name_si: "",
   description: "",
+  description_si: "",
   more_details: "",
+  more_details_si: "",
   price: "",
   category_id: "",
   blog_link: "",
@@ -203,8 +209,11 @@ export default function MenuItems() {
     setEditingItem(item);
     setFormData({
       name: item.name,
+      name_si: item.name_si ?? "",
       description: item.description ?? "",
+      description_si: item.description_si ?? "",
       more_details: item.more_details ?? "",
+      more_details_si: item.more_details_si ?? "",
       price: String(item.price),
       category_id: item.category_id,
       blog_link: item.blog_link ?? "",
@@ -247,8 +256,11 @@ export default function MenuItems() {
     try {
       const payload = {
         name: formData.name.trim(),
+        name_si: formData.name_si.trim() || null,
         description: formData.description.trim() || null,
+        description_si: formData.description_si.trim() || null,
         more_details: formData.more_details.trim() || null,
+        more_details_si: formData.more_details_si.trim() || null,
         price: priceNum,
         currency: restaurantCurrency,
         category_id: formData.category_id,
@@ -518,39 +530,80 @@ export default function MenuItems() {
             <div className="space-y-4 pr-1">
               <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-900">Basic Information</h3>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    Item Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData((f) => ({ ...f, name: e.target.value.slice(0, 150) }))}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                    placeholder="e.g., Chicken Kottu"
-                  />
+                
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Item Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData((f) => ({ ...f, name: e.target.value.slice(0, 150) }))}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      placeholder="e.g., Chicken Kottu"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Item Name (සිංහල)
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name_si}
+                      onChange={(e) => setFormData((f) => ({ ...f, name_si: e.target.value.slice(0, 150) }))}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      placeholder="උදා: චිකන් කොත්තු"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Short Description</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value.slice(0, 350) }))}
-                    rows={3}
-                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                    placeholder="Short summary shown in menu cards"
-                  />
-                  <p className="mt-1 text-[11px] text-gray-400">Maximum 350 characters</p>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Short Description</label>
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value.slice(0, 350) }))}
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      placeholder="Short summary shown in menu cards"
+                    />
+                    <p className="mt-1 text-[11px] text-gray-400">Maximum 350 characters</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Short Description (සිංහල)</label>
+                    <textarea
+                      value={formData.description_si}
+                      onChange={(e) => setFormData((f) => ({ ...f, description_si: e.target.value.slice(0, 350) }))}
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      placeholder="සිංහල කෙටි විස්තරය"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">More Details</label>
-                  <textarea
-                    value={formData.more_details}
-                    onChange={(e) => setFormData((f) => ({ ...f, more_details: e.target.value.slice(0, 1000) }))}
-                    rows={4}
-                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                    placeholder="Ingredients, serving notes, allergens, chef note..."
-                  />
-                  <p className="mt-1 text-[11px] text-gray-400">Maximum 1000 characters</p>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">More Details</label>
+                    <textarea
+                      value={formData.more_details}
+                      onChange={(e) => setFormData((f) => ({ ...f, more_details: e.target.value.slice(0, 1000) }))}
+                      rows={3}
+                      className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      placeholder="Ingredients, serving notes, allergens, chef note..."
+                    />
+                    <p className="mt-1 text-[11px] text-gray-400">Maximum 1000 characters</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">More Details (සිංහල)</label>
+                    <textarea
+                      value={formData.more_details_si}
+                      onChange={(e) => setFormData((f) => ({ ...f, more_details_si: e.target.value.slice(0, 1000) }))}
+                      rows={3}
+                      className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                      placeholder="සිංහල අමතර විස්තර"
+                    />
+                  </div>
                 </div>
               </section>
 

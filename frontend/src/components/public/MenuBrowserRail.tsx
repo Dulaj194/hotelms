@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { UtensilsCrossed } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import type { PublicCategoryResponse } from "@/types/publicMenu";
@@ -15,6 +16,7 @@ export default function MenuBrowserRail({
   activeCategoryId,
   onSelectCategory,
 }: MenuBrowserRailProps) {
+  const { t, i18n } = useTranslation();
   const categoryRefs = useRef(new Map<string, HTMLButtonElement | null>());
 
   const scrollIntoViewIfAvailable = (node: HTMLButtonElement | null | undefined) => {
@@ -50,7 +52,7 @@ export default function MenuBrowserRail({
             : "border-slate-200 bg-white text-slate-600 shadow-sm hover:border-orange-200 hover:bg-orange-50/50"
         }`}
       >
-        All
+        {t("menu:all")}
       </button>
 
       <div className="no-scrollbar box-border flex w-full max-w-full min-w-0 flex-1 snap-x snap-mandatory touch-pan-x justify-start gap-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth horizontal-scroll sm:justify-center">
@@ -94,7 +96,7 @@ export default function MenuBrowserRail({
               <span className={`min-w-0 truncate text-sm font-bold tracking-tight ${
                 isActive ? "text-white" : "text-slate-700"
               }`}>
-                {category.name}
+                {i18n.language === "si" && category.name_si ? category.name_si : category.name}
               </span>
             </button>
           );

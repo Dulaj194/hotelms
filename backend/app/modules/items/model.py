@@ -23,8 +23,11 @@ class Item(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    name_si: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_si: Mapped[str | None] = mapped_column(Text, nullable=True)
     more_details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    more_details_si: Mapped[str | None] = mapped_column(Text, nullable=True)
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(12), nullable=False, default="LKR")
     image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)

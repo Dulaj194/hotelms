@@ -41,7 +41,9 @@ class PublicOfferResponse(BaseModel):
 class PublicItemSummaryResponse(BaseModel):
     id: int
     name: str
+    name_si: str | None = None
     description: str | None
+    description_si: str | None = None
     price: float
     image_path: str | None
     image_path_2: str | None = None
@@ -50,6 +52,7 @@ class PublicItemSummaryResponse(BaseModel):
     image_path_5: str | None = None
     video_path: str | None = None
     more_details: str | None = None
+    more_details_si: str | None = None
     blog_link: str | None = None
     is_available: bool
     category_id: int
@@ -60,7 +63,9 @@ class PublicItemSummaryResponse(BaseModel):
 class PublicItemDetailResponse(BaseModel):
     id: int
     name: str
+    name_si: str | None = None
     description: str | None
+    description_si: str | None = None
     price: float
     image_path: str | None
     image_path_2: str | None = None
@@ -73,6 +78,7 @@ class PublicItemDetailResponse(BaseModel):
     is_available: bool
     category_id: int
     category_name: str | None
+    category_name_si: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -83,7 +89,9 @@ class PublicItemDetailResponse(BaseModel):
 class PublicCategoryResponse(BaseModel):
     id: int
     name: str
+    name_si: str | None = None
     description: str | None
+    description_si: str | None = None
     image_path: str | None
     sort_order: int
     menu_id: int
@@ -98,7 +106,9 @@ class PublicCategoryResponse(BaseModel):
 class PublicMenuSectionResponse(BaseModel):
     id: int
     name: str
+    name_si: str | None = None
     description: str | None
+    description_si: str | None = None
     image_path: str | None
     sort_order: int
     categories: list[PublicCategoryResponse]

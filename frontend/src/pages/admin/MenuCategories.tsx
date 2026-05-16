@@ -15,7 +15,9 @@ import type { Category, Menu } from "@/types/menu";
 
 interface FormData {
   name: string;
+  name_si: string;
   description: string;
+  description_si: string;
   menu_id: number | "";
   sort_order: number;
   is_active: boolean;
@@ -23,7 +25,9 @@ interface FormData {
 
 const EMPTY_FORM: FormData = {
   name: "",
+  name_si: "",
   description: "",
+  description_si: "",
   menu_id: "",
   sort_order: 0,
   is_active: true,
@@ -135,7 +139,9 @@ export default function MenuCategories() {
     setEditingCategory(category);
     setFormData({
       name: category.name,
+      name_si: category.name_si ?? "",
       description: category.description ?? "",
+      description_si: category.description_si ?? "",
       menu_id: category.menu_id ?? "",
       sort_order: category.sort_order,
       is_active: category.is_active,
@@ -195,7 +201,9 @@ export default function MenuCategories() {
     try {
       const payload = {
         name: formData.name.trim(),
+        name_si: formData.name_si.trim() || null,
         description: formData.description.trim() || null,
+        description_si: formData.description_si.trim() || null,
         menu_id: formData.menu_id,
         sort_order: formData.sort_order,
         is_active: formData.is_active,
@@ -471,33 +479,64 @@ export default function MenuCategories() {
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">
-                  Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(event) =>
-                    setFormData((current) => ({ ...current, name: event.target.value }))
-                  }
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                  placeholder="e.g., Appetizers"
-                />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
+                    Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(event) =>
+                      setFormData((current) => ({ ...current, name: event.target.value }))
+                    }
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    placeholder="e.g., Appetizers"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">
+                    Name (සිංහල)
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name_si}
+                    onChange={(event) =>
+                      setFormData((current) => ({ ...current, name_si: event.target.value }))
+                    }
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    placeholder="උදා: ආහාර රුචිය වඩන ආහාර"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(event) =>
-                    setFormData((current) => ({ ...current, description: event.target.value }))
-                  }
-                  rows={2}
-                  maxLength={500}
-                  className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                  placeholder="Optional description"
-                />
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(event) =>
+                      setFormData((current) => ({ ...current, description: event.target.value }))
+                    }
+                    rows={2}
+                    maxLength={500}
+                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    placeholder="Optional description"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">Description (සිංහල)</label>
+                  <textarea
+                    value={formData.description_si}
+                    onChange={(event) =>
+                      setFormData((current) => ({ ...current, description_si: event.target.value }))
+                    }
+                    rows={2}
+                    maxLength={500}
+                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                    placeholder="සිංහල විස්තරය"
+                  />
+                </div>
               </div>
 
               <div>

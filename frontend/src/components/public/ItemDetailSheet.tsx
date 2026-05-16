@@ -2,6 +2,7 @@ import { ShoppingCart, X, Plus, Minus, Check, UtensilsCrossed, Info, ChevronRigh
 import SafeMenuAsset from "./SafeMenuAsset";
 import { PublicItemSummaryResponse } from "@/types/publicMenu";
 import { useEffect, useState, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 interface ItemDetailSheetProps {
   item: PublicItemSummaryResponse | null;
@@ -20,6 +21,7 @@ export default function ItemDetailSheet({
   qtyInCart,
   formatPrice,
 }: ItemDetailSheetProps) {
+  const { i18n } = useTranslation();
   const [adding, setAdding] = useState(false);
   const [success, setSuccess] = useState(false);
   const [localQty, setLocalQty] = useState(1);
@@ -29,6 +31,11 @@ export default function ItemDetailSheet({
   const [headerScrolled, setHeaderScrolled] = useState(false);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const isSi = i18n.language === "si";
+  const displayName = isSi && item?.name_si ? item.name_si : (item?.name || "");
+  const displayDesc = isSi && item?.description_si ? item.description_si : (item?.description || "This signature dish is crafted using time-honored techniques and the freshest ingredients available. Every element is designed to provide a sophisticated and memorable dining experience.");
+  const displayMore = isSi && item?.more_details_si ? item.more_details_si : (item?.more_details || null);
 
   const images = useMemo(() => {
     if (!item) return [];
@@ -110,7 +117,7 @@ export default function ItemDetailSheet({
           headerScrolled ? "bg-white/90 backdrop-blur-md border-b border-slate-100 opacity-100" : "opacity-0 pointer-events-none"
         }`}>
           <span className="text-sm font-black uppercase tracking-widest text-slate-900 truncate pr-10">
-            {item.name}
+            {displayName}
           </span>
         </div>
 
@@ -153,7 +160,7 @@ export default function ItemDetailSheet({
             ) : (
               <SafeMenuAsset
                 path={activeImage}
-                alt={item.name}
+                alt={displayName}
                 className="h-full w-full object-cover transition-all duration-700 hover:scale-110"
                 fallback={
                   <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-slate-300">
@@ -173,7 +180,7 @@ export default function ItemDetailSheet({
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black uppercase tracking-[0.2em] text-orange-400/80 mb-0.5">Signature Dish</span>
                     <span className="text-sm font-black uppercase tracking-widest text-white whitespace-nowrap">
-                      {item.name}
+                      {displayName}
                     </span>
                   </div>
                   <div className="ml-2 grid h-7 w-7 place-items-center rounded-full bg-white/10 text-white transition-transform group-hover:translate-x-1">
@@ -240,7 +247,7 @@ export default function ItemDetailSheet({
             <div className="flex flex-col gap-1">
               <div className="flex items-start justify-between gap-4">
                 <h2 className="text-2xl font-black leading-[1.1] tracking-tight text-slate-900 sm:text-3xl">
-                  {item.name}
+                  {displayName}
                 </h2>
                 <div className="shrink-0 text-right">
                   <p className="text-2xl font-black tracking-tight text-orange-600 sm:text-3xl">
@@ -265,7 +272,7 @@ export default function ItemDetailSheet({
                   <span className="text-[10px] font-black uppercase tracking-[0.2em]">Item Description</span>
                 </div>
                 <p className="text-base font-medium leading-relaxed text-slate-500 sm:text-lg">
-                  {item.description || "This signature dish is crafted using time-honored techniques and the freshest ingredients available. Every element is designed to provide a sophisticated and memorable dining experience."}
+                  {displayDesc}
                 </p>
               </div>
 
@@ -276,7 +283,7 @@ export default function ItemDetailSheet({
                     <span className="text-[10px] font-black uppercase tracking-[0.2em]">Chef's Special Notes</span>
                   </div>
                   <p className="text-sm font-semibold leading-relaxed text-slate-600 bg-orange-50/50 p-4 rounded-2xl border border-orange-100/50">
-                    {item.more_details}
+                    {displayMore}
                   </p>
                 </div>
               )}

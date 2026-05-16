@@ -27,7 +27,9 @@ export interface PublicOfferResponse {
 export interface PublicItemSummaryResponse {
   id: number;
   name: string;
+  name_si?: string | null;
   description: string | null;
+  description_si?: string | null;
   price: number;
   image_path: string | null;
   image_path_2?: string | null;
@@ -36,6 +38,7 @@ export interface PublicItemSummaryResponse {
   image_path_5?: string | null;
   video_path?: string | null;
   more_details?: string | null;
+  more_details_si?: string | null;
   blog_link?: string | null;
   is_available: boolean;
   category_id: number;
@@ -44,7 +47,9 @@ export interface PublicItemSummaryResponse {
 export interface PublicItemDetailResponse {
   id: number;
   name: string;
+  name_si?: string | null;
   description: string | null;
+  description_si?: string | null;
   price: number;
   image_path: string | null;
   image_path_2?: string | null;
@@ -53,10 +58,12 @@ export interface PublicItemDetailResponse {
   image_path_5?: string | null;
   video_path?: string | null;
   more_details?: string | null;
+  more_details_si?: string | null;
   blog_link?: string | null;
   is_available: boolean;
   category_id: number;
   category_name: string | null;
+  category_name_si?: string | null;
 }
 
 // --- Categories --------------------------------------------------------------
@@ -64,7 +71,9 @@ export interface PublicItemDetailResponse {
 export interface PublicCategoryResponse {
   id: number;
   name: string;
+  name_si?: string | null;
   description: string | null;
+  description_si?: string | null;
   image_path: string | null;
   sort_order: number;
   menu_id: number;
@@ -74,7 +83,9 @@ export interface PublicCategoryResponse {
 export interface PublicMenuSectionResponse {
   id: number;
   name: string;
+  name_si?: string | null;
   description: string | null;
+  description_si?: string | null;
   image_path: string | null;
   sort_order: number;
   categories: PublicCategoryResponse[];

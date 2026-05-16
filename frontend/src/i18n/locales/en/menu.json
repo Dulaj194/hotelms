@@ -30,5 +30,11 @@
   "guest_name": "Guest Name",
   "my_orders": "My Orders",
   "search_menu": "Search menu",
-  "back_to_top": "Back to top"
+  "back_to_top": "Back to top",
+  "all": "All",
+  "all_categories": "All Categories",
+  "other_categories": "Other Categories",
+  "browse_menus": "Browse Menus",
+  "select_category": "Select a category",
+  "items": "items"
 }
