@@ -71,7 +71,7 @@ function FloatingCartButton({ itemCount, onOpenCart }: FloatingCartButtonProps) 
 }
 
 export default function TableMenu() {
-  const { t } = useTranslation(["common", "menu", "cart"]);
+  const { t, i18n } = useTranslation(["common", "menu", "cart"]);
   const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber } = useParams<{
     restaurantId: string;
@@ -693,6 +693,10 @@ export default function TableMenu() {
 
 
   const renderItemCard = ({ item, categoryId, categoryName }: MenuTile) => {
+    const cartItem = cart?.items.find((ci) => ci.item_id === item.id);
+    const qtyInCart = cartItem?.quantity ?? 0;
+    const isAdding = addingItemId === item.id;
+    const activeOffer = menu?.offers?.find(o => o.product_type === "item" && o.product_id === item.id);
     const isSi = i18n.language === "si";
     const displayName = isSi && item.name_si ? item.name_si : item.name;
     const displayDesc = isSi && item.description_si ? item.description_si : (item.description || t("menu:default_description"));
@@ -870,7 +874,7 @@ export default function TableMenu() {
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && searchInputRef.current?.blur()}
-                placeholder="Search dishes, ingredients, or category"
+                placeholder={t("menu:search_menu")}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-11 pr-12 text-sm outline-none transition focus:border-orange-400 focus:bg-white focus:ring-4 focus:ring-orange-100"
               />
               <button
@@ -885,13 +889,13 @@ export default function TableMenu() {
               <div className="mt-4 max-h-[calc(70dvh-100px)] overflow-y-auto no-scrollbar pb-2 animate-in fade-in slide-in-from-top-2 duration-300">
                 <div className="mb-3 flex items-center justify-between px-1">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                    Search Results ({visibleTiles.length})
+                    {t("common:search_results")} ({visibleTiles.length})
                   </p>
                   <button 
                     onClick={() => setSearchQuery("")}
                     className="text-[10px] font-bold uppercase text-orange-500 hover:text-orange-600"
                   >
-                    Clear
+                    {t("common:clear")}
                   </button>
                 </div>
                 
@@ -919,10 +923,14 @@ export default function TableMenu() {
                           />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-bold text-slate-900">{tile.item.name}</p>
+                          <p className="truncate text-sm font-bold text-slate-900">
+                            {i18n.language === "si" && tile.item.name_si ? tile.item.name_si : tile.item.name}
+                          </p>
                           <div className="mt-0.5 flex items-center gap-2">
                             <span className="text-xs font-black text-orange-600">${tile.item.price.toFixed(2)}</span>
-                            <span className="truncate text-[10px] font-medium text-slate-400">{tile.categoryName}</span>
+                            <span className="truncate text-[10px] font-medium text-slate-400">
+                                {i18n.language === "si" && tile.item.category_name_si ? tile.item.category_name_si : tile.categoryName}
+                            </span>
                           </div>
                         </div>
                         <ChevronRight className="mr-1 h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-orange-500" />
@@ -974,8 +982,8 @@ export default function TableMenu() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
                 <div className="absolute bottom-6 left-6 right-6">
-                  <h2 className="text-2xl font-black tracking-tight sm:text-3xl">Deliciousness delivered.</h2>
-                  <p className="mt-1 text-sm font-medium text-white/80">Select your favorites and order in seconds.</p>
+                  <h2 className="text-2xl font-black tracking-tight sm:text-3xl">{t("menu:banner_title", "Deliciousness delivered.")}</h2>
+                  <p className="mt-1 text-sm font-medium text-white/80">{t("menu:banner_subtitle", "Select your favorites and order in seconds.")}</p>
                 </div>
               </div>
             </section>
@@ -995,7 +1003,7 @@ export default function TableMenu() {
                       Featured Picks
                     </div>
                     <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-                      Handcrafted Specials
+                      {t("menu:handcrafted_specials")}
                     </h2>
                   </div>
                 </div>
@@ -1043,10 +1051,10 @@ export default function TableMenu() {
                               {t("menu:offer")}
                             </span>
                             <h3 className="mt-2 text-base sm:text-lg font-black leading-tight text-slate-900 line-clamp-2">
-                              {offer.title}
+                              {i18n.language === "si" && offer.title_si ? offer.title_si : offer.title}
                             </h3>
                             <p className="mt-1 text-xs font-medium text-slate-600 line-clamp-2">
-                              {offer.description}
+                              {i18n.language === "si" && offer.description_si ? offer.description_si : offer.description}
                             </p>
                           </div>
                           <div className="pt-2">
@@ -1114,10 +1122,12 @@ export default function TableMenu() {
                   <div className="flex items-end justify-between">
                     <div>
                       <h2 className="text-xl font-black tracking-tight text-slate-900">
-                        {catId === null ? "All items" : navItem?.name}
+                        {catId === null ? t("menu:all_items") : (i18n.language === "si" && navItem?.name_si ? navItem.name_si : navItem?.name)}
                       </h2>
                       {navItem?.description && (
-                        <p className="mt-1 text-xs font-medium text-slate-400">{navItem.description}</p>
+                        <p className="mt-1 text-xs font-medium text-slate-400">
+                            {i18n.language === "si" && navItem.description_si ? navItem.description_si : navItem.description}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -1153,7 +1163,7 @@ export default function TableMenu() {
             className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition-all duration-300 active:scale-90 hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Search className="h-5 w-5" />
-            <span className="max-w-full truncate">Search</span>
+            <span className="max-w-full truncate">{t("common:search")}</span>
           </button>
 
           <FloatingCartButton itemCount={cartItemCount} onOpenCart={handleOpenCart} />

@@ -304,7 +304,7 @@ function RoomCartDrawer({
 // Main page component
 
 export default function RoomMenu() {
-  const { t } = useTranslation(["common", "menu", "cart"]);
+  const { t, i18n } = useTranslation(["common", "menu", "cart"]);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { restaurantId, roomNumber } = useParams<{
@@ -519,7 +519,7 @@ export default function RoomMenu() {
   if (!menu) {
     return (
       <div className="min-h-dvh flex items-center justify-center">
-        <p className="text-gray-400 animate-pulse">Loading menu...</p>
+        <p className="text-gray-400 animate-pulse">{t("menu:loading_menu")}</p>
       </div>
     );
   }
@@ -825,10 +825,10 @@ export default function RoomMenu() {
                               {t("menu:offer")}
                             </span>
                             <h3 className="mt-2 text-base sm:text-lg font-black leading-tight text-slate-900 line-clamp-2">
-                              {offer.title}
+                              {i18n.language === "si" && offer.title_si ? offer.title_si : offer.title}
                             </h3>
                             <p className="mt-1 text-xs font-medium text-slate-600 line-clamp-2">
-                              {offer.description}
+                              {i18n.language === "si" && offer.description_si ? offer.description_si : offer.description}
                             </p>
                           </div>
                           <div className="pt-2">
@@ -887,7 +887,7 @@ export default function RoomMenu() {
             return (
               <div key={catId ?? "all"} className="space-y-4">
                 <h2 className="text-lg font-bold text-gray-900">
-                  {catId === null ? t("menu:all_items") : navItem?.name}
+                  {catId === null ? t("menu:all_items") : (i18n.language === "si" && navItem?.name_si ? navItem.name_si : navItem?.name)}
                 </h2>
                 
                 {items.length === 0 ? (
