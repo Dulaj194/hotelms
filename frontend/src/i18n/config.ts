@@ -2,15 +2,24 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 
-// Import empty resource files for now (Phase 2 will populate these)
+import enCommon from './locales/en/common.json';
+import enMenu from './locales/en/menu.json';
+import enCart from './locales/en/cart.json';
+
+import siCommon from './locales/si/common.json';
+import siMenu from './locales/si/menu.json';
+import siCart from './locales/si/cart.json';
+
 const resources = {
   en: {
-    common: {},
-    menu: {}
+    common: enCommon,
+    menu: enMenu,
+    cart: enCart
   },
   si: {
-    common: {},
-    menu: {}
+    common: siCommon,
+    menu: siMenu,
+    cart: siCart
   }
 };
 
@@ -21,7 +30,7 @@ i18n
     resources,
     lng: 'en', // Force default to English
     fallbackLng: 'en',
-    ns: ['common', 'menu'],
+    ns: ['common', 'menu', 'cart'],
     defaultNS: 'common',
     interpolation: {
       escapeValue: false

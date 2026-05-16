@@ -1,0 +1,16 @@
+{
+  "title": "Cart",
+  "empty": "Your cart is empty.",
+  "order_placed": "Order Placed!",
+  "order_sent": "Your order has been sent to the kitchen.",
+  "order_number": "Order number",
+  "total": "Total",
+  "track_order": "Track Order",
+  "continue_browsing": "Continue Browsing",
+  "each": "each",
+  "unavailable": "Unavailable",
+  "note": "Note",
+  "place_order": "Place Order",
+  "clear_cart": "Clear cart",
+  "placing_order": "Placing order..."
+}

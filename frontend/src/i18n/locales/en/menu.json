@@ -1,0 +1,13 @@
+{
+  "title": "Menu",
+  "loading_menu": "Loading menu...",
+  "load_error": "Failed to load the menu. Please try again.",
+  "invalid_qr": "Invalid room QR link. Please scan the room QR code again.",
+  "available": "Available",
+  "sold_out": "Sold out",
+  "offer": "Offer",
+  "add_to_cart": "Add to Cart",
+  "added": "Added!",
+  "room": "Room",
+  "request_service": "Request Service"
+}
