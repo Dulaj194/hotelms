@@ -65,9 +65,11 @@
     width: 100%;
     overscroll-behavior-y: none;
     @apply bg-background text-foreground;
-    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', 'Noto Sans Sinhala', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+    line-height: 1.6; /* Better for Sinhala modifiers */
   }
 
   #root {
