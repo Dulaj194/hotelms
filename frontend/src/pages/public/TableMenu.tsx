@@ -16,12 +16,14 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
 import QuickServiceDrawer, { type QuickServiceItem } from "@/components/public/QuickServiceDrawer";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import BillConfirmationOverlay from "@/components/public/BillConfirmationOverlay";
+import LanguageSwitcher from "@/components/public/LanguageSwitcher";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { getGuestToken } from "@/hooks/useGuestSession";
 import {
@@ -68,6 +70,7 @@ function FloatingCartButton({ itemCount, onOpenCart }: FloatingCartButtonProps) 
 }
 
 export default function TableMenu() {
+  const { t } = useTranslation(["common", "menu", "cart"]);
   const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber } = useParams<{
     restaurantId: string;
@@ -285,7 +288,7 @@ export default function TableMenu() {
     if (!restaurantId || !tableNumber || !guestName) return;
     const parsedRestaurantId = Number(restaurantId);
     if (Number.isNaN(parsedRestaurantId)) {
-      setPageError("Invalid restaurant context. Please scan the table QR code again.");
+      setPageError(t("menu:load_error"));
       return;
     }
 
@@ -294,7 +297,7 @@ export default function TableMenu() {
     }
 
     if (!qrAccessKey && !getGuestQrAccessKey(parsedRestaurantId, tableNumber)) {
-      setPageError("Invalid table QR link. Please scan the table QR code again.");
+      setPageError(t("menu:invalid_qr"));
       return;
     }
 
@@ -336,7 +339,7 @@ export default function TableMenu() {
         );
         setMenu(data);
       } catch {
-        setPageError("Failed to load the menu. Please try again.");
+        setPageError(t("menu:load_error"));
       }
     };
 
@@ -427,7 +430,7 @@ export default function TableMenu() {
   const handleNameSubmit = useCallback(() => {
     const trimmed = guestNameInput.trim();
     if (!trimmed) {
-      setNameError("Please enter your name to start ordering.");
+      setNameError(t("menu:name_error"));
       if (window.navigator.vibrate) window.navigator.vibrate([30, 100, 30]);
       return;
     }
@@ -539,7 +542,7 @@ export default function TableMenu() {
         <div className="mb-6 grid h-20 w-20 place-items-center rounded-[2rem] bg-red-50 text-red-500 shadow-sm">
           <AlertCircle className="h-10 w-10" />
         </div>
-        <h1 className="text-2xl font-black tracking-tight text-slate-900">Something went wrong</h1>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900">{t("common:something_went_wrong")}</h1>
         <p className="mt-2 max-w-xs text-sm font-medium leading-relaxed text-slate-500">
           {pageError}
         </p>
@@ -548,7 +551,7 @@ export default function TableMenu() {
           className="mt-8 flex items-center gap-2 rounded-2xl bg-slate-900 px-8 py-4 text-sm font-bold text-white shadow-xl transition hover:bg-slate-800 active:scale-95"
         >
           <RefreshCcw className="h-4 w-4" />
-          Try again
+          {t("common:try_again")}
         </button>
       </div>
     );
@@ -607,7 +610,7 @@ export default function TableMenu() {
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/70">
-                    Table Session
+                    {t("menu:table_session")}
                   </p>
                   <h1 className="mt-3 text-3xl font-black leading-[1.1] tracking-tight sm:text-4xl">
                     {menu?.restaurant.name ?? "Luminous Hotel"}
@@ -621,13 +624,13 @@ export default function TableMenu() {
               <div className="mt-8 flex flex-wrap gap-2">
                 <div className="flex items-center gap-1.5 rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Table {tableNumber}
+                  {t("menu:room")} {tableNumber}
                 </div>
                 <span className="rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
-                  QR Verified
+                  {t("menu:qr_verified")}
                 </span>
                 <span className="rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-[11px] font-bold text-emerald-100 backdrop-blur-md ring-1 ring-emerald-500/30">
-                  Fast ordering
+                  {t("menu:fast_ordering")}
                 </span>
               </div>
             </div>
@@ -635,7 +638,7 @@ export default function TableMenu() {
             <div className="px-7 py-8">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                  Your name
+                  {t("menu:your_name")}
                 </label>
                 <input
                   value={guestNameInput}
@@ -646,7 +649,7 @@ export default function TableMenu() {
                       handleNameSubmit();
                     }
                   }}
-                  placeholder="e.g. Kasun"
+                  placeholder={t("menu:name_placeholder")}
                   className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-5 py-4 text-base font-medium outline-none transition-all placeholder:text-slate-300 focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/10"
                 />
                 {nameError && (
@@ -663,7 +666,7 @@ export default function TableMenu() {
                 className="mt-8 group relative inline-flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-4 text-base font-bold text-white transition-all active:scale-[0.98] hover:bg-slate-800"
               >
                 <span className="relative z-10 flex items-center gap-2">
-                  Start session
+                  {t("menu:start_session")}
                   <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
                 </span>
                 <div className="absolute inset-0 z-0 bg-gradient-to-r from-orange-500 to-amber-500 opacity-0 transition-opacity group-hover:opacity-10" />
@@ -671,8 +674,7 @@ export default function TableMenu() {
 
               <div className="mt-8 rounded-2xl bg-slate-50 p-4 text-center">
                 <p className="text-[11px] leading-relaxed font-medium text-slate-500">
-                  Enter your name once to start your digital ordering experience. 
-                  Your cart and orders will be tracked for this session.
+                  {t("menu:name_hint")}
                 </p>
               </div>
             </div>
@@ -713,14 +715,14 @@ export default function TableMenu() {
             <div className="absolute top-2.5 left-2.5 z-10">
               <span className="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-md backdrop-blur-sm">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-300 animate-pulse" />
-                Special Offer
+                {t("menu:offer")}
               </span>
             </div>
           )}
           {!item.is_available && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]">
               <span className="rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#0F172A]">
-                Sold Out
+                {t("menu:sold_out")}
               </span>
             </div>
           )}
@@ -757,7 +759,7 @@ export default function TableMenu() {
 
           {/* 4. Description Section */}
           <p className="mt-2 text-[14px] font-normal leading-relaxed text-[#94A3B8] line-clamp-2">
-            {item.description || "Freshly prepared with premium ingredients."}
+            {item.description || t("menu:default_description")}
           </p>
 
           {/* 5. Add Button Section */}
@@ -806,7 +808,7 @@ export default function TableMenu() {
                   <Check className="h-5 w-5 animate-in zoom-in-50" />
                 ) : (
                   <>
-                    <span>Add to Cart</span>
+                    <span>{t("menu:add_to_cart")}</span>
                     <ShoppingCart className="h-4 w-4" />
                   </>
                 )}
@@ -839,15 +841,18 @@ export default function TableMenu() {
             />
             <div className="min-w-0">
               <p className="truncate text-base font-black text-slate-900">{menu.restaurant.name}</p>
-              <p className="text-[10px] font-bold text-slate-500">Table {displayTableNumber}</p>
+              <p className="text-[10px] font-bold text-slate-500">{t("menu:room")} {displayTableNumber}</p>
             </div>
           </div>
-          <button
-            onClick={() => setProfileDrawerOpen(true)}
-            className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200"
-          >
-            <UserRound className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <button
+              onClick={() => setProfileDrawerOpen(true)}
+              className="grid h-10 w-10 place-items-center rounded-xl bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+            >
+              <UserRound className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Search Panel */}
@@ -1032,7 +1037,7 @@ export default function TableMenu() {
                         <div className="flex flex-1 flex-col justify-between p-4 sm:p-5 min-w-0">
                           <div className="min-w-0">
                             <span className="inline-flex w-fit items-center gap-1 rounded bg-slate-900/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-700">
-                              Special Offer
+                              {t("menu:offer")}
                             </span>
                             <h3 className="mt-2 text-base sm:text-lg font-black leading-tight text-slate-900 line-clamp-2">
                               {offer.title}
@@ -1043,7 +1048,7 @@ export default function TableMenu() {
                           </div>
                           <div className="pt-2">
                             <button className="rounded-full bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800">
-                              {offer.product_type === "item" ? "Order now" : "Explore"}
+                              {offer.product_type === "item" ? t("menu:order_now") : t("menu:explore")}
                             </button>
                           </div>
                         </div>
@@ -1136,7 +1141,7 @@ export default function TableMenu() {
             }`}
           >
             <MenuIcon className="h-5 w-5" />
-            <span className="max-w-full truncate">Menu</span>
+            <span className="max-w-full truncate">{t("menu:title")}</span>
           </button>
 
           <button
@@ -1162,7 +1167,7 @@ export default function TableMenu() {
             className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Bell className="h-5 w-5" />
-            <span className="max-w-full truncate">Orders</span>
+            <span className="max-w-full truncate">{t("menu:orders")}</span>
           </button>
 
           <button
@@ -1172,7 +1177,7 @@ export default function TableMenu() {
             aria-label="Contact staff"
           >
             <MessageCircle className="h-5 w-5" />
-            <span className="max-w-full truncate">Service</span>
+            <span className="max-w-full truncate">{t("common:request")}</span>
           </button>
         </div>
       </nav>
@@ -1241,11 +1246,11 @@ export default function TableMenu() {
           <div className="absolute bottom-0 right-0 top-0 box-border flex w-full max-w-[min(24rem,100%)] flex-col bg-white shadow-2xl transition-all duration-300 animate-in slide-in-from-right-40">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h2 className="text-lg font-bold text-slate-900">Profile</h2>
+              <h2 className="text-lg font-bold text-slate-900">{t("menu:profile")}</h2>
               <button
                 onClick={() => setProfileDrawerOpen(false)}
                 className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                aria-label="Close profile menu"
+                aria-label={t("common:close")}
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1260,7 +1265,7 @@ export default function TableMenu() {
                     {guestName?.charAt(0).toUpperCase() ?? "G"}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-500">Guest Name</p>
+                    <p className="text-sm font-semibold text-slate-500">{t("menu:guest_name")}</p>
                     <p className="truncate text-lg font-bold text-slate-900">{guestName ?? "Guest"}</p>
                   </div>
                 </div>
@@ -1268,7 +1273,7 @@ export default function TableMenu() {
                 {tableNumber && restaurantId && (
                   <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm">
                     <p className="text-slate-600">
-                      <span className="font-semibold text-slate-900">Table:</span> {tableNumber}
+                      <span className="font-semibold text-slate-900">{t("menu:room")}:</span> {tableNumber}
                     </p>
                     <p className="break-words text-slate-600">
                       <span className="font-semibold text-slate-900">Restaurant:</span> {menu?.restaurant.name}
@@ -1289,7 +1294,7 @@ export default function TableMenu() {
                     onClick={() => setProfileDrawerOpen(false)}
                     className="flex min-h-12 items-center justify-between px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 sm:px-6"
                   >
-                    <span>My Orders</span>
+                    <span>{t("menu:my_orders")}</span>
                     <ChevronRight className="h-4 w-4 text-slate-400" />
                   </Link>
                 )}
@@ -1302,7 +1307,7 @@ export default function TableMenu() {
                     handleToggleSearch();
                   }}
                 >
-                  <span>Search menu</span>
+                  <span>{t("menu:search_menu")}</span>
                   <ChevronRight className="h-4 w-4 text-slate-400" />
                 </button>
 
@@ -1314,7 +1319,7 @@ export default function TableMenu() {
                     handleScrollTo("menu-top");
                   }}
                 >
-                  <span>Back to top</span>
+                  <span>{t("menu:back_to_top")}</span>
                   <ChevronRight className="h-4 w-4 text-slate-400" />
                 </button>
               </div>
@@ -1327,7 +1332,7 @@ export default function TableMenu() {
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-red-50 py-3 text-sm font-bold text-red-600 transition hover:bg-red-100"
               >
                 <LogOut className="h-4 w-4" />
-                Log Out
+                {t("common:logout")}
               </button>
             </div>
           </div>

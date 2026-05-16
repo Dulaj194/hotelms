@@ -14,8 +14,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, Check, ChefHat, ChevronRight, Menu as MenuIcon, Search, ShoppingCart, X } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
 import MenuBrowserRail from "@/components/public/MenuBrowserRail";
+import LanguageSwitcher from "@/components/public/LanguageSwitcher";
 import { usePublicMenuBrowser } from "@/components/public/usePublicMenuBrowser";
 import { useSwipeNavigation } from "@/components/public/useSwipeNavigation";
 import { useLocalRoomCart } from "@/hooks/useLocalMenuCart";
@@ -73,6 +75,7 @@ function RoomCartDrawer({
   placing,
   orderPlaced,
 }: RoomCartDrawerProps) {
+  const { t } = useTranslation(["common", "menu", "cart"]);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const itemCount = cart?.item_count ?? 0;
   const total = cart?.total ?? 0;
@@ -106,12 +109,12 @@ function RoomCartDrawer({
         {/* Header */}
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="text-lg font-semibold">
-            Cart{itemCount > 0 ? ` (${itemCount})` : ""}
+            {t("cart:title")}{itemCount > 0 ? ` (${itemCount})` : ""}
           </h2>
           <button
             onClick={onClose}
             className="grid h-10 w-10 place-items-center rounded-full transition-colors hover:bg-gray-100"
-            aria-label="Close cart"
+            aria-label={t("common:close")}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -149,16 +152,16 @@ function RoomCartDrawer({
                 />
               </svg>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Order Placed!</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">{t("cart:order_placed")}</h3>
             <p className="text-gray-500 text-sm mb-3">
-              Your order has been sent to the kitchen.
+              {t("cart:order_sent")}
             </p>
             <div className="bg-gray-50 rounded-lg px-4 py-3 w-full mb-4">
-              <p className="text-xs text-gray-500 mb-1">Order number</p>
+              <p className="text-xs text-gray-500 mb-1">{t("cart:order_number")}</p>
               <p className="font-bold text-gray-900">{orderPlaced.order_number}</p>
             </div>
             <p className="text-xs text-gray-400 mb-4">
-              Total: ${orderPlaced.total_amount.toFixed(2)}
+              {t("cart:total")}: ${orderPlaced.total_amount.toFixed(2)}
             </p>
             <div className="w-full space-y-2">
               <button
@@ -166,14 +169,14 @@ function RoomCartDrawer({
                 className="min-h-11 w-full rounded-xl bg-orange-500 py-2.5 text-sm font-semibold text-white
                            hover:bg-orange-600 transition-colors"
               >
-                Track Order
+                {t("cart:track_order")}
               </button>
               <button
                 onClick={onContinueBrowsing}
                 className="min-h-11 w-full rounded-xl border border-orange-200 py-2 text-sm font-semibold text-orange-600
                            hover:bg-orange-50 transition-colors"
               >
-                Continue Browsing
+                {t("cart:continue_browsing")}
               </button>
             </div>
           </div>
@@ -184,7 +187,7 @@ function RoomCartDrawer({
           <>
             <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
               {!cart || cart.items.length === 0 ? (
-                <p className="text-center text-gray-400 mt-8">Your cart is empty.</p>
+                <p className="text-center text-gray-400 mt-8">{t("cart:empty")}</p>
               ) : (
                 cart.items.map((item) => (
                   <div
@@ -208,14 +211,14 @@ function RoomCartDrawer({
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-sm text-slate-900 break-words line-clamp-1">{item.name}</p>
                           <p className="text-xs font-medium text-slate-500 mt-0.5">
-                            ${item.unit_price.toFixed(2)} each
+                            ${item.unit_price.toFixed(2)} {t("cart:each")}
                           </p>
                           {!item.is_available && (
-                            <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-wider">Unavailable</p>
+                            <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-wider">{t("cart:unavailable")}</p>
                           )}
                           {item.note && (
                             <p className="mt-1.5 flex items-start gap-1 text-[10px] font-semibold text-orange-600 bg-orange-50 p-1.5 rounded-lg border border-orange-100">
-                              <span className="shrink-0 mt-0.5">Note:</span>
+                              <span className="shrink-0 mt-0.5">{t("cart:note")}:</span>
                               <span className="line-clamp-2">{item.note}</span>
                             </p>
                           )}
@@ -263,7 +266,7 @@ function RoomCartDrawer({
             {cart && cart.items.length > 0 && (
               <div className="space-y-3 border-t px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <div className="flex justify-between font-semibold text-base">
-                  <span>Total</span>
+                  <span>{t("cart:total")}</span>
                   <span>${total.toFixed(2)}</span>
                 </div>
 
@@ -357,7 +360,7 @@ export default function RoomMenu() {
   useEffect(() => {
     if (!restaurantId || !roomNumber) return;
     if (!qrAccessKey) {
-      setPageError("Invalid room QR link. Please scan the room QR code again.");
+      setPageError(t("menu:invalid_qr"));
       return;
     }
     setSessionReady(true);
@@ -699,6 +702,7 @@ export default function RoomMenu() {
                 Request
               </Link>
             )}
+            <LanguageSwitcher />
           {/* Cart button */}
           <button
             onClick={() => setCartOpen(true)}
@@ -766,10 +770,10 @@ export default function RoomMenu() {
                   <div>
                     <div className="inline-flex items-center gap-1.5 rounded-full bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-orange-600">
                       <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
-                      Featured Picks
+                      {t("menu:featured_picks")}
                     </div>
                     <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">
-                      Handcrafted Specials
+                      {t("menu:handcrafted_specials")}
                     </h2>
                   </div>
                 </div>
@@ -814,7 +818,7 @@ export default function RoomMenu() {
                         <div className="flex flex-1 flex-col justify-between p-4 sm:p-5 min-w-0">
                           <div className="min-w-0">
                             <span className="inline-flex w-fit items-center gap-1 rounded bg-slate-900/5 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-700">
-                              Special Offer
+                              {t("menu:offer")}
                             </span>
                             <h3 className="mt-2 text-base sm:text-lg font-black leading-tight text-slate-900 line-clamp-2">
                               {offer.title}
@@ -825,7 +829,7 @@ export default function RoomMenu() {
                           </div>
                           <div className="pt-2">
                             <button className="rounded-full bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800">
-                              {offer.product_type === "item" ? "Order now" : "Explore"}
+                              {offer.product_type === "item" ? t("menu:order_now") : t("menu:explore")}
                             </button>
                           </div>
                         </div>
@@ -879,13 +883,13 @@ export default function RoomMenu() {
             return (
               <div key={catId ?? "all"} className="space-y-4">
                 <h2 className="text-lg font-bold text-gray-900">
-                  {catId === null ? "All items" : navItem?.name}
+                  {catId === null ? t("menu:all_items") : navItem?.name}
                 </h2>
                 
                 {items.length === 0 ? (
                   <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 bg-white py-12 text-center">
                     <ChefHat className="mb-2 h-8 w-8 text-gray-300" />
-                    <p className="text-sm font-medium text-gray-400">No items found</p>
+                    <p className="text-sm font-medium text-gray-400">{t("menu:no_items_found")}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3 min-[380px]:grid-cols-2">
@@ -910,7 +914,7 @@ export default function RoomMenu() {
             }`}
           >
             <MenuIcon className="h-5 w-5" />
-            <span className="max-w-full truncate">Menu</span>
+            <span className="max-w-full truncate">{t("menu:title")}</span>
           </button>
 
           <button
@@ -919,7 +923,7 @@ export default function RoomMenu() {
             className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Search className="h-5 w-5" />
-            <span className="max-w-full truncate">Search</span>
+            <span className="max-w-full truncate">{t("common:search")}</span>
           </button>
 
           <FloatingCartButton 
@@ -939,7 +943,7 @@ export default function RoomMenu() {
             className="flex min-w-0 flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 min-[360px]:rounded-2xl min-[360px]:text-[11px]"
           >
             <Bell className="h-5 w-5" />
-            <span className="max-w-full truncate">Orders</span>
+            <span className="max-w-full truncate">{t("menu:orders")}</span>
           </button>
 
           <button
@@ -952,7 +956,7 @@ export default function RoomMenu() {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
-            <span className="max-w-full truncate">Request</span>
+            <span className="max-w-full truncate">{t("common:request")}</span>
           </button>
         </div>
       </nav>

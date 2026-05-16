@@ -3,5 +3,9 @@
   "error": "Error",
   "close": "Close",
   "welcome": "Welcome",
-  "request": "Request"
+  "request": "Request",
+  "search": "Search",
+  "try_again": "Try again",
+  "something_went_wrong": "Something went wrong",
+  "logout": "Log Out"
 }
