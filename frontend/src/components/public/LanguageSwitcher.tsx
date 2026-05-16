@@ -3,7 +3,7 @@ import { Languages, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 export default function LanguageSwitcher() {
-  const { i18n, t } = useTranslation("common");
+  const { i18n } = useTranslation("common");
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 

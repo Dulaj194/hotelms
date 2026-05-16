@@ -28,7 +28,7 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: 'en', // Force default to English
+    // Remove hardcoded 'lng' to allow LanguageDetector to work
     fallbackLng: 'en',
     ns: ['common', 'menu', 'cart'],
     defaultNS: 'common',

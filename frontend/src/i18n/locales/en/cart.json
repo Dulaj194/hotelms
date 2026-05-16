@@ -12,5 +12,7 @@
   "note": "Note",
   "place_order": "Place Order",
   "clear_cart": "Clear cart",
-  "placing_order": "Placing order..."
+  "placing_order": "Placing order...",
+  "open_cart": "Open cart",
+  "open_cart_items": "Open cart, {{count}} items"
 }

@@ -31,12 +31,13 @@ import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publ
 import type { RoomOrderDetailResponse } from "@/types/roomSession";
 
 function FloatingCartButton({ itemCount, onOpenCart }: { itemCount: number; onOpenCart: () => void }) {
+  const { t } = useTranslation("cart");
   return (
     <button
       type="button"
       onClick={onOpenCart}
       className="relative -mt-6 mx-auto grid h-14 w-14 place-items-center rounded-full bg-orange-500 text-white shadow-[0_20px_40px_rgba(249,115,22,0.35)] transition hover:bg-orange-600 min-[360px]:-mt-7 min-[360px]:h-16 min-[360px]:w-16"
-      aria-label={itemCount > 0 ? `Open cart, ${itemCount} items` : "Open cart"}
+      aria-label={itemCount > 0 ? t("open_cart_items", { count: itemCount }) : t("open_cart")}
     >
       <ShoppingCart className="h-6 w-6 min-[360px]:h-7 min-[360px]:w-7" />
       {itemCount > 0 && (
@@ -303,6 +304,7 @@ function RoomCartDrawer({
 // Main page component
 
 export default function RoomMenu() {
+  const { t } = useTranslation(["common", "menu", "cart"]);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { restaurantId, roomNumber } = useParams<{
