@@ -34,6 +34,10 @@ _TARGET_LOOKUPS: dict[str, Callable[[Session, int, int], object | None]] = {
     "category": category_repo.get_by_id,
     "item": item_repo.get_by_id,
 }
+_MEDIA_SLOT_TO_FIELD = {
+    "primary": "image_path",
+    "primary_si": "image_path_si",
+}
 
 
 def _validate_dates(
@@ -178,8 +182,12 @@ async def upload_offer_image(
     db: Session,
     offer_id: int,
     restaurant_id: int,
+    slot: str,
     file: UploadFile,
 ) -> OfferImageUploadResponse:
+    if slot not in _MEDIA_SLOT_TO_FIELD:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid media slot.")
+
     current_offer = repository.get_by_id(db, offer_id, restaurant_id)
     if not current_offer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found.")
@@ -212,8 +220,13 @@ async def upload_offer_image(
         ) from exc
 
     image_path = f"/uploads/offers/{filename}"
-    previous_image_file = _to_offer_upload_file_path(current_offer.image_path)
-    offer = repository.update_image_path(db, offer_id, restaurant_id, image_path)
+    field_name = _MEDIA_SLOT_TO_FIELD[slot]
+    
+    # Get previous path for cleanup
+    prev_path = getattr(current_offer, field_name, None)
+    previous_image_file = _to_offer_upload_file_path(prev_path)
+    
+    offer = repository.update_media_path(db, offer_id, restaurant_id, field_name, image_path)
     if not offer:
         _safe_delete_file(new_file_path)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found.")

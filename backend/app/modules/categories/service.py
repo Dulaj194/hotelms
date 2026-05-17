@@ -14,6 +14,10 @@ from app.modules.categories.schemas import (
 
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+_MEDIA_SLOT_TO_FIELD = {
+    "primary": "image_path",
+    "primary_si": "image_path_si",
+}
 
 
 def list_categories(
@@ -93,13 +97,12 @@ async def upload_category_image(
     db: Session,
     category_id: int,
     restaurant_id: int,
+    slot: str,
     file: UploadFile,
 ) -> CategoryImageUploadResponse:
-    """Validate, save, and register a category image.
+    if slot not in _MEDIA_SLOT_TO_FIELD:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid media slot.")
 
-    SECURITY: Extension derived from content-type, never from original filename.
-    UUID filename prevents directory traversal. Size capped at settings limit.
-    """
     if file.content_type not in _ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -114,8 +117,9 @@ async def upload_category_image(
         ext_map=_EXT_MAP,
         max_size_mb=settings.max_upload_size_mb,
     )
+    field_name = _MEDIA_SLOT_TO_FIELD[slot]
     try:
-        category = repository.update_image_path(db, category_id, restaurant_id, image_path)
+        category = repository.update_media_path(db, category_id, restaurant_id, field_name, image_path)
     except SQLAlchemyError:
         db.rollback()
         delete_uploaded_file(upload_root=settings.upload_dir, public_path=image_path)

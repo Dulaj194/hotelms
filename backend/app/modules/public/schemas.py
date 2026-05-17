@@ -30,6 +30,7 @@ class PublicOfferResponse(BaseModel):
     description: str
     description_si: str | None = None
     image_path: str | None
+    image_path_si: str | None = None
     product_type: Literal["menu", "category", "item"]
     product_id: int
     is_featured: bool = False
@@ -48,6 +49,7 @@ class PublicItemSummaryResponse(BaseModel):
     description_si: str | None = None
     price: float
     image_path: str | None
+    image_path_si: str | None = None
     image_path_2: str | None = None
     image_path_3: str | None = None
     image_path_4: str | None = None
@@ -70,6 +72,7 @@ class PublicItemDetailResponse(BaseModel):
     description_si: str | None = None
     price: float
     image_path: str | None
+    image_path_si: str | None = None
     image_path_2: str | None = None
     image_path_3: str | None = None
     image_path_4: str | None = None
@@ -95,6 +98,7 @@ class PublicCategoryResponse(BaseModel):
     description: str | None
     description_si: str | None = None
     image_path: str | None
+    image_path_si: str | None = None
     sort_order: int
     menu_id: int
     items: list[PublicItemSummaryResponse]
@@ -112,6 +116,7 @@ class PublicMenuSectionResponse(BaseModel):
     description: str | None
     description_si: str | None = None
     image_path: str | None
+    image_path_si: str | None = None
     sort_order: int
     categories: list[PublicCategoryResponse]
 

@@ -31,6 +31,7 @@ class Item(Base):
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(12), nullable=False, default="LKR")
     image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_path_si: Mapped[str | None] = mapped_column(String(500), nullable=True)
     image_path_2: Mapped[str | None] = mapped_column(String(500), nullable=True)
     image_path_3: Mapped[str | None] = mapped_column(String(500), nullable=True)
     image_path_4: Mapped[str | None] = mapped_column(String(500), nullable=True)

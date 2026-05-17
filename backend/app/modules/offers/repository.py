@@ -91,16 +91,17 @@ def update_by_id(
     return offer
 
 
-def update_image_path(
+def update_media_path(
     db: Session,
     offer_id: int,
     restaurant_id: int,
-    image_path: str,
+    field_name: str,
+    path: str,
 ) -> Offer | None:
     offer = get_by_id(db, offer_id, restaurant_id)
     if not offer:
         return None
-    offer.image_path = image_path
+    setattr(offer, field_name, path)
     db.commit()
     db.refresh(offer)
     return offer

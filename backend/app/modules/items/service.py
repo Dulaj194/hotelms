@@ -21,6 +21,7 @@ _VIDEO_EXT_MAP = {"video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime":
 
 _MEDIA_SLOT_TO_FIELD = {
     "primary": "image_path",
+    "primary_si": "image_path_si",
     "additional_1": "image_path_2",
     "additional_2": "image_path_3",
     "additional_3": "image_path_4",

@@ -43,6 +43,9 @@ export function useOfferForm({
   const [originalStartDate, setOriginalStartDate] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [selectedFileSi, setSelectedFileSi] = useState<File | null>(null);
+  const [imagePreviewUrlSi, setImagePreviewUrlSi] = useState<string | null>(null);
+  const [existingImagePathSi, setExistingImagePathSi] = useState<string | null>(null);
 
   const today = todayDateString();
 
@@ -90,6 +93,7 @@ export function useOfferForm({
       const offer = await api.get<OfferResponse>(`/offers/${offerId}`);
       setFormData(mapOfferToFormData(offer));
       setExistingImagePath(offer.image_path);
+      setExistingImagePathSi(offer.image_path_si);
       setOriginalStartDate(offer.start_date);
     } catch (error) {
       setPageError(getErrorMessage(error, "Failed to load offer details."));
@@ -111,6 +115,14 @@ export function useOfferForm({
   const clearSelectedImage = useCallback(() => {
     setSelectedFile(null);
     setImagePreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  }, []);
+
+  const clearSelectedImageSi = useCallback(() => {
+    setSelectedFileSi(null);
+    setImagePreviewUrlSi((current) => {
       if (current) URL.revokeObjectURL(current);
       return null;
     });
@@ -145,6 +157,35 @@ export function useOfferForm({
     [clearSelectedImage]
   );
 
+  const handleFileChangeSi = useCallback(
+    (file: File | null) => {
+      if (!file) {
+        clearSelectedImageSi();
+        return;
+      }
+
+      if (!VALID_IMAGE_TYPES.includes(file.type)) {
+        setFormError("Invalid image format. Allowed: JPG, JPEG, PNG, WEBP, GIF.");
+        clearSelectedImageSi();
+        return;
+      }
+
+      if (file.size > IMAGE_MAX_BYTES) {
+        setFormError("Image exceeds 5MB limit.");
+        clearSelectedImageSi();
+        return;
+      }
+
+      setFormError(null);
+      setSelectedFileSi(file);
+      setImagePreviewUrlSi((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return URL.createObjectURL(file);
+      });
+    },
+    [clearSelectedImageSi]
+  );
+
   const handleStartDateChange = useCallback((value: string) => {
     setFormData((current) => ({
       ...current,
@@ -156,16 +197,27 @@ export function useOfferForm({
     }));
   }, []);
 
-  const uploadImage = useCallback(
+  const uploadImages = useCallback(
     async (targetOfferId: number) => {
-      if (!selectedFile) return;
+      const uploads = [];
+      
+      if (selectedFile) {
+        const body = new FormData();
+        body.append("file", selectedFile);
+        uploads.push(api.post<OfferImageUploadResponse>(`/offers/${targetOfferId}/media/primary`, body));
+      }
+      
+      if (selectedFileSi) {
+        const bodySi = new FormData();
+        bodySi.append("file", selectedFileSi);
+        uploads.push(api.post<OfferImageUploadResponse>(`/offers/${targetOfferId}/media/primary_si`, bodySi));
+      }
 
-      const body = new FormData();
-      body.append("file", selectedFile);
-
-      await api.post<OfferImageUploadResponse>(`/offers/${targetOfferId}/image`, body);
+      if (uploads.length > 0) {
+        await Promise.all(uploads);
+      }
     },
-    [selectedFile]
+    [selectedFile, selectedFileSi]
   );
 
   const saveOffer = useCallback(async () => {
@@ -191,10 +243,10 @@ export function useOfferForm({
 
       if (isEditMode && offerId) {
         await api.patch<OfferResponse>(`/offers/${offerId}`, payload);
-        await uploadImage(offerId);
+        await uploadImages(offerId);
       } else {
         const created = await api.post<OfferResponse>("/offers", payload);
-        await uploadImage(created.id);
+        await uploadImages(created.id);
       }
 
       return { success: true as const };
@@ -222,12 +274,17 @@ export function useOfferForm({
     formData,
     setFormData,
     existingImagePath,
+    existingImagePathSi,
     selectedFile,
+    selectedFileSi,
     imagePreviewUrl,
+    imagePreviewUrlSi,
     productOptions,
     minStartDate,
     clearSelectedImage,
+    clearSelectedImageSi,
     handleFileChange,
+    handleFileChangeSi,
     handleStartDateChange,
     saveOffer,
   };

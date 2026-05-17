@@ -3,6 +3,8 @@ import { UploadCloud } from "lucide-react";
 import { toAssetUrl } from "@/lib/assets";
 
 type Props = {
+  label?: string;
+  id?: string;
   selectedFile: File | null;
   imagePreviewUrl: string | null;
   existingImagePath: string | null;
@@ -11,6 +13,8 @@ type Props = {
 };
 
 export default function OfferImagePicker({
+  label = "Upload Image",
+  id = "offer-image-upload",
   selectedFile,
   imagePreviewUrl,
   existingImagePath,
@@ -20,13 +24,13 @@ export default function OfferImagePicker({
   return (
     <div className="md:col-span-2">
       <label className="mb-1 block text-sm font-semibold text-slate-700">
-        Upload Image
+        {label}
       </label>
 
       <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
         <div className="flex flex-wrap items-center gap-3">
           <label
-            htmlFor="offer-image-upload"
+            htmlFor={id}
             className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
           >
             <UploadCloud className="h-4 w-4" />
@@ -34,7 +38,7 @@ export default function OfferImagePicker({
           </label>
 
           <input
-            id="offer-image-upload"
+            id={id}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
             onChange={(event) => onFileChange(event.target.files?.[0] ?? null)}

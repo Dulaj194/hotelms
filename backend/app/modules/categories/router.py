@@ -82,16 +82,12 @@ def delete_category(
     return service.delete_category(db, category_id, restaurant_id)
 
 
-@router.post("/{category_id}/image", response_model=CategoryImageUploadResponse)
+@router.post("/{category_id}/media/{slot}", response_model=CategoryImageUploadResponse)
 async def upload_category_image(
     category_id: int,
+    slot: str,
     file: UploadFile = File(...),
     restaurant_id: int = Depends(_require_categories_restaurant_id),
     db: Session = Depends(get_db),
 ) -> CategoryImageUploadResponse:
-    """Upload/replace category image. Owner/admin only.
-
-    Multipart/form-data. Allowed: jpg, png, webp. Max: settings.max_upload_size_mb.
-    SECURITY: filename is UUID-generated server-side; restaurant_id from token.
-    """
-    return await service.upload_category_image(db, category_id, restaurant_id, file)
+    return await service.upload_category_image(db, category_id, restaurant_id, slot, file)

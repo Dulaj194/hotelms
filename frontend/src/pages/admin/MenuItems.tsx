@@ -10,10 +10,11 @@ import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
 import type { Category, Item } from "@/types/menu";
 import type { RestaurantMeResponse } from "@/types/restaurant";
 
-type MediaSlot = "primary" | "additional_1" | "additional_2" | "additional_3" | "additional_4" | "video";
+type MediaSlot = "primary" | "primary_si" | "additional_1" | "additional_2" | "additional_3" | "additional_4" | "video";
 
 const IMAGE_SLOTS: Array<{ slot: Exclude<MediaSlot, "video">; label: string }> = [
   { slot: "primary", label: "Primary Image" },
+  { slot: "primary_si", label: "Sinhala Image (Optional)" },
   { slot: "additional_1", label: "Additional Image 1" },
   { slot: "additional_2", label: "Additional Image 2" },
   { slot: "additional_3", label: "Additional Image 3" },
@@ -22,6 +23,7 @@ const IMAGE_SLOTS: Array<{ slot: Exclude<MediaSlot, "video">; label: string }> =
 
 const SLOT_TO_API_SEGMENT: Record<MediaSlot, string> = {
   primary: "primary",
+  primary_si: "primary_si",
   additional_1: "additional_1",
   additional_2: "additional_2",
   additional_3: "additional_3",
@@ -31,6 +33,7 @@ const SLOT_TO_API_SEGMENT: Record<MediaSlot, string> = {
 
 const SLOT_TO_ITEM_FIELD: Record<MediaSlot, keyof Item> = {
   primary: "image_path",
+  primary_si: "image_path_si",
   additional_1: "image_path_2",
   additional_2: "image_path_3",
   additional_3: "image_path_4",
@@ -266,6 +269,7 @@ export default function MenuItems() {
         category_id: formData.category_id,
         blog_link: formData.blog_link.trim() || null,
         image_path: removeExistingMedia.primary ? null : undefined,
+        image_path_si: removeExistingMedia.primary_si ? null : undefined,
         image_path_2: removeExistingMedia.additional_1 ? null : undefined,
         image_path_3: removeExistingMedia.additional_2 ? null : undefined,
         image_path_4: removeExistingMedia.additional_3 ? null : undefined,
@@ -357,10 +361,10 @@ export default function MenuItems() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const response = await api.post<{ image_path: string }>(`/items/${uploadTarget.id}/image`, fd);
+      const response = await api.post<{ path: string }>(`/items/${uploadTarget.id}/media/primary`, fd);
       setItems((current) =>
         current.map((item) =>
-          item.id === uploadTarget.id ? { ...item, image_path: response.image_path } : item,
+          item.id === uploadTarget.id ? { ...item, image_path: response.path } : item,
         ),
       );
     } catch {

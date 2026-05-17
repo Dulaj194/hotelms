@@ -10,6 +10,7 @@
 import { getAccessToken } from "@/lib/auth";
 import { clearAuth, setAccessToken } from "@/lib/auth";
 import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
+import i18n from "@/i18n/config";
 
 const BASE_URL = RESOLVED_API_BASE_URL;
 const REFRESH_PATH = "/auth/refresh";
@@ -99,6 +100,7 @@ async function request<T>(
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
+  headers["Accept-Language"] = i18n.language || "en";
   if (options?.headers) {
     Object.assign(headers, options.headers);
   }

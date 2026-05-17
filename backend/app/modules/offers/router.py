@@ -74,11 +74,12 @@ def delete_offer(
     return service.delete_offer(db, offer_id, restaurant_id)
 
 
-@router.post("/{offer_id}/image", response_model=OfferImageUploadResponse)
+@router.post("/{offer_id}/media/{slot}", response_model=OfferImageUploadResponse)
 async def upload_offer_image(
     offer_id: int,
+    slot: str,
     file: UploadFile = File(...),
     restaurant_id: int = Depends(_require_offers_restaurant_id),
     db: Session = Depends(get_db),
 ) -> OfferImageUploadResponse:
-    return await service.upload_offer_image(db, offer_id, restaurant_id, file)
+    return await service.upload_offer_image(db, offer_id, restaurant_id, slot, file)

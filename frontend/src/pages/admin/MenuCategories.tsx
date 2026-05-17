@@ -21,6 +21,7 @@ interface FormData {
   menu_id: number | "";
   sort_order: number;
   is_active: boolean;
+  image_path_si?: string | null;
 }
 
 const EMPTY_FORM: FormData = {
@@ -221,7 +222,7 @@ export default function MenuCategories() {
       if (selectedImageFile) {
         const fd = new FormData();
         fd.append("file", selectedImageFile);
-        await api.post(`/categories/${savedCategoryId}/image`, fd);
+        await api.post(`/categories/${savedCategoryId}/media/primary`, fd);
       }
 
       closeModal();
@@ -264,7 +265,7 @@ export default function MenuCategories() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      await api.post(`/categories/${uploadTarget.id}/image`, fd);
+      await api.post(`/categories/${uploadTarget.id}/media/primary`, fd);
       await loadCategories();
     } catch {
       await loadCategories();
@@ -567,18 +568,39 @@ export default function MenuCategories() {
                 )}
               </div>
 
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">Image (optional)</label>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleModalImageChange}
-                  className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100"
-                />
-                <p className="mt-1 text-[11px] text-gray-400">
-                  Max file size 5MB (JPG, PNG, WebP)
-                  {selectedImageFile ? ` - Selected: ${selectedImageFile.name}` : ""}
-                </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">Image (English)</label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleModalImageChange}
+                    className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Max file size 5MB (JPG, PNG, WebP)
+                  </p>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-700">Image (Sinhala)</label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file && editingCategory) {
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        await api.post(`/categories/${editingCategory.id}/media/primary_si`, fd);
+                        await loadCategories();
+                      }
+                    }}
+                    className="w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-100"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-400">
+                    Localized banner for guests using Sinhala.
+                  </p>
+                </div>
               </div>
 
               <div>

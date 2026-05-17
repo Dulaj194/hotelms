@@ -385,7 +385,7 @@ export default function RoomMenu() {
     };
 
     void fetchMenu();
-  }, [restaurantId]);
+  }, [restaurantId, i18n.language]);
 
   // 2.1 Fetch quick services
   useEffect(() => {

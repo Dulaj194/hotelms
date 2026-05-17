@@ -83,8 +83,11 @@ export default function OfferFormPage() {
               setFormData={form.setFormData}
               productOptions={form.productOptions}
               existingImagePath={form.existingImagePath}
+              existingImagePathSi={form.existingImagePathSi}
               selectedFile={form.selectedFile}
+              selectedFileSi={form.selectedFileSi}
               imagePreviewUrl={form.imagePreviewUrl}
+              imagePreviewUrlSi={form.imagePreviewUrlSi}
               formError={form.formError}
               minStartDate={form.minStartDate}
               saving={form.saving}
@@ -93,7 +96,9 @@ export default function OfferFormPage() {
               onOpenStartDatePicker={() => openDatePicker(startDateRef)}
               onOpenEndDatePicker={() => openDatePicker(endDateRef)}
               onFileChange={form.handleFileChange}
+              onFileChangeSi={form.handleFileChangeSi}
               onClearSelectedImage={form.clearSelectedImage}
+              onClearSelectedImageSi={form.clearSelectedImageSi}
               onStartDateChange={form.handleStartDateChange}
               onCancel={() => navigate("/admin/offers")}
               onSubmit={() => void handleSubmit()}

@@ -17,8 +17,11 @@ type Props = {
   setFormData: Dispatch<SetStateAction<OfferFormData>>;
   productOptions: ProductOption[];
   existingImagePath: string | null;
+  existingImagePathSi: string | null;
   selectedFile: File | null;
+  selectedFileSi: File | null;
   imagePreviewUrl: string | null;
+  imagePreviewUrlSi: string | null;
   formError: string | null;
   minStartDate: string;
   saving: boolean;
@@ -27,7 +30,9 @@ type Props = {
   onOpenStartDatePicker: () => void;
   onOpenEndDatePicker: () => void;
   onFileChange: (file: File | null) => void;
+  onFileChangeSi: (file: File | null) => void;
   onClearSelectedImage: () => void;
+  onClearSelectedImageSi: () => void;
   onStartDateChange: (value: string) => void;
   onCancel: () => void;
   onSubmit: () => void;
@@ -39,8 +44,11 @@ export default function OfferForm({
   setFormData,
   productOptions,
   existingImagePath,
+  existingImagePathSi,
   selectedFile,
+  selectedFileSi,
   imagePreviewUrl,
+  imagePreviewUrlSi,
   formError,
   minStartDate,
   saving,
@@ -49,7 +57,9 @@ export default function OfferForm({
   onOpenStartDatePicker,
   onOpenEndDatePicker,
   onFileChange,
+  onFileChangeSi,
   onClearSelectedImage,
+  onClearSelectedImageSi,
   onStartDateChange,
   onCancel,
   onSubmit,
@@ -163,11 +173,23 @@ export default function OfferForm({
           </div>
 
           <OfferImagePicker
+            label="Upload Image (English)"
+            id="offer-image-en"
             selectedFile={selectedFile}
             imagePreviewUrl={imagePreviewUrl}
             existingImagePath={existingImagePath}
             onFileChange={onFileChange}
             onClear={onClearSelectedImage}
+          />
+
+          <OfferImagePicker
+            label="Upload Image (Sinhala)"
+            id="offer-image-si"
+            selectedFile={selectedFileSi}
+            imagePreviewUrl={imagePreviewUrlSi}
+            existingImagePath={existingImagePathSi}
+            onFileChange={onFileChangeSi}
+            onClear={onClearSelectedImageSi}
           />
 
           <div>

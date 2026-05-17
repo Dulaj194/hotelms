@@ -7,9 +7,9 @@
  */
 
 import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
+import i18n from "@/i18n/config";
 
-const BASE_URL =
-  RESOLVED_API_BASE_URL;
+const BASE_URL = RESOLVED_API_BASE_URL;
 
 export interface PublicApiOptions {
   headers?: Record<string, string>;
@@ -30,7 +30,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 export async function publicGet<T>(path: string, options?: PublicApiOptions): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    "Accept-Language": i18n.language || "en",
+  };
   if (options?.headers) {
     Object.assign(headers, options.headers);
   }
@@ -45,6 +47,7 @@ export async function publicGet<T>(path: string, options?: PublicApiOptions): Pr
 export async function publicPost<T>(path: string, body: unknown, options?: PublicApiOptions): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "Accept-Language": i18n.language || "en",
   };
   if (options?.headers) {
     Object.assign(headers, options.headers);
@@ -61,6 +64,7 @@ export async function publicPost<T>(path: string, body: unknown, options?: Publi
 export async function publicPatch<T>(path: string, body: unknown, options?: PublicApiOptions): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "Accept-Language": i18n.language || "en",
   };
   if (options?.headers) {
     Object.assign(headers, options.headers);

@@ -15,6 +15,7 @@ import {
   MessageSquareText,
 } from "lucide-react";
 
+import { useTranslation } from "react-i18next";
 import {
   getGuestDisplayName,
   getGuestQrAccessKey,
@@ -23,6 +24,7 @@ import {
 import { useLocalTableCart } from "@/hooks/useLocalMenuCart";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
+import LanguageSwitcher from "@/components/public/LanguageSwitcher";
 import { publicGet } from "@/lib/publicApi";
 import type { CartItemResponse } from "@/types/cart";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
@@ -57,6 +59,7 @@ function buildMenuItems(menu: PublicMenuResponse | null): MenuItemWithCategory[]
 
 
 export default function TableCartCheckout() {
+  const { t, i18n } = useTranslation(["common", "menu", "cart"]);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber } = useParams<{
@@ -165,7 +168,7 @@ export default function TableCartCheckout() {
     };
 
     void loadMenu();
-  }, [restaurantId]);
+  }, [restaurantId, i18n.language]);
 
   useEffect(() => {
     if (itemCount === 0) {
@@ -396,14 +399,17 @@ export default function TableCartCheckout() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setEditMode((current) => !current)}
-            className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            {editMode ? "Done" : "Edit"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <LanguageSwitcher />
+            <button
+              type="button"
+              onClick={() => setEditMode((current) => !current)}
+              className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {editMode ? "Done" : "Edit"}
+            </button>
+          </div>
         </div>
 
         {editMode && itemCount > 0 && (

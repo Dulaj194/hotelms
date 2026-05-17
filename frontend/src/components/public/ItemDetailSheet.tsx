@@ -32,10 +32,9 @@ export default function ItemDetailSheet({
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const isSi = i18n.language === "si";
-  const displayName = isSi && item?.name_si ? item.name_si : (item?.name || "");
-  const displayDesc = isSi && item?.description_si ? item.description_si : (item?.description || "This signature dish is crafted using time-honored techniques and the freshest ingredients available. Every element is designed to provide a sophisticated and memorable dining experience.");
-  const displayMore = isSi && item?.more_details_si ? item.more_details_si : (item?.more_details || null);
+  const displayName = item?.name || "";
+  const displayDesc = item?.description || "This signature dish is crafted using time-honored techniques and the freshest ingredients available. Every element is designed to provide a sophisticated and memorable dining experience.";
+  const displayMore = item?.more_details || null;
 
   const images = useMemo(() => {
     if (!item) return [];

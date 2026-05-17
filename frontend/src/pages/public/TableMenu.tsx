@@ -349,7 +349,7 @@ export default function TableMenu() {
     };
 
     void fetchMenu();
-  }, [restaurantId]);
+  }, [restaurantId, i18n.language]);
 
   // 2.1 Fetch quick services
   useEffect(() => {
@@ -928,7 +928,7 @@ export default function TableMenu() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-bold text-slate-900">
-                            {i18n.language === "si" && tile.item.name_si ? tile.item.name_si : tile.item.name}
+                            {tile.item.name}
                           </p>
                           <div className="mt-0.5 flex items-center gap-2">
                             <span className="text-xs font-black text-orange-600">${tile.item.price.toFixed(2)}</span>

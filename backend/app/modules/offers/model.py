@@ -31,6 +31,7 @@ class Offer(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     description_si: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_path_si: Mapped[str | None] = mapped_column(String(500), nullable=True)
     product_type: Mapped[OfferTargetType] = mapped_column(
         Enum(OfferTargetType), nullable=False, index=True
     )
