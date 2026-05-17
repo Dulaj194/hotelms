@@ -24,6 +24,7 @@ export interface Item {
   price: number;
   currency: string;
   image_path: string | null;
+  image_path_si: string | null;
   image_path_2: string | null;
   image_path_3: string | null;
   image_path_4: string | null;

@@ -8,6 +8,7 @@ export interface OfferResponse {
   description: string;
   description_si: string | null;
   image_path: string | null;
+  image_path_si: string | null;
   product_type: OfferTargetType;
   product_id: number;
   start_date: string;

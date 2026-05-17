@@ -2,7 +2,6 @@ import { ShoppingCart, X, Plus, Minus, Check, UtensilsCrossed, Info, ChevronRigh
 import SafeMenuAsset from "./SafeMenuAsset";
 import { PublicItemSummaryResponse } from "@/types/publicMenu";
 import { useEffect, useState, useMemo, useRef } from "react";
-import { useTranslation } from "react-i18next";
 
 interface ItemDetailSheetProps {
   item: PublicItemSummaryResponse | null;
@@ -21,7 +20,6 @@ export default function ItemDetailSheet({
   qtyInCart,
   formatPrice,
 }: ItemDetailSheetProps) {
-  const { i18n } = useTranslation();
   const [adding, setAdding] = useState(false);
   const [success, setSuccess] = useState(false);
   const [localQty, setLocalQty] = useState(1);

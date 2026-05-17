@@ -263,7 +263,7 @@ export function useOfferForm({
     originalStartDate,
     selectedFile,
     today,
-    uploadImage,
+    uploadImages,
   ]);
 
   return {
