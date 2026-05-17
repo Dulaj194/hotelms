@@ -16,7 +16,7 @@ export default function MenuBrowserRail({
   activeCategoryId,
   onSelectCategory,
 }: MenuBrowserRailProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const categoryRefs = useRef(new Map<string, HTMLButtonElement | null>());
 
   const scrollIntoViewIfAvailable = (node: HTMLButtonElement | null | undefined) => {
@@ -96,7 +96,7 @@ export default function MenuBrowserRail({
               <span className={`min-w-0 truncate text-sm font-bold tracking-tight ${
                 isActive ? "text-white" : "text-slate-700"
               }`}>
-                {i18n.language === "si" && category.name_si ? category.name_si : category.name}
+                {category.name}
               </span>
             </button>
           );

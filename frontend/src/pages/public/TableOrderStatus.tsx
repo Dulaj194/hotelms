@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   getGuestToken,
 } from "@/hooks/useGuestSession";
+import { useTranslation } from "react-i18next";
 import { isSessionHttpError } from "@/features/public/sessionHttp";
 import {
   fetchGuestSessionJson,
@@ -36,6 +37,7 @@ const POLL_INTERVAL_MS = 15_000; // refresh every 15 s
 const FINALIZED: Set<string> = new Set(["completed", "served", "paid", "rejected"]);
 
 export default function TableOrderStatus() {
+  const { t } = useTranslation(["common", "menu", "cart"]);
   const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber, orderId } = useParams<{
     restaurantId: string;
@@ -88,13 +90,13 @@ export default function TableOrderStatus() {
           }
         }
 
-        setError("Guest session expired. Please scan the table QR code again.");
+        setError(t("cart:guest_session_expired"));
         return;
       }
 
       setError(err instanceof Error ? err.message : "Could not load order.");
     }
-  }, [orderId, restoreGuestSession]);
+  }, [orderId, restoreGuestSession, t]);
 
   useEffect(() => {
     if (getGuestToken()) {
@@ -103,19 +105,19 @@ export default function TableOrderStatus() {
     }
 
     if (!restaurantId || !tableNumber || !effectiveQrAccessKey) {
-      setError("Guest session expired. Please scan the table QR code again.");
+      setError(t("cart:guest_session_expired"));
       return;
     }
 
     if (!guestName) {
-      setError("Guest session expired. Please scan the table QR code again.");
+      setError(t("cart:guest_session_expired"));
       return;
     }
 
     const restoreSession = async () => {
       const restored = await restoreGuestSession();
       if (!restored) {
-        setError("Could not restore the table session. Please scan the QR code again.");
+        setError(t("cart:could_not_restore_session"));
       }
     };
 
@@ -145,7 +147,7 @@ export default function TableOrderStatus() {
           }
         }
 
-        setCancelError("Guest session expired. Please scan the table QR code again.");
+        setCancelError(t("cart:guest_session_expired"));
         return;
       }
 
@@ -153,7 +155,7 @@ export default function TableOrderStatus() {
     } finally {
       setCanceling(false);
     }
-  }, [cancelRemaining, canceling, load, orderId, restoreGuestSession]);
+  }, [cancelRemaining, canceling, load, orderId, restoreGuestSession, t]);
 
   // Initial load
   useEffect(() => {
@@ -190,7 +192,7 @@ export default function TableOrderStatus() {
   if (!order) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-slate-50">
-        <p className="animate-pulse text-sm text-slate-500">Loading order...</p>
+        <p className="animate-pulse text-sm text-slate-500">{t("cart:loading_order")}</p>
       </div>
     );
   }
@@ -219,7 +221,7 @@ export default function TableOrderStatus() {
         {/* Status timeline */}
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-sm">
-            Order Status
+            {t("cart:order_status_title")}
           </h2>
           <OrderTimeline order={order} />
         </section>
@@ -227,7 +229,7 @@ export default function TableOrderStatus() {
         {/* Items */}
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-sm">
-            Items
+            {t("cart:items")}
           </h2>
           <div className="mt-3 space-y-3">
             {order.items.map((item) => (
@@ -255,23 +257,23 @@ export default function TableOrderStatus() {
         {/* Totals */}
         <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5">
           <div className="flex justify-between py-1">
-            <span className="text-slate-500">Subtotal</span>
+            <span className="text-slate-500">{t("cart:subtotal")}</span>
             <span>${order.subtotal_amount.toFixed(2)}</span>
           </div>
           {order.tax_amount > 0 && (
             <div className="flex justify-between py-1">
-              <span className="text-slate-500">Tax</span>
+              <span className="text-slate-500">{t("cart:tax")}</span>
               <span>${order.tax_amount.toFixed(2)}</span>
             </div>
           )}
           {order.discount_amount > 0 && (
             <div className="flex justify-between py-1 text-emerald-600">
-              <span>Discount</span>
+              <span>{t("cart:discount")}</span>
               <span>-${order.discount_amount.toFixed(2)}</span>
             </div>
           )}
           <div className="mt-2 flex justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-900">
-            <span>Total</span>
+            <span>{t("cart:total")}</span>
             <span>${order.total_amount.toFixed(2)}</span>
           </div>
         </section>
@@ -280,7 +282,7 @@ export default function TableOrderStatus() {
         {order.notes && (
           <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5">
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Notes
+              {t("cart:notes")}
             </p>
             <p className="text-slate-700">{order.notes}</p>
           </section>
@@ -288,7 +290,7 @@ export default function TableOrderStatus() {
 
         {!FINALIZED.has(order.status) && (
           <p className="text-center text-xs text-slate-400">
-            This page refreshes automatically every 15 seconds.
+            {t("cart:auto_refresh_notice")}
           </p>
         )}
 
@@ -303,7 +305,7 @@ export default function TableOrderStatus() {
               }
               className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
             >
-              View my orders
+              {t("cart:view_my_orders")}
             </Link>
             <Link
               to={
@@ -313,7 +315,7 @@ export default function TableOrderStatus() {
               }
               className="inline-flex min-h-11 items-center justify-center rounded-xl border border-orange-200 px-4 text-sm font-semibold text-orange-700 transition hover:bg-orange-50"
             >
-              Back to menu
+              {t("cart:back_to_menu")}
             </Link>
           </div>
         )}
@@ -324,7 +326,7 @@ export default function TableOrderStatus() {
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 sm:mb-6 sm:bg-white">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">
-                Quick Cancel Window
+                {t("cart:quick_cancel_window")}
               </p>
               <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">
                 {cancelRemaining}s
@@ -336,7 +338,7 @@ export default function TableOrderStatus() {
               disabled={canceling}
               className="min-h-12 w-full rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {canceling ? "Cancelling..." : `Cancel Order (${cancelRemaining}s)`}
+              {canceling ? t("cart:cancelling") : `${t("cart:cancel_order")} (${cancelRemaining}s)`}
             </button>
             {cancelError && <p className="mt-2 text-xs text-red-600">{cancelError}</p>}
           </div>
@@ -358,11 +360,12 @@ const LIFECYCLE_STEPS: Array<{ status: OrderDetailResponse["status"]; label: str
 ];
 
 function OrderTimeline({ order }: { order: OrderDetailResponse }) {
+  const { t } = useTranslation(["common", "menu", "cart"]);
   if (order.status === "rejected") {
     return (
       <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">
         <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
-        <span className="text-sm font-medium">Order rejected</span>
+        <span className="text-sm font-medium">{t("cart:order_rejected_timeline")}</span>
       </div>
     );
   }
@@ -374,6 +377,15 @@ function OrderTimeline({ order }: { order: OrderDetailResponse }) {
       {LIFECYCLE_STEPS.map((step, idx) => {
         const done = idx < statusIndex;
         const current = idx === statusIndex;
+        
+        let displayLabel = step.label;
+        if (step.status === "pending") displayLabel = t("cart:order_placed_timeline");
+        else if (step.status === "confirmed") displayLabel = t("cart:confirmed_timeline");
+        else if (step.status === "processing") displayLabel = t("cart:being_prepared_timeline");
+        else if (step.status === "completed") displayLabel = t("cart:ready_timeline");
+        else if (step.status === "served") displayLabel = t("cart:served_timeline");
+        else if (step.status === "paid") displayLabel = t("cart:paid_timeline");
+
         return (
           <li key={step.status} className="flex items-center gap-3 rounded-lg px-1 py-1 text-sm">
             <span
@@ -394,7 +406,7 @@ function OrderTimeline({ order }: { order: OrderDetailResponse }) {
                   : "text-gray-400"
               }
             >
-              {step.label}
+              {displayLabel}
             </span>
           </li>
         );

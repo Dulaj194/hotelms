@@ -374,7 +374,7 @@ export default function TableCartCheckout() {
               }}
               className="mt-8 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-blue-600 px-8 text-sm font-black text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 active:scale-95"
             >
-              Okay
+              {t("cart:okay")}
             </button>
           </div>
         </div>
@@ -518,7 +518,7 @@ export default function TableCartCheckout() {
                 setCouponError(null);
               }}
               className="min-w-0 flex-1 rounded-xl border border-amber-200 bg-white px-3 text-sm font-semibold uppercase text-slate-900 outline-none transition placeholder:normal-case placeholder:text-slate-400 focus:border-amber-400 focus:ring-4 focus:ring-amber-100"
-              placeholder="Coupon code"
+              placeholder={t("cart:coupon_code")}
             />
             <button
               type="button"
@@ -526,7 +526,7 @@ export default function TableCartCheckout() {
               disabled={applyingCoupon || itemCount === 0}
               className="min-h-11 rounded-xl bg-amber-500 px-4 text-xs font-black text-white transition hover:bg-amber-600 disabled:opacity-60"
             >
-              {applyingCoupon ? "..." : "Apply"}
+              {applyingCoupon ? "..." : t("cart:apply")}
             </button>
           </div>
 
@@ -534,25 +534,25 @@ export default function TableCartCheckout() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-[0_10px_26px_rgba(15,23,42,0.05)]">
-          <h2 className="mb-3 text-base font-black text-slate-900">Order Summary</h2>
+          <h2 className="mb-3 text-base font-black text-slate-900">{t("cart:order_summary")}</h2>
           <div className="space-y-2 text-slate-600">
             <div className="flex items-center justify-between gap-3">
-              <span>Sub total</span>
+              <span>{t("cart:subtotal")}</span>
               <span className="font-semibold text-slate-900">{formatCurrency(subtotal)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span>Discount</span>
+              <span>{t("cart:discount")}</span>
               <span className="font-semibold text-emerald-700">-{formatCurrency(discount)}</span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span>Taxes / charges</span>
+              <span>{t("cart:taxes_charges")}</span>
               <span className="font-semibold text-slate-900">
                 {formatCurrency(taxesAndCharges)}
               </span>
             </div>
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base font-black text-slate-900">
-            <span>Grand total</span>
+            <span>{t("cart:grand_total")}</span>
             <span>{formatCurrency(grandTotal)}</span>
           </div>
         </section>
@@ -568,7 +568,7 @@ export default function TableCartCheckout() {
         <div className="mx-auto flex w-full max-w-md items-center gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-              Payable
+              {t("cart:payable")}
             </p>
             <p key={grandTotal} className="text-lg font-black text-slate-900 animate-pop-in">{formatCurrency(grandTotal)}</p>
           </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { getRoomToken } from "@/hooks/useRoomSession";
+import { useTranslation } from "react-i18next";
 import { isSessionHttpError } from "@/features/public/sessionHttp";
 import { fetchRoomSessionJson, restoreRoomSession } from "@/features/public/roomSession";
 import {
@@ -37,13 +38,14 @@ function getRemainingCancelSeconds(order: RoomOrderDetailResponse | null): numbe
 }
 
 function OrderTimeline({ order }: { order: RoomOrderDetailResponse }) {
+  const { t } = useTranslation(["common", "menu", "cart"]);
   const steps: Array<{ status: OrderStatus; label: string }> = [
-    { status: "pending", label: "Order placed" },
-    { status: "confirmed", label: "Confirmed" },
-    { status: "processing", label: "Being prepared" },
-    { status: "completed", label: "Ready for delivery" },
-    { status: "served", label: "Delivered" },
-    { status: "paid", label: "Charged to folio" },
+    { status: "pending", label: t("cart:order_placed_timeline") },
+    { status: "confirmed", label: t("cart:confirmed_timeline") },
+    { status: "processing", label: t("cart:being_prepared_timeline") },
+    { status: "completed", label: t("cart:ready_delivery_timeline") },
+    { status: "served", label: t("cart:delivered_timeline") },
+    { status: "paid", label: t("cart:charged_folio_timeline") },
   ];
 
   if (!isKnownOrderStatus(order.status)) {
@@ -58,7 +60,7 @@ function OrderTimeline({ order }: { order: RoomOrderDetailResponse }) {
     return (
       <div className="flex items-center gap-2 text-red-600">
         <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
-        <span className="text-sm font-medium">Order rejected</span>
+        <span className="text-sm font-medium">{t("cart:order_rejected_timeline")}</span>
       </div>
     );
   }
@@ -101,6 +103,7 @@ function OrderTimeline({ order }: { order: RoomOrderDetailResponse }) {
 }
 
 export default function RoomOrderStatus() {
+  const { t } = useTranslation(["common", "menu", "cart"]);
   const [searchParams] = useSearchParams();
   const { restaurantId, roomNumber, orderId } = useParams<{
     restaurantId: string;
@@ -138,14 +141,14 @@ export default function RoomOrderStatus() {
     }
 
     if (!restaurantId || !roomNumber || !qrAccessKey) {
-      setError("Room session expired. Please scan the room QR code again.");
+      setError(t("cart:room_session_expired"));
       return;
     }
 
     const startRoomSession = async () => {
       const restored = await restoreRoomGuestSession();
       if (!restored) {
-        setError("Could not restore the room session. Please scan the room QR code again.");
+        setError(t("cart:could_not_restore_room_session"));
       }
     };
 
@@ -179,7 +182,7 @@ export default function RoomOrderStatus() {
           }
         }
 
-        setError("Room session expired. Please scan the room QR code again.");
+        setError(t("cart:room_session_expired"));
         return;
       }
 
@@ -187,7 +190,7 @@ export default function RoomOrderStatus() {
         loadError instanceof Error ? loadError.message : "Could not load room order.",
       );
     }
-  }, [orderId, restoreRoomGuestSession, sessionReady]);
+  }, [orderId, restoreRoomGuestSession, sessionReady, t]);
 
   const handleCancelOrder = useCallback(async () => {
     if (!orderId || cancelRemaining <= 0 || canceling) return;
@@ -216,7 +219,7 @@ export default function RoomOrderStatus() {
           }
         }
 
-        setCancelError("Room session expired. Please scan the room QR code again.");
+        setCancelError(t("cart:room_session_expired"));
         return;
       }
 
@@ -226,7 +229,7 @@ export default function RoomOrderStatus() {
     } finally {
       setCanceling(false);
     }
-  }, [cancelRemaining, canceling, loadOrder, orderId, restoreRoomGuestSession]);
+  }, [cancelRemaining, canceling, loadOrder, orderId, restoreRoomGuestSession, t]);
 
   useEffect(() => {
     void loadOrder();
@@ -271,7 +274,7 @@ export default function RoomOrderStatus() {
   if (!order) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-slate-50">
-        <p className="animate-pulse text-sm text-slate-500">Loading room order...</p>
+        <p className="animate-pulse text-sm text-slate-500">{t("cart:loading_room_order")}</p>
       </div>
     );
   }
@@ -299,14 +302,14 @@ export default function RoomOrderStatus() {
       <main className="mx-auto flex w-full max-w-2xl flex-col gap-5 px-4 py-6">
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">
-            Order Status
+            {t("cart:order_status_title")}
           </h2>
           <OrderTimeline order={order} />
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">
-            Items
+            {t("cart:items")}
           </h2>
           <div className="space-y-3">
             {order.items.map((item) => (
@@ -332,23 +335,23 @@ export default function RoomOrderStatus() {
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-slate-500">Subtotal</span>
+            <span className="text-slate-500">{t("cart:subtotal")}</span>
             <span>${order.subtotal_amount.toFixed(2)}</span>
           </div>
           {order.tax_amount > 0 && (
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-slate-500">Tax</span>
+              <span className="text-slate-500">{t("cart:tax")}</span>
               <span>${order.tax_amount.toFixed(2)}</span>
             </div>
           )}
           {order.discount_amount > 0 && (
             <div className="mt-2 flex items-center justify-between text-emerald-600">
-              <span>Discount</span>
+              <span>{t("cart:discount")}</span>
               <span>-${order.discount_amount.toFixed(2)}</span>
             </div>
           )}
           <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-base font-bold text-slate-900">
-            <span>Total</span>
+            <span>{t("cart:total")}</span>
             <span>${order.total_amount.toFixed(2)}</span>
           </div>
         </section>
@@ -356,7 +359,7 @@ export default function RoomOrderStatus() {
         {order.notes && (
           <section className="rounded-3xl border border-slate-200 bg-white p-5 text-sm shadow-sm">
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              Notes
+              {t("cart:notes")}
             </p>
             <p className="text-slate-700">{order.notes}</p>
           </section>
@@ -365,10 +368,10 @@ export default function RoomOrderStatus() {
         {(order.status === "pending" || order.status === "confirmed") && cancelRemaining > 0 && (
           <section className="rounded-3xl border border-slate-200 bg-white p-5 text-sm shadow-sm space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              Quick Cancel Window
+              {t("cart:quick_cancel_window")}
             </p>
             <p className="text-slate-600">
-              You can cancel this room order within 10 seconds after placing it.
+              {t("cart:quick_cancel_room_desc")}
             </p>
             <button
               type="button"
@@ -376,7 +379,7 @@ export default function RoomOrderStatus() {
               disabled={canceling}
               className="w-full rounded-2xl bg-red-600 px-4 py-2.5 font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {canceling ? "Cancelling..." : `Cancel Order (${cancelRemaining}s)`}
+              {canceling ? t("cart:cancelling") : `${t("cart:cancel_order")} (${cancelRemaining}s)`}
             </button>
             {cancelError ? <p className="text-xs text-red-600">{cancelError}</p> : null}
           </section>
@@ -384,7 +387,7 @@ export default function RoomOrderStatus() {
 
         {!orderStatus || !FINALIZED.has(orderStatus) ? (
           <p className="text-center text-xs text-slate-400">
-            This page refreshes automatically every 15 seconds.
+            {t("cart:auto_refresh_notice")}
           </p>
         ) : null}
 
@@ -399,7 +402,7 @@ export default function RoomOrderStatus() {
               }
               className="inline-flex min-h-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
             >
-              View my orders
+              {t("cart:view_my_orders")}
             </Link>
             <Link
               to={
@@ -409,7 +412,7 @@ export default function RoomOrderStatus() {
               }
               className="text-sm font-semibold text-orange-600 hover:underline"
             >
-              Back to room menu
+              {t("cart:back_to_menu")}
             </Link>
           </div>
         )}

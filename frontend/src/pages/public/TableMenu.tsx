@@ -193,10 +193,8 @@ export default function TableMenu() {
         ? visibleCategories
         : visibleCategories.filter((category) => category.id === activeCategoryId);
 
-    const isSi = i18n.language === "si";
-
     return categorySource.flatMap((category) => {
-      const catName = isSi && category.name_si ? category.name_si : category.name;
+      const catName = category.name;
       return category.items.map((item) => ({
         item,
         categoryId: category.id,
@@ -701,9 +699,8 @@ export default function TableMenu() {
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
     const activeOffer = menu?.offers?.find(o => o.product_type === "item" && o.product_id === item.id);
-    const isSi = i18n.language === "si";
-    const displayName = isSi && item.name_si ? item.name_si : item.name;
-    const displayDesc = isSi && item.description_si ? item.description_si : (item.description || t("menu:default_description"));
+    const displayName = item.name;
+    const displayDesc = item.description || t("menu:default_description");
 
     return (
       <article
@@ -1126,11 +1123,11 @@ export default function TableMenu() {
                   <div className="flex items-end justify-between">
                     <div>
                       <h2 className="text-xl font-black tracking-tight text-slate-900">
-                        {catId === null ? t("menu:all_items") : (i18n.language === "si" && navItem?.name_si ? navItem.name_si : navItem?.name)}
+                        {catId === null ? t("menu:all_items") : navItem?.name}
                       </h2>
                       {navItem?.description && (
                         <p className="mt-1 text-xs font-medium text-slate-400">
-                            {i18n.language === "si" && navItem.description_si ? navItem.description_si : navItem.description}
+                            {navItem.description}
                         </p>
                       )}
                     </div>

@@ -532,9 +532,8 @@ export default function RoomMenu() {
     const qtyInCart = cartItem?.quantity ?? 0;
     const isAdding = addingItemId === item.id;
     const activeOffer = menu?.offers?.find(o => o.product_type === "item" && o.product_id === item.id);
-    const isSi = i18n.language === "si";
-    const displayName = isSi && item.name_si ? item.name_si : item.name;
-    const displayDesc = isSi && item.description_si ? item.description_si : (item.description || "");
+    const displayName = item.name;
+    const displayDesc = item.description || "";
 
     return (
       <div
@@ -888,7 +887,7 @@ export default function RoomMenu() {
             return (
               <div key={catId ?? "all"} className="space-y-4">
                 <h2 className="text-lg font-bold text-gray-900">
-                  {catId === null ? t("menu:all_items") : (i18n.language === "si" && navItem?.name_si ? navItem.name_si : navItem?.name)}
+                  {catId === null ? t("menu:all_items") : navItem?.name}
                 </h2>
                 
                 {items.length === 0 ? (

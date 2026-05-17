@@ -19,7 +19,7 @@ export default function PublicMenuDropdown({
   isOpen,
   onClose,
 }: PublicMenuDropdownProps) {
-  const { t, i18n } = useTranslation(["common", "menu"]);
+  const { t } = useTranslation(["common", "menu"]);
   const [expandedMenuId, setExpandedMenuId] = useState<number | null>(null);
   const [dragY, setDragY] = useState(0);
   const startY = useRef(0);
@@ -134,7 +134,7 @@ export default function PublicMenuDropdown({
                     <div className={`p-2.5 rounded-xl ${expandedMenuId === menuSection.id ? "bg-white/10 text-white" : "bg-white text-slate-400 border border-slate-100 shadow-sm"}`}>
                       <MenuIcon className="w-4.5 h-4.5" />
                     </div>
-                    <span className="font-bold text-[15px]">{i18n.language === "si" && menuSection.name_si ? menuSection.name_si : menuSection.name}</span>
+                    <span className="font-bold text-[15px]">{menuSection.name}</span>
                   </div>
                   <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${expandedMenuId === menuSection.id ? "rotate-180" : "text-slate-300"}`} />
                 </button>
@@ -165,7 +165,7 @@ export default function PublicMenuDropdown({
                         </div>
                         <div className="flex-1 min-w-0">
                           <span className="block font-bold text-[14px] leading-tight text-slate-700 truncate">
-                            {i18n.language === "si" && category.name_si ? category.name_si : category.name}
+                            {category.name}
                           </span>
                           <span className="block mt-0.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
                             {category.items?.length ?? 0} {t("menu:items")}
@@ -208,7 +208,7 @@ export default function PublicMenuDropdown({
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <span className="block font-bold text-[14px] leading-tight text-slate-700 truncate">
-                                    {i18n.language === "si" && category.name_si ? category.name_si : category.name}
+                                    {category.name}
                                   </span>
                                   <span className="block mt-0.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
                                     {category.items?.length ?? 0} {t("menu:items")}
