@@ -259,12 +259,12 @@ export default function TableCartCheckout() {
                   {item.name}
                 </h2>
                 <p className="mt-1 text-xs font-semibold text-slate-500">
-                  {formatCurrency(item.unit_price)} each
+                  {formatCurrency(item.unit_price)} {t("cart:each")}
                 </p>
                 {item.note && (
                   <p className="mt-1.5 flex items-start gap-1.5 text-[11px] font-medium leading-relaxed text-orange-600 bg-orange-50/50 p-2 rounded-lg border border-orange-100/50">
                     <MessageSquareText className="h-3 w-3 mt-0.5 shrink-0" />
-                    <span className="line-clamp-2">Note: {item.note}</span>
+                    <span className="line-clamp-2">{t("cart:note")}: {item.note}</span>
                   </p>
                 )}
               </div>
@@ -280,7 +280,7 @@ export default function TableCartCheckout() {
 
             {!item.is_available && (
               <p className="mt-2 rounded-lg bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-600">
-                Currently unavailable
+                {t("cart:unavailable")}
               </p>
             )}
 
@@ -364,8 +364,8 @@ export default function TableCartCheckout() {
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-200">
               <Check className="h-10 w-10 stroke-[3]" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900">Order Confirmed!</h2>
-            <p className="mt-4 text-slate-500">Your order has been placed successfully.</p>
+            <h2 className="text-2xl font-black text-slate-900">{t("cart:order_placed")}</h2>
+            <p className="mt-4 text-slate-500">{t("cart:order_sent")}</p>
             <button
               type="button"
               onClick={() => {
@@ -419,7 +419,7 @@ export default function TableCartCheckout() {
               onClick={clearCart}
               className="min-h-9 rounded-xl border border-red-100 bg-red-50 px-3 text-xs font-bold text-red-600 transition hover:bg-red-100"
             >
-              Clear cart
+              {t("cart:clear_cart")}
             </button>
           </div>
         )}
@@ -432,13 +432,13 @@ export default function TableCartCheckout() {
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-slate-100 text-slate-500">
                 <ShoppingBag className="h-6 w-6" />
               </div>
-              <p className="mt-3 text-sm font-bold text-slate-900">Your cart is empty</p>
+              <p className="mt-3 text-sm font-bold text-slate-900">{t("cart:empty")}</p>
               <button
                 type="button"
                 onClick={() => navigate(menuPath)}
                 className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-bold text-white transition hover:bg-orange-600"
               >
-                Browse menu
+                {t("cart:continue_browsing")}
               </button>
             </div>
           ) : (
@@ -581,10 +581,10 @@ export default function TableCartCheckout() {
             {placing ? (
               <span className="flex items-center gap-2">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                Placing...
+                {t("cart:placing_order")}
               </span>
             ) : (
-              "Place Order"
+              t("cart:place_order")
             )}
           </button>
         </div>
