@@ -10,6 +10,10 @@ from app.modules.public.schemas import (
     PublicMenuResponse,
     PublicRestaurantInfoResponse,
 )
+from app.modules.promo_codes.schemas import (
+    PromoCodeValidateRequest,
+    PromoCodeValidationResponse,
+)
 
 router = APIRouter()
 
@@ -78,3 +82,19 @@ def public_items_by_category(
     lang = get_language(request)
     items = service.get_public_items_by_category(db, restaurant_id, category_id)
     return localize_object(items, lang)
+
+
+@router.post(
+    "/restaurants/{restaurant_id}/coupon/validate",
+    response_model=PromoCodeValidationResponse,
+    summary="Validate a promo code for a guest",
+)
+def public_validate_promo_code(
+    restaurant_id: int,
+    payload: PromoCodeValidateRequest,
+    db: Session = Depends(get_db),
+) -> PromoCodeValidationResponse:
+    """Validate a promo code for a restaurant. No auth required."""
+    from app.modules.promo_codes.service import validate_promo_for_restaurant
+    return validate_promo_for_restaurant(db, restaurant_id=restaurant_id, payload=payload)
+

@@ -13,6 +13,7 @@ import {
   Trash2,
   UtensilsCrossed,
   MessageSquareText,
+  AlertTriangle,
 } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
@@ -25,7 +26,7 @@ import { useLocalTableCart } from "@/hooks/useLocalMenuCart";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import LanguageSwitcher from "@/components/public/LanguageSwitcher";
-import { publicGet } from "@/lib/publicApi";
+import { publicGet, publicPost } from "@/lib/publicApi";
 import type { CartItemResponse } from "@/types/cart";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
 
@@ -120,6 +121,9 @@ export default function TableCartCheckout() {
   }, [menuItems]);
 
   const cartItems = cart?.items ?? [];
+  const hasUnavailableItems = useMemo(() => {
+    return cartItems.some((item) => !item.is_available);
+  }, [cartItems]);
   const itemCount = cart?.item_count ?? 0;
   const subtotal = cart?.total ?? 0;
   const discount = appliedCoupon
@@ -198,12 +202,43 @@ export default function TableCartCheckout() {
       return;
     }
 
+    if (!restaurantId) {
+      setCouponError(t("cart:invalid_restaurant_context"));
+      return;
+    }
+
     setApplyingCoupon(true);
     setCouponError(null);
-    setAppliedCoupon({ code, discountPercent: 0 });
-    setCouponInput(code);
-    setApplyingCoupon(false);
-  }, [couponInput]);
+    try {
+      type PromoCodeValidationResponse = {
+        valid: boolean;
+        message: string;
+        code?: string;
+        discount_percent?: number;
+      };
+
+      const result = await publicPost<PromoCodeValidationResponse>(
+        `/public/restaurants/${restaurantId}/coupon/validate`,
+        { code },
+      );
+
+      if (result.valid) {
+        setAppliedCoupon({
+          code: result.code ?? code,
+          discountPercent: result.discount_percent ?? 0,
+        });
+        setCouponInput(result.code ?? code);
+      } else {
+        setCouponError(result.message || t("cart:invalid_coupon"));
+        setAppliedCoupon(null);
+      }
+    } catch (err) {
+      setCouponError(err instanceof Error ? err.message : t("cart:failed_apply_coupon"));
+      setAppliedCoupon(null);
+    } finally {
+      setApplyingCoupon(false);
+    }
+  }, [couponInput, restaurantId, t]);
 
   const handleAddRecommendation = useCallback(
     async (itemId: number) => {
@@ -220,6 +255,11 @@ export default function TableCartCheckout() {
   const handlePlaceOrder = useCallback(async () => {
     if (!restaurantId || !tableNumber || itemCount <= 0) return;
 
+    if (hasUnavailableItems) {
+      setPlaceError(t("cart:remove_unavailable_items_error", "Please remove unavailable items from your cart before placing the order."));
+      return;
+    }
+
     try {
       await placeOrder(
         appliedCoupon ? { promo_code: appliedCoupon.code } : {},
@@ -234,7 +274,7 @@ export default function TableCartCheckout() {
         setPlaceError(msg);
       }
     }
-  }, [appliedCoupon, itemCount, placeOrder, restaurantId, tableNumber]);
+  }, [appliedCoupon, itemCount, placeOrder, restaurantId, tableNumber, hasUnavailableItems, t]);
 
   const renderImage = (path: string | undefined | null, name: string) => {
     return (
@@ -438,6 +478,19 @@ export default function TableCartCheckout() {
       </header>
 
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 py-4 pb-40">
+        {hasUnavailableItems && (
+          <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50/70 p-4 shadow-[0_10px_26px_rgba(220,38,38,0.06)] animate-in slide-in-from-top-4 duration-300">
+            <div className="mt-0.5 grid h-6 w-6 place-items-center rounded-lg bg-red-100 text-red-600">
+              <AlertTriangle className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-black text-red-900">{t("cart:unavailable_items_title", "Action Required")}</h3>
+              <p className="mt-1 text-xs font-semibold text-red-600 leading-relaxed">
+                {t("cart:unavailable_items_desc", "Some items in your cart are currently out of stock or unavailable. Please remove them to proceed with your order.")}
+              </p>
+            </div>
+          </div>
+        )}
         <section className="space-y-3">
           {cartItems.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center shadow-sm">
@@ -587,7 +640,7 @@ export default function TableCartCheckout() {
           <button
             type="button"
             onClick={handlePlaceOrder}
-            disabled={placing || itemCount === 0}
+            disabled={placing || itemCount === 0 || hasUnavailableItems}
             className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-orange-500 px-5 text-sm font-black text-white shadow-[0_14px_28px_rgba(249,115,22,0.28)] transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95"
           >
             {placing ? (
