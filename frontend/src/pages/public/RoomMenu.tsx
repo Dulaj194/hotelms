@@ -837,10 +837,10 @@ export default function RoomMenu() {
                               {t("menu:offer")}
                             </span>
                             <h3 className="mt-2 text-base sm:text-lg font-black leading-tight text-slate-900 line-clamp-2">
-                              {i18n.language === "si" && offer.title_si ? offer.title_si : offer.title}
+                              {offer.title}
                             </h3>
                             <p className="mt-1 text-xs font-medium text-slate-600 line-clamp-2">
-                              {i18n.language === "si" && offer.description_si ? offer.description_si : offer.description}
+                              {offer.description}
                             </p>
                           </div>
                           <div className="pt-2">
