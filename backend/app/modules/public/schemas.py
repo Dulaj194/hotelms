@@ -79,6 +79,7 @@ class PublicItemDetailResponse(BaseModel):
     image_path_5: str | None = None
     video_path: str | None = None
     more_details: str | None = None
+    more_details_si: str | None = None
     blog_link: str | None = None
     is_available: bool
     category_id: int

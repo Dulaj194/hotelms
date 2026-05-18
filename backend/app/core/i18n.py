@@ -11,18 +11,39 @@ def get_language(request: Request) -> str:
         return "si"
     return "en"
 
-def localize_object(obj: Any, lang: str) -> Any:
+def localize_object(obj: Any, lang: str, seen: set[int] | None = None) -> Any:
     """
     Senior Software Engineer Approach:
     Recursively localizes any object (SQLAlchemy model, Pydantic model, dict, or list).
     Dynamically identifies all attributes/keys ending with '_si' and overwrites the base field
     with the Sinhala value if lang is 'si' and the Sinhala value is not empty.
+    
+    Includes recursion protection to prevent infinite loops on circular dependencies.
     """
     if obj is None:
         return obj
 
+    if seen is None:
+        seen = set()
+
+    obj_id = id(obj)
+    if obj_id in seen:
+        return obj
+
     if isinstance(obj, list):
-        return [localize_object(item, lang) for item in obj]
+        return [localize_object(item, lang, seen) for item in obj]
+    
+    # Track complex types to prevent recursion
+    is_complex = isinstance(obj, (dict, list)) or hasattr(obj, "__dict__")
+    try:
+        from pydantic import BaseModel
+        if isinstance(obj, BaseModel):
+            is_complex = True
+    except Exception:
+        pass
+
+    if is_complex:
+        seen.add(obj_id)
     
     if isinstance(obj, dict):
         # 1. Localize keys ending with _si
@@ -36,7 +57,7 @@ def localize_object(obj: Any, lang: str) -> Any:
         # 2. Recurse into nested values
         for k, v in obj.items():
             if isinstance(v, (list, dict)) or hasattr(v, "__dict__"):
-                obj[k] = localize_object(v, lang)
+                obj[k] = localize_object(v, lang, seen)
         return obj
     
     # Handle Pydantic models (BaseModel)
@@ -72,7 +93,7 @@ def localize_object(obj: Any, lang: str) -> Any:
             try:
                 v = getattr(obj, field)
                 if isinstance(v, (list, dict, BaseModel)) or hasattr(v, "__dict__"):
-                    localized_v = localize_object(v, lang)
+                    localized_v = localize_object(v, lang, seen)
                     try:
                         obj.__dict__[field] = localized_v
                     except Exception:
@@ -126,10 +147,10 @@ def localize_object(obj: Any, lang: str) -> Any:
                 v = getattr(obj, attr)
                 if isinstance(v, (list, dict, BaseModel)) or hasattr(v, "__dict__"):
                     try:
-                        setattr(obj, attr, localize_object(v, lang))
+                        setattr(obj, attr, localize_object(v, lang, seen))
                     except Exception:
                         try:
-                            obj.__dict__[attr] = localize_object(v, lang)
+                            obj.__dict__[attr] = localize_object(v, lang, seen)
                         except Exception:
                             pass
             except Exception:
@@ -137,3 +158,4 @@ def localize_object(obj: Any, lang: str) -> Any:
         return obj
 
     return obj
+

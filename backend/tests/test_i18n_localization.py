@@ -113,6 +113,25 @@ class TestI18nLocalization(unittest.TestCase):
         self.assertEqual(localized.categories[0].items[0].description, "සිසිල් කළ බීම")
         self.assertEqual(localized.categories[0].items[0].image_path, "/images/cola_si.jpg")
 
+    def test_localize_circular_references(self) -> None:
+        # Create a dictionary with a circular reference
+        node_a = {
+            "name": "Node A",
+            "name_si": "නෝඩ් ඒ",
+        }
+        node_b = {
+            "name": "Node B",
+            "name_si": "නෝඩ් බී",
+            "parent": node_a
+        }
+        node_a["child"] = node_b
+
+        # Localize in Sinhala - this would raise RecursionError if circular references aren't handled
+        localized = localize_object(node_a, "si")
+        self.assertEqual(localized["name"], "නෝඩ් ඒ")
+        self.assertEqual(localized["child"]["name"], "නෝඩ් බී")
+        self.assertEqual(localized["child"]["parent"]["name"], "නෝඩ් ඒ")
+
 
 if __name__ == "__main__":
     unittest.main()
