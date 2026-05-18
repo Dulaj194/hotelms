@@ -6,6 +6,8 @@ import { fetchRoomSessionJson, restoreRoomSession } from "@/features/public/room
 import type { OrderStatus } from "@/types/order";
 import type { RoomOrderDetailResponse } from "@/types/roomSession";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "@/components/public/LanguageSwitcher";
 
 type RoomOrderListResponse = {
   orders: RoomOrderDetailResponse[];
@@ -19,6 +21,19 @@ function isKnownOrderStatus(value: string): value is OrderStatus {
 }
 
 export default function RoomOrdersList() {
+  const { t, i18n } = useTranslation(["common", "menu", "cart"]);
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+
+  useEffect(() => {
+    const handleLangChange = (lng: string) => {
+      setCurrentLanguage(lng);
+    };
+    i18n.on("languageChanged", handleLangChange);
+    return () => {
+      i18n.off("languageChanged", handleLangChange);
+    };
+  }, [i18n]);
+
   const [searchParams] = useSearchParams();
   const { restaurantId, roomNumber } = useParams<{
     restaurantId: string;
@@ -69,15 +84,15 @@ export default function RoomOrdersList() {
           }
         }
 
-        setError("Room session expired. Please scan the room QR code again.");
+        setError(t("cart:session_expired_checkout"));
         return;
       }
 
-      setError(err instanceof Error ? err.message : "Could not load room orders.");
+      setError(err instanceof Error ? err.message : t("cart:failed_place_order"));
     } finally {
       setLoading(false);
     }
-  }, [restoreRoomGuestSession, sessionReady]);
+  }, [restoreRoomGuestSession, sessionReady, t]);
 
   useEffect(() => {
     if (getRoomToken()) {
@@ -86,7 +101,7 @@ export default function RoomOrdersList() {
     }
 
     if (!restaurantId || !roomNumber || !qrAccessKey) {
-      setError("Room session expired. Please scan the room QR code again.");
+      setError(t("cart:session_expired_checkout"));
       setLoading(false);
       return;
     }
@@ -94,19 +109,19 @@ export default function RoomOrdersList() {
     const restore = async () => {
       const restored = await restoreRoomGuestSession();
       if (!restored) {
-        setError("Could not restore the room session. Please scan the room QR code again.");
+        setError(t("cart:session_expired_checkout"));
         setLoading(false);
       }
     };
 
     void restore();
-  }, [qrAccessKey, restaurantId, restoreRoomGuestSession, roomNumber]);
+  }, [qrAccessKey, restaurantId, restoreRoomGuestSession, roomNumber, t]);
 
   // Initial load
   useEffect(() => {
     if (!sessionReady) return;
     void load();
-  }, [load, sessionReady]);
+  }, [load, sessionReady, currentLanguage]);
 
   // Poll for updates
   useEffect(() => {
@@ -137,7 +152,7 @@ export default function RoomOrdersList() {
   if (loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-slate-50">
-        <p className="animate-pulse text-sm text-slate-500">Loading room orders...</p>
+        <p className="animate-pulse text-sm text-slate-500">{t("cart:loading_room_orders")}</p>
       </div>
     );
   }
@@ -148,21 +163,24 @@ export default function RoomOrdersList() {
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
         <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            <p className="truncate text-lg font-semibold text-slate-900">My Room Orders</p>
+            <p className="truncate text-lg font-semibold text-slate-900">{t("cart:my_room_orders")}</p>
             {restaurantId && roomNumber && (
-              <p className="text-xs text-slate-500">Room {roomNumber}</p>
+              <p className="text-xs text-slate-500">{t("cart:room_label", { room: roomNumber })}</p>
             )}
           </div>
-          <span className="text-sm font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-700">
-            {orders.length}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <LanguageSwitcher />
+            <span className="text-sm font-medium px-3 py-1.5 rounded-full bg-slate-100 text-slate-700">
+              {orders.length}
+            </span>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col space-y-3 px-4 py-4 sm:px-5 sm:py-6">
         {sortedOrders.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <p className="text-sm text-slate-500 mb-4">No room orders yet</p>
+            <p className="text-sm text-slate-500 mb-4">{t("cart:no_room_orders_yet")}</p>
             {restaurantId && roomNumber && (
               <Link
                 to={
@@ -172,7 +190,7 @@ export default function RoomOrdersList() {
                 }
                 className="inline-flex min-h-11 items-center justify-center rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white transition hover:bg-orange-600"
               >
-                Place an order
+                {t("cart:place_an_order")}
               </Link>
             )}
           </div>
@@ -212,7 +230,7 @@ export default function RoomOrdersList() {
 
                 <div className="mt-3 flex items-end justify-between gap-3">
                   <div className="text-sm text-slate-500">
-                    ${order.subtotal_amount.toFixed(2)} + ${order.tax_amount.toFixed(2)} tax
+                    ${order.subtotal_amount.toFixed(2)} + ${order.tax_amount.toFixed(2)} {t("cart:tax_label", "tax")}
                   </div>
                   <p className="text-lg font-bold text-slate-900">
                     ${order.total_amount.toFixed(2)}
@@ -235,7 +253,7 @@ export default function RoomOrdersList() {
             }
             className="block w-full rounded-xl border border-orange-200 bg-orange-50 py-3 text-center text-sm font-semibold text-orange-700 transition hover:bg-orange-100"
           >
-            Back to room menu
+            {t("cart:back_to_room_menu_btn")}
           </Link>
         </div>
       )}

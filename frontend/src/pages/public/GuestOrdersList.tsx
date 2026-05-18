@@ -19,6 +19,8 @@ import {
 import type { OrderHeaderResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 import { toAssetUrl } from "@/lib/assets";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "@/components/public/LanguageSwitcher";
 
 
 type OrdersFilterTab = "active" | "completed" | "canceled";
@@ -29,11 +31,6 @@ const TAB_TO_STATUSES: Record<OrdersFilterTab, OrderHeaderResponse["status"][]> 
   canceled: ["rejected"],
 };
 
-const TAB_LABEL: Record<OrdersFilterTab, string> = {
-  active: "Active",
-  completed: "Completed",
-  canceled: "Canceled",
-};
 
 function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`;
@@ -42,6 +39,19 @@ function formatCurrency(value: number): string {
 const POLL_INTERVAL_MS = 5_000;
 
 export default function GuestOrdersList() {
+  const { t, i18n } = useTranslation(["common", "menu", "cart"]);
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+
+  useEffect(() => {
+    const handleLangChange = (lng: string) => {
+      setCurrentLanguage(lng);
+    };
+    i18n.on("languageChanged", handleLangChange);
+    return () => {
+      i18n.off("languageChanged", handleLangChange);
+    };
+  }, [i18n]);
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber } = useParams<{
@@ -100,15 +110,15 @@ export default function GuestOrdersList() {
           }
         }
 
-        setError("Guest session expired. Please scan the table QR code again.");
+        setError(t("cart:session_expired_checkout"));
         return;
       }
 
-      setError(err instanceof Error ? err.message : "Could not load orders.");
+      setError(err instanceof Error ? err.message : t("cart:failed_place_order"));
     } finally {
       setLoading(false);
     }
-  }, [restoreGuestSession]);
+  }, [restoreGuestSession, t]);
 
   useEffect(() => {
     if (getGuestToken()) {
@@ -117,25 +127,25 @@ export default function GuestOrdersList() {
     }
 
     if (!restaurantId || !tableNumber || !effectiveQrAccessKey || !guestName) {
-      setError("Guest session expired. Please scan the table QR code again.");
+      setError(t("cart:session_expired_checkout"));
       return;
     }
 
     const restoreSession = async () => {
       const restored = await restoreGuestSession();
       if (!restored) {
-        setError("Could not restore the table session. Please scan the QR code again.");
+        setError(t("cart:invalid_table_context"));
       }
     };
 
     void restoreSession();
-  }, [effectiveQrAccessKey, guestName, restaurantId, restoreGuestSession, tableNumber]);
+  }, [effectiveQrAccessKey, guestName, restaurantId, restoreGuestSession, tableNumber, t]);
 
   // Initial load
   useEffect(() => {
     if (!sessionReady) return;
     void load();
-  }, [load, sessionReady]);
+  }, [load, sessionReady, currentLanguage]);
 
   // Poll for updates
   useEffect(() => {
@@ -233,9 +243,9 @@ export default function GuestOrdersList() {
   };
 
   const emptyTabMessage: Record<OrdersFilterTab, string> = {
-    active: "No active orders right now",
-    completed: "No completed orders yet",
-    canceled: "No canceled orders",
+    active: t("cart:no_active_orders"),
+    completed: t("cart:no_completed_orders"),
+    canceled: t("cart:no_canceled_orders"),
   };
 
   const formatOrderItemTitle = (order: OrderHeaderResponse): string => {
@@ -261,14 +271,15 @@ export default function GuestOrdersList() {
 
   const formatBreakdownText = (order: OrderHeaderResponse): string => {
     const previews = order.item_previews ?? [];
+    const taxLabel = t("cart:tax_label", "tax");
     if (previews.length === 0) {
-      return `$${order.subtotal_amount.toFixed(2)} + $${order.tax_amount.toFixed(2)} tax`;
+      return `$${order.subtotal_amount.toFixed(2)} + $${order.tax_amount.toFixed(2)} ${taxLabel}`;
     }
     const parts = previews.map(
       (item) => `${item.quantity} x $${item.unit_price_snapshot.toFixed(2)}`,
     );
     const leftSide = parts.join(" + ");
-    return `${leftSide} + $${order.tax_amount.toFixed(2)} tax`;
+    return `${leftSide} + $${order.tax_amount.toFixed(2)} ${taxLabel}`;
   };
 
   if (error) {
@@ -284,7 +295,7 @@ export default function GuestOrdersList() {
   if (loading) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-slate-50">
-        <p className="animate-pulse text-sm text-slate-500">Loading orders...</p>
+        <p className="animate-pulse text-sm text-slate-500">{t("cart:loading_orders")}</p>
       </div>
     );
   }
@@ -309,10 +320,10 @@ export default function GuestOrdersList() {
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div className="min-w-0">
-                <p className="truncate text-xl font-black tracking-tight text-slate-900">My Orders</p>
+                <p className="truncate text-xl font-black tracking-tight text-slate-900">{t("cart:my_orders")}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   {tableNumber && (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1">Table {tableNumber}</span>
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1">{t("cart:table_label", { table: tableNumber })}</span>
                   )}
                   {guestName && (
                     <span className="rounded-full bg-rose-50 px-2.5 py-1 font-semibold text-rose-600">
@@ -322,6 +333,7 @@ export default function GuestOrdersList() {
                 </div>
               </div>
             </div>
+            <LanguageSwitcher />
           </div>
 
 
@@ -338,7 +350,7 @@ export default function GuestOrdersList() {
                       : "text-slate-600 hover:bg-rose-50 hover:text-rose-600"
                     }`}
                 >
-                  {TAB_LABEL[tab]} ({tabCounts[tab]})
+                  {t(`cart:${tab}_orders`)} ({tabCounts[tab]})
                 </button>
               );
             })}
@@ -358,7 +370,7 @@ export default function GuestOrdersList() {
                 {groupedOrders[tab].length === 0 ? (
                   <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
                     <p className={`text-sm font-medium text-slate-500 ${tab === 'active' && orders.length === 0 ? 'mb-4' : ''}`}>
-                      {tab === 'active' && orders.length === 0 ? "No orders yet" : emptyTabMessage[tab]}
+                      {tab === 'active' && orders.length === 0 ? t("cart:no_orders_yet") : emptyTabMessage[tab]}
                     </p>
                     {tab === 'active' && orders.length === 0 && restaurantId && tableNumber && (
                       <Link
@@ -369,7 +381,7 @@ export default function GuestOrdersList() {
                         }
                         className="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-500 px-4 text-sm font-semibold text-white transition hover:bg-rose-600"
                       >
-                        Place an order
+                        {t("cart:place_an_order")}
                       </Link>
                     )}
                   </div>
@@ -402,7 +414,7 @@ export default function GuestOrdersList() {
                               />
                             ) : (
                               <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-[11px] font-semibold text-slate-400">
-                                No img
+                                {t("cart:no_img")}
                               </div>
                             )}
                           </div>
@@ -435,24 +447,24 @@ export default function GuestOrdersList() {
                             <div className="mt-3 flex flex-wrap gap-2">
                               {tab === "active" && (
                                 <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
-                                  Track order
+                                  {t("cart:track_order_btn")}
                                 </span>
                               )}
                               {tab === "completed" && (
                                 <>
                                   <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
-                                    Leave a review
+                                    {t("cart:leave_review_btn")}
                                   </span>
                                   {restaurantId && tableNumber && (
                                     <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
-                                      Order again
+                                      {t("cart:order_again_btn")}
                                     </span>
                                   )}
                                 </>
                               )}
                               {tab === "canceled" && (
                                 <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold text-rose-600">
-                                  Order canceled
+                                  {t("cart:order_canceled_btn")}
                                 </span>
                               )}
                             </div>
@@ -475,18 +487,18 @@ export default function GuestOrdersList() {
           {tabCounts.completed === 0 && (
             <div className="bg-slate-900 py-1.5 px-4">
               <p className="text-center text-[9px] font-black uppercase tracking-[0.12em] text-rose-500">
-                Wait for order to be served to request bill
+                {t("cart:wait_bill_notice")}
               </p>
             </div>
           )}
           <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Running Bill
+                {t("cart:running_bill")}
               </p>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-xl font-black text-slate-900">{formatCurrency(totals.total)}</span>
-                <span className="text-[10px] font-bold text-slate-400">({totals.items} items)</span>
+                <span className="text-[10px] font-bold text-slate-400">({totals.items} {t("cart:items_label")})</span>
               </div>
             </div>
 
@@ -503,17 +515,17 @@ export default function GuestOrdersList() {
                 {requestingBill ? (
                   <span className="flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    Processing...
+                    {t("cart:processing_btn")}
                   </span>
                 ) : billRequested ? (
                   <>
                     <CheckCircle className="h-4 w-4" />
-                    Bill Requested
+                    {t("cart:bill_requested_btn")}
                   </>
                 ) : (
                   <>
                     <Receipt className="h-4 w-4" />
-                    Request Bill
+                    {t("cart:request_bill_btn")}
                   </>
                 )}
               </button>
@@ -529,7 +541,7 @@ export default function GuestOrdersList() {
                 className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-6 text-sm font-black text-white shadow-[0_14px_28px_rgba(249,115,22,0.2)] transition hover:bg-orange-600 active:scale-95"
               >
                 <Plus className="h-4 w-4" />
-                Add Items
+                {t("cart:add_items_btn")}
               </button>
             )}
           </div>
@@ -545,7 +557,7 @@ export default function GuestOrdersList() {
               }
               className="block w-full rounded-2xl bg-slate-900 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"
             >
-              Back to menu
+              {t("cart:back_to_menu_btn")}
             </Link>
           </div>
         )
