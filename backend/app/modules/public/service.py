@@ -65,8 +65,11 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
         return PublicCategoryResponse(
             id=cat.id,
             name=cat.name,
+            name_si=getattr(cat, "name_si", None),
             description=cat.description,
+            description_si=getattr(cat, "description_si", None),
             image_path=cat.image_path,
+            image_path_si=getattr(cat, "image_path_si", None),
             sort_order=cat.sort_order,
             menu_id=cat.menu_id,
             items=items_by_category.get(cat.id, []),
@@ -83,8 +86,11 @@ def get_public_menu(db: Session, restaurant_id: int) -> PublicMenuResponse:
         PublicMenuSectionResponse(
             id=m.id,
             name=m.name,
+            name_si=getattr(m, "name_si", None),
             description=m.description,
+            description_si=getattr(m, "description_si", None),
             image_path=m.image_path,
+            image_path_si=getattr(m, "image_path_si", None),
             sort_order=m.sort_order,
             categories=cats_by_menu.get(m.id, []),
         )
@@ -126,12 +132,24 @@ def get_public_item_detail(db: Session, restaurant_id: int, item_id: int) -> Pub
     return PublicItemDetailResponse(
         id=item.id,
         name=item.name,
+        name_si=getattr(item, "name_si", None),
         description=item.description,
+        description_si=getattr(item, "description_si", None),
         price=float(item.price),
         image_path=item.image_path,
+        image_path_si=getattr(item, "image_path_si", None),
+        image_path_2=getattr(item, "image_path_2", None),
+        image_path_3=getattr(item, "image_path_3", None),
+        image_path_4=getattr(item, "image_path_4", None),
+        image_path_5=getattr(item, "image_path_5", None),
+        video_path=getattr(item, "video_path", None),
+        more_details=getattr(item, "more_details", None),
+        more_details_si=getattr(item, "more_details_si", None),
+        blog_link=getattr(item, "blog_link", None),
         is_available=item.is_available,
         category_id=item.category_id,
         category_name=item.category.name if item.category else None,
+        category_name_si=getattr(item.category, "name_si", None) if item.category else None,
     )
 
 
