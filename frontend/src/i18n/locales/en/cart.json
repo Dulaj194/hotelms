@@ -50,5 +50,19 @@
   "charged_folio_timeline": "Charged to folio",
   "order_rejected_timeline": "Order rejected",
   "loading_order": "Loading order...",
-  "loading_room_order": "Loading room order..."
+  "loading_room_order": "Loading room order...",
+  "frequently_bought_together": "Frequently Bought Together",
+  "quick_addons": "Quick add-ons for this order",
+  "no_addons": "No add-ons available right now.",
+  "apply_coupon": "Apply coupon",
+  "adding": "ADDING",
+  "add": "ADD",
+  "view_details": "View details",
+  "coupon_percent_off": "{{code}} gives {{percent}}% off",
+  "coupon_validation_notice": "{{code}} will be validated at checkout",
+  "enter_coupon_error": "Enter a coupon code.",
+  "failed_place_order": "Failed to place order.",
+  "invalid_table_context": "Invalid table context. Please scan the table QR code again.",
+  "invalid_restaurant_context": "Invalid restaurant context. Please scan the QR code again.",
+  "session_expired_checkout": "Your session has expired. Please go back to the menu or scan the QR code again."
 }

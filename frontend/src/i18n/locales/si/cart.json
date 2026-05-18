@@ -50,5 +50,19 @@
   "charged_folio_timeline": "කාමර ගිණුමට එකතු කරන ලදී",
   "order_rejected_timeline": "ඇණවුම ප්‍රතික්ෂේප කරන ලදී",
   "loading_order": "ඇණවුම පූරණය වෙමින්...",
-  "loading_room_order": "කාමර ඇණවුම පූරණය වෙමින්..."
+  "loading_room_order": "කාමර ඇණවුම පූරණය වෙමින්...",
+  "frequently_bought_together": "නිතර එකට මිලදී ගන්නා ආහාර",
+  "quick_addons": "මෙම ඇණවුම සඳහා ඉක්මන් අමතර ආහාර",
+  "no_addons": "දැනට අමතර ආහාර කිසිවක් ලබාගත නොහැක.",
+  "apply_coupon": "කූපන් පතක් භාවිතා කරන්න",
+  "adding": "එක් කරමින්",
+  "add": "එක් කරන්න",
+  "view_details": "විස්තර බලන්න",
+  "coupon_percent_off": "{{code}} මඟින් {{percent}}% ක වට්ටමක් හිමිවේ",
+  "coupon_validation_notice": "{{code}} ඇණවුම සම්පූර්ණ කරන විට වලංගු කරනු ඇත",
+  "enter_coupon_error": "කරුණාකර කූපන් කේතයක් ඇතුළත් කරන්න.",
+  "failed_place_order": "ඇණවුම යොමු කිරීමට අපොහොසත් විය.",
+  "invalid_table_context": "වලංගු නොවන මේසයකි. කරුණාකර නැවත QR කේතය ස්කෑන් කරන්න.",
+  "invalid_restaurant_context": "වලංගු නොවන අවන්හලකි. කරුණාකර නැවත QR කේතය ස්කෑන් කරන්න.",
+  "session_expired_checkout": "ඔබේ සැසිය කල් ඉකුත් වී ඇත. කරුණාකර නැවත මෙනුවට ගොස් QR කේතය ස්කෑන් කරන්න."
 }

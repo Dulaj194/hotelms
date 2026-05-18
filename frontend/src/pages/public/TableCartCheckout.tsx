@@ -143,13 +143,13 @@ export default function TableCartCheckout() {
 
   useEffect(() => {
     if (!restaurantId || !tableNumber) {
-      setPageError("Invalid table context. Please scan the table QR code again.");
+      setPageError(t("cart:invalid_table_context"));
       return;
     }
 
     const parsedRestaurantId = Number(restaurantId);
     if (Number.isNaN(parsedRestaurantId)) {
-      setPageError("Invalid restaurant context. Please scan the table QR code again.");
+      setPageError(t("cart:invalid_restaurant_context"));
       return;
     }
 
@@ -158,7 +158,7 @@ export default function TableCartCheckout() {
     }
 
     if (!qrAccessKey && !getGuestQrAccessKey(parsedRestaurantId, tableNumber)) {
-      setPageError("Could not load your cart. Please go back to the menu and scan again.");
+      setPageError(t("cart:could_not_restore_session"));
       return;
     }
 
@@ -175,7 +175,7 @@ export default function TableCartCheckout() {
         );
         setMenu(data);
       } catch {
-        setPageError("Failed to load menu details. Please try again.");
+        setPageError(t("menu:load_error"));
       }
     };
 
@@ -193,7 +193,7 @@ export default function TableCartCheckout() {
   const handleApplyCoupon = useCallback(async () => {
     const code = couponInput.trim();
     if (!code) {
-      setCouponError("Enter a coupon code.");
+      setCouponError(t("cart:enter_coupon_error"));
       setAppliedCoupon(null);
       return;
     }
@@ -227,9 +227,9 @@ export default function TableCartCheckout() {
       
       setShowSuccess(true);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to place order.";
+      const msg = err instanceof Error ? err.message : t("cart:failed_place_order");
       if (msg.includes("401") || msg.toLowerCase().includes("unauthorized")) {
-        setPlaceError("Your session has expired. Please go back to the menu or scan the QR code again.");
+        setPlaceError(t("cart:session_expired_checkout"));
       } else {
         setPlaceError(msg);
       }
@@ -335,7 +335,7 @@ export default function TableCartCheckout() {
           onClick={() => setSelectedItem(menuItem ?? null)}
           className="mt-3 flex min-h-10 w-full items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
         >
-          View details
+          {t("cart:view_details")}
           <ChevronRight className="h-4 w-4" />
         </button>
       </article>
@@ -461,15 +461,15 @@ export default function TableCartCheckout() {
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_26px_rgba(15,23,42,0.05)]">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-black text-slate-900">Frequently Bought Together</h2>
-              <p className="mt-0.5 text-xs text-slate-500">Quick add-ons for this order</p>
+              <h2 className="text-base font-black text-slate-900">{t("cart:frequently_bought_together")}</h2>
+              <p className="mt-0.5 text-xs text-slate-500">{t("cart:quick_addons")}</p>
             </div>
             <Sparkles className="h-5 w-5 text-orange-500" />
           </div>
 
           {recommendations.length === 0 ? (
             <p className="rounded-xl bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">
-              No add-ons available right now.
+              {t("cart:no_addons")}
             </p>
           ) : (
             <div className="-mx-4 overflow-x-auto px-4 pb-1">
@@ -495,7 +495,7 @@ export default function TableCartCheckout() {
                         disabled={addingItemId === item.id}
                         className="mt-auto inline-flex min-h-9 w-full items-center justify-center rounded-xl bg-slate-900 px-3 text-xs font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
                       >
-                        {addingItemId === item.id ? "ADDING" : "ADD"}
+                        {addingItemId === item.id ? t("cart:adding") : t("cart:add")}
                       </button>
                     </div>
                   </article>
@@ -511,12 +511,12 @@ export default function TableCartCheckout() {
               <Tag className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-black text-slate-900">Apply coupon</h2>
+              <h2 className="text-sm font-black text-slate-900">{t("cart:apply_coupon")}</h2>
               {appliedCoupon && (
                 <p className="text-xs font-semibold text-emerald-700">
                   {appliedCoupon.discountPercent > 0
-                    ? `${appliedCoupon.code} gives ${appliedCoupon.discountPercent}% off`
-                    : `${appliedCoupon.code} will be validated at checkout`}
+                    ? t("cart:coupon_percent_off", { code: appliedCoupon.code, percent: appliedCoupon.discountPercent })
+                    : t("cart:coupon_validation_notice", { code: appliedCoupon.code })}
                 </p>
               )}
             </div>

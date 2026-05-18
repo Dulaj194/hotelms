@@ -13,6 +13,7 @@ import {
 } from "@/features/public/tableSession";
 import type { OrderDetailResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
+import LanguageSwitcher from "@/components/public/LanguageSwitcher";
 
 const CANCEL_WINDOW_SECONDS = 10;
 
@@ -37,7 +38,19 @@ const POLL_INTERVAL_MS = 15_000; // refresh every 15 s
 const FINALIZED: Set<string> = new Set(["completed", "served", "paid", "rejected"]);
 
 export default function TableOrderStatus() {
-  const { t } = useTranslation(["common", "menu", "cart"]);
+  const { t, i18n } = useTranslation(["common", "menu", "cart"]);
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+
+  useEffect(() => {
+    const handleLangChange = (lng: string) => {
+      setCurrentLanguage(lng);
+    };
+    i18n.on("languageChanged", handleLangChange);
+    return () => {
+      i18n.off("languageChanged", handleLangChange);
+    };
+  }, [i18n]);
+
   const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber, orderId } = useParams<{
     restaurantId: string;
@@ -161,7 +174,7 @@ export default function TableOrderStatus() {
   useEffect(() => {
     if (!sessionReady) return;
     void load();
-  }, [load, sessionReady]);
+  }, [load, sessionReady, currentLanguage]);
 
   // Poll until finalized
   useEffect(() => {
@@ -209,11 +222,14 @@ export default function TableOrderStatus() {
             <p className="text-xs text-slate-500">Table {order.table_number}</p>
             {guestName && <p className="text-xs text-orange-600">Guest: {guestName}</p>}
           </div>
-          <span
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusColor}`}
-          >
-            {statusLabel}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <LanguageSwitcher />
+            <span
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${statusColor}`}
+            >
+              {statusLabel}
+            </span>
+          </div>
         </div>
       </header>
 
