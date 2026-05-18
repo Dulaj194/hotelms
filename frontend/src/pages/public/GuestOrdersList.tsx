@@ -301,8 +301,8 @@ export default function GuestOrdersList() {
   }
 
   return (
-    <div className="min-h-dvh bg-[linear-gradient(180deg,#fbeaec_0%,#f8fafc_35%,#f8fafc_100%)] text-slate-900">
-      <header className="sticky top-0 z-30 border-b border-rose-100/80 bg-white/95 backdrop-blur-xl">
+    <div className="min-h-dvh bg-[linear-gradient(180deg,#fff7ed_0%,#f8fafc_35%,#f8fafc_100%)] text-slate-900">
+      <header className="sticky top-0 z-30 border-b border-orange-100/80 bg-white/95 backdrop-blur-xl">
         <div className="mx-auto w-full max-w-lg px-4 pb-4 pt-3 sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
@@ -326,7 +326,7 @@ export default function GuestOrdersList() {
                     <span className="rounded-full bg-slate-100 px-2.5 py-1">{t("cart:table_label", { table: tableNumber })}</span>
                   )}
                   {guestName && (
-                    <span className="rounded-full bg-rose-50 px-2.5 py-1 font-semibold text-rose-600">
+                    <span className="rounded-full bg-orange-50 px-2.5 py-1 font-semibold text-orange-600">
                       {guestName}
                     </span>
                   )}
@@ -337,7 +337,7 @@ export default function GuestOrdersList() {
           </div>
 
 
-          <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-rose-100 bg-white p-1.5 shadow-sm">
+          <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl border border-orange-100 bg-white p-1.5 shadow-sm">
             {tabs.map((tab) => {
               const isActive = tab === activeTab;
               return (
@@ -346,8 +346,8 @@ export default function GuestOrdersList() {
                   type="button"
                   onClick={() => handleTabClick(tab)}
                   className={`rounded-xl px-2 py-2 text-xs font-bold transition sm:text-sm ${isActive
-                      ? "bg-rose-500 text-white shadow-sm"
-                      : "text-slate-600 hover:bg-rose-50 hover:text-rose-600"
+                      ? "bg-orange-500 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-orange-50 hover:text-orange-600"
                     }`}
                 >
                   {t(`cart:${tab}_orders`)} ({tabCounts[tab]})
@@ -398,7 +398,7 @@ export default function GuestOrdersList() {
                             ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(effectiveQrAccessKey)}`
                             : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
                         }
-                        className="rounded-3xl border border-rose-100 bg-white p-4 shadow-sm transition hover:border-rose-200 hover:shadow-md"
+                        className="rounded-3xl border border-orange-100 bg-white p-4 shadow-sm transition hover:border-orange-200 hover:shadow-md"
                       >
                         <div className="flex items-start gap-3">
                           <div className="shrink-0">
@@ -406,7 +406,7 @@ export default function GuestOrdersList() {
                               <img
                                 src={getItemImageUrl(primaryPreview.item_image_snapshot) ?? undefined}
                                 alt={formatOrderItemTitle(order)}
-                                className="h-16 w-16 rounded-2xl object-cover ring-1 ring-rose-100"
+                                className="h-16 w-16 rounded-2xl object-cover ring-1 ring-orange-100"
                                 onError={(e) => {
                                   const img = e.currentTarget;
                                   img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3C/svg%3E";
@@ -424,7 +424,7 @@ export default function GuestOrdersList() {
                               <p className="line-clamp-2 text-sm font-bold text-slate-900 sm:text-[15px]">
                                 {formatOrderItemTitle(order)}
                               </p>
-                              <p className="shrink-0 text-sm font-extrabold text-rose-600">
+                              <p className="shrink-0 text-sm font-extrabold text-orange-600">
                                 ${order.total_amount.toFixed(2)}
                               </p>
                             </div>
@@ -446,24 +446,24 @@ export default function GuestOrdersList() {
 
                             <div className="mt-3 flex flex-wrap gap-2">
                               {tab === "active" && (
-                                <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
+                                <span className="rounded-full bg-orange-500 px-3 py-1 text-[11px] font-bold text-white">
                                   {t("cart:track_order_btn")}
                                 </span>
                               )}
                               {tab === "completed" && (
                                 <>
-                                  <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
+                                  <span className="rounded-full bg-orange-100 px-3 py-1 text-[11px] font-bold text-orange-600">
                                     {t("cart:leave_review_btn")}
                                   </span>
                                   {restaurantId && tableNumber && (
-                                    <span className="rounded-full bg-rose-500 px-3 py-1 text-[11px] font-bold text-white">
+                                    <span className="rounded-full bg-orange-500 px-3 py-1 text-[11px] font-bold text-white">
                                       {t("cart:order_again_btn")}
                                     </span>
                                   )}
                                 </>
                               )}
                               {tab === "canceled" && (
-                                <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold text-rose-600">
+                                <span className="rounded-full bg-orange-100 px-3 py-1 text-[11px] font-semibold text-orange-600">
                                   {t("cart:order_canceled_btn")}
                                 </span>
                               )}
@@ -486,7 +486,7 @@ export default function GuestOrdersList() {
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/95 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl">
           {tabCounts.completed === 0 && (
             <div className="bg-slate-900 py-1.5 px-4">
-              <p className="text-center text-[9px] font-black uppercase tracking-[0.12em] text-rose-500">
+              <p className="text-center text-[9px] font-black uppercase tracking-[0.12em] text-orange-500">
                 {t("cart:wait_bill_notice")}
               </p>
             </div>
@@ -548,7 +548,7 @@ export default function GuestOrdersList() {
         </div>
       ) : (
         restaurantId && tableNumber && (
-          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-rose-100 bg-white/95 px-4 py-3 backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-orange-100 bg-white/95 px-4 py-3 backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
             <Link
               to={
                 effectiveQrAccessKey
