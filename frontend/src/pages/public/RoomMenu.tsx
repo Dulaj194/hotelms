@@ -306,6 +306,18 @@ function RoomCartDrawer({
 
 export default function RoomMenu() {
   const { t, i18n } = useTranslation(["common", "menu", "cart"]);
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+
+  useEffect(() => {
+    const handleLangChange = (lng: string) => {
+      setCurrentLanguage(lng);
+    };
+    i18n.on("languageChanged", handleLangChange);
+    return () => {
+      i18n.off("languageChanged", handleLangChange);
+    };
+  }, [i18n]);
+
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { restaurantId, roomNumber } = useParams<{
@@ -385,7 +397,7 @@ export default function RoomMenu() {
     };
 
     void fetchMenu();
-  }, [restaurantId, i18n.language]);
+  }, [restaurantId, currentLanguage]);
 
   // 2.1 Fetch quick services
   useEffect(() => {
@@ -403,7 +415,7 @@ export default function RoomMenu() {
     };
 
     void fetchQuickServices();
-  }, [restaurantId]);
+  }, [restaurantId, currentLanguage]);
 
   // 3. Scroll visibility logic
   const handleContentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {

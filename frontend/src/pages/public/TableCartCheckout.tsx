@@ -60,6 +60,18 @@ function buildMenuItems(menu: PublicMenuResponse | null): MenuItemWithCategory[]
 
 export default function TableCartCheckout() {
   const { t, i18n } = useTranslation(["common", "menu", "cart"]);
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+
+  useEffect(() => {
+    const handleLangChange = (lng: string) => {
+      setCurrentLanguage(lng);
+    };
+    i18n.on("languageChanged", handleLangChange);
+    return () => {
+      i18n.off("languageChanged", handleLangChange);
+    };
+  }, [i18n]);
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber } = useParams<{
@@ -168,7 +180,7 @@ export default function TableCartCheckout() {
     };
 
     void loadMenu();
-  }, [restaurantId, i18n.language]);
+  }, [restaurantId, currentLanguage]);
 
   useEffect(() => {
     if (itemCount === 0) {

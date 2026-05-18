@@ -73,6 +73,18 @@ function FloatingCartButton({ itemCount, onOpenCart }: FloatingCartButtonProps) 
 
 export default function TableMenu() {
   const { t, i18n } = useTranslation(["common", "menu", "cart"]);
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+
+  useEffect(() => {
+    const handleLangChange = (lng: string) => {
+      setCurrentLanguage(lng);
+    };
+    i18n.on("languageChanged", handleLangChange);
+    return () => {
+      i18n.off("languageChanged", handleLangChange);
+    };
+  }, [i18n]);
+
   const [searchParams] = useSearchParams();
   const { restaurantId, tableNumber } = useParams<{
     restaurantId: string;
@@ -347,7 +359,7 @@ export default function TableMenu() {
     };
 
     void fetchMenu();
-  }, [restaurantId, i18n.language]);
+  }, [restaurantId, currentLanguage]);
 
   // 2.1 Fetch quick services
   useEffect(() => {
@@ -365,7 +377,7 @@ export default function TableMenu() {
     };
 
     void fetchQuickServices();
-  }, [restaurantId]);
+  }, [restaurantId, currentLanguage]);
 
   const formatPrice = useCallback((price: number) => `$${price.toFixed(2)}`, []);
 
