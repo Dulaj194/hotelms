@@ -13,6 +13,7 @@ import {
 import type {
   RoomOrderDetailResponse,
 } from "@/types/roomSession";
+import LanguageSwitcher from "@/components/public/LanguageSwitcher";
 const CANCEL_WINDOW_SECONDS = 10;
 
 const POLL_INTERVAL_MS = 15_000;
@@ -103,7 +104,19 @@ function OrderTimeline({ order }: { order: RoomOrderDetailResponse }) {
 }
 
 export default function RoomOrderStatus() {
-  const { t } = useTranslation(["common", "menu", "cart"]);
+  const { t, i18n } = useTranslation(["common", "menu", "cart"]);
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+
+  useEffect(() => {
+    const handleLangChange = (lng: string) => {
+      setCurrentLanguage(lng);
+    };
+    i18n.on("languageChanged", handleLangChange);
+    return () => {
+      i18n.off("languageChanged", handleLangChange);
+    };
+  }, [i18n]);
+
   const [searchParams] = useSearchParams();
   const { restaurantId, roomNumber, orderId } = useParams<{
     restaurantId: string;
@@ -233,7 +246,7 @@ export default function RoomOrderStatus() {
 
   useEffect(() => {
     void loadOrder();
-  }, [loadOrder]);
+  }, [loadOrder, currentLanguage]);
 
   const orderStatus = useMemo<OrderStatus | null>(() => {
     if (!order || !isKnownOrderStatus(order.status)) return null;
@@ -293,9 +306,12 @@ export default function RoomOrderStatus() {
               Room {order.room_number ?? roomNumber ?? "-"}
             </p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusColor}`}>
-            {statusLabel}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <LanguageSwitcher />
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusColor}`}>
+              {statusLabel}
+            </span>
+          </div>
         </div>
       </header>
 
