@@ -235,6 +235,7 @@ def _build_line_items_from_payload(
     *,
     restaurant_id: int,
     items: list[PlaceOrderItemRequest],
+    lang: str = "en",
 ) -> tuple[list[dict], float]:
     if not items:
         raise HTTPException(
@@ -265,10 +266,16 @@ def _build_line_items_from_payload(
         line_total = unit_price * quantity
         subtotal += line_total
 
+        # Resolve localized name for invoice (Sinhala fallback)
+        localized_name = item.name
+        if lang == "si" and item.name_si:
+            localized_name = item.name_si
+
         line_items.append(
             {
                 "item_id": item.id,
-                "item_name_snapshot": item.name,
+                "item_name_snapshot": item.name, # Always English for Kitchen (KDS)
+                "item_name_snapshot_localized": localized_name, # Localized for guest invoice
                 "item_image_snapshot": item.image_path,
                 "unit_price_snapshot": unit_price,
                 "quantity": quantity,
@@ -343,6 +350,7 @@ def _create_and_persist_order(
     *,
     clear_redis_cart: bool,
     guest_token: str | None = None,
+    lang: str = "en",
 ) -> PlaceOrderResponse:
     # 1. Block ordering if bill is already requested (Cart Locking)
     if session.session_status in {TableSessionStatus.BILL_REQUESTED, TableSessionStatus.BILL_ACKNOWLEDGED}:
@@ -368,6 +376,7 @@ def _create_and_persist_order(
         db,
         restaurant_id=session.restaurant_id,
         items=items_to_process,
+        lang=lang,
     )
 
     tax_amount = 0.0
@@ -568,6 +577,8 @@ def place_order(
     r: redis_lib.Redis,
     session: TableSession,
     payload: PlaceOrderRequest,
+    *,
+    lang: str = "en",
 ) -> PlaceOrderResponse:
     """Convert the guest's Redis/payload cart into a persisted order."""
     return _create_and_persist_order(
@@ -576,6 +587,7 @@ def place_order(
         session,
         payload,
         clear_redis_cart=not payload.items,
+        lang=lang,
     )
 
 
@@ -584,6 +596,8 @@ def place_order_from_qr_key(
     r: redis_lib.Redis | None,
     qr_access_key: str,
     payload: PlaceOrderRequest,
+    *,
+    lang: str = "en",
 ) -> PlaceOrderResponse:
     """Place a table order directly from a QR key and client-side cart payload."""
     if not payload.items:
@@ -608,6 +622,7 @@ def place_order_from_qr_key(
         payload,
         clear_redis_cart=False,
         guest_token=guest_token,
+        lang=lang,
     )
 
 

@@ -47,6 +47,7 @@ class OrderItemResponse(BaseModel):
     id: int
     item_id: int
     item_name_snapshot: str
+    item_name_snapshot_localized: str | None = None
     item_image_snapshot: str | None
     unit_price_snapshot: float
     quantity: int
@@ -58,6 +59,7 @@ class OrderItemResponse(BaseModel):
 
 class OrderItemPreviewResponse(BaseModel):
     item_name_snapshot: str
+    item_name_snapshot_localized: str | None = None
     item_image_snapshot: str | None
     unit_price_snapshot: float
     quantity: int
@@ -138,6 +140,7 @@ class KitchenOrderItemSummary(BaseModel):
     id: int
     item_id: int
     item_name_snapshot: str
+    item_name_snapshot_localized: str | None = None
     quantity: int
     unit_price_snapshot: float
     line_total: float

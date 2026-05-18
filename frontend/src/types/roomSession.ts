@@ -74,6 +74,7 @@ export interface RoomOrderItemResponse {
   id: number;
   item_id: number;
   item_name_snapshot: string;
+  item_name_snapshot_localized?: string | null;
   unit_price_snapshot: number;
   quantity: number;
   line_total: number;

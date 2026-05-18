@@ -31,6 +31,7 @@ export interface OrderItemResponse {
   id: number;
   item_id: number;
   item_name_snapshot: string;
+  item_name_snapshot_localized?: string | null;
   item_image_snapshot: string | null;
   unit_price_snapshot: number;
   quantity: number;
@@ -40,6 +41,7 @@ export interface OrderItemResponse {
 
 export interface OrderItemPreviewResponse {
   item_name_snapshot: string;
+  item_name_snapshot_localized?: string | null;
   item_image_snapshot: string | null;
   unit_price_snapshot: number;
   quantity: number;
@@ -142,6 +144,7 @@ export interface KitchenOrderItemSummary {
   id: number;
   item_id: number;
   item_name_snapshot: string;
+  item_name_snapshot_localized?: string | null;
   quantity: number;
   unit_price_snapshot: number;
   line_total: number;

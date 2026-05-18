@@ -254,7 +254,9 @@ export default function TableOrderStatus() {
                 className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-sm"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-slate-900">{item.item_name_snapshot}</p>
+                  <p className="truncate font-medium text-slate-900">
+                    {item.item_name_snapshot_localized || item.item_name_snapshot}
+                  </p>
                   {item.notes && (
                     <p className="mt-0.5 text-[10px] font-medium text-orange-600 italic">
                       “{item.notes}”

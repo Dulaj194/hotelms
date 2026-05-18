@@ -19,6 +19,7 @@ export type BillReviewStatus = "not_sent" | "pending" | "accepted" | "rejected";
 export interface BillOrderItem {
   id: number;
   item_name_snapshot: string;
+  item_name_snapshot_localized?: string | null;
   quantity: number;
   unit_price_snapshot: number;
   line_total: number;

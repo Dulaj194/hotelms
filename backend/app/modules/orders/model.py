@@ -172,6 +172,7 @@ class OrderItem(Base):
 
     # Snapshots at the time of placement - DB authoritative
     item_name_snapshot: Mapped[str] = mapped_column(String(255), nullable=False)
+    item_name_snapshot_localized: Mapped[str | None] = mapped_column(String(255), nullable=True)
     item_image_snapshot: Mapped[str | None] = mapped_column(String(500), nullable=True)
     unit_price_snapshot: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
 

@@ -331,7 +331,9 @@ export default function RoomOrderStatus() {
             {order.items.map((item) => (
               <div key={item.id} className="flex items-start justify-between gap-4 text-sm">
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-900">{item.item_name_snapshot}</p>
+                  <p className="font-medium text-slate-900">
+                    {item.item_name_snapshot_localized || item.item_name_snapshot}
+                  </p>
                   {item.notes && (
                     <p className="mt-0.5 text-[10px] font-medium text-orange-600 italic">
                       “{item.notes}”

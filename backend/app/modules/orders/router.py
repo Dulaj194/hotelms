@@ -13,9 +13,10 @@ Route groups:
   PATCH  /orders/{order_id}/status — staff: update order status + publish event
 """
 import redis as redis_lib
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
+from app.core.i18n import get_language
 from app.core.dependencies import (
     get_current_guest_session,
     get_current_restaurant_id,
@@ -50,6 +51,7 @@ _STAFF_ROLES = role_catalog.QR_MENU_STAFF_ROLES
 @router.post("", response_model=PlaceOrderResponse, status_code=201)
 def place_order(
     payload: PlaceOrderRequest,
+    request: Request,
     x_guest_session: str | None = Header(default=None, alias="X-Guest-Session"),
     x_table_key: str | None = Header(default=None, alias="X-Table-Key"),
     db: Session = Depends(get_db),
@@ -60,11 +62,12 @@ def place_order(
     Accepts either an existing X-Guest-Session token or the original X-Table-Key
     QR credential. restaurant_id and table context are validated server-side.
     """
+    lang = get_language(request)
     if x_guest_session:
         session = resolve_guest_session_token(x_guest_session, db)
-        return service.place_order(db, r, session, payload)
+        return service.place_order(db, r, session, payload, lang=lang)
     if x_table_key:
-        return service.place_order_from_qr_key(db, r, x_table_key, payload)
+        return service.place_order_from_qr_key(db, r, x_table_key, payload, lang=lang)
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Missing table checkout credential.",

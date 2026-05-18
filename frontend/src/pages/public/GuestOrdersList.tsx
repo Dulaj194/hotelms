@@ -249,9 +249,10 @@ export default function GuestOrdersList() {
   };
 
   const formatOrderItemTitle = (order: OrderHeaderResponse): string => {
+    const firstPreview = order.item_previews?.[0];
+    if (firstPreview?.item_name_snapshot_localized) return firstPreview.item_name_snapshot_localized;
     const primaryName = order.primary_item_name?.trim();
     if (primaryName) return primaryName;
-    const firstPreview = order.item_previews?.[0];
     if (firstPreview?.item_name_snapshot) return firstPreview.item_name_snapshot;
     return order.order_number;
   };

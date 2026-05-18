@@ -10,6 +10,7 @@
 
 export interface EventOrderItem {
   item_name_snapshot: string;
+  item_name_snapshot_localized?: string | null;
   quantity: number;
   line_total: number;
 }

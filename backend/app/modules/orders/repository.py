@@ -98,6 +98,7 @@ def create_order_items(
             restaurant_id=restaurant_id,
             item_id=item_data["item_id"],
             item_name_snapshot=item_data["item_name_snapshot"],
+            item_name_snapshot_localized=item_data.get("item_name_snapshot_localized"),
             item_image_snapshot=item_data.get("item_image_snapshot"),
             unit_price_snapshot=round(item_data["unit_price_snapshot"], 2),
             quantity=item_data["quantity"],
