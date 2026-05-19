@@ -35,8 +35,9 @@ from app.modules.site_content.router import (
 )
 from app.modules.subscriptions.router import router as subscriptions_router
 from app.modules.table_sessions.router import router as table_sessions_router
-from app.modules.users.router import router as users_router
 from app.modules.quick_services.router import router as quick_services_router, public_router as public_quick_services_router
+from app.modules.platform_banners.router import super_admin_router as platform_banners_super_admin_router, client_router as platform_banners_client_router
+
 
 
 router = APIRouter(prefix=settings.api_v1_prefix)
@@ -84,5 +85,8 @@ router.include_router(reports_router, prefix="/reports", tags=["reports"])
 router.include_router(settings_router, prefix="/settings", tags=["settings"])
 router.include_router(quick_services_router, prefix="/quick-services", tags=["quick-services"])
 router.include_router(audit_logs_router, prefix="/audit-logs", tags=["audit-logs"])
+router.include_router(platform_banners_super_admin_router, tags=["super-admin-banners"])
+router.include_router(platform_banners_client_router, tags=["dashboard-banners"])
 router.include_router(realtime_router, prefix="/ws", tags=["websocket"])
+
 

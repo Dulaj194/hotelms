@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import DashboardLayout from "@/components/shared/DashboardLayout";
+import AnnouncementsWidget from "@/components/shared/AnnouncementsWidget";
 import { ApiError, api } from "@/lib/api";
+
 import { getUser } from "@/lib/auth";
 import type {
   AdminDashboardOverviewResponse,
@@ -296,7 +298,9 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        <AnnouncementsWidget />
         <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
+
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
