@@ -35,8 +35,10 @@ from app.modules.site_content.router import (
 )
 from app.modules.subscriptions.router import router as subscriptions_router
 from app.modules.table_sessions.router import router as table_sessions_router
+from app.modules.users.router import router as users_router
 from app.modules.quick_services.router import router as quick_services_router, public_router as public_quick_services_router
 from app.modules.platform_banners.router import super_admin_router as platform_banners_super_admin_router, client_router as platform_banners_client_router
+
 
 
 
