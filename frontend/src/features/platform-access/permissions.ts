@@ -10,7 +10,9 @@ export type PlatformPermissionResource =
   | "packages"
   | "site_content"
   | "promo_codes"
-  | "platform_users";
+  | "platform_users"
+  | "platform_banners";
+
 
 export type PlatformPermissionAction = "view" | "review" | "approve" | "mutate";
 
@@ -106,7 +108,20 @@ const PLATFORM_PERMISSION_RULES: PlatformPermissionRule[] = [
     requiredScopes: ["security_admin"],
     description: "View and manage platform users.",
   },
+  {
+    resource: "platform_banners",
+    action: "view",
+    requiredScopes: ["ops_viewer", "tenant_admin"],
+    description: "View platform banners.",
+  },
+  {
+    resource: "platform_banners",
+    action: "mutate",
+    requiredScopes: ["tenant_admin"],
+    description: "Create, update, and delete platform banners.",
+  },
 ];
+
 
 export function getRequiredScopesForPlatformAction(
   resource: PlatformPermissionResource,

@@ -75,8 +75,10 @@ const SuperAdminPromoCodes = lazy(() => import("@/pages/super-admin/PromoCodes")
 const SuperAdminPlatformUsers = lazy(() => import("@/pages/super-admin/PlatformUsers"));
 const SuperAdminAuditLogs = lazy(() => import("@/pages/super-admin/AuditLogs"));
 const SuperAdminSiteContent = lazy(() => import("@/pages/super-admin/SiteContent"));
+const SuperAdminPlatformBanners = lazy(() => import("@/pages/super-admin/PlatformBanners"));
 
 function RootRedirect() {
+
   if (!isAuthenticated()) return <Navigate to="/login" replace />;
   const user = getUser();
   if (user?.must_change_password) {
@@ -604,7 +606,22 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/super-admin/platform-banners"
+          element={
+            <ProtectedRoute
+              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                "platform_banners",
+                "view",
+              )}
+            >
+              <SuperAdminPlatformBanners />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/super-admin/login"
+
           element={<Navigate to="/login/super-admin" replace />}
         />
 

@@ -56,7 +56,13 @@ const SUPER_ADMIN_NAV = [
     label: "Audit Logs",
     scopes: getRequiredScopesForPlatformAction("audit_logs", "view"),
   },
+  {
+    path: "/super-admin/platform-banners",
+    label: "Platform Banners",
+    scopes: getRequiredScopesForPlatformAction("platform_banners", "view"),
+  },
 ];
+
 
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.superAdmin";
 
