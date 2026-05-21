@@ -1,29 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ComponentType, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Activity,
-  BarChart3,
-  BedDouble,
   ChevronDown,
-  ClipboardList,
   CookingPot,
-  HandPlatter,
   Handshake,
-  History,
-  Kanban,
-  LayoutGrid,
   Menu,
   MessageSquare,
-  Package,
   QrCode,
   Settings,
   ShieldCheck,
   SquareMenu,
   Ticket,
-  User,
-  Users,
-  UtensilsCrossed,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
@@ -31,13 +19,9 @@ import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { clearAuth, getUser, normalizeRole } from "@/lib/auth";
 import { getBillingHomePath } from "@/features/billing/helpers";
 import {
-  BILLING_STAFF_ROLES,
   canAccessModuleItem,
   canAccessHousekeepingTasks,
   hasRoleAccess,
-  HOUSEKEEPING_ROOM_ROLES,
-  HOUSEKEEPING_TASK_ROLES,
-  QR_MENU_STAFF_ROLES,
   RESTAURANT_ADMIN_ROLES,
 } from "@/lib/moduleAccess";
 import {
@@ -45,23 +29,25 @@ import {
 } from "@/lib/navigationHistory";
 import type { HousekeepingPendingCountResponse } from "@/types/housekeeping";
 
-interface NavItem {
-  path: string;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-  roles: readonly string[] | null;
-  privilege?: string;
-  moduleKey?: string;
-}
-
-interface MenuSubItem {
-  path: string;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-  roles?: readonly string[];
-  privilege?: string;
-  moduleKey?: string;
-}
+import {
+  ALL_NAV_ITEMS,
+  commPaths,
+  commSubItems,
+  financePaths,
+  financeSubItems,
+  housekeepingPaths,
+  housekeepingSubItems,
+  menuPaths,
+  menuSubItems,
+  offerPaths,
+  offerSubItems,
+  opsPaths,
+  opsSubItems,
+  qrPaths,
+  qrSubItems,
+  settingsPaths,
+  settingsSubItems,
+} from "./sidebarConfig";
 
 type SidebarGroupState = {
   menusOpen: boolean;
@@ -112,21 +98,7 @@ function loadSidebarGroupState(): SidebarGroupState {
   }
 }
 
-const ALL_NAV_ITEMS: NavItem[] = [
-  {
-    path: "/admin/restaurant-profile",
-    label: "Restaurant",
-    icon: UtensilsCrossed,
-    roles: RESTAURANT_ADMIN_ROLES,
-  },
-  {
-    path: "/admin/subscription",
-    label: "Subscription",
-    icon: Package,
-    roles: RESTAURANT_ADMIN_ROLES,
-  },
-  { path: "/admin/staff", label: "Staff", icon: Users, roles: RESTAURANT_ADMIN_ROLES },
-];
+
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -162,179 +134,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     settingsOpen 
   } = groupState;
 
-  const menuSubItems: MenuSubItem[] = useMemo(
-    () => [
-      { path: "/admin/menu/menus", label: "Add Menu", icon: SquareMenu },
-      { path: "/admin/menu/categories", label: "Add Category", icon: ClipboardList },
-      { path: "/admin/menu/items", label: "Add Item", icon: HandPlatter },
-    ],
-    []
-  );
 
-  const offerSubItems: MenuSubItem[] = useMemo(
-    () => [
-      { path: "/admin/offers/new", label: "Add New Offer", icon: ShieldCheck, moduleKey: "offers" },
-      { path: "/admin/offers", label: "Manage Offers", icon: ClipboardList, moduleKey: "offers" },
-    ],
-    []
-  );
-
-  const opsSubItems: MenuSubItem[] = useMemo(
-    () => [
-      {
-        path: "/admin/steward",
-        label: "Steward Hub",
-        icon: Activity,
-        privilege: "QR_MENU",
-        moduleKey: "steward_ops",
-      },
-      {
-        path: "/admin/kitchen/orders",
-        label: "Kitchen Queue",
-        icon: Kanban,
-        privilege: "QR_MENU",
-        moduleKey: "kds",
-      },
-      {
-        path: "/admin/kitchen/history",
-        label: "Order History",
-        icon: History,
-        privilege: "QR_MENU",
-        moduleKey: "kds",
-      },
-    ],
-    []
-  );
-
-  const commSubItems: MenuSubItem[] = useMemo(
-    () => [
-      {
-        path: "/admin/chat",
-        label: "Staff Chat",
-        icon: MessageSquare,
-        privilege: "QR_MENU",
-        moduleKey: "steward_ops",
-      },
-      {
-        path: "/admin/chat",
-        label: "Guest Requests",
-        icon: Handshake,
-        privilege: "QR_MENU",
-        moduleKey: "steward_ops",
-      },
-    ],
-    []
-  );
-
-  const financeSubItems: MenuSubItem[] = useMemo(
-    () => [
-      {
-        path: "/admin/billing",
-        label: "Billing",
-        icon: Ticket,
-        roles: BILLING_STAFF_ROLES,
-        privilege: "QR_MENU",
-        moduleKey: "billing",
-      },
-      {
-        path: "/admin/reports",
-        label: "Reports",
-        icon: BarChart3,
-        roles: QR_MENU_STAFF_ROLES,
-        privilege: "QR_MENU",
-        moduleKey: "reports",
-      },
-    ],
-    []
-  );
-
-  const settingsSubItems: MenuSubItem[] = useMemo(
-    () => [
-      {
-        path: "/admin/restaurant-profile",
-        label: "Profile",
-        icon: User,
-        roles: RESTAURANT_ADMIN_ROLES,
-      },
-      {
-        path: "/admin/settings/quick-services",
-        label: "Service Management",
-        icon: Settings,
-        roles: RESTAURANT_ADMIN_ROLES,
-        privilege: "QR_MENU",
-        moduleKey: "steward_ops",
-      },
-    ],
-    []
-  );
-
-  const qrSubItems: MenuSubItem[] = useMemo(
-    () => [
-      {
-        path: "/admin/qr/tables",
-        label: "All Table QR Codes",
-        icon: QrCode,
-        roles: RESTAURANT_ADMIN_ROLES,
-        privilege: "QR_MENU",
-        moduleKey: "qr",
-      },
-      {
-        path: "/admin/qr/tables/generate",
-        label: "Generate Table QR Codes",
-        icon: LayoutGrid,
-        roles: RESTAURANT_ADMIN_ROLES,
-        privilege: "QR_MENU",
-        moduleKey: "qr",
-      },
-      {
-        path: "/admin/qr/rooms",
-        label: "All Room QR Codes",
-        icon: QrCode,
-        roles: RESTAURANT_ADMIN_ROLES,
-        privilege: "QR_MENU",
-        moduleKey: "qr",
-      },
-      {
-        path: "/admin/qr/rooms/generate",
-        label: "Generate Room QR Codes",
-        icon: LayoutGrid,
-        roles: RESTAURANT_ADMIN_ROLES,
-        privilege: "QR_MENU",
-        moduleKey: "qr",
-      },
-    ],
-    []
-  );
-
-  const housekeepingSubItems: MenuSubItem[] = useMemo(
-    () => [
-      {
-        path: "/admin/housekeeping/rooms",
-        label: "Rooms",
-        icon: BedDouble,
-        roles: HOUSEKEEPING_ROOM_ROLES,
-        moduleKey: "housekeeping",
-      },
-      {
-        path: "/admin/housekeeping",
-        label: "Messages",
-        icon: Handshake,
-        roles: HOUSEKEEPING_TASK_ROLES,
-        privilege: "HOUSEKEEPING",
-        moduleKey: "housekeeping",
-      },
-    ],
-    []
-  );
-
-  const menuPaths = useMemo(() => menuSubItems.map((item) => item.path), [menuSubItems]);
-  const opsPaths = useMemo(() => opsSubItems.map((item) => item.path), [opsSubItems]);
-  const commPaths = useMemo(() => commSubItems.map((item) => item.path), [commSubItems]);
-  const financePaths = useMemo(() => financeSubItems.map((item) => item.path), [financeSubItems]);
-  const settingsPaths = useMemo(() => settingsSubItems.map((item) => item.path), [settingsSubItems]);
-  const qrPaths = useMemo(() => qrSubItems.map((item) => item.path), [qrSubItems]);
-  const housekeepingPaths = useMemo(() => housekeepingSubItems.map((item) => item.path), [housekeepingSubItems]);
-  const offerPaths = useMemo(() => offerSubItems.map((item) => item.path), [offerSubItems]);
 
   const visibleOpsSubItems = useMemo(
     () =>
@@ -528,70 +328,47 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!mobileSidebarOpen) return;
+    if (typeof window === "undefined" || !mobileSidebarOpen) return;
+    
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [mobileSidebarOpen]);
-
-  useEffect(() => {
-    if (!mobileSidebarOpen) return;
+    
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         closeMobileSidebar();
       }
     };
     window.addEventListener("keydown", onKeyDown);
+    
     return () => {
+      document.body.style.overflow = originalOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [mobileSidebarOpen]);
 
   useEffect(() => {
     setGroupState((prev) => {
-      const next = { ...prev };
       let changed = false;
+      const next = { ...prev };
+      
+      const groupChecks = [
+        { key: "menusOpen", visible: isMenuGroupVisible, active: isMenuGroupActive },
+        { key: "opsOpen", visible: isOpsGroupVisible, active: isOpsGroupActive },
+        { key: "commOpen", visible: isCommGroupVisible, active: isCommGroupActive },
+        { key: "financeOpen", visible: isFinanceGroupVisible, active: isFinanceGroupActive },
+        { key: "settingsOpen", visible: isSettingsGroupVisible, active: isSettingsGroupActive },
+        { key: "qrOpen", visible: isQrGroupVisible, active: isQrGroupActive },
+        { key: "housekeepingOpen", visible: isHousekeepingGroupVisible, active: isHousekeepingGroupActive },
+        { key: "offersOpen", visible: isOfferGroupVisible, active: isOfferGroupActive },
+      ] as const;
 
-      if (isMenuGroupVisible && isMenuGroupActive && !next.menusOpen) {
-        next.menusOpen = true;
-        changed = true;
+      for (const { key, visible, active } of groupChecks) {
+        if (visible && active && !next[key]) {
+          next[key] = true;
+          changed = true;
+        }
       }
-      if (isOpsGroupVisible && isOpsGroupActive && !next.opsOpen) {
-        next.opsOpen = true;
-        changed = true;
-      }
-      if (isCommGroupVisible && isCommGroupActive && !next.commOpen) {
-        next.commOpen = true;
-        changed = true;
-      }
-      if (isFinanceGroupVisible && isFinanceGroupActive && !next.financeOpen) {
-        next.financeOpen = true;
-        changed = true;
-      }
-      if (isSettingsGroupVisible && isSettingsGroupActive && !next.settingsOpen) {
-        next.settingsOpen = true;
-        changed = true;
-      }
-      if (isQrGroupVisible && isQrGroupActive && !next.qrOpen) {
-        next.qrOpen = true;
-        changed = true;
-      }
-      if (
-        isHousekeepingGroupVisible &&
-        isHousekeepingGroupActive &&
-        !next.housekeepingOpen
-      ) {
-        next.housekeepingOpen = true;
-        changed = true;
-      }
-      if (isOfferGroupVisible && isOfferGroupActive && !next.offersOpen) {
-        next.offersOpen = true;
-        changed = true;
-      }
-
+      
       return changed ? next : prev;
     });
   }, [
