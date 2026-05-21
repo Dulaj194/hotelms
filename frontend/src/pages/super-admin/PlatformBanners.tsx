@@ -49,13 +49,21 @@ export default function PlatformBanners() {
     setLoading(true);
     try {
       const response = await api.get<PlatformBanner[]>("/super-admin/banners");
-      setBanners(response || []);
+      if (Array.isArray(response)) {
+        setBanners(response);
+      } else if (response && Array.isArray((response as any).data)) {
+        setBanners((response as any).data);
+      } else {
+        setBanners([]);
+        console.warn("Unexpected response format for banners API:", response);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.detail || "Failed to fetch banners");
       } else {
         setError("An unexpected error occurred");
       }
+      setBanners([]); // Fallback to empty array on error
     } finally {
       setLoading(false);
     }
@@ -198,7 +206,7 @@ export default function PlatformBanners() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {banners.map((banner) => (
+                {Array.isArray(banners) && banners.map((banner) => (
                   <tr key={banner.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="text-sm font-semibold text-gray-900">{banner.title}</div>
