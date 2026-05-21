@@ -115,9 +115,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     privileges,
     moduleAccess,
   } = useSubscriptionPrivileges();
-  const [groupState, setGroupState] = useState<SidebarGroupState>(() =>
-    loadSidebarGroupState()
-  );
+  const [groupState, setGroupState] = useState<SidebarGroupState>(DEFAULT_SIDEBAR_GROUP_STATE);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [housekeepingPendingCount, setHousekeepingPendingCount] = useState(0);
   const [badgeCounts, setBadgeCounts] = useState({ awaiting: 0, requests: 0 });
@@ -320,10 +318,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     );
   };
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(SIDEBAR_GROUPS_STORAGE_KEY, JSON.stringify(groupState));
-  }, [groupState]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -373,9 +367,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         { key: "offersOpen", visible: isOfferGroupVisible, active: isOfferGroupActive },
       ] as const;
 
-      for (const { key, visible, active } of groupChecks) {
-        if (visible && active && !next[key]) {
-          next[key] = true;
+      const activeGroup = groupChecks.find(g => g.visible && g.active);
+
+      if (activeGroup) {
+        if (!next[activeGroup.key]) {
+          (Object.keys(next) as Array<keyof SidebarGroupState>).forEach((k) => {
+            next[k] = false;
+          });
+          next[activeGroup.key] = true;
           changed = true;
         }
       }
