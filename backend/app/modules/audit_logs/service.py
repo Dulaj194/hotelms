@@ -268,11 +268,7 @@ def get_audit_log_export_download_path(
     *,
     job_id: str,
 ) -> Path:
-    job = (
-        db.query(AuditLogExportJob)
-        .filter(AuditLogExportJob.id == job_id)
-        .first()
-    )
+    job = repository.get_export_job_by_id(db, job_id)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -414,62 +410,25 @@ def _build_audit_logs_query(
     created_from: datetime | None = None,
     created_to: datetime | None = None,
 ):
-    from app.modules.users.model import User
-
-    query = db.query(AuditLog)
-
-    if event_type:
-        query = query.filter(AuditLog.event_type == event_type)
-
-    if category:
-        query = query.filter(AuditLog.category == category.strip().lower())
-
-    if severity:
-        query = query.filter(AuditLog.severity == severity.strip().lower())
-
-    if restaurant_id is not None:
-        query = query.filter(
-            or_(
-                AuditLog.restaurant_id == restaurant_id,
-                AuditLog.metadata_restaurant_id == restaurant_id,
-            )
-        )
-
-    if search:
-        pattern = f"%{search.strip()}%"
-        query = query.filter(
-            or_(
-                AuditLog.event_type.ilike(pattern),
-                AuditLog.metadata_json.ilike(pattern),
-                AuditLog.ip_address.ilike(pattern),
-                AuditLog.user_agent.ilike(pattern),
-            )
-        )
-
+    actor_ids = None
     if actor_search:
         actor_pattern = f"%{actor_search.strip()}%"
-        actor_ids = [
-            user_id
-            for (user_id,) in db.query(User.id)
-            .filter(
-                or_(
-                    User.full_name.ilike(actor_pattern),
-                    User.email.ilike(actor_pattern),
-                )
-            )
-            .all()
-        ]
-        query = query.filter(AuditLog.user_id.in_(actor_ids) if actor_ids else false())
+        actor_ids = repository.get_user_ids_by_search_term(db, actor_pattern)
 
     normalized_created_from = _normalize_filter_datetime(created_from)
-    if normalized_created_from is not None:
-        query = query.filter(AuditLog.created_at >= normalized_created_from)
-
     normalized_created_to = _normalize_filter_datetime(created_to)
-    if normalized_created_to is not None:
-        query = query.filter(AuditLog.created_at <= normalized_created_to)
 
-    return query
+    return repository.build_audit_logs_query_base(
+        db,
+        event_type=event_type,
+        restaurant_id=restaurant_id,
+        search=search,
+        severity=severity,
+        category=category,
+        created_from=normalized_created_from,
+        created_to=normalized_created_to,
+        actor_ids=actor_ids,
+    )
 
 
 def _safe_int(value: object) -> int | None:
@@ -696,12 +655,7 @@ def _get_notification_state_map(
 ) -> dict[int, SuperAdminNotificationState]:
     if not audit_log_ids:
         return {}
-    states = (
-        db.query(SuperAdminNotificationState)
-        .filter(SuperAdminNotificationState.audit_log_id.in_(audit_log_ids))
-        .all()
-    )
-    return {state.audit_log_id: state for state in states}
+    return repository.get_notification_states_by_audit_log_ids(db, audit_log_ids)
 
 
 def _parse_notification_id(notification_id: str) -> int:
@@ -727,13 +681,8 @@ def _get_notification_target(
 ) -> tuple[AuditLog, SuperAdminNotificationState]:
     """Get audit log and its notification state for a notification ID."""
     audit_log_id = _parse_notification_id(notification_id)
-    log = (
-        db.query(AuditLog)
-        .filter(
-            AuditLog.id == audit_log_id,
-            AuditLog.event_type.in_(sorted(catalog.HIGH_SIGNAL_EVENT_TYPES)),
-        )
-        .first()
+    log = repository.get_high_signal_audit_log(
+        db, audit_log_id, sorted(catalog.HIGH_SIGNAL_EVENT_TYPES)
     )
     if log is None:
         raise HTTPException(
@@ -808,27 +757,22 @@ def write_audit_log(
         severity = catalog.get_event_severity(event_type, metadata_payload)
         bind = db.get_bind()
         audit_session_factory = sessionmaker(bind=bind, autocommit=False, autoflush=False)
-        with audit_session_factory() as audit_db:
-            log = AuditLog(
-                event_type=event_type,
-                category=category,
-                severity=severity,
-                user_id=user_id,
-                restaurant_id=effective_restaurant_id,
-                metadata_restaurant_id=metadata_restaurant_id,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                metadata_json=json.dumps(metadata_payload) if metadata_payload else None,
-            )
-            audit_db.add(log)
-            audit_db.flush()
-
-            if event_type in catalog.HIGH_SIGNAL_EVENT_TYPES:
-                audit_db.add(SuperAdminNotificationState(audit_log_id=log.id))
-
-            audit_db.commit()
-            audit_db.refresh(log)
-            audit_db.expunge(log)
+        log = AuditLog(
+            event_type=event_type,
+            category=category,
+            severity=severity,
+            user_id=user_id,
+            restaurant_id=effective_restaurant_id,
+            metadata_restaurant_id=metadata_restaurant_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            metadata_json=json.dumps(metadata_payload) if metadata_payload else None,
+        )
+        log = repository.write_audit_log_with_notification(
+            audit_session_factory, 
+            log, 
+            event_type in catalog.HIGH_SIGNAL_EVENT_TYPES
+        )
         return log
     except Exception as exc:
         logger.warning("Audit log write failed [%s]: %s", event_type, exc)
@@ -892,13 +836,8 @@ def list_super_admin_notifications(
     sort: str = "unresolved_first",
     include_archived: bool = False,
 ) -> SuperAdminNotificationListResponse:
-    base_query = (
-        db.query(AuditLog, SuperAdminNotificationState)
-        .outerjoin(
-            SuperAdminNotificationState,
-            SuperAdminNotificationState.audit_log_id == AuditLog.id,
-        )
-        .filter(AuditLog.event_type.in_(sorted(catalog.HIGH_SIGNAL_EVENT_TYPES)))
+    base_query = repository.build_super_admin_notifications_query(
+        db, sorted(catalog.HIGH_SIGNAL_EVENT_TYPES)
     )
 
     if category:
@@ -1234,9 +1173,7 @@ def update_super_admin_notification(
             notification_state.archived_at = None
             notification_state.archived_by_user_id = None
 
-    db.add(notification_state)
-    db.commit()
-    db.refresh(notification_state)
+    notification_state = repository.update_notification_state(db, notification_state)
 
     response = serialize_notification_entry(db, log, notification_state)
 
