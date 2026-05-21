@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, ShieldAlert, Sparkles, X } from "lucide-react";
+import { Plus, Edit2, Trash2, ShieldAlert, Sparkles, X, Upload } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import ActionDialog from "@/components/shared/ActionDialog";
 import { canPerformPlatformAction } from "@/features/platform-access/permissions";
@@ -38,6 +38,7 @@ export default function PlatformBanners() {
     dismissible: true,
   });
   const [formSaving, setFormSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [deleteBannerId, setDeleteBannerId] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -106,6 +107,26 @@ export default function PlatformBanners() {
       });
     }
     setIsModalOpen(true);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formDataUpload = new FormData();
+    formDataUpload.append("file", file);
+
+    try {
+      const res = await api.post<{ image_path: string }>("/super-admin/banners/upload-image", formDataUpload);
+      setFormData({...formData, image_url: res.image_path});
+    } catch (err) {
+      console.error(err);
+      alert("Failed to upload image. Please ensure it's a valid JPG/PNG/WEBP under 5MB.");
+    } finally {
+      setIsUploading(false);
+      e.target.value = ""; // Reset input so same file can be uploaded again if needed
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -349,13 +370,29 @@ export default function PlatformBanners() {
 
                   <div className="col-span-2">
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Image URL (For Promotions)</label>
-                    <input
-                      type="url"
-                      placeholder="https://..."
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      value={formData.image_url || ""}
-                      onChange={(e) => setFormData({...formData, image_url: e.target.value})}
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        value={formData.image_url || ""}
+                        onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+                      />
+                      <label className="relative cursor-pointer bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 flex items-center justify-center px-4 rounded-lg shadow-sm transition-colors whitespace-nowrap text-sm font-medium">
+                        {isUploading ? "Uploading..." : (
+                          <>
+                            <Upload size={16} className="mr-2" /> Upload
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="sr-only"
+                          onChange={handleImageUpload}
+                          disabled={isUploading}
+                        />
+                      </label>
+                    </div>
                   </div>
 
                   <div>

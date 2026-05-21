@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.file_storage import save_upload_file
 
 from app.modules.platform_banners import repository
 from app.modules.platform_banners.model import BannerCategory, PlatformBanner
@@ -62,3 +65,26 @@ def get_active_banners_grouped(db: Session) -> ActiveBannersGrouped:
         promotional=promotional,
         system_alert=system_alert
     )
+
+
+_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+_EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+
+
+async def upload_banner_image(file: UploadFile) -> str:
+    """Validate, save, and return the path for a banner image."""
+    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type '{file.content_type}'. Allowed: jpg, png, webp.",
+        )
+
+    image_path = await save_upload_file(
+        file=file,
+        upload_root=settings.upload_dir,
+        subdir="banners",
+        allowed_content_types=_ALLOWED_CONTENT_TYPES,
+        ext_map=_EXT_MAP,
+        max_size_mb=settings.max_upload_size_mb,
+    )
+    return image_path

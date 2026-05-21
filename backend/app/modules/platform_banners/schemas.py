@@ -54,3 +54,7 @@ class ActiveBannersGrouped(BaseModel):
     system_alert: list[PlatformBannerResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PlatformBannerImageUploadResponse(BaseModel):
+    image_path: str

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db, require_platform_scopes
@@ -13,6 +13,7 @@ from app.modules.platform_banners.schemas import (
     PlatformBannerCreate,
     PlatformBannerResponse,
     PlatformBannerUpdate,
+    PlatformBannerImageUploadResponse,
 )
 
 # Management router (Super Admin only)
@@ -88,6 +89,22 @@ def delete_banner(
     service.delete_platform_banner(db, banner_id)
     return success_response(
         message=f"Platform banner {banner_id} deleted successfully."
+    )
+
+
+@super_admin_router.post(
+    "/upload-image",
+    response_model=Any,
+)
+async def upload_banner_image_endpoint(
+    file: UploadFile = File(...),
+    current_user: Any = Depends(require_platform_scopes("tenant_admin")),
+) -> Any:
+    """Upload a platform banner image (Super Admin only)."""
+    image_path = await service.upload_banner_image(file)
+    return success_response(
+        data=PlatformBannerImageUploadResponse(image_path=image_path).model_dump(),
+        message="Platform banner image uploaded successfully."
     )
 
 
