@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { Menu } from "lucide-react";
 import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
 import { getRequiredScopesForPlatformAction } from "@/features/platform-access/permissions";
@@ -67,7 +67,7 @@ const SUPER_ADMIN_NAV = [
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.superAdmin";
 
 interface SuperAdminLayoutProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
@@ -216,7 +216,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
 
       <main className="h-dvh overflow-y-auto">
         <div className="app-content-container py-8">
-          {children}
+          {children ?? <Outlet />}
         </div>
       </main>
     </div>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
 import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -212,7 +211,7 @@ export default function SuperAdminOverview() {
   );
 
   return (
-    <SuperAdminLayout>
+    <>
       <div className="app-page-stack">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -484,6 +483,6 @@ export default function SuperAdminOverview() {
           </>
         )}
       </div>
-    </SuperAdminLayout>
+    </>
   );
 }

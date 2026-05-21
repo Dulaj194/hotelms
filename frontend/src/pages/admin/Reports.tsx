@@ -10,7 +10,6 @@ import {
   FileText
 } from "lucide-react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api, ApiError, refreshAccessToken } from "@/lib/api";
 import { getAccessToken } from "@/lib/auth";
 import { RESOLVED_API_BASE_URL } from "@/lib/networkBase";
@@ -219,7 +218,7 @@ export default function Reports() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-8">
         {/* Header Section */}
         <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
@@ -467,7 +466,7 @@ export default function Reports() {
           </>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }
 

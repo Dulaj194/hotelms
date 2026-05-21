@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { getUser } from "@/lib/auth";
 import {
   HOUSEKEEPING_SUPERVISOR_ROLES,
@@ -34,12 +33,12 @@ export default function HousekeepingPage() {
   if (!user || !ALLOWED_ROLES.has(user.role)) return null;
 
   return (
-    <DashboardLayout>
+    <>
       <HousekeepingDashboard
         userId={user.id}
         userName={user.full_name}
         supervisor={isSupervisor(user.role)}
       />
-    </DashboardLayout>
+    </>
   );
 }

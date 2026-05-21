@@ -12,7 +12,6 @@ import {
   XCircle,
 } from "lucide-react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
 import type {
   BillingTransactionListResponse,
@@ -248,7 +247,7 @@ export default function SubscriptionPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 p-6 text-white shadow-sm">
           <div className="absolute -right-14 -top-12 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
@@ -543,7 +542,7 @@ export default function SubscriptionPage() {
           />
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }
 

@@ -17,7 +17,6 @@ import {
   QrCode
 } from "lucide-react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import ManualItemAddDrawer from "@/components/admin/ManualItemAddDrawer";
 import { getUser, normalizeRole } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
@@ -470,7 +469,7 @@ export default function Billing() {
   }, [loadFolios]);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-4 pb-20">
         {/* Workspace Header */}
         <div className="rounded-[3rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-8 text-white shadow-2xl relative overflow-hidden">
@@ -855,6 +854,6 @@ export default function Billing() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import BillingFolioDrawer from "@/features/billing/BillingFolioDrawer";
 import {
   acceptAccountantFolio,
@@ -362,7 +361,7 @@ export default function AccountantBillingDashboard() {
     ) : null;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="app-page-stack mx-auto max-w-7xl">
         <div className="rounded-[32px] bg-gradient-to-r from-sky-700 via-cyan-600 to-emerald-600 p-6 text-white shadow-sm">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -576,6 +575,6 @@ export default function AccountantBillingDashboard() {
           }
         }}
       />
-    </DashboardLayout>
+    </>
   );
 }

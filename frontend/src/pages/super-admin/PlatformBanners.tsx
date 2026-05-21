@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, ShieldAlert, Sparkles, X, Upload } from "lucide-react";
-import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import { api, ApiError } from "@/lib/api";
 import ActionDialog from "@/components/shared/ActionDialog";
 import { canPerformPlatformAction } from "@/features/platform-access/permissions";
@@ -176,7 +175,7 @@ export default function PlatformBanners() {
   };
 
   return (
-    <SuperAdminLayout>
+    <>
       <div className="space-y-6 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-xl border shadow-sm">
         <div>
@@ -504,6 +503,6 @@ export default function PlatformBanners() {
         />
       )}
       </div>
-    </SuperAdminLayout>
+    </>
   );
 }

@@ -11,7 +11,6 @@ import {
   CheckCircle2
 } from "lucide-react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import type {
   BulkQRCodeResponse,
@@ -135,7 +134,7 @@ export default function GenerateTableQRCodes() {
   }, [loadExistingSummary, singleTableNumber]);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="mx-auto max-w-6xl space-y-8 pb-12">
         {/* Modern Header */}
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
@@ -368,6 +367,6 @@ export default function GenerateTableQRCodes() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

@@ -3,7 +3,6 @@ import { Camera, CheckCircle2, Pencil, Plus, Save, Trash2, X } from "lucide-reac
 import { useSearchParams } from "react-router-dom";
 
 import AssetImage from "@/components/shared/AssetImage";
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
 import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
@@ -377,7 +376,7 @@ export default function MenuItems() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="mb-5 sm:mb-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Menu Items</h1>
@@ -867,7 +866,7 @@ export default function MenuItems() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }
 

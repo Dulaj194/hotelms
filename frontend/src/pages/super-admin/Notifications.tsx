@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import { canPerformPlatformAction } from "@/features/platform-access/permissions";
 import { bulkUpdateSuperAdminNotifications } from "@/features/super-admin/notifications/api";
 import {
@@ -319,7 +318,7 @@ export default function SuperAdminNotificationsPage() {
   }
 
   return (
-    <SuperAdminLayout>
+    <>
       <div className="app-page-stack">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -871,7 +870,7 @@ export default function SuperAdminNotificationsPage() {
           </div>
         )}
       </div>
-    </SuperAdminLayout>
+    </>
   );
 }
 

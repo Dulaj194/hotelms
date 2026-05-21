@@ -2,6 +2,8 @@ import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import PrivilegeRoute from "@/components/shared/PrivilegeRoute";
+import DashboardLayout from "@/components/shared/DashboardLayout";
+import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { getRequiredScopesForPlatformAction } from "@/features/platform-access/permissions";
 import { getRoleRedirect, getUser, isAuthenticated, normalizeRole } from "@/lib/auth";
@@ -76,6 +78,23 @@ const SuperAdminPlatformUsers = lazy(() => import("@/pages/super-admin/PlatformU
 const SuperAdminAuditLogs = lazy(() => import("@/pages/super-admin/AuditLogs"));
 const SuperAdminSiteContent = lazy(() => import("@/pages/super-admin/SiteContent"));
 const SuperAdminPlatformBanners = lazy(() => import("@/pages/super-admin/PlatformBanners"));
+
+
+function AdminLayoutWrapper() {
+  return (
+    <ProtectedRoute>
+      <DashboardLayout />
+    </ProtectedRoute>
+  );
+}
+
+function SuperAdminLayoutWrapper() {
+  return (
+    <ProtectedRoute allowedRoles={SUPER_ADMIN_ONLY_ROLES}>
+      <SuperAdminLayout />
+    </ProtectedRoute>
+  );
+}
 
 function RootRedirect() {
 
@@ -163,467 +182,471 @@ function AppRoutes() {
 
         <Route path="/restaurant" element={<RootRedirect />} />
 
-        <Route
-          path="/admin/restaurant-profile"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <AdminRestaurantProfile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/staff"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <Staff />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/offers"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <PrivilegeRoute requiredModuleKey="offers">
-                <OfferListPage />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/offers/new"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <PrivilegeRoute requiredModuleKey="offers">
-                <OfferFormPage />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/offers/:offerId/edit"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <PrivilegeRoute requiredModuleKey="offers">
-                <OfferFormPage />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/steward"
-          element={
-            <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
-              <PrivilegeRoute requiredModuleKey="steward_ops">
-                <Steward />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/chat"
-          element={
-            <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
-              <PrivilegeRoute requiredModuleKey="steward_ops">
-                <StewardChat />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/reports"
-          element={
-            <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
-              <PrivilegeRoute requiredModuleKey="reports">
-                <Reports />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/admin/kitchen" element={<Navigate to="/admin/kitchen/orders" replace />} />
-        <Route
-          path="/admin/kitchen/orders"
-          element={
-            <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
-              <PrivilegeRoute requiredModuleKey="kds">
-                <Kitchen />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/kitchen/history"
-          element={
-            <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
-              <PrivilegeRoute requiredModuleKey="kds">
-                <OrderHistory />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/billing"
-          element={
-            <ProtectedRoute allowedRoles={BILLING_STAFF_ROLES}>
-              <PrivilegeRoute requiredModuleKey="billing">
-                <BillingRouteEntry />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/billing/cashier"
-          element={
-            <ProtectedRoute allowedRoles={BILLING_CASHIER_REVIEW_ROLES}>
-              <PrivilegeRoute requiredModuleKey="billing">
-                <CashierBillingDashboard />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/billing/accountant"
-          element={
-            <ProtectedRoute allowedRoles={BILLING_ACCOUNTANT_REVIEW_ROLES}>
-              <PrivilegeRoute requiredModuleKey="billing">
-                <AccountantBillingDashboard />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/admin/rooms" element={<Navigate to="/admin/housekeeping/rooms" replace />} />
-        <Route
-          path="/admin/housekeeping/rooms"
-          element={
-            <ProtectedRoute allowedRoles={HOUSEKEEPING_ROOM_ROLES}>
-              <PrivilegeRoute requiredModuleKey="housekeeping">
-                <Rooms />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/rooms/qr/all"
-          element={<Navigate to="/admin/qr/rooms" replace />}
-        />
-        <Route
-          path="/admin/housekeeping/rooms/qr/all"
-          element={<Navigate to="/admin/qr/rooms" replace />}
-        />
-        <Route
-          path="/admin/qr/rooms"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <PrivilegeRoute requiredModuleKey="qr">
-                <AllRoomQRCodes />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/rooms/qr/generate"
-          element={<Navigate to="/admin/qr/rooms/generate" replace />}
-        />
-        <Route
-          path="/admin/housekeeping/rooms/qr/generate"
-          element={<Navigate to="/admin/qr/rooms/generate" replace />}
-        />
-        <Route
-          path="/admin/qr/rooms/generate"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <PrivilegeRoute requiredModuleKey="qr">
-                <GenerateRoomQRCodes />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/tables"
-          element={<Navigate to="/admin/qr/tables" replace />}
-        />
-        <Route path="/admin/qr" element={<Navigate to="/admin/qr/tables" replace />} />
-        <Route
-          path="/admin/qr/tables"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <PrivilegeRoute requiredModuleKey="qr">
-                <AllTableQRCodes />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/qr/tables/generate"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <PrivilegeRoute requiredModuleKey="qr">
-                <GenerateTableQRCodes />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/housekeeping"
-          element={
-            <ProtectedRoute allowedRoles={HOUSEKEEPING_TASK_ROLES}>
-              <PrivilegeRoute requiredModuleKey="housekeeping">
-                <Housekeeping />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/menu/menus"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <Menus />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/menu/categories"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <MenuCategories />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/menu/items"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <MenuItems />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/subscription"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <SubscriptionPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/settings/quick-services"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <PrivilegeRoute requiredModuleKey="steward_ops">
-                <ServiceManagement />
-              </PrivilegeRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/subscription/payment/success"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <SubscriptionPaymentSuccess />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/subscription/payment/cancel"
-          element={
-            <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
-              <SubscriptionPaymentCancel />
-            </ProtectedRoute>
-          }
-        />
+        <Route element={<AdminLayoutWrapper />}>
+          <Route
+            path="/admin/restaurant-profile"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <AdminRestaurantProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/staff"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <Staff />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/offers"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <PrivilegeRoute requiredModuleKey="offers">
+                  <OfferListPage />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/offers/new"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <PrivilegeRoute requiredModuleKey="offers">
+                  <OfferFormPage />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/offers/:offerId/edit"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <PrivilegeRoute requiredModuleKey="offers">
+                  <OfferFormPage />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/steward"
+            element={
+              <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
+                <PrivilegeRoute requiredModuleKey="steward_ops">
+                  <Steward />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/chat"
+            element={
+              <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
+                <PrivilegeRoute requiredModuleKey="steward_ops">
+                  <StewardChat />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
+                <PrivilegeRoute requiredModuleKey="reports">
+                  <Reports />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/kitchen" element={<Navigate to="/admin/kitchen/orders" replace />} />
+          <Route
+            path="/admin/kitchen/orders"
+            element={
+              <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
+                <PrivilegeRoute requiredModuleKey="kds">
+                  <Kitchen />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/kitchen/history"
+            element={
+              <ProtectedRoute allowedRoles={QR_MENU_STAFF_ROLES}>
+                <PrivilegeRoute requiredModuleKey="kds">
+                  <OrderHistory />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/billing"
+            element={
+              <ProtectedRoute allowedRoles={BILLING_STAFF_ROLES}>
+                <PrivilegeRoute requiredModuleKey="billing">
+                  <BillingRouteEntry />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/billing/cashier"
+            element={
+              <ProtectedRoute allowedRoles={BILLING_CASHIER_REVIEW_ROLES}>
+                <PrivilegeRoute requiredModuleKey="billing">
+                  <CashierBillingDashboard />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/billing/accountant"
+            element={
+              <ProtectedRoute allowedRoles={BILLING_ACCOUNTANT_REVIEW_ROLES}>
+                <PrivilegeRoute requiredModuleKey="billing">
+                  <AccountantBillingDashboard />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/admin/rooms" element={<Navigate to="/admin/housekeeping/rooms" replace />} />
+          <Route
+            path="/admin/housekeeping/rooms"
+            element={
+              <ProtectedRoute allowedRoles={HOUSEKEEPING_ROOM_ROLES}>
+                <PrivilegeRoute requiredModuleKey="housekeeping">
+                  <Rooms />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/rooms/qr/all"
+            element={<Navigate to="/admin/qr/rooms" replace />}
+          />
+          <Route
+            path="/admin/housekeeping/rooms/qr/all"
+            element={<Navigate to="/admin/qr/rooms" replace />}
+          />
+          <Route
+            path="/admin/qr/rooms"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <PrivilegeRoute requiredModuleKey="qr">
+                  <AllRoomQRCodes />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/rooms/qr/generate"
+            element={<Navigate to="/admin/qr/rooms/generate" replace />}
+          />
+          <Route
+            path="/admin/housekeeping/rooms/qr/generate"
+            element={<Navigate to="/admin/qr/rooms/generate" replace />}
+          />
+          <Route
+            path="/admin/qr/rooms/generate"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <PrivilegeRoute requiredModuleKey="qr">
+                  <GenerateRoomQRCodes />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/tables"
+            element={<Navigate to="/admin/qr/tables" replace />}
+          />
+          <Route path="/admin/qr" element={<Navigate to="/admin/qr/tables" replace />} />
+          <Route
+            path="/admin/qr/tables"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <PrivilegeRoute requiredModuleKey="qr">
+                  <AllTableQRCodes />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/qr/tables/generate"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <PrivilegeRoute requiredModuleKey="qr">
+                  <GenerateTableQRCodes />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/housekeeping"
+            element={
+              <ProtectedRoute allowedRoles={HOUSEKEEPING_TASK_ROLES}>
+                <PrivilegeRoute requiredModuleKey="housekeeping">
+                  <Housekeeping />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/menu/menus"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <Menus />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/menu/categories"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <MenuCategories />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/menu/items"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <MenuItems />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/subscription"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <SubscriptionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings/quick-services"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <PrivilegeRoute requiredModuleKey="steward_ops">
+                  <ServiceManagement />
+                </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/subscription/payment/success"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <SubscriptionPaymentSuccess />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/subscription/payment/cancel"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <SubscriptionPaymentCancel />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
 
-        <Route
-          path="/super-admin"
-          element={
-            <ProtectedRoute allowedRoles={SUPER_ADMIN_ONLY_ROLES}>
-              <SuperAdminOverview />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/notifications"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "notifications_queue",
-                "view",
-              )}
-            >
-              <SuperAdminNotifications />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/registrations"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "registrations",
-                "view",
-              )}
-            >
-              <SuperAdminPendingRegistrations />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/pending-registrations"
-          element={<Navigate to="/super-admin/registrations" replace />}
-        />
-        <Route
-          path="/super-admin/registrations/history"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "registrations",
-                "view",
-              )}
-            >
-              <SuperAdminRegistrationHistory />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/restaurants"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "restaurants",
-                "view",
-              )}
-            >
-              <SuperAdminRestaurants />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/manage-restaurants"
-          element={<Navigate to="/super-admin/restaurants" replace />}
-        />
-        <Route
-          path="/super-admin/packages"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "packages",
-                "view",
-              )}
-            >
-              <SuperAdminPackages />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/settings-requests"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "settings_requests",
-                "view",
-              )}
-            >
-              <SuperAdminSettingsRequests />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/pending-approvals"
-          element={<Navigate to="/super-admin/settings-requests" replace />}
-        />
-        <Route
-          path="/super-admin/site-content"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "site_content",
-                "view",
-              )}
-            >
-              <SuperAdminSiteContent />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/settings-requests/history"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "settings_requests",
-                "view",
-              )}
-            >
-              <SuperAdminSettingsRequestHistory />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/promo-codes"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "promo_codes",
-                "view",
-              )}
-            >
-              <SuperAdminPromoCodes />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/platform-users"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "platform_users",
-                "view",
-              )}
-            >
-              <SuperAdminPlatformUsers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/audit-logs"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "audit_logs",
-                "view",
-              )}
-            >
-              <SuperAdminAuditLogs />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/platform-banners"
-          element={
-            <ProtectedRoute
-              allowedRoles={SUPER_ADMIN_ONLY_ROLES}
-              requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
-                "platform_banners",
-                "view",
-              )}
-            >
-              <SuperAdminPlatformBanners />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/super-admin/login"
+        <Route element={<SuperAdminLayoutWrapper />}>
+          <Route
+            path="/super-admin"
+            element={
+              <ProtectedRoute allowedRoles={SUPER_ADMIN_ONLY_ROLES}>
+                <SuperAdminOverview />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/notifications"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "notifications_queue",
+                  "view",
+                )}
+              >
+                <SuperAdminNotifications />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/registrations"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "registrations",
+                  "view",
+                )}
+              >
+                <SuperAdminPendingRegistrations />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/pending-registrations"
+            element={<Navigate to="/super-admin/registrations" replace />}
+          />
+          <Route
+            path="/super-admin/registrations/history"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "registrations",
+                  "view",
+                )}
+              >
+                <SuperAdminRegistrationHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/restaurants"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "restaurants",
+                  "view",
+                )}
+              >
+                <SuperAdminRestaurants />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/manage-restaurants"
+            element={<Navigate to="/super-admin/restaurants" replace />}
+          />
+          <Route
+            path="/super-admin/packages"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "packages",
+                  "view",
+                )}
+              >
+                <SuperAdminPackages />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/settings-requests"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "settings_requests",
+                  "view",
+                )}
+              >
+                <SuperAdminSettingsRequests />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/pending-approvals"
+            element={<Navigate to="/super-admin/settings-requests" replace />}
+          />
+          <Route
+            path="/super-admin/site-content"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "site_content",
+                  "view",
+                )}
+              >
+                <SuperAdminSiteContent />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/settings-requests/history"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "settings_requests",
+                  "view",
+                )}
+              >
+                <SuperAdminSettingsRequestHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/promo-codes"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "promo_codes",
+                  "view",
+                )}
+              >
+                <SuperAdminPromoCodes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/platform-users"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "platform_users",
+                  "view",
+                )}
+              >
+                <SuperAdminPlatformUsers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/audit-logs"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "audit_logs",
+                  "view",
+                )}
+              >
+                <SuperAdminAuditLogs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/platform-banners"
+            element={
+              <ProtectedRoute
+                allowedRoles={SUPER_ADMIN_ONLY_ROLES}
+                requiredSuperAdminScopes={getRequiredScopesForPlatformAction(
+                  "platform_banners",
+                  "view",
+                )}
+              >
+                <SuperAdminPlatformBanners />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/login"
 
-          element={<Navigate to="/login/super-admin" replace />}
-        />
+            element={<Navigate to="/login/super-admin" replace />}
+          />
+        </Route>
 
         <Route path="/admin" element={<RootRedirect />} />
         <Route path="/" element={<Landing />} />

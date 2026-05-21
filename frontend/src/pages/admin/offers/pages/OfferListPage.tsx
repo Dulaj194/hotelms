@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 import { api } from "@/lib/api";
 import type { OfferResponse } from "@/types/offer";
@@ -61,7 +60,7 @@ export default function OfferListPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <OfferPageHeader
           title="Manage Offers"
@@ -138,6 +137,6 @@ export default function OfferListPage() {
           onConfirm={() => void handleDelete()}
         />
       </div>
-    </DashboardLayout>
+    </>
   );
 }

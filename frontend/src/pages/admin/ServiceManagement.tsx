@@ -18,7 +18,6 @@ import {
   FileText
 } from "lucide-react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import {
   TenantContextBadge,
   TenantScopeEmptyState,
@@ -181,7 +180,7 @@ export default function ServiceManagement() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Service Management</h1>
@@ -428,6 +427,6 @@ export default function ServiceManagement() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
 import type { BillingTransactionListResponse } from "@/types/payment";
 import type { SubscriptionStatusResponse } from "@/types/subscription";
@@ -44,7 +43,7 @@ export default function SubscriptionPaymentSuccess() {
   const sessionId = searchParams.get("session_id");
 
   return (
-    <DashboardLayout>
+    <>
       <div className="rounded-xl border bg-white p-6 shadow-sm">
         <h1 className="text-xl font-semibold text-gray-900">Payment Success</h1>
         {sessionId && <p className="mt-2 text-xs text-gray-500">Session: {sessionId}</p>}
@@ -58,6 +57,6 @@ export default function SubscriptionPaymentSuccess() {
           </Link>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

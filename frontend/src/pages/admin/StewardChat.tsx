@@ -17,7 +17,6 @@ import {
   MapPin,
 } from "lucide-react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { ApiError, api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -198,9 +197,9 @@ export default function StewardChatPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <StewardChat restaurantId={user.restaurant_id} />
-    </DashboardLayout>
+    </>
   );
 }
 

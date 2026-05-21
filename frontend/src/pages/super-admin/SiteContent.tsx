@@ -11,7 +11,6 @@ import {
   Send,
 } from "lucide-react";
 
-import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import {
   downloadContactLeadCsv,
   fromDateTimeInputValue,
@@ -526,7 +525,7 @@ export default function SuperAdminSiteContentPage() {
   const publishedBlogCount = blogs.filter((item) => item.is_published).length;
 
   return (
-    <SuperAdminLayout>
+    <>
       <div className="app-page-stack">
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1202,7 +1201,7 @@ export default function SuperAdminSiteContentPage() {
           </>
         )}
       </div>
-    </SuperAdminLayout>
+    </>
   );
 }
 

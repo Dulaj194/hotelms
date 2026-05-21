@@ -3,7 +3,6 @@ import { Camera, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import AssetImage from "@/components/shared/AssetImage";
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import {
   TenantContextBadge,
   TenantScopeEmptyState,
@@ -225,7 +224,7 @@ export default function Menus() {
   });
 
   return (
-    <DashboardLayout>
+    <>
       <div className="mb-5 flex flex-col gap-3 sm:mb-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">Menus</h1>
@@ -508,6 +507,6 @@ export default function Menus() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   );
 }

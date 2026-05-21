@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import BillingFolioDrawer from "@/features/billing/BillingFolioDrawer";
 import {
   acceptCashierFolio,
@@ -341,7 +340,7 @@ export default function CashierBillingDashboard() {
     ) : null;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="app-page-stack mx-auto max-w-7xl">
         <div className="rounded-[32px] bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 p-6 text-white shadow-sm">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -511,6 +510,6 @@ export default function CashierBillingDashboard() {
           }
         }}
       />
-    </DashboardLayout>
+    </>
   );
 }

@@ -3,7 +3,6 @@ import type { ChangeEvent, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Clock3, RefreshCw, Star } from "lucide-react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { getFeatureFlagEntries } from "@/features/access/catalog";
 import { ApiError, api } from "@/lib/api";
 import { toAssetUrl } from "@/lib/assets";
@@ -493,19 +492,19 @@ export default function RestaurantProfile() {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="space-y-4">
           <div className="h-36 animate-pulse rounded-2xl border border-slate-200 bg-white" />
           <div className="h-28 animate-pulse rounded-2xl border border-slate-200 bg-white" />
           <div className="h-64 animate-pulse rounded-2xl border border-slate-200 bg-white" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (fetchError || !restaurant) {
     return (
-      <DashboardLayout>
+      <>
         <section className="rounded-2xl border border-red-200 bg-red-50 p-6">
           <h1 className="text-lg font-semibold text-red-800">Unable to load restaurant profile</h1>
           <p className="mt-2 text-sm text-red-700">{fetchError ?? "Restaurant profile not found."}</p>
@@ -518,7 +517,7 @@ export default function RestaurantProfile() {
             Retry
           </button>
         </section>
-      </DashboardLayout>
+      </>
     );
   }
 
@@ -573,7 +572,7 @@ export default function RestaurantProfile() {
     !submittingAccessRequest && !pendingAccessRequest && changedFeatureEntries.length > 0;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1076,7 +1075,7 @@ export default function RestaurantProfile() {
           </div>
         </section>
       </div>
-    </DashboardLayout>
+    </>
   );
 }
 

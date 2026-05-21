@@ -13,7 +13,6 @@ import {
   Calendar
 } from "lucide-react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { ApiError, api } from "@/lib/api";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 import type { ActiveOrderListResponse, OrderHeaderResponse, OrderStatus } from "@/types/order";
@@ -101,7 +100,7 @@ export default function OrderHistory() {
   }, [orders, searchText, sourceFilter, statusFilter]);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-8">
         {/* Header section */}
         <div className="bg-white rounded-3xl border border-slate-100 p-8 shadow-sm">
@@ -289,6 +288,6 @@ export default function OrderHistory() {
           )}
         </div>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

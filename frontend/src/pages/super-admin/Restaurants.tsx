@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import ActionDialog from "@/components/shared/ActionDialog";
-import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
 import {
   createRestaurant,
@@ -1153,7 +1152,7 @@ export default function SuperAdminRestaurants() {
   }
 
   return (
-    <SuperAdminLayout>
+    <>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -1352,6 +1351,6 @@ export default function SuperAdminRestaurants() {
           />
         )}
       </div>
-    </SuperAdminLayout>
+    </>
   );
 }

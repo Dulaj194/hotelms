@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import ActionDialog from "@/components/shared/ActionDialog";
-import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import { formatSettingFieldLabel, formatSettingFieldValue } from "@/features/access/catalog";
 import { canPerformPlatformAction } from "@/features/platform-access/permissions";
 import { ApiError, api } from "@/lib/api";
@@ -280,7 +279,7 @@ export default function SuperAdminSettingsRequests() {
   }, [selectedRequest]);
 
   return (
-    <SuperAdminLayout>
+    <>
       <div className="space-y-6">
         <div className="rounded-lg border bg-white p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -628,6 +627,6 @@ export default function SuperAdminSettingsRequests() {
           </div>
         </ActionDialog>
       )}
-    </SuperAdminLayout>
+    </>
   );
 }

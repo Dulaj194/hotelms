@@ -25,7 +25,6 @@ import {
   ChevronDown
 } from "lucide-react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { useKitchenSocket } from "@/hooks/useKitchenSocket";
 import { api } from "@/lib/api";
 import { getUser } from "@/lib/auth";
@@ -117,9 +116,9 @@ export default function Steward() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <LiveOperationsDashboard restaurantId={user.restaurant_id} />
-    </DashboardLayout>
+    </>
   );
 }
 

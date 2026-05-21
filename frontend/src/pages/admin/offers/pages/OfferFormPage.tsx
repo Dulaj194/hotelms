@@ -1,7 +1,6 @@
 import { useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { useSubscriptionPrivileges } from "@/hooks/useSubscriptionPrivileges";
 
 import OfferForm from "../components/OfferForm";
@@ -47,7 +46,7 @@ export default function OfferFormPage() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         {!privilegeLoading && !offersEnabled && (
           <OfferNotice
@@ -105,6 +104,6 @@ export default function OfferFormPage() {
             />
           )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

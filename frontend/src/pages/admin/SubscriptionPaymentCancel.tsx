@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 
 export default function SubscriptionPaymentCancel() {
   return (
-    <DashboardLayout>
+    <>
       <div className="rounded-xl border bg-white p-6 shadow-sm">
         <h1 className="text-xl font-semibold text-gray-900">Payment Cancelled</h1>
         <p className="mt-4 text-sm text-gray-700">
@@ -17,6 +16,6 @@ export default function SubscriptionPaymentCancel() {
           Back to Subscription
         </Link>
       </div>
-    </DashboardLayout>
+    </>
   );
 }

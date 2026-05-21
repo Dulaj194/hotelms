@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import type { RoomListResponse, RoomResponse } from "@/types/room";
 import type { BulkQRCodeResponse } from "@/types/publicMenu";
@@ -167,7 +166,7 @@ export default function GenerateRoomQRCodes() {
   }, [selectedRooms]);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="app-page-stack mx-auto max-w-6xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -312,6 +311,6 @@ export default function GenerateRoomQRCodes() {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

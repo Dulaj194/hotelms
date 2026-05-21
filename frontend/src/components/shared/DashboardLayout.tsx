@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import {
   ChevronDown,
   CookingPot,
@@ -101,7 +101,7 @@ function loadSidebarGroupState(): SidebarGroupState {
 
 
 interface DashboardLayoutProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
@@ -965,7 +965,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           key={location.pathname}
           className="app-content-container py-8 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out"
         >
-          {children}
+          {children ?? <Outlet />}
         </div>
       </main>
     </div>

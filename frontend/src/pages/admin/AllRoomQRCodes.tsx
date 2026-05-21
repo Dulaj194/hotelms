@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import ActionDialog from "@/components/shared/ActionDialog";
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import type {
   QRCodeDeleteResponse,
@@ -152,7 +151,7 @@ export default function AllRoomQRCodes() {
   }, [loadRoomQRCodes]);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="app-page-stack mx-auto max-w-6xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -268,6 +267,6 @@ export default function AllRoomQRCodes() {
           confirmTone="danger"
         />
       )}
-    </DashboardLayout>
+    </>
   );
 }

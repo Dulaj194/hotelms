@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import { api } from "@/lib/api";
 import { getUser, normalizeRole } from "@/lib/auth";
 import type {
@@ -137,7 +136,7 @@ export default function Rooms() {
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="app-page-stack mx-auto max-w-4xl">
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -403,6 +402,6 @@ export default function Rooms() {
         </div>
       )}
       </div>
-    </DashboardLayout>
+    </>
   );
 }

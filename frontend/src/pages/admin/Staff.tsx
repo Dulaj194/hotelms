@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import ActionDialog from "@/components/shared/ActionDialog";
-import DashboardLayout from "@/components/shared/DashboardLayout";
 import type {
   AssignedArea,
   StaffManagementPolicyResponse,
@@ -324,7 +323,7 @@ export default function Staff() {
     staffList.find((staff) => staff.role === "housekeeper")?.pending_tasks_count ?? 0;
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-5">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Staff</h1>
@@ -686,7 +685,7 @@ export default function Staff() {
           confirmTone={confirmAction.confirmTone}
         />
       )}
-    </DashboardLayout>
+    </>
   );
 }
 
