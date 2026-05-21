@@ -88,6 +88,7 @@ def delete_banner(
     """Delete a platform banner (Super Admin only)."""
     service.delete_platform_banner(db, banner_id)
     return success_response(
+        data=None,
         message=f"Platform banner {banner_id} deleted successfully."
     )
 
