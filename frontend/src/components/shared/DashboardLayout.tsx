@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import {
@@ -965,7 +965,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           key={location.pathname}
           className="app-content-container py-8 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out"
         >
-          {children ?? <Outlet />}
+          <Suspense fallback={<div className="flex h-[50vh] items-center justify-center text-sm text-slate-500">Loading page...</div>}>
+            {children ?? <Outlet />}
+          </Suspense>
         </div>
       </main>
     </div>

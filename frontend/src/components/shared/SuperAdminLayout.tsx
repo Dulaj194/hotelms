@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import type { ReactNode } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { Menu } from "lucide-react";
@@ -216,7 +216,9 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
 
       <main className="h-dvh overflow-y-auto">
         <div className="app-content-container py-8">
-          {children ?? <Outlet />}
+          <Suspense fallback={<div className="flex h-[50vh] items-center justify-center text-sm text-slate-500">Loading page...</div>}>
+            {children ?? <Outlet />}
+          </Suspense>
         </div>
       </main>
     </div>
