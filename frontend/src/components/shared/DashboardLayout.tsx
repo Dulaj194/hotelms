@@ -61,7 +61,7 @@ type SidebarGroupState = {
   settingsOpen: boolean;
 };
 
-const SIDEBAR_GROUPS_STORAGE_KEY = "hotelms.sidebar.groups";
+
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.admin";
 const DEFAULT_SIDEBAR_GROUP_STATE: SidebarGroupState = {
   menusOpen: false,
@@ -75,28 +75,7 @@ const DEFAULT_SIDEBAR_GROUP_STATE: SidebarGroupState = {
   settingsOpen: false,
 };
 
-function loadSidebarGroupState(): SidebarGroupState {
-  if (typeof window === "undefined") return DEFAULT_SIDEBAR_GROUP_STATE;
-  try {
-    const raw = window.localStorage.getItem(SIDEBAR_GROUPS_STORAGE_KEY);
-    if (!raw) return DEFAULT_SIDEBAR_GROUP_STATE;
-    const parsed = JSON.parse(raw) as Partial<SidebarGroupState>;
-    return {
-      menusOpen: parsed.menusOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.menusOpen,
-      kitchenOpen: parsed.kitchenOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.kitchenOpen,
-      qrOpen: parsed.qrOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.qrOpen,
-      housekeepingOpen:
-        parsed.housekeepingOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.housekeepingOpen,
-      offersOpen: parsed.offersOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.offersOpen,
-      opsOpen: parsed.opsOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.opsOpen,
-      commOpen: parsed.commOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.commOpen,
-      financeOpen: parsed.financeOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.financeOpen,
-      settingsOpen: parsed.settingsOpen ?? DEFAULT_SIDEBAR_GROUP_STATE.settingsOpen,
-    };
-  } catch {
-    return DEFAULT_SIDEBAR_GROUP_STATE;
-  }
-}
+
 
 
 
