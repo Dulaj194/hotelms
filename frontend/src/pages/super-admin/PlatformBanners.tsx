@@ -300,7 +300,7 @@ export default function PlatformBanners() {
                     <input
                       required
                       type="text"
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       value={formData.title || ""}
                       onChange={(e) => setFormData({...formData, title: e.target.value})}
                     />
@@ -311,7 +311,7 @@ export default function PlatformBanners() {
                     <textarea
                       required
                       rows={3}
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       value={formData.content || ""}
                       onChange={(e) => setFormData({...formData, content: e.target.value})}
                     />
@@ -320,7 +320,7 @@ export default function PlatformBanners() {
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
                     <select
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       value={formData.category}
                       onChange={(e) => setFormData({...formData, category: e.target.value as any})}
                     >
@@ -332,7 +332,7 @@ export default function PlatformBanners() {
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Visual Type</label>
                     <select
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       value={formData.type}
                       onChange={(e) => setFormData({...formData, type: e.target.value as any})}
                     >
@@ -352,7 +352,7 @@ export default function PlatformBanners() {
                     <input
                       type="url"
                       placeholder="https://..."
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       value={formData.image_url || ""}
                       onChange={(e) => setFormData({...formData, image_url: e.target.value})}
                     />
@@ -363,7 +363,7 @@ export default function PlatformBanners() {
                     <input
                       type="url"
                       placeholder="https://..."
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       value={formData.cta_link || ""}
                       onChange={(e) => setFormData({...formData, cta_link: e.target.value})}
                     />
@@ -374,7 +374,7 @@ export default function PlatformBanners() {
                     <input
                       type="text"
                       placeholder="e.g. Register Now"
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       value={formData.cta_label || ""}
                       onChange={(e) => setFormData({...formData, cta_label: e.target.value})}
                     />
@@ -388,7 +388,7 @@ export default function PlatformBanners() {
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Start Time (Local)</label>
                     <input
                       type="datetime-local"
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       value={formData.starts_at || ""}
                       onChange={(e) => setFormData({...formData, starts_at: e.target.value})}
                     />
@@ -398,7 +398,7 @@ export default function PlatformBanners() {
                     <label className="block text-sm font-semibold text-gray-700 mb-1">End Time (Local)</label>
                     <input
                       type="datetime-local"
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                       value={formData.ends_at || ""}
                       onChange={(e) => setFormData({...formData, ends_at: e.target.value})}
                     />
