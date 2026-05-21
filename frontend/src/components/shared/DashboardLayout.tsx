@@ -289,7 +289,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   );
   const billingNavPath = getBillingHomePath(role);
   const toggleGroup = (group: keyof SidebarGroupState) => {
-    setGroupState((prev) => ({ ...prev, [group]: !prev[group] }));
+    setGroupState((prev) => {
+      if (prev[group]) {
+        return { ...prev, [group]: false };
+      } else {
+        const nextState = { ...prev };
+        (Object.keys(nextState) as Array<keyof SidebarGroupState>).forEach((k) => {
+          nextState[k] = false;
+        });
+        nextState[group] = true;
+        return nextState;
+      }
+    });
   };
   const toggleMobileSidebar = () => {
     setMobileSidebarOpen((prev) => !prev);
