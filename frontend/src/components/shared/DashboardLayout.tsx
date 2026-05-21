@@ -65,12 +65,12 @@ const SIDEBAR_GROUPS_STORAGE_KEY = "hotelms.sidebar.groups";
 const SIDEBAR_SCROLL_STORAGE_KEY = "hotelms.sidebar.scrollTop.admin";
 const DEFAULT_SIDEBAR_GROUP_STATE: SidebarGroupState = {
   menusOpen: false,
-  kitchenOpen: true,
+  kitchenOpen: false,
   qrOpen: false,
-  housekeepingOpen: true,
+  housekeepingOpen: false,
   offersOpen: false,
-  opsOpen: true,
-  commOpen: true,
+  opsOpen: false,
+  commOpen: false,
   financeOpen: false,
   settingsOpen: false,
 };
