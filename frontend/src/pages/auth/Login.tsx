@@ -208,8 +208,14 @@ export default function Login() {
         navigate("/first-time-password", { replace: true });
         return;
       }
-      navigate(getRoleRedirect(provisionalRole, []), { replace: true });
-      void api.get<UserMeResponse>("/auth/me").then((me) => setUser(me)).catch(() => {});
+
+      try {
+        const me = await api.get<UserMeResponse>("/auth/me");
+        setUser(me);
+        navigate(getRoleRedirect(me.role, me.super_admin_scopes), { replace: true });
+      } catch (err) {
+        navigate(getRoleRedirect(provisionalRole, []), { replace: true });
+      }
     } catch (err) {
       trackAnalyticsEvent("login_submit_failure", {
         entry_point: searchParams.get("entry_point") ?? undefined,
