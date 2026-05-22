@@ -42,7 +42,7 @@ class OrderSource(str, enum.Enum):
 
 # Explicit allowed status transitions - all others are forbidden.
 ALLOWED_TRANSITIONS: dict[OrderStatus, set[OrderStatus]] = {
-    OrderStatus.pending: {OrderStatus.confirmed, OrderStatus.rejected},
+    OrderStatus.pending: {OrderStatus.confirmed, OrderStatus.processing, OrderStatus.rejected},
     OrderStatus.confirmed: {OrderStatus.processing, OrderStatus.rejected},
     OrderStatus.processing: {OrderStatus.completed, OrderStatus.rejected},
     OrderStatus.completed: {OrderStatus.served, OrderStatus.paid},
