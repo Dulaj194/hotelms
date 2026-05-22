@@ -418,6 +418,8 @@ export default function SuperAdminRestaurants() {
         phone: restaurant.phone,
         address: restaurant.address,
         public_menu_banner_urls: restaurant.public_menu_banner_urls,
+        default_language: restaurant.default_language,
+        allow_multi_language: restaurant.allow_multi_language,
         feature_flags: restaurant.feature_flags,
         is_active: restaurant.is_active,
       });

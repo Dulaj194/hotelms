@@ -13,7 +13,7 @@ type MediaSlot = "primary" | "primary_si" | "additional_1" | "additional_2" | "a
 
 const IMAGE_SLOTS: Array<{ slot: Exclude<MediaSlot, "video">; label: string }> = [
   { slot: "primary", label: "Primary Image" },
-  { slot: "primary_si", label: "Sinhala Image (Optional)" },
+  { slot: "primary_si", label: "Secondary Language Image (Optional)" },
   { slot: "additional_1", label: "Additional Image 1" },
   { slot: "additional_2", label: "Additional Image 2" },
   { slot: "additional_3", label: "Additional Image 3" },
@@ -72,6 +72,7 @@ export default function MenuItems() {
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [restaurantCurrency, setRestaurantCurrency] = useState("LKR");
+  const [restaurantInfo, setRestaurantInfo] = useState<RestaurantMeResponse | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +113,7 @@ export default function MenuItems() {
       setItems(unwrapPaginated(itemsRes));
       setCategories(unwrapPaginated(catsRes));
       setRestaurantCurrency((restaurantRes.currency || "LKR").toUpperCase());
+      setRestaurantInfo(restaurantRes);
     } catch {
       setError("Failed to load data.");
     } finally {
@@ -547,18 +549,20 @@ export default function MenuItems() {
                       placeholder="e.g., Chicken Kottu"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Item Name (සිංහල)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name_si}
-                      onChange={(e) => setFormData((f) => ({ ...f, name_si: e.target.value.slice(0, 150) }))}
-                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                      placeholder="උදා: චිකන් කොත්තු"
-                    />
-                  </div>
+                  {restaurantInfo?.allow_multi_language && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Item Name (Secondary Language)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.name_si}
+                        onChange={(e) => setFormData((f) => ({ ...f, name_si: e.target.value.slice(0, 150) }))}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                        placeholder="e.g., චිකන් කොත්තු"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -573,16 +577,18 @@ export default function MenuItems() {
                     />
                     <p className="mt-1 text-[11px] text-gray-400">Maximum 350 characters</p>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Short Description (සිංහල)</label>
-                    <textarea
-                      value={formData.description_si}
-                      onChange={(e) => setFormData((f) => ({ ...f, description_si: e.target.value.slice(0, 350) }))}
-                      rows={2}
-                      className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                      placeholder="සිංහල කෙටි විස්තරය"
-                    />
-                  </div>
+                  {restaurantInfo?.allow_multi_language && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Short Description (Secondary Language)</label>
+                      <textarea
+                        value={formData.description_si}
+                        onChange={(e) => setFormData((f) => ({ ...f, description_si: e.target.value.slice(0, 350) }))}
+                        rows={2}
+                        className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                        placeholder="Secondary language description"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -597,16 +603,18 @@ export default function MenuItems() {
                     />
                     <p className="mt-1 text-[11px] text-gray-400">Maximum 1000 characters</p>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">More Details (සිංහල)</label>
-                    <textarea
-                      value={formData.more_details_si}
-                      onChange={(e) => setFormData((f) => ({ ...f, more_details_si: e.target.value.slice(0, 1000) }))}
-                      rows={3}
-                      className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
-                      placeholder="සිංහල අමතර විස්තර"
-                    />
-                  </div>
+                  {restaurantInfo?.allow_multi_language && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">More Details (Secondary Language)</label>
+                      <textarea
+                        value={formData.more_details_si}
+                        onChange={(e) => setFormData((f) => ({ ...f, more_details_si: e.target.value.slice(0, 1000) }))}
+                        rows={3}
+                        className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-100"
+                        placeholder="Secondary language details"
+                      />
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -729,7 +737,9 @@ export default function MenuItems() {
                 })()}
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {IMAGE_SLOTS.slice(1).map(({ slot, label }) => {
+                  {IMAGE_SLOTS.slice(1)
+                    .filter(slotObj => slotObj.slot !== "primary_si" || restaurantInfo?.allow_multi_language)
+                    .map(({ slot, label }) => {
                     const preview = mediaPreviewUrls[slot];
                     const existingPath = !removeExistingMedia[slot] ? existingMediaPath(slot) : null;
 

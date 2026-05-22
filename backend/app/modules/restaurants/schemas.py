@@ -182,6 +182,8 @@ class RestaurantResponse(BaseModel):
     opening_time: str | None
     closing_time: str | None
     logo_url: str | None
+    default_language: str = "en"
+    allow_multi_language: bool = False
     feature_flags: RestaurantFeatureFlagsResponse
     integration: RestaurantIntegrationResponse = Field(
         default_factory=RestaurantIntegrationResponse
@@ -267,6 +269,8 @@ class RestaurantCreateRequest(BaseModel):
     public_menu_banner_urls: list[str] | None = None
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
+    default_language: str | None = Field(None, max_length=10)
+    allow_multi_language: bool | None = None
     change_reason: str | None = Field(default=None, min_length=3, max_length=500)
 
     @field_validator("public_menu_banner_urls", mode="before")
@@ -290,6 +294,8 @@ class RestaurantAdminUpdateRequest(BaseModel):
     public_menu_banner_urls: list[str] | None = None
     opening_time: str | None = Field(None, max_length=8)
     closing_time: str | None = Field(None, max_length=8)
+    default_language: str | None = Field(None, max_length=10)
+    allow_multi_language: bool | None = None
     feature_flags: RestaurantFeatureFlagsUpdateRequest | None = None
     is_active: bool | None = None
     change_reason: str | None = Field(default=None, min_length=3, max_length=500)
@@ -378,6 +384,8 @@ class RestaurantRegistrationSummaryResponse(BaseModel):
     opening_time: str | None
     closing_time: str | None
     logo_url: str | None
+    default_language: str = "en"
+    allow_multi_language: bool = False
     created_at: datetime
     registration_status: RegistrationStatusValue
     registration_reviewed_by_id: int | None

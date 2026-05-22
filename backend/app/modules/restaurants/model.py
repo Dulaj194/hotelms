@@ -64,6 +64,8 @@ class Restaurant(Base):
     opening_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
     closing_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
     logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    default_language: Mapped[str] = mapped_column(String(10), default="en", nullable=False)
+    allow_multi_language: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     enable_steward: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     enable_housekeeping: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     enable_kds: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

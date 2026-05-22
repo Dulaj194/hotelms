@@ -61,6 +61,31 @@ export function CreateRestaurantForm({
           onChange={(event) => onLogoChange(event.target.files?.[0] ?? null)}
         />
       </div>
+      <div className="grid grid-cols-2 gap-3 pt-2">
+        <div className="space-y-1">
+          <label className="text-sm font-medium">Default Language</label>
+          <select
+            value={form.default_language || "en"}
+            onChange={(e) => onFormChange({ ...form, default_language: e.target.value })}
+            className="block w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-slate-500"
+          >
+            <option value="en">English</option>
+            <option value="si">Sinhala</option>
+            <option value="ta">Tamil</option>
+          </select>
+        </div>
+        <div className="flex items-end pb-1">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.allow_multi_language || false}
+              onChange={(e) => onFormChange({ ...form, allow_multi_language: e.target.checked })}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm font-medium text-slate-700">Enable Multi-Language</span>
+          </label>
+        </div>
+      </div>
       <div className="flex gap-2 pt-1">
         <button
           type="submit"

@@ -90,6 +90,8 @@ export interface RestaurantResponse {
   opening_time: string | null;
   closing_time: string | null;
   logo_url: string | null;
+  default_language: string;
+  allow_multi_language: boolean;
   feature_flags: RestaurantFeatureFlags;
   integration: RestaurantIntegrationResponse;
   is_active: boolean;
@@ -139,6 +141,8 @@ export interface RestaurantUpdateRequest {
   public_menu_banner_urls?: string[] | null;
   opening_time?: string | null;
   closing_time?: string | null;
+  default_language?: string | null;
+  allow_multi_language?: boolean | null;
 }
 
 export interface RestaurantLogoUploadResponse {
@@ -160,6 +164,8 @@ export interface RestaurantRegistrationSummaryResponse {
   opening_time: string | null;
   closing_time: string | null;
   logo_url: string | null;
+  default_language: string;
+  allow_multi_language: boolean;
   created_at: string;
   registration_status: RestaurantRegistrationStatus;
   registration_reviewed_by_id: number | null;
@@ -223,6 +229,8 @@ export interface RestaurantCreateRequest {
   public_menu_banner_urls?: string[] | null;
   opening_time?: string | null;
   closing_time?: string | null;
+  default_language?: string | null;
+  allow_multi_language?: boolean | null;
 }
 
 export interface RestaurantAdminUpdateRequest {
@@ -238,6 +246,8 @@ export interface RestaurantAdminUpdateRequest {
   public_menu_banner_urls?: string[] | null;
   opening_time?: string | null;
   closing_time?: string | null;
+  default_language?: string | null;
+  allow_multi_language?: boolean | null;
   feature_flags?: Partial<RestaurantFeatureFlags> | null;
   is_active?: boolean;
 }
