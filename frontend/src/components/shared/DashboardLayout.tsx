@@ -23,6 +23,7 @@ import {
   canAccessHousekeepingTasks,
   hasRoleAccess,
   RESTAURANT_ADMIN_ROLES,
+  QR_MENU_STAFF_ROLES,
 } from "@/lib/moduleAccess";
 import {
   clearInAppNavigationHistory,
@@ -410,9 +411,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     };
   }, [housekeepingTasksEnabled, isHousekeepingGroupVisible, privilegesLoading]);
 
+  const isQrStaff = hasRoleAccess(role, QR_MENU_STAFF_ROLES);
+
   // Real-time Badge Counts (Steward Orders & Requests)
   const fetchBadgeCounts = useCallback(async () => {
-    if (!user?.restaurant_id) return;
+    if (!user?.restaurant_id || !isQrStaff) return;
     try {
       const data = await api.get<Record<string, number>>("/orders/badge-counts");
       setBadgeCounts({
@@ -422,10 +425,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     } catch {
       // Silent fail
     }
-  }, [user?.restaurant_id]);
+  }, [user?.restaurant_id, isQrStaff]);
 
   useKitchenSocket({
-    restaurantId: user?.restaurant_id,
+    restaurantId: isQrStaff ? user?.restaurant_id : null,
     onNewOrder: () => void fetchBadgeCounts(),
     onStatusUpdate: () => void fetchBadgeCounts(),
     onBillRequested: () => void fetchBadgeCounts(),
@@ -436,10 +439,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   });
 
   useEffect(() => {
+    if (!isQrStaff) return;
     void fetchBadgeCounts();
     const timer = setInterval(() => void fetchBadgeCounts(), 30000); // 30s fallback
     return () => clearInterval(timer);
-  }, [fetchBadgeCounts]);
+  }, [fetchBadgeCounts, isQrStaff]);
 
   function handleLogout() {
     clearInAppNavigationHistory();
