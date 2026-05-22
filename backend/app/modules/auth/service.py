@@ -1,5 +1,6 @@
 import uuid
 import json
+from typing import Any
 from datetime import UTC, datetime, timedelta, timezone
 
 import redis as redis_lib
@@ -97,7 +98,7 @@ def _check_rate_limit(redis_client: redis_lib.Redis | None, ip: str) -> None:
     
     try:
         count = redis_client.get(_rate_limit_key(ip))
-        if count and int(count) >= settings.login_rate_limit_attempts:
+        if count and int(str(count)) >= settings.login_rate_limit_attempts:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=(
@@ -156,7 +157,7 @@ def _build_session_state(*, created_at: int, last_seen: int) -> str:
     return json.dumps({"created_at": created_at, "last_seen": last_seen})
 
 
-def _parse_session_state(raw: str | bytes | None) -> tuple[int, int] | None:
+def _parse_session_state(raw: Any) -> tuple[int, int] | None:
     if raw is None:
         return None
 
@@ -191,12 +192,16 @@ def _revoke_all_user_sessions(
         return
     try:
         pattern = f"refresh_token:{user_id}:*"
-        cursor = '0'
+        cursor: int = 0
         while True:
-            cursor, keys = redis_client.scan(cursor=cursor, match=pattern, count=100)
-            if keys:
-                redis_client.delete(*keys)
-            if cursor == 0 or cursor == '0':
+            scan_res = redis_client.scan(cursor=cursor, match=pattern, count=100)
+            if isinstance(scan_res, tuple):
+                cursor, keys = scan_res
+                if keys:
+                    redis_client.delete(*keys)
+                if cursor == 0:
+                    break
+            else:
                 break
     except Exception:
         return
@@ -572,7 +577,7 @@ async def register_restaurant_idempotent(
     try:
         existing = redis_client.get(redis_key)
         if existing:
-            payload = json.loads(existing)
+            payload = json.loads(str(existing))
             if payload.get("state") == "success":
                 return int(payload["restaurant_id"]), str(payload["owner_email"])
             raise HTTPException(
@@ -725,11 +730,12 @@ def login(
 
     try:
         now_ts = int(datetime.now(UTC).timestamp())
-        redis_client.setex(
-            _refresh_redis_key(user.id, session_id),
-            settings.refresh_token_expire_days * 86400,
-            _build_session_state(created_at=now_ts, last_seen=now_ts),
-        )
+        if redis_client is not None:
+            redis_client.setex(
+                _refresh_redis_key(user.id, session_id),
+                settings.refresh_token_expire_days * 86400,
+                _build_session_state(created_at=now_ts, last_seen=now_ts),
+            )
         _set_refresh_cookie(response, refresh_token_value)
     except Exception:
         logger.warning("Refresh token session not stored — Redis unavailable")
