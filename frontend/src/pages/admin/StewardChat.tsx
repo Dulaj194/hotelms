@@ -56,6 +56,7 @@ interface UnifiedRequest {
   message: string | null;
   order_source: string;
   requested_at: string;
+  status: "PENDING" | "ACKNOWLEDGED";
 }
 
 // --- Utils ---
@@ -93,9 +94,10 @@ interface RequestCardProps {
   request: UnifiedRequest;
   isProcessing: boolean;
   onAcknowledge: (req: UnifiedRequest) => void;
+  onResolve: (req: UnifiedRequest) => void;
 }
 
-function RequestCard({ request, isProcessing, onAcknowledge }: RequestCardProps) {
+function RequestCard({ request, isProcessing, onAcknowledge, onResolve }: RequestCardProps) {
   const config = SERVICE_CONFIG[request.type] || {
     label: request.type,
     icon: Bell,
@@ -162,25 +164,43 @@ function RequestCard({ request, isProcessing, onAcknowledge }: RequestCardProps)
           </div>
         )}
 
-        <button
-          type="button"
-          disabled={isProcessing}
-          onClick={() => onAcknowledge(request)}
-          className={`w-full group relative flex items-center justify-center gap-3 overflow-hidden rounded-[1.5rem] py-4 text-sm font-black transition-all active:scale-[0.97] disabled:opacity-60 shadow-lg ${
-            request.type === 'BILL'
-              ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-200'
-              : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-300'
-          }`}
-        >
-          {isProcessing ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : (
-            <>
-              <Check className="h-5 w-5 transition-transform group-hover:scale-125" />
-              <span>Acknowledge Request</span>
-            </>
-          )}
-        </button>
+        {request.status === 'PENDING' ? (
+          <button
+            type="button"
+            disabled={isProcessing}
+            onClick={() => onAcknowledge(request)}
+            className={`w-full group relative flex items-center justify-center gap-3 overflow-hidden rounded-[1.5rem] py-4 text-sm font-black transition-all active:scale-[0.97] disabled:opacity-60 shadow-lg ${
+              request.type === 'BILL'
+                ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-rose-200'
+                : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-300'
+            }`}
+          >
+            {isProcessing ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <>
+                <Check className="h-5 w-5 transition-transform group-hover:scale-125" />
+                <span>Acknowledge Request</span>
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={isProcessing}
+            onClick={() => onResolve(request)}
+            className={`w-full group relative flex items-center justify-center gap-3 overflow-hidden rounded-[1.5rem] py-4 text-sm font-black transition-all active:scale-[0.97] disabled:opacity-60 shadow-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200`}
+          >
+            {isProcessing ? (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <>
+                <Check className="h-5 w-5 transition-transform group-hover:scale-125" />
+                <span>{request.type === 'BILL' ? 'Present Bill' : 'Resolve Request'}</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -333,14 +353,16 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
           ...req,
           id: req.session_id,
           type: 'BILL',
-          message: req.message || null
+          message: req.message || null,
+          status: req.session_status === 'BILL_ACKNOWLEDGED' ? 'ACKNOWLEDGED' : 'PENDING'
         });
       });
 
       serviceRes.requests.forEach(req => {
         nextRequests.set(`SERVICE:${req.id}`, {
           ...req,
-          type: req.service_type
+          type: req.service_type,
+          status: req.acknowledged_by ? 'ACKNOWLEDGED' : 'PENDING'
         });
       });
 
@@ -377,7 +399,8 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
         type: 'BILL',
         message: null,
         order_source,
-        requested_at
+        requested_at,
+        status: 'PENDING'
       });
       return next;
     });
@@ -400,7 +423,8 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
         type: service_type,
         message,
         order_source,
-        requested_at
+        requested_at,
+        status: 'PENDING'
       });
       return next;
     });
@@ -409,7 +433,10 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
   const handleServiceAcknowledged = useCallback((event: ServiceAcknowledgedEvent) => {
     setRequests(prev => {
       const next = new Map(prev);
-      next.delete(`SERVICE:${event.data.request_id}`);
+      const req = next.get(`SERVICE:${event.data.request_id}`);
+      if (req) {
+        next.set(`SERVICE:${event.data.request_id}`, { ...req, status: 'ACKNOWLEDGED' });
+      }
       return next;
     });
   }, []);
@@ -417,7 +444,18 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
   const handleBillAcknowledged = useCallback((event: BillAcknowledgedEvent) => {
     setRequests(prev => {
       const next = new Map(prev);
-      next.delete(`BILL:${event.data.session_id}`);
+      const req = next.get(`BILL:${event.data.session_id}`);
+      if (req) {
+        next.set(`BILL:${event.data.session_id}`, { ...req, status: 'ACKNOWLEDGED' });
+      }
+      return next;
+    });
+  }, []);
+
+  const handleServiceResolved = useCallback((event: any) => {
+    setRequests(prev => {
+      const next = new Map(prev);
+      next.delete(`SERVICE:${event.data.request_id}`);
       return next;
     });
   }, []);
@@ -428,6 +466,7 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
     onServiceRequested: handleServiceRequested,
     onServiceAcknowledged: handleServiceAcknowledged,
     onBillAcknowledged: handleBillAcknowledged,
+    onServiceResolved: handleServiceResolved,
   });
 
   const handleAcknowledge = useCallback(async (req: UnifiedRequest) => {
@@ -441,13 +480,40 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
       
       setRequests(prev => {
         const next = new Map(prev);
-        next.delete(req.type === 'BILL' ? `BILL:${req.id}` : `SERVICE:${req.id}`);
+        const reqKey = req.type === 'BILL' ? `BILL:${req.id}` : `SERVICE:${req.id}`;
+        const existing = next.get(reqKey);
+        if (existing) {
+          next.set(reqKey, { ...existing, status: 'ACKNOWLEDGED' });
+        }
         return next;
       });
       
       showAlert(`Acknowledged request for ${req.order_source === 'room' ? 'Room' : 'Table'} ${req.table_number}`);
     } catch (err) {
       showAlert(err instanceof ApiError ? err.detail : "Failed to acknowledge request");
+    } finally {
+      setActionId(null);
+    }
+  }, [showAlert]);
+
+  const handleResolve = useCallback(async (req: UnifiedRequest) => {
+    setActionId(req.id);
+    try {
+      if (req.type === 'BILL') {
+        await api.patch(`/table-sessions/bill-requests/${req.id}/present`, {});
+      } else {
+        await api.delete(`/table-sessions/service-requests/${req.id}`);
+      }
+      
+      setRequests(prev => {
+        const next = new Map(prev);
+        next.delete(req.type === 'BILL' ? `BILL:${req.id}` : `SERVICE:${req.id}`);
+        return next;
+      });
+      
+      showAlert(`Resolved request for ${req.order_source === 'room' ? 'Room' : 'Table'} ${req.table_number}`);
+    } catch (err) {
+      showAlert(err instanceof ApiError ? err.detail : "Failed to resolve request");
     } finally {
       setActionId(null);
     }
@@ -607,6 +673,7 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
                     request={req}
                     isProcessing={actionId === req.id}
                     onAcknowledge={handleAcknowledge}
+                    onResolve={handleResolve}
                   />
                 ))}
               </div>
@@ -636,6 +703,7 @@ function StewardChat({ restaurantId }: { restaurantId: number | null }) {
                     request={req}
                     isProcessing={actionId === req.id}
                     onAcknowledge={handleAcknowledge}
+                    onResolve={handleResolve}
                   />
                 ))}
               </div>

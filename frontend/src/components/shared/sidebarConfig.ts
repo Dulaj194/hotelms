@@ -9,7 +9,6 @@ import {
   History,
   Kanban,
   LayoutGrid,
-  MessageSquare,
   Package,
   QrCode,
   Settings,
@@ -99,13 +98,6 @@ export const opsSubItems: MenuSubItem[] = [
 ];
 
 export const commSubItems: MenuSubItem[] = [
-  {
-    path: "/admin/chat",
-    label: "Staff Chat",
-    icon: MessageSquare,
-    privilege: "QR_MENU",
-    moduleKey: "steward_ops",
-  },
   {
     path: "/admin/chat",
     label: "Guest Requests",

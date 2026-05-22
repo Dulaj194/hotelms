@@ -56,6 +56,7 @@ class BillRequestResponse(BaseModel):
     table_number: str
     customer_name: str | None
     order_source: str = "table"
+    session_status: str
     requested_at: datetime = Field(alias="updated_at")
 
     model_config = {"from_attributes": True, "populate_by_name": True}
@@ -78,6 +79,7 @@ class ServiceRequestResponse(BaseModel):
     order_source: str
     service_type: str
     message: str | None
+    acknowledged_by: int | None
     requested_at: datetime
 
     model_config = {"from_attributes": True}
