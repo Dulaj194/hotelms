@@ -1,4 +1,45 @@
-import { useCallback, useEffect, useState } from "react";
+import sys
+
+filepath = 'd:/in_project/hotelms/frontend/src/pages/admin/CashierBillingDashboard.tsx'
+with open(filepath, 'r') as f:
+    content = f.read()
+
+# Replacement 1: Imports
+old_imports = '''import { useCallback, useEffect, useState } from "react";
+
+import BillingFolioDrawer from "@/features/billing/BillingFolioDrawer";
+import {
+  acceptCashierFolio,
+  getBillingFolioDetail,
+  getBillingQueueSummary,
+  listBillingFolios,
+  recordBillPrint,
+  sendFolioToAccountant,
+  rejectCashierFolio,
+} from "@/features/billing/api";
+import {
+  formatBillingCurrency,
+  formatBillingDate,
+  getBillContextLabel,
+  getHandoffClass,
+  getHandoffLabel,
+  getReviewClass,
+  getReviewLabel,
+  printBillingInvoice,
+  summarizeBillReview,
+} from "@/features/billing/helpers";
+import { useBillingRealtime } from "@/features/billing/useBillingRealtime";
+import { ApiError } from "@/lib/api";
+import { getUser, normalizeRole } from "@/lib/auth";
+import type {
+  BillDetailResponse,
+  BillRecord,
+  BillingQueueSummaryResponse,
+} from "@/types/billing";
+
+type CashierView = "pending" | "ready";'''
+
+new_imports = '''import { useCallback, useEffect, useState } from "react";
 
 import BillingFolioDrawer from "@/features/billing/BillingFolioDrawer";
 import {
@@ -33,73 +74,21 @@ import type {
 } from "@/types/billing";
 
 type CashierView = "pending" | "ready";
-type DashboardTab = "queue" | "shift_summary";
+type DashboardTab = "queue" | "shift_summary";'''
+content = content.replace(old_imports, new_imports)
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) return error.detail || fallback;
-  if (error instanceof Error) return error.message || fallback;
-  return fallback;
-}
-
-function MetricCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "slate" | "amber" | "emerald" | "sky";
-}) {
-  const toneClass = {
-    slate: "from-slate-900 to-slate-700 text-white",
-    amber: "from-amber-500 to-amber-600 text-white",
-    emerald: "from-emerald-500 to-emerald-600 text-white",
-    sky: "from-sky-500 to-sky-600 text-white",
-  }[tone];
-
-  return (
-    <div className={`rounded-3xl bg-gradient-to-br p-4 shadow-sm ${toneClass}`}>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">{label}</p>
-      <p className="mt-3 text-3xl font-bold">{value}</p>
-    </div>
-  );
-}
-
-function QueueCard({
-  bill,
-  busy,
-  onOpen,
-  onPrint,
-  onAccept,
-  onReject,
-  onSendToAccountant,
-}: {
-  bill: BillRecord;
-  busy: boolean;
-  onOpen: () => void;
-  onPrint: () => void;
-  onAccept: () => void;
-  onReject: () => void;
-  onSendToAccountant: () => void;
-}) {
-  const readyForAccountant =
-    bill.handoff_status === "sent_to_cashier" && bill.cashier_status === "accepted";
-  const pendingCashier =
-    bill.handoff_status === "sent_to_cashier" && bill.cashier_status === "pending";
-
-  return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-            {bill.bill_number}
-          </p>
-          <h3 className="mt-1 text-xl font-bold text-slate-900">
-            {getBillContextLabel(bill.context_type, bill.table_number, bill.room_number)}
-          </h3>
-          <p className="font-mono text-xs text-slate-400">{bill.session_id}</p>
-        </div>
-        <div className="space-y-2 text-left sm:text-right">
+# Replacement 2: QueueCard
+old_queuecard_amount = '''        <div className="space-y-2 text-left sm:text-right">
+          <span
+            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getHandoffClass(
+              bill.handoff_status,
+            )}`}
+          >
+            {getHandoffLabel(bill.handoff_status)}
+          </span>
+          <p className="text-lg font-bold text-slate-900">{formatBillingCurrency(bill.total_amount)}</p>
+        </div>'''
+new_queuecard_amount = '''        <div className="space-y-2 text-left sm:text-right">
           <span
             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getHandoffClass(
               bill.handoff_status,
@@ -113,88 +102,28 @@ function QueueCard({
               {bill.payment_method.replace("_", " ")}
             </p>
           )}
-        </div>
-      </div>
+        </div>'''
+content = content.replace(old_queuecard_amount, new_queuecard_amount)
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-          <p className="text-slate-500">Cashier review</p>
-          <span
-            className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getReviewClass(
-              bill.cashier_status,
-            )}`}
-          >
-            {getReviewLabel(bill.cashier_status)}
-          </span>
-        </div>
-        <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-          <p className="text-slate-500">Print audit</p>
-          <p className="mt-2 font-semibold text-slate-900">
-            {bill.printed_count} print(s)
-          </p>
-          <p className="text-xs text-slate-500">{formatBillingDate(bill.last_printed_at)}</p>
-        </div>
-      </div>
 
-      <p className="mt-4 text-sm text-slate-500">{summarizeBillReview(bill)}</p>
+# Replacement 3: Main State
+old_state = '''  const [view, setView] = useState<CashierView>("pending");
+  const [search, setSearch] = useState("");
+  const [summary, setSummary] = useState<BillingQueueSummaryResponse | null>(null);
+  const [folios, setFolios] = useState<BillRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busyBillId, setBusyBillId] = useState<number | null>(null);
+  const [selectedBillId, setSelectedBillId] = useState<number | null>(null);
+  const [detail, setDetail] = useState<BillDetailResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [printingBillId, setPrintingBillId] = useState<number | null>(null);
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-        >
-          Open Audit
-        </button>
-        <button
-          type="button"
-          onClick={onPrint}
-          disabled={busy}
-          className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          Print
-        </button>
-        {pendingCashier && (
-          <>
-            <button
-              type="button"
-              onClick={onAccept}
-              disabled={busy}
-              className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Accept
-            </button>
-            <button
-              type="button"
-              onClick={onReject}
-              disabled={busy}
-              className="rounded-2xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Reject
-            </button>
-          </>
-        )}
-        {readyForAccountant && (
-          <button
-            type="button"
-            onClick={onSendToAccountant}
-            disabled={busy}
-            className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Send to Accountant
-          </button>
-        )}
-      </div>
-    </article>
-  );
-}
-
-export default function CashierBillingDashboard() {
-  const user = getUser();
-  const role = normalizeRole(user?.role);
-  const restaurantId = user?.restaurant_id ?? null;
-
-  const [tab, setTab] = useState<DashboardTab>("queue");
+  const loadSummary = useCallback(async () => {'''
+new_state = '''  const [tab, setTab] = useState<DashboardTab>("queue");
   const [view, setView] = useState<CashierView>("pending");
   const [search, setSearch] = useState("");
   const [summary, setSummary] = useState<BillingQueueSummaryResponse | null>(null);
@@ -217,52 +146,55 @@ export default function CashierBillingDashboard() {
   const [rejectingBillId, setRejectingBillId] = useState<number | null>(null);
   const [rejectNote, setRejectNote] = useState("");
 
-  const loadSummary = useCallback(async () => {
-    setSummaryLoading(true);
-    try {
-      setSummary(await getBillingQueueSummary());
-    } catch (loadError) {
-      setActionError((current) => current ?? getErrorMessage(loadError, "Failed to load queue summary."));
-    } finally {
-      setSummaryLoading(false);
-    }
-  }, []);
+  const loadSummary = useCallback(async () => {'''
+content = content.replace(old_state, new_state)
 
-  const loadFolios = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await listBillingFolios({
-        context_type: "room",
-        handoff_status: "sent_to_cashier",
-        cashier_status: view === "pending" ? "pending" : "accepted",
-        limit: 100,
-        search: search.trim() || undefined,
-      });
-      setFolios(response.items);
-    } catch (loadError) {
-      setFolios([]);
-      setError(getErrorMessage(loadError, "Failed to load cashier queue."));
-    } finally {
-      setLoading(false);
-    }
-  }, [search, view]);
+# Replacement 4: Loaders & handleAction
+old_loaders = '''  useEffect(() => {
+    void loadSummary();
+  }, [loadSummary]);
 
-  const loadDetail = useCallback(async (billId: number) => {
-    setSelectedBillId(billId);
-    setDetailLoading(true);
-    setDetailError(null);
-    try {
-      setDetail(await getBillingFolioDetail(billId));
-    } catch (loadError) {
-      setDetail(null);
-      setDetailError(getErrorMessage(loadError, "Failed to load folio detail."));
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+  useEffect(() => {
+    void loadFolios();
+  }, [loadFolios]);
 
-  const loadReconciliation = useCallback(async () => {
+  const { connected, connectionError } = useBillingRealtime({
+    restaurantId,
+    onEvent: () => {
+      void loadSummary();
+      void loadFolios();
+      if (selectedBillId) {
+        void loadDetail(selectedBillId);
+      }
+    },
+  });
+
+  const handleAction = useCallback(
+    async (billId: number, action: "accept" | "reject" | "send_to_accountant") => {
+      setBusyBillId(billId);
+      setActionError(null);
+      try {
+        if (action === "accept") {
+          await acceptCashierFolio(billId);
+        } else if (action === "reject") {
+          await rejectCashierFolio(billId);
+        } else {
+          await sendFolioToAccountant(billId);
+        }
+        await Promise.all([loadSummary(), loadFolios()]);
+        if (selectedBillId === billId) {
+          await loadDetail(billId);
+        }
+      } catch (actionLoadError) {
+        setActionError(getErrorMessage(actionLoadError, "Cashier action failed."));
+      } finally {
+        setBusyBillId(null);
+      }
+    },
+    [loadDetail, loadFolios, loadSummary, selectedBillId],
+  );'''
+
+new_loaders = '''  const loadReconciliation = useCallback(async () => {
     setReconciliationLoading(true);
     try {
       setReconciliation(await getBillingReconciliation());
@@ -335,39 +267,18 @@ export default function CashierBillingDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [folios, loadSummary, loadFolios, loadReconciliation]);
+  }, [folios, loadSummary, loadFolios, loadReconciliation]);'''
+content = content.replace(old_loaders, new_loaders)
 
-  const handlePrint = useCallback(
-    async (billId: number) => {
-      setPrintingBillId(billId);
-      setActionError(null);
-      try {
-        await recordBillPrint(billId);
-        const nextDetail =
-          detail?.bill?.id === billId ? await getBillingFolioDetail(billId) : await getBillingFolioDetail(billId);
-        setDetail(nextDetail);
-        printBillingInvoice(nextDetail);
-        await Promise.all([loadSummary(), loadFolios()]);
-      } catch (printError) {
-        setActionError(getErrorMessage(printError, "Failed to print invoice."));
-      } finally {
-        setPrintingBillId(null);
-      }
-    },
-    [detail, loadFolios, loadSummary],
-  );
-
-  const drawerActions =
-    detail?.bill?.handoff_status === "sent_to_cashier" && detail.bill.cashier_status === "pending" ? (
-      <>
-        <button
+# Replacement 5: Drawer Action reject
+old_drawer = '''        <button
           type="button"
-          onClick={() => void handleAction(detail.bill!.id, "accept")}
-          className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+          onClick={() => void handleAction(detail.bill!.id, "reject")}
+          className="rounded-2xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
         >
-          Accept
-        </button>
-        <button
+          Reject
+        </button>'''
+new_drawer = '''        <button
           type="button"
           onClick={() => {
              setRejectingBillId(detail.bill!.id);
@@ -376,67 +287,15 @@ export default function CashierBillingDashboard() {
           className="rounded-2xl border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50"
         >
           Reject
-        </button>
-      </>
-    ) : detail?.bill?.handoff_status === "sent_to_cashier" &&
-        detail.bill.cashier_status === "accepted" ? (
-      <button
-        type="button"
-        onClick={() => void handleAction(detail.bill!.id, "send_to_accountant")}
-        className="rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
-      >
-        Send to Accountant
-      </button>
-    ) : null;
+        </button>'''
+content = content.replace(old_drawer, new_drawer)
 
-  return (
-    <>
-      <div className="app-page-stack mx-auto max-w-7xl">
-        <div className="rounded-[32px] bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500 p-6 text-white shadow-sm">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-2xl space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/75">
-                Cashier Dashboard
-              </p>
-              <h1 className="app-page-title">Room folio review and transfer queue</h1>
-              <p className="app-body-text text-white/85">
-                Review settled folios, record invoice prints, and push approved guest bills to the accountant queue with live updates.
-              </p>
-            </div>
-            <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
-              <span className="rounded-full bg-white/15 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em]">
-                {connected ? "Realtime connected" : "Realtime reconnecting"}
-              </span>
-              <span className="rounded-full bg-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em]">
-                Role {role}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  void loadSummary();
-                  void loadFolios();
-                }}
-                className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
-        </div>
+# Replacing Render
+idx = content.find('        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">')
+end_idx = content.find('      <BillingFolioDrawer')
+render_content = content[idx:end_idx]
 
-        {connectionError && (
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            {connectionError}
-          </div>
-        )}
-
-        {actionError && (
-          <div className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-            {actionError}
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">
+new_render_content = '''        <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">
           <button
             type="button"
             onClick={() => setTab("queue")}
@@ -650,26 +509,11 @@ export default function CashierBillingDashboard() {
             )}
           </div>
         )}
-      </div>
-      <BillingFolioDrawer
-        open={selectedBillId !== null}
-        detail={detail}
-        loading={detailLoading}
-        error={detailError}
-        printing={printingBillId === selectedBillId}
-        actions={drawerActions}
-        onClose={() => {
-          setSelectedBillId(null);
-          setDetail(null);
-          setDetailError(null);
-        }}
-        onPrint={() => {
-          if (selectedBillId) {
-            void handlePrint(selectedBillId);
-          }
-        }}
-      />
-      {rejectingBillId && (
+'''
+
+content = content.replace(render_content, new_render_content)
+
+modal_content = '''      {rejectingBillId && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
             <h3 className="text-xl font-bold text-slate-900">Reject Folio</h3>
@@ -711,4 +555,12 @@ export default function CashierBillingDashboard() {
       )}
     </>
   );
-}
+}'''
+
+content = content.replace('''    </>
+  );
+}''', modal_content)
+
+with open(filepath, 'w') as f:
+    f.write(content)
+print('Replaced successfully')
