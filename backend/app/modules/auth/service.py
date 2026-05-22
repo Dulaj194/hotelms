@@ -182,20 +182,22 @@ def _session_is_expired(created_at: int, last_seen: int) -> bool:
     return idle_expired or absolute_expired
 
 
-def _revoke_presented_refresh_session(
-    redis_client: redis_lib.Redis,
-    refresh_token: str | None,
+def _revoke_all_user_sessions(
+    redis_client: redis_lib.Redis | None,
+    user_id: int,
 ) -> None:
-    if not refresh_token:
+    """Invalidate all existing sessions for a user to enforce single-device login."""
+    if redis_client is None:
         return
     try:
-        payload = decode_token(refresh_token)
-        if payload.get("type") != "refresh":
-            return
-        session_id = payload.get("session_id")
-        user_id = int(payload.get("sub", 0))
-        if session_id and user_id:
-            redis_client.delete(_refresh_redis_key(user_id, session_id))
+        pattern = f"refresh_token:{user_id}:*"
+        cursor = '0'
+        while True:
+            cursor, keys = redis_client.scan(cursor=cursor, match=pattern, count=100)
+            if keys:
+                redis_client.delete(*keys)
+            if cursor == 0 or cursor == '0':
+                break
     except Exception:
         return
 
@@ -711,7 +713,8 @@ def login(
             detail=GENERIC_AUTH_ERROR_DETAIL,
         )
 
-    _revoke_presented_refresh_session(redis_client, existing_refresh_token)
+    # Enforce single-device login: revoke all existing sessions before creating a new one
+    _revoke_all_user_sessions(redis_client, user.id)
 
     session_id = str(uuid.uuid4())
     access_token = create_access_token(
