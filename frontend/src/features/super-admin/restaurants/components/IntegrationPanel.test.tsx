@@ -28,6 +28,8 @@ describe("IntegrationPanel", () => {
           opening_time: null,
           closing_time: null,
           logo_url: null,
+          default_language: "en",
+          allow_multi_language: false,
           feature_flags: {
             steward: true,
             housekeeping: true,
