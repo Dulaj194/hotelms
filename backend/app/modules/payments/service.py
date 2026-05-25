@@ -62,7 +62,7 @@ def _normalize_to_naive_utc(value: datetime | None) -> datetime | None:
 
 
 def _utcnow_naive() -> datetime:
-    return datetime.utcnow()
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _normalize_metadata_json(value: str | None) -> dict[str, Any]:
@@ -142,7 +142,7 @@ def create_checkout_session(
                 detail=validation.message,
             )
         promo_code_value = validation.code
-        discount_percent = float(validation.discount_percent)
+        discount_percent = validation.discount_percent if validation.discount_percent is not None else 0.0
         final_amount = max(0.0, final_amount - (final_amount * (discount_percent / 100)))
 
     transaction = payment_repo.create_billing_transaction(
@@ -260,7 +260,7 @@ def process_webhook(
     except HTTPException as exc:
         _record_stripe_webhook_failure(
             db,
-            reason=str(exc.detail),
+            reason=exc.detail,
             stripe_event_type=event_type,
         )
         raise
@@ -618,8 +618,10 @@ def get_platform_commercial_overview(
                     0,
                     (
                         (
-                            _normalize_to_naive_utc(
-                                subscription.trial_expires_at or subscription.expires_at
+                            (
+                                _normalize_to_naive_utc(
+                                    subscription.trial_expires_at or subscription.expires_at
+                                ) or now
                             )
                             - now
                         )
