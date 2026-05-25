@@ -114,3 +114,33 @@ class PlatformCommercialOverviewResponse(BaseModel):
     overdue_payments: list[PlatformOverduePaymentResponse]
     failed_stripe_webhooks: list[PlatformFailedWebhookResponse]
     expiring_subscriptions: list[PlatformExpiringSubscriptionResponse]
+
+
+class PaymentTerminalBase(BaseModel):
+    counter_name: str = Field(..., max_length=100)
+    provider: str = Field(..., max_length=50)
+    is_active: bool = True
+
+class PaymentTerminalCreate(PaymentTerminalBase):
+    merchant_id: str = Field(..., max_length=255)
+    terminal_id: str = Field(..., max_length=255)
+    api_key: str | None = Field(default=None, max_length=1024)
+
+class PaymentTerminalUpdate(BaseModel):
+    counter_name: str | None = Field(default=None, max_length=100)
+    provider: str | None = Field(default=None, max_length=50)
+    merchant_id: str | None = Field(default=None, max_length=255)
+    terminal_id: str | None = Field(default=None, max_length=255)
+    api_key: str | None = Field(default=None, max_length=1024)
+    is_active: bool | None = None
+
+class PaymentTerminalResponse(PaymentTerminalBase):
+    id: int
+    restaurant_id: int
+    merchant_id_masked: str
+    terminal_id_masked: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+

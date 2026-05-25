@@ -38,6 +38,7 @@ const Staff = lazy(() => import("@/pages/admin/Staff"));
 const Steward = lazy(() => import("@/pages/admin/Steward"));
 const StewardChat = lazy(() => import("@/pages/admin/StewardChat"));
 const ServiceManagement = lazy(() => import("@/pages/admin/ServiceManagement"));
+const PaymentTerminals = lazy(() => import("@/pages/admin/PaymentTerminals"));
 
 const SubscriptionPage = lazy(() => import("@/pages/admin/Subscription"));
 const SubscriptionPaymentCancel = lazy(() => import("@/pages/admin/SubscriptionPaymentCancel"));
@@ -422,6 +423,14 @@ function AppRoutes() {
                 <PrivilegeRoute requiredModuleKey="steward_ops">
                   <ServiceManagement />
                 </PrivilegeRoute>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/settings/payment-terminals"
+            element={
+              <ProtectedRoute allowedRoles={RESTAURANT_ADMIN_ROLES}>
+                <PaymentTerminals />
               </ProtectedRoute>
             }
           />

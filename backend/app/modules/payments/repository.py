@@ -13,6 +13,7 @@ from app.modules.payments.model import (
     Payment,
     PaymentStatus,
     ProcessedWebhookEvent,
+    PaymentTerminal,
 )
 
 
@@ -318,3 +319,91 @@ def record_processed_webhook_event(
     db.flush()
     db.refresh(record)
     return record
+
+
+def create_payment_terminal(
+    db: Session,
+    *,
+    restaurant_id: int,
+    counter_name: str,
+    provider: str,
+    encrypted_merchant_id: str,
+    encrypted_terminal_id: str,
+    encrypted_api_key: str | None,
+    is_active: bool,
+) -> PaymentTerminal:
+    record = PaymentTerminal(
+        restaurant_id=restaurant_id,
+        counter_name=counter_name,
+        provider=provider,
+        encrypted_merchant_id=encrypted_merchant_id,
+        encrypted_terminal_id=encrypted_terminal_id,
+        encrypted_api_key=encrypted_api_key,
+        is_active=is_active,
+    )
+    db.add(record)
+    db.flush()
+    db.refresh(record)
+    return record
+
+
+def get_payment_terminal(
+    db: Session,
+    terminal_id: int,
+    restaurant_id: int | None = None,
+) -> PaymentTerminal | None:
+    query = db.query(PaymentTerminal).filter(PaymentTerminal.id == terminal_id)
+    if restaurant_id is not None:
+        query = query.filter(PaymentTerminal.restaurant_id == restaurant_id)
+    return query.first()
+
+
+def list_payment_terminals(
+    db: Session,
+    restaurant_id: int,
+) -> list[PaymentTerminal]:
+    return (
+        db.query(PaymentTerminal)
+        .filter(PaymentTerminal.restaurant_id == restaurant_id)
+        .order_by(PaymentTerminal.counter_name.asc())
+        .all()
+    )
+
+
+def update_payment_terminal(
+    db: Session,
+    *,
+    terminal: PaymentTerminal,
+    counter_name: str | None = None,
+    provider: str | None = None,
+    encrypted_merchant_id: str | None = None,
+    encrypted_terminal_id: str | None = None,
+    encrypted_api_key: str | None = None,
+    is_active: bool | None = None,
+) -> PaymentTerminal:
+    if counter_name is not None:
+        terminal.counter_name = counter_name
+    if provider is not None:
+        terminal.provider = provider
+    if encrypted_merchant_id is not None:
+        terminal.encrypted_merchant_id = encrypted_merchant_id
+    if encrypted_terminal_id is not None:
+        terminal.encrypted_terminal_id = encrypted_terminal_id
+    if encrypted_api_key is not None:
+        terminal.encrypted_api_key = encrypted_api_key
+    if is_active is not None:
+        terminal.is_active = is_active
+        
+    terminal.updated_at = datetime.now(UTC)
+    db.flush()
+    db.refresh(terminal)
+    return terminal
+
+
+def delete_payment_terminal(
+    db: Session,
+    terminal: PaymentTerminal,
+) -> None:
+    db.delete(terminal)
+    db.flush()
+

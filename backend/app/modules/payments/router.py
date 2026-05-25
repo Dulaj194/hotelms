@@ -17,6 +17,9 @@ from app.modules.payments.schemas import (
 	CheckoutSessionResponse,
 	PlatformCommercialOverviewResponse,
 	WebhookAckResponse,
+    PaymentTerminalCreate,
+    PaymentTerminalUpdate,
+    PaymentTerminalResponse,
 )
 
 router = APIRouter()
@@ -84,3 +87,54 @@ def get_platform_commercial_overview(
 	_=Depends(require_platform_scopes("ops_viewer", "billing_admin")),
 ) -> PlatformCommercialOverviewResponse:
 	return service.get_platform_commercial_overview(db)
+
+
+@router.get("/terminals", response_model=list[PaymentTerminalResponse])
+def list_payment_terminals(
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+) -> list[PaymentTerminalResponse]:
+    return service.list_payment_terminals(db, restaurant_id=restaurant_id)
+
+
+@router.post("/terminals", response_model=PaymentTerminalResponse)
+def create_payment_terminal(
+    payload: PaymentTerminalCreate,
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+) -> PaymentTerminalResponse:
+    terminal = service.create_payment_terminal(db, restaurant_id=restaurant_id, payload=payload)
+    db.commit()
+    return terminal
+
+
+@router.put("/terminals/{terminal_id}", response_model=PaymentTerminalResponse)
+def update_payment_terminal(
+    terminal_id: int,
+    payload: PaymentTerminalUpdate,
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+) -> PaymentTerminalResponse:
+    terminal = service.update_payment_terminal(
+        db, 
+        restaurant_id=restaurant_id, 
+        terminal_id=terminal_id, 
+        payload=payload
+    )
+    db.commit()
+    return terminal
+
+
+@router.delete("/terminals/{terminal_id}", status_code=204)
+def delete_payment_terminal(
+    terminal_id: int,
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+) -> None:
+    service.delete_payment_terminal(db, restaurant_id=restaurant_id, terminal_id=terminal_id)
+    db.commit()
+

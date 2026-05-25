@@ -28,6 +28,9 @@ from app.modules.payments.schemas import (
     PlatformFailedWebhookResponse,
     PlatformOverduePaymentResponse,
     PlatformRevenueByTenantResponse,
+    PaymentTerminalCreate,
+    PaymentTerminalUpdate,
+    PaymentTerminalResponse,
 )
 from app.modules.restaurants.model import Restaurant
 from app.modules.subscriptions.model import RestaurantSubscription, SubscriptionStatus
@@ -624,6 +627,126 @@ def get_platform_commercial_overview(
                 ),
             )
             for subscription, restaurant, package in expiring_rows
-            if (subscription.trial_expires_at or subscription.expires_at) is not None
         ],
     )
+
+
+def create_payment_terminal(
+    db: Session,
+    *,
+    restaurant_id: int,
+    payload: PaymentTerminalCreate,
+) -> PaymentTerminalResponse:
+    from app.core.security import encrypt_secret_value
+
+    encrypted_api_key = encrypt_secret_value(payload.api_key) if payload.api_key else None
+    
+    terminal = payment_repo.create_payment_terminal(
+        db,
+        restaurant_id=restaurant_id,
+        counter_name=payload.counter_name,
+        provider=payload.provider,
+        encrypted_merchant_id=encrypt_secret_value(payload.merchant_id),
+        encrypted_terminal_id=encrypt_secret_value(payload.terminal_id),
+        encrypted_api_key=encrypted_api_key,
+        is_active=payload.is_active,
+    )
+    
+    return _map_terminal_to_response(terminal)
+
+
+def get_payment_terminal(
+    db: Session,
+    *,
+    restaurant_id: int,
+    terminal_id: int,
+) -> PaymentTerminalResponse:
+    terminal = payment_repo.get_payment_terminal(db, terminal_id, restaurant_id)
+    if terminal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment terminal not found.")
+    return _map_terminal_to_response(terminal)
+
+
+def list_payment_terminals(
+    db: Session,
+    *,
+    restaurant_id: int,
+) -> list[PaymentTerminalResponse]:
+    terminals = payment_repo.list_payment_terminals(db, restaurant_id=restaurant_id)
+    return [_map_terminal_to_response(t) for t in terminals]
+
+
+def update_payment_terminal(
+    db: Session,
+    *,
+    restaurant_id: int,
+    terminal_id: int,
+    payload: PaymentTerminalUpdate,
+) -> PaymentTerminalResponse:
+    from app.core.security import encrypt_secret_value
+
+    terminal = payment_repo.get_payment_terminal(db, terminal_id, restaurant_id)
+    if terminal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment terminal not found.")
+
+    encrypted_merchant_id = None
+    if payload.merchant_id is not None:
+        encrypted_merchant_id = encrypt_secret_value(payload.merchant_id)
+
+    encrypted_terminal_id = None
+    if payload.terminal_id is not None:
+        encrypted_terminal_id = encrypt_secret_value(payload.terminal_id)
+        
+    encrypted_api_key = None
+    if payload.api_key is not None:
+        encrypted_api_key = encrypt_secret_value(payload.api_key) if payload.api_key else "" # Store empty string if cleared, or None if None. Actually, schema says str | None.
+        if payload.api_key == "":
+             encrypted_api_key = None
+
+    updated_terminal = payment_repo.update_payment_terminal(
+        db,
+        terminal=terminal,
+        counter_name=payload.counter_name,
+        provider=payload.provider,
+        encrypted_merchant_id=encrypted_merchant_id,
+        encrypted_terminal_id=encrypted_terminal_id,
+        encrypted_api_key=encrypted_api_key,
+        is_active=payload.is_active,
+    )
+    return _map_terminal_to_response(updated_terminal)
+
+
+def delete_payment_terminal(
+    db: Session,
+    *,
+    restaurant_id: int,
+    terminal_id: int,
+) -> None:
+    terminal = payment_repo.get_payment_terminal(db, terminal_id, restaurant_id)
+    if terminal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment terminal not found.")
+    payment_repo.delete_payment_terminal(db, terminal)
+
+
+def _map_terminal_to_response(terminal: Any) -> PaymentTerminalResponse:
+    from app.core.security import decrypt_secret_value
+    
+    merchant_id = decrypt_secret_value(terminal.encrypted_merchant_id) or ""
+    terminal_id_raw = decrypt_secret_value(terminal.encrypted_terminal_id) or ""
+    
+    # Mask IDs for safety
+    merchant_id_masked = f"****-{merchant_id[-4:]}" if len(merchant_id) > 4 else "****"
+    terminal_id_masked = f"****-{terminal_id_raw[-4:]}" if len(terminal_id_raw) > 4 else "****"
+
+    return PaymentTerminalResponse(
+        id=terminal.id,
+        restaurant_id=terminal.restaurant_id,
+        counter_name=terminal.counter_name,
+        provider=terminal.provider,
+        merchant_id_masked=merchant_id_masked,
+        terminal_id_masked=terminal_id_masked,
+        is_active=terminal.is_active,
+        created_at=terminal.created_at,
+        updated_at=terminal.updated_at,
+    )
+

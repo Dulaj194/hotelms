@@ -150,3 +150,32 @@ class ProcessedWebhookEvent(Base):
     processed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class PaymentTerminal(Base):
+    __tablename__ = "payment_terminals"
+    __table_args__ = (UniqueConstraint("restaurant_id", "counter_name", name="uq_payment_terminals_counter"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    counter_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    encrypted_merchant_id: Mapped[str] = mapped_column(Text, nullable=False)
+    encrypted_terminal_id: Mapped[str] = mapped_column(Text, nullable=False)
+    encrypted_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+

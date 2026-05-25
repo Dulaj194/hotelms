@@ -18,6 +18,7 @@ import {
   User,
   Users,
   UtensilsCrossed,
+  CreditCard,
 } from "lucide-react";
 
 import {
@@ -158,6 +159,12 @@ export const settingsSubItems: MenuSubItem[] = [
     roles: RESTAURANT_ADMIN_ROLES,
     privilege: "QR_MENU",
     moduleKey: "steward_ops",
+  },
+  {
+    path: "/admin/settings/payment-terminals",
+    label: "Payment Terminals",
+    icon: CreditCard,
+    roles: RESTAURANT_ADMIN_ROLES,
   },
 ];
 
