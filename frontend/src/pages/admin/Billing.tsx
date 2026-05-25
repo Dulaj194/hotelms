@@ -398,6 +398,22 @@ export default function Billing() {
     setPosError(null);
   };
 
+  const loadFolios = useCallback(async () => {
+    setFolioLoading(true);
+    setFolioError(null);
+    try {
+      const params = new URLSearchParams({ context_type: "room", limit: "100" });
+      if (filter !== "all") params.set("handoff_status", filter);
+      const data = await api.get<BillListResponse>(`/billing/folios?${params.toString()}`);
+      setFolios(data.items);
+    } catch (error) {
+      setFolios([]);
+      setFolioError(errorText(error, "Failed to load folio queue."));
+    } finally {
+      setFolioLoading(false);
+    }
+  }, [filter]);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (posIntent && posIntent.status === "pending" && posStatus === "loading") {
@@ -437,22 +453,6 @@ export default function Billing() {
     }
     return () => clearInterval(interval);
   }, [posIntent, posStatus, mode, summary, loadFolios]);
-
-  const loadFolios = useCallback(async () => {
-    setFolioLoading(true);
-    setFolioError(null);
-    try {
-      const params = new URLSearchParams({ context_type: "room", limit: "100" });
-      if (filter !== "all") params.set("handoff_status", filter);
-      const data = await api.get<BillListResponse>(`/billing/folios?${params.toString()}`);
-      setFolios(data.items);
-    } catch (error) {
-      setFolios([]);
-      setFolioError(errorText(error, "Failed to load folio queue."));
-    } finally {
-      setFolioLoading(false);
-    }
-  }, [filter]);
 
   useEffect(() => {
     if (tab === "folios") void loadFolios();
