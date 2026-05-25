@@ -110,9 +110,25 @@ export const commSubItems: MenuSubItem[] = [
 export const financeSubItems: MenuSubItem[] = [
   {
     path: "/admin/billing",
-    label: "Billing",
+    label: "Active Sessions",
     icon: Ticket,
     roles: BILLING_STAFF_ROLES,
+    privilege: "QR_MENU",
+    moduleKey: "billing",
+  },
+  {
+    path: "/admin/billing/cashier",
+    label: "Cashier Queue",
+    icon: Kanban,
+    roles: BILLING_CASHIER_REVIEW_ROLES,
+    privilege: "QR_MENU",
+    moduleKey: "billing",
+  },
+  {
+    path: "/admin/billing/accountant",
+    label: "Accountant Queue",
+    icon: Activity,
+    roles: BILLING_ACCOUNTANT_REVIEW_ROLES,
     privilege: "QR_MENU",
     moduleKey: "billing",
   },

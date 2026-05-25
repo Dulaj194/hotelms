@@ -107,16 +107,7 @@ function RootRedirect() {
   return <Navigate to={redirectPath || "/dashboard"} replace />;
 }
 
-function BillingRouteEntry() {
-  const role = normalizeRole(getUser()?.role);
-  if (role === "cashier") {
-    return <Navigate to="/admin/billing/cashier" replace />;
-  }
-  if (role === "accountant") {
-    return <Navigate to="/admin/billing/accountant" replace />;
-  }
-  return <Billing />;
-}
+
 
 const routeFallback = (
   <div className="flex min-h-dvh items-center justify-center text-sm text-gray-500">
@@ -285,7 +276,7 @@ function AppRoutes() {
             element={
               <ProtectedRoute allowedRoles={BILLING_STAFF_ROLES}>
                 <PrivilegeRoute requiredModuleKey="billing">
-                  <BillingRouteEntry />
+                  <Billing />
                 </PrivilegeRoute>
               </ProtectedRoute>
             }
