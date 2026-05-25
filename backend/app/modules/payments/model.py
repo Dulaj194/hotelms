@@ -31,6 +31,13 @@ class BillingTransactionStatus(str, enum.Enum):
     cancelled = "cancelled"
 
 
+class PosPaymentStatus(str, enum.Enum):
+    pending = "pending"
+    paid = "paid"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
 class BillingTransactionType(str, enum.Enum):
     subscription_purchase = "subscription_purchase"
 
@@ -169,6 +176,49 @@ class PaymentTerminal(Base):
     encrypted_terminal_id: Mapped[str] = mapped_column(Text, nullable=False)
     encrypted_api_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class PosPaymentIntent(Base):
+    __tablename__ = "pos_payment_intents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    restaurant_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("restaurants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    terminal_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("payment_terminals.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    bill_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("bills.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    session_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    
+    status: Mapped[PosPaymentStatus] = mapped_column(
+        Enum(PosPaymentStatus), nullable=False, default=PosPaymentStatus.pending
+    )
+    
+    provider_reference: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

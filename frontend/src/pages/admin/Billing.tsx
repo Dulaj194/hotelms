@@ -20,6 +20,13 @@ import {
 import ManualItemAddDrawer from "@/components/admin/ManualItemAddDrawer";
 import { getUser, normalizeRole } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
+import { 
+  listPaymentTerminals, 
+  triggerPosPayment, 
+  syncPosPaymentStatus, 
+  type PaymentTerminalResponse, 
+  type PosPaymentIntentResponse 
+} from "@/features/payments/api";
 import type {
   BillContextType,
   BillHandoffStatus,
@@ -301,6 +308,12 @@ export default function Billing() {
   const [folioActionId, setFolioActionId] = useState<number | null>(null);
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
 
+  const [terminals, setTerminals] = useState<PaymentTerminalResponse[]>([]);
+  const [selectedTerminal, setSelectedTerminal] = useState<number | "">("");
+  const [posIntent, setPosIntent] = useState<PosPaymentIntentResponse | null>(null);
+  const [posStatus, setPosStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [posError, setPosError] = useState<string | null>(null);
+
   const mode: Mode = tab === "room" ? "room" : "table";
   const lookup = mode === "room" ? roomLookup : tableLookup;
   const canSettle = useMemo(() => Boolean(summary && !summary.is_settled && summary.order_count > 0), [summary]);
@@ -313,6 +326,9 @@ export default function Billing() {
     setMethod("cash");
     setTransactionRef("");
     setNotes("");
+    setPosIntent(null);
+    setPosStatus("idle");
+    setPosError(null);
   }, []);
 
   const loadSummary = useCallback(async (nextMode: Mode, raw: string) => {
@@ -346,6 +362,81 @@ export default function Billing() {
       if (stored) setRecentLookups(JSON.parse(stored));
     } catch (e) {}
   }, []);
+
+  useEffect(() => {
+    if (method === "card" && terminals.length === 0) {
+      listPaymentTerminals().then(data => {
+        const active = data.filter(t => t.is_active);
+        setTerminals(active);
+        if (active.length > 0) {
+          setSelectedTerminal(active[0].id);
+        }
+      }).catch(console.error);
+    }
+  }, [method, terminals.length]);
+
+  const onPosTrigger = async () => {
+    if (!summary || !selectedTerminal) return;
+    setPosStatus("loading");
+    setPosError(null);
+    try {
+      const intent = await triggerPosPayment({
+        terminal_id: Number(selectedTerminal),
+        session_id: summary.session_id,
+        amount: summary.grand_total
+      });
+      setPosIntent(intent);
+    } catch (err) {
+      setPosStatus("error");
+      setPosError(errorText(err, "Failed to send payment to terminal."));
+    }
+  };
+
+  const onCancelPos = () => {
+    setPosIntent(null);
+    setPosStatus("idle");
+    setPosError(null);
+  };
+
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (posIntent && posIntent.status === "pending" && posStatus === "loading") {
+      interval = setInterval(async () => {
+        try {
+          const updated = await syncPosPaymentStatus(posIntent.id);
+          setPosIntent(updated);
+          if (updated.status === "paid") {
+            setPosStatus("idle");
+            setSettling(true);
+            try {
+              let refreshed = await api.get<BillSummaryResponse>(summaryPath(mode, summary!.session_id));
+              const fakeReceipt = {
+                bill_id: refreshed.bill!.id,
+                bill_number: refreshed.bill!.bill_number,
+                session_id: refreshed.session_id,
+                total_amount: refreshed.grand_total,
+                payment_method: refreshed.bill!.payment_method as BillPaymentMethod,
+                settled_at: refreshed.bill!.settled_at!,
+                order_count: refreshed.order_count,
+              };
+              setReceipt({ summary: refreshed, receipt: fakeReceipt as any });
+              setSummary(null);
+              if (mode === "room") void loadFolios();
+            } finally {
+              setSettling(false);
+              setPosIntent(null);
+            }
+          } else if (updated.status === "failed" || updated.status === "cancelled") {
+            setPosStatus("error");
+            setPosError(updated.error_message || "Transaction failed.");
+          }
+        } catch (err) {
+          // ignore network errors on polling
+        }
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [posIntent, posStatus, mode, summary, loadFolios]);
 
   const loadFolios = useCallback(async () => {
     setFolioLoading(true);
@@ -652,9 +743,60 @@ export default function Billing() {
                      </div>
                   </div>
 
-                  {/* Payment Panel */}
+                   {/* Payment Panel */}
                   <div className="space-y-6 sticky top-8">
-                     <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl">
+                     <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden">
+                        
+                        {posStatus !== "idle" && (
+                          <div className="absolute inset-0 z-50 bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-8 flex-col text-center animate-in fade-in">
+                            {posStatus === "loading" ? (
+                              <>
+                                <div className="h-20 w-20 relative mb-6">
+                                   <div className="absolute inset-0 border-4 border-emerald-500/20 rounded-full"></div>
+                                   <div className="absolute inset-0 border-4 border-emerald-500 rounded-full border-t-transparent animate-spin"></div>
+                                   <CreditCard className="absolute inset-0 m-auto h-8 w-8 text-emerald-500 animate-pulse" />
+                                </div>
+                                <h3 className="text-xl font-black text-white mb-2 leading-tight">Waiting for guest to tap...</h3>
+                                <p className="text-slate-400 text-sm font-medium mb-6">
+                                   Please follow the instructions on the card terminal.
+                                </p>
+                                <div className="bg-slate-800/80 rounded-2xl p-5 w-full max-w-[240px] mb-6 border border-slate-700/50 shadow-inner">
+                                   <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Total Amount</p>
+                                   <p className="text-2xl font-black tabular-nums text-emerald-400 mb-3">{cur(summary.grand_total)}</p>
+                                   {posIntent && (
+                                     <>
+                                       <div className="h-px w-full bg-slate-700/50 mb-3" />
+                                       <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Intent ID</p>
+                                       <p className="text-xs font-mono text-slate-300 truncate px-2">{posIntent.provider_reference || "Pending..."}</p>
+                                     </>
+                                   )}
+                                </div>
+                                <button onClick={onCancelPos} className="text-xs font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-widest">
+                                  Cancel Transaction
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <div className="h-16 w-16 rounded-full bg-rose-500/20 flex items-center justify-center mb-6 ring-4 ring-rose-500/10">
+                                   <CreditCard className="h-8 w-8 text-rose-500" />
+                                </div>
+                                <h3 className="text-xl font-black text-white mb-2">Transaction Failed</h3>
+                                <p className="text-rose-400 text-sm font-medium mb-8 max-w-xs">
+                                   {posError || "The terminal is offline or the transaction was declined."}
+                                </p>
+                                <div className="flex flex-col gap-3 w-full max-w-[200px]">
+                                   <button onClick={onPosTrigger} className="w-full py-3 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-colors shadow-lg shadow-emerald-500/20">
+                                     Retry Payment
+                                   </button>
+                                   <button onClick={onCancelPos} className="w-full py-3 bg-slate-800 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-700 transition-colors border border-slate-700">
+                                     Go Back
+                                   </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+
                         <div className="space-y-4 mb-8">
                            <div className="flex justify-between text-slate-400 text-xs font-bold"><span>Subtotal</span><span className="tabular-nums">{cur(summary.subtotal)}</span></div>
                            <div className="flex justify-between text-slate-400 text-xs font-bold"><span>Tax & Service</span><span className="tabular-nums">{cur(summary.tax_amount)}</span></div>
@@ -737,12 +879,56 @@ export default function Billing() {
                               </button>
                             )}
 
-                            <button
-                              disabled={settling}
-                              className="w-full py-5 bg-emerald-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-900/40 hover:bg-emerald-400 transition-all active:scale-[0.98] disabled:opacity-50"
-                            >
-                              {settling ? "Processing..." : `Settle Payment`}
-                            </button>
+                            {method === "card" && (
+                              <div className="bg-slate-800 rounded-2xl p-5 border border-emerald-500/30 shadow-inner">
+                                <div className="flex items-center gap-3 mb-4">
+                                  <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                    <CreditCard className="h-4 w-4 text-emerald-400" />
+                                  </div>
+                                  <h4 className="text-sm font-black text-white">POS Terminal Payment</h4>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                  <div>
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2 block px-1">Select Active Terminal</label>
+                                    <div className="relative">
+                                      <select 
+                                        value={selectedTerminal} 
+                                        onChange={(e) => setSelectedTerminal(e.target.value ? Number(e.target.value) : "")}
+                                        className="w-full px-4 py-3.5 bg-slate-900 border border-slate-700 rounded-xl text-sm font-bold text-white outline-none focus:border-emerald-500 transition-all appearance-none cursor-pointer"
+                                      >
+                                        <option value="" disabled>-- Select Terminal --</option>
+                                        {terminals.map(t => (
+                                          <option key={t.id} value={t.id}>{t.counter_name} ({t.provider})</option>
+                                        ))}
+                                      </select>
+                                      <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+                                        <ArrowLeftRight className="h-4 w-4 text-slate-500 rotate-90" />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  <button
+                                    type="button"
+                                    onClick={onPosTrigger}
+                                    disabled={!selectedTerminal || settling}
+                                    className="w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-emerald-900/40 hover:bg-emerald-400 transition-all active:scale-[0.98] disabled:opacity-50"
+                                  >
+                                    Send Amount to Machine
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {method !== "card" && (
+                              <button
+                                disabled={settling}
+                                type="submit"
+                                className="w-full py-5 bg-emerald-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-900/40 hover:bg-emerald-400 transition-all active:scale-[0.98] disabled:opacity-50"
+                              >
+                                {settling ? "Processing..." : `Settle Payment`}
+                              </button>
+                            )}
                           </form>
                         ) : (
                           <div className="space-y-3">

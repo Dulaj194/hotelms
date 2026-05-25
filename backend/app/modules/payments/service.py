@@ -35,6 +35,11 @@ from app.modules.payments.schemas import (
 from app.modules.restaurants.model import Restaurant
 from app.modules.subscriptions.model import RestaurantSubscription, SubscriptionStatus
 from app.modules.subscriptions import service as subscriptions_service
+from app.modules.payments.pos_provider import MockTerminalProvider
+from app.modules.payments.schemas import PosPaymentTriggerRequest, PosPaymentIntentResponse
+from app.modules.payments.model import PosPaymentStatus
+from app.modules.billing.schemas import SettleSessionSplitRequest, SettlementSplitPaymentRequest
+from app.core.security import decrypt_secret_value
 
 
 def _get_stripe_module() -> Any:
@@ -752,3 +757,125 @@ def _map_terminal_to_response(terminal: Any) -> PaymentTerminalResponse:
         updated_at=terminal.updated_at,
     )
 
+
+def trigger_pos_payment(db: Session, *, restaurant_id: int, payload: PosPaymentTriggerRequest) -> PosPaymentIntentResponse:
+    terminal = payment_repo.get_payment_terminal(db, terminal_id=payload.terminal_id, restaurant_id=restaurant_id)
+    if not terminal or not terminal.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active terminal not found.")
+        
+    merchant_id = decrypt_secret_value(terminal.encrypted_merchant_id) or ""
+    terminal_id = decrypt_secret_value(terminal.encrypted_terminal_id) or ""
+    api_key = decrypt_secret_value(terminal.encrypted_api_key) if terminal.encrypted_api_key else None
+    
+    if not MockTerminalProvider.check_terminal_online(merchant_id, terminal_id, api_key):
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Terminal is currently offline.")
+        
+    provider_res = MockTerminalProvider.push_payment(merchant_id, terminal_id, api_key, payload.amount, payload.session_id)
+    
+    intent = payment_repo.create_pos_intent(
+        db,
+        restaurant_id=restaurant_id,
+        terminal_id=terminal.id,
+        bill_id=None,
+        session_id=payload.session_id,
+        amount=payload.amount,
+    )
+    
+    payment_repo.update_pos_intent(db, intent=intent, provider_reference=provider_res["provider_reference"])
+    
+    return PosPaymentIntentResponse.model_validate(intent)
+
+
+def sync_pos_payment_status(db: Session, *, restaurant_id: int, intent_id: int) -> PosPaymentIntentResponse:
+    intent = payment_repo.get_pos_intent(db, intent_id=intent_id, restaurant_id=restaurant_id)
+    if not intent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment intent not found.")
+        
+    if intent.status in (PosPaymentStatus.paid, PosPaymentStatus.failed, PosPaymentStatus.cancelled):
+        return PosPaymentIntentResponse.model_validate(intent)
+        
+    terminal = payment_repo.get_payment_terminal(db, terminal_id=intent.terminal_id, restaurant_id=restaurant_id)
+    if not terminal:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Terminal not found.")
+        
+    api_key = decrypt_secret_value(terminal.encrypted_api_key) if terminal.encrypted_api_key else None
+    
+    provider_res = MockTerminalProvider.check_payment_status(intent.provider_reference or "", api_key)
+    new_status = provider_res.get("status")
+    
+    if new_status == "paid" and intent.status != PosPaymentStatus.paid:
+        _auto_settle_intent(db, intent)
+    elif new_status == "failed":
+        payment_repo.update_pos_intent(db, intent=intent, status=PosPaymentStatus.failed, error_message="Payment failed at terminal.")
+        
+    return PosPaymentIntentResponse.model_validate(intent)
+
+
+def process_pos_webhook(db: Session, *, payload_bytes: bytes, signature_header: str) -> None:
+    try:
+        payload = json.loads(payload_bytes)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload.")
+        
+    event_id = payload.get("event_id")
+    if not event_id:
+        return
+        
+    if payment_repo.has_processed_webhook_event(db, event_id):
+        return
+        
+    provider_ref = payload.get("provider_reference")
+    intent = payment_repo.get_pos_intent_by_provider_reference(db, provider_reference=provider_ref)
+    if not intent:
+        return
+        
+    terminal = payment_repo.get_payment_terminal(db, terminal_id=intent.terminal_id)
+    if not terminal:
+        return
+        
+    api_key = decrypt_secret_value(terminal.encrypted_api_key) if terminal.encrypted_api_key else None
+    secret = api_key or "default_secret"
+    
+    if not MockTerminalProvider.verify_webhook_signature(payload_bytes, signature_header, secret):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature.")
+        
+    payment_repo.record_processed_webhook_event(db, event_id=event_id, event_type=payload.get("type", "pos.payment"), provider="pos_provider", payload=payload)
+    
+    new_status = payload.get("status")
+    if new_status == "paid" and intent.status != PosPaymentStatus.paid:
+        _auto_settle_intent(db, intent)
+    elif new_status == "failed":
+        payment_repo.update_pos_intent(db, intent=intent, status=PosPaymentStatus.failed, error_message=payload.get("error_message", "Payment failed at terminal."))
+
+
+def _auto_settle_intent(db: Session, intent) -> None:
+    intent = payment_repo.update_pos_intent(db, intent=intent, status=PosPaymentStatus.paid)
+    
+    settle_payload = SettleSessionSplitRequest(
+        payment_method="card",
+        paid_amount=intent.amount,
+        payments=[
+            SettlementSplitPaymentRequest(
+                payment_method="card",
+                amount=intent.amount,
+                transaction_reference=intent.provider_reference or "",
+                notes="POS Terminal Auto-settled via Webhook"
+            )
+        ]
+    )
+    
+    try:
+        from app.modules.billing import service as billing_service
+        res = billing_service.settle_session(
+            db, 
+            session_id=intent.session_id, 
+            restaurant_id=intent.restaurant_id, 
+            payload=settle_payload, 
+            current_user=None, 
+            r=None
+        )
+        intent.bill_id = res.bill_id
+        db.flush()
+    except Exception as e:
+        intent.error_message = f"Failed to settle bill: {str(e)}"
+        db.flush()

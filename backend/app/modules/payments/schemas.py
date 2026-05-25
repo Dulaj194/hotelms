@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.modules.payments.model import BillingTransactionStatus, BillingTransactionType, PaymentStatus
+from app.modules.payments.model import BillingTransactionStatus, BillingTransactionType, PaymentStatus, PosPaymentStatus
 
 
 class PaymentResponse(BaseModel):
@@ -139,6 +139,28 @@ class PaymentTerminalResponse(PaymentTerminalBase):
     restaurant_id: int
     merchant_id_masked: str
     terminal_id_masked: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class PosPaymentTriggerRequest(BaseModel):
+    terminal_id: int = Field(..., gt=0)
+    session_id: str = Field(..., max_length=255)
+    amount: float = Field(..., gt=0)
+
+
+class PosPaymentIntentResponse(BaseModel):
+    id: int
+    restaurant_id: int
+    terminal_id: int
+    bill_id: int | None
+    session_id: str
+    amount: float
+    status: PosPaymentStatus
+    provider_reference: str | None
+    error_message: str | None
     created_at: datetime
     updated_at: datetime
 

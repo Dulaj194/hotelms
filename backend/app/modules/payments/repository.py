@@ -14,6 +14,8 @@ from app.modules.payments.model import (
     PaymentStatus,
     ProcessedWebhookEvent,
     PaymentTerminal,
+    PosPaymentIntent,
+    PosPaymentStatus,
 )
 
 
@@ -404,6 +406,72 @@ def delete_payment_terminal(
     db: Session,
     terminal: PaymentTerminal,
 ) -> None:
-    db.delete(terminal)
     db.flush()
+
+
+def create_pos_intent(
+    db: Session,
+    *,
+    restaurant_id: int,
+    terminal_id: int,
+    bill_id: int | None,
+    session_id: str,
+    amount: float,
+) -> PosPaymentIntent:
+    record = PosPaymentIntent(
+        restaurant_id=restaurant_id,
+        terminal_id=terminal_id,
+        bill_id=bill_id,
+        session_id=session_id,
+        amount=round(amount, 2),
+        status=PosPaymentStatus.pending,
+    )
+    db.add(record)
+    db.flush()
+    db.refresh(record)
+    return record
+
+
+def get_pos_intent(
+    db: Session,
+    intent_id: int,
+    restaurant_id: int | None = None,
+) -> PosPaymentIntent | None:
+    query = db.query(PosPaymentIntent).filter(PosPaymentIntent.id == intent_id)
+    if restaurant_id is not None:
+        query = query.filter(PosPaymentIntent.restaurant_id == restaurant_id)
+    return query.first()
+
+
+def get_pos_intent_by_provider_reference(
+    db: Session,
+    provider_reference: str,
+) -> PosPaymentIntent | None:
+    return (
+        db.query(PosPaymentIntent)
+        .filter(PosPaymentIntent.provider_reference == provider_reference)
+        .first()
+    )
+
+
+def update_pos_intent(
+    db: Session,
+    *,
+    intent: PosPaymentIntent,
+    status: PosPaymentStatus | None = None,
+    provider_reference: str | None = None,
+    error_message: str | None = None,
+) -> PosPaymentIntent:
+    if status is not None:
+        intent.status = status
+    if provider_reference is not None:
+        intent.provider_reference = provider_reference
+    if error_message is not None:
+        intent.error_message = error_message
+        
+    intent.updated_at = datetime.now(UTC)
+    db.flush()
+    db.refresh(intent)
+    return intent
+
 

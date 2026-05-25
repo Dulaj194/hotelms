@@ -20,11 +20,14 @@ from app.modules.payments.schemas import (
     PaymentTerminalCreate,
     PaymentTerminalUpdate,
     PaymentTerminalResponse,
+    PosPaymentTriggerRequest,
+    PosPaymentIntentResponse,
 )
 
 router = APIRouter()
 
 _RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
+_BILLING_STAFF_ROLES = role_catalog.BILLING_STAFF_ROLES
 
 
 @router.post("/checkout", response_model=CheckoutSessionResponse)
@@ -137,4 +140,43 @@ def delete_payment_terminal(
 ) -> None:
     service.delete_payment_terminal(db, restaurant_id=restaurant_id, terminal_id=terminal_id)
     db.commit()
+
+
+@router.post("/pos/trigger", response_model=PosPaymentIntentResponse)
+def trigger_pos_payment(
+    payload: PosPaymentTriggerRequest,
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_BILLING_STAFF_ROLES)),
+) -> PosPaymentIntentResponse:
+    intent = service.trigger_pos_payment(db, restaurant_id=restaurant_id, payload=payload)
+    db.commit()
+    return intent
+
+
+@router.get("/pos/status/{intent_id}", response_model=PosPaymentIntentResponse)
+def get_pos_payment_status(
+    intent_id: int,
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_BILLING_STAFF_ROLES)),
+) -> PosPaymentIntentResponse:
+    intent = service.sync_pos_payment_status(db, restaurant_id=restaurant_id, intent_id=intent_id)
+    db.commit()
+    return intent
+
+
+@router.post("/pos/webhook", response_model=WebhookAckResponse)
+async def handle_pos_webhook(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> WebhookAckResponse:
+    signature = request.headers.get("pos-signature")
+    if not signature:
+        return WebhookAckResponse(received=False)
+
+    payload = await request.body()
+    service.process_pos_webhook(db, payload_bytes=payload, signature_header=signature)
+    db.commit()
+    return WebhookAckResponse(received=True)
 
