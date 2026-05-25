@@ -6,7 +6,7 @@ import DashboardLayout from "@/components/shared/DashboardLayout";
 import SuperAdminLayout from "@/components/shared/SuperAdminLayout";
 import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { getRequiredScopesForPlatformAction } from "@/features/platform-access/permissions";
-import { getRoleRedirect, getUser, isAuthenticated, normalizeRole } from "@/lib/auth";
+import { getRoleRedirect, getUser, isAuthenticated } from "@/lib/auth";
 import {
   BILLING_ACCOUNTANT_REVIEW_ROLES,
   BILLING_CASHIER_REVIEW_ROLES,
