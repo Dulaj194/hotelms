@@ -1,9 +1,14 @@
 import json
 from types import SimpleNamespace
+from typing import Callable, TYPE_CHECKING
 from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+
+if TYPE_CHECKING:
+    from app.modules.subscriptions.schemas import SuperAdminSubscriptionUpdateRequest
+
 
 from app.core.config import settings
 from app.modules.access import catalog as access_catalog
@@ -83,7 +88,7 @@ class SubscriptionTransition:
     def perform_update(
         self,
         *,
-        handler: callable,  # Callable that performs the modification and returns new subscription
+        handler: Callable,  # Callable that performs the modification and returns new subscription
         action: SubscriptionChangeAction,
         audit_event_type: str,
         change_reason: str | None = None,

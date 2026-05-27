@@ -368,3 +368,10 @@ def summarize_contact_leads(
             .count()
         )
     return summary
+
+def unset_other_featured_posts(db: Session, active_post_id: int) -> None:
+    db.query(SiteBlogPost).filter(
+        SiteBlogPost.id != active_post_id,
+        SiteBlogPost.is_featured.is_(True)
+    ).update({SiteBlogPost.is_featured: False})
+

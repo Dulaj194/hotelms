@@ -1,6 +1,6 @@
 import json
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -156,7 +156,7 @@ def get_overdue_open_subscriptions(
     db: Session,
 ) -> list[RestaurantSubscription]:
     """Return all active/trial subscriptions whose expiry has passed."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None) # Keep it naive for consistency if needed or use aware
     return (
         db.query(RestaurantSubscription)
         .filter(

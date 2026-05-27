@@ -1,5 +1,6 @@
 from __future__ import annotations
 import uuid
+from typing import Any
 from datetime import UTC, datetime, timedelta
 
 import redis as redis_lib
@@ -202,7 +203,7 @@ def list_bill_requests(
 def request_service(
     db: Session,
     r: redis_lib.Redis,
-    session: TableSession | object, # Accept anything with these attrs
+    session: Any, # Accept anything with these attrs
     service_type: str,
     message: str | None = None,
     order_source: str | None = None,
@@ -212,7 +213,7 @@ def request_service(
     Args:
         db (Session): The database session.
         r (redis_lib.Redis): The Redis client instance.
-        session (TableSession | object): The session requesting service.
+        session (Any): The session requesting service.
         service_type (str): The type of service requested.
         message (str | None, optional): An optional message. Defaults to None.
         order_source (str | None, optional): The source. Defaults to None.
@@ -407,7 +408,7 @@ def present_bill(
         
         # Calculate current total for the notification
         from app.modules.orders.repository import list_billable_orders_by_session
-        billable = list_billable_orders_by_session(db, session_id)
+        billable = list_billable_orders_by_session(db, restaurant_id, session_id)
         total = sum(order.total_amount for order in billable)
         
         # Notify guest via real-time channel

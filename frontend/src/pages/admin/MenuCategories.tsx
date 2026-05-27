@@ -9,7 +9,7 @@ import {
 } from "@/components/shared/TenantScopeNotice";
 import { useTenantContext } from "@/hooks/useTenantContext";
 import { api } from "@/lib/api";
-import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
+import type { PaginatedResponse } from "@/lib/pagination";
 import type { Category, Menu } from "@/types/menu";
 
 interface FormData {

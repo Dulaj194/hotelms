@@ -94,7 +94,7 @@ def _write_site_content_mutation_audit(
     normalized_after = _to_json_safe_dict(after_state)
     delta = _build_change_delta(normalized_before, normalized_after)
 
-    metadata = {
+    metadata: dict[str, Any] = {
         "reason": _normalize_reason(reason, default_reason=default_reason),
         "before": normalized_before,
         "after": normalized_after,
@@ -324,7 +324,7 @@ def _load_user_map(db: Session, user_ids: set[int | None]) -> dict[int, User]:
         return {}
     return {
         user.id: user
-        for user in repository.get_users_by_ids(db, normalized_ids)
+        for user in users_repository.get_users_by_ids(db, normalized_ids)
     }
 
 
@@ -339,8 +339,8 @@ def _serialize_page_summary(
         is_published=page.is_published,
         last_published_at=page.last_published_at,
         updated_at=page.updated_at,
-        updated_by=_to_admin_user(user_map.get(page.updated_by_user_id)),
-        published_by=_to_admin_user(user_map.get(page.published_by_user_id)),
+        updated_by=_to_admin_user(user_map.get(page.updated_by_user_id) if page.updated_by_user_id is not None else None),
+        published_by=_to_admin_user(user_map.get(page.published_by_user_id) if page.published_by_user_id is not None else None),
     )
 
 
@@ -375,8 +375,8 @@ def _serialize_blog_summary(
         live_published_at=content["live_published_at"],
         last_published_at=content["last_published_at"],
         updated_at=post.updated_at,
-        updated_by=_to_admin_user(user_map.get(post.updated_by_user_id)),
-        published_by=_to_admin_user(user_map.get(post.published_by_user_id)),
+        updated_by=_to_admin_user(user_map.get(post.updated_by_user_id) if post.updated_by_user_id is not None else None),
+        published_by=_to_admin_user(user_map.get(post.published_by_user_id) if post.published_by_user_id is not None else None),
     )
 
 
@@ -418,7 +418,7 @@ def _serialize_contact_lead(
         utm_content=lead.utm_content,
         status=lead.status,
         internal_notes=lead.internal_notes,
-        assigned_to=_to_admin_user(user_map.get(lead.assigned_to_user_id)),
+        assigned_to=_to_admin_user(user_map.get(lead.assigned_to_user_id) if lead.assigned_to_user_id is not None else None),
         created_at=lead.created_at,
         updated_at=lead.updated_at,
     )
@@ -1145,7 +1145,7 @@ def export_contact_leads_csv(
     )
 
     for lead in leads:
-        assignee = user_map.get(lead.assigned_to_user_id)
+        assignee = user_map.get(lead.assigned_to_user_id) if lead.assigned_to_user_id is not None else None
         writer.writerow(
             [
                 lead.id,

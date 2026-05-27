@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -64,7 +66,7 @@ def _normalize_assigned_area(
     *,
     role: UserRole,
     assigned_area: str | None,
-) -> str | None:
+) -> Any:
     if not role_hierarchy.is_allowed_assigned_area(role, assigned_area):
         allowed_areas = role_hierarchy.get_allowed_assigned_areas(role)
         raise HTTPException(
@@ -77,7 +79,7 @@ def _normalize_assigned_area(
     return assigned_area if assigned_area is not None else role_hierarchy.get_default_assigned_area(role)
 
 
-def _normalize_super_admin_scopes(scopes: list[str] | None) -> list[str]:
+def _normalize_super_admin_scopes(scopes: Any) -> list[str]:
     return platform_access_catalog.normalize_platform_scopes(scopes)
 
 
@@ -161,8 +163,8 @@ def list_staff(db: Session, restaurant_id: int) -> list[StaffListItemResponse]:
 def get_staff_management_policy(current_user: User) -> StaffManagementPolicyResponse:
     manageable_roles = role_hierarchy.get_manageable_roles(current_user.role)
 
-    allowed_assigned_areas_by_role: dict[UserRole, list[str]] = {}
-    default_assigned_area_by_role: dict[UserRole, str | None] = {}
+    allowed_assigned_areas_by_role: dict[UserRole, Any] = {}
+    default_assigned_area_by_role: dict[UserRole, Any] = {}
     for role in sorted(manageable_roles, key=lambda role_item: role_item.value):
         allowed_assigned_areas_by_role[role] = sorted(
             area
@@ -576,7 +578,7 @@ def create_platform_user(
     user = repo_create_platform_user(
         db,
         full_name=data.full_name,
-        email=str(data.email),
+        email=data.email,
         username=normalized_username,
         phone=normalized_phone,
         password=data.password,
