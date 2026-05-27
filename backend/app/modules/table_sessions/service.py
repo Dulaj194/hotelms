@@ -408,7 +408,7 @@ def present_bill(
         
         # Calculate current total for the notification
         from app.modules.orders.repository import list_billable_orders_by_session
-        billable = list_billable_orders_by_session(db, restaurant_id, session_id)
+        billable = list_billable_orders_by_session(db, session_id, restaurant_id)
         total = sum(order.total_amount for order in billable)
         
         # Notify guest via real-time channel

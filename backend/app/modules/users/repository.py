@@ -12,6 +12,13 @@ from app.modules.users.schemas import StaffCreateRequest, StaffUpdateRequest, Us
 # Use these only for authentication flows or explicit cross-tenant operations.
 
 
+def get_users_by_ids(db: Session, user_ids: set[int]) -> list[User]:
+    """Fetch users by their IDs without tenant scoping."""
+    if not user_ids:
+        return []
+    return db.query(User).filter(User.id.in_(user_ids)).all()
+
+
 def get_by_id_global(db: Session, user_id: int) -> User | None:
     """Fetch a user by ID without tenant scoping."""
     return db.query(User).filter(User.id == user_id).first()
