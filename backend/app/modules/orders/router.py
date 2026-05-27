@@ -38,6 +38,10 @@ from app.modules.orders.schemas import (
     PlaceOrderResponse,
     UpdateOrderStatusRequest,
 )
+from app.core.pagination import PaginationParams, FilterParams, create_paginated_response, pagination_depends
+from app.core.response_utils import success_response
+from app.core.response_schemas import ApiResponse
+from typing import Any
 from app.modules.table_sessions.model import TableSession
 
 router = APIRouter()
@@ -148,27 +152,52 @@ def list_completed_orders(
 
 # ── Staff / admin list endpoints ──────────────────────────────────────────────
 
-@router.get("/active", response_model=ActiveOrderListResponse)
+@router.get("/active", response_model=ApiResponse[Any])
 def list_active_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
+    pagination: PaginationParams = Depends(pagination_depends),
+    filters: FilterParams = Depends(),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
-) -> ActiveOrderListResponse:
+) -> ApiResponse:
     """List all non-finalized orders (pending / confirmed / processing)."""
-    return service.list_active_orders(db, restaurant_id)
+    orders, total = service.list_active_orders(
+        db, 
+        restaurant_id,
+        skip=pagination.skip,
+        limit=pagination.limit,
+        search=filters.search,
+        sort_by=filters.sort_by,
+        sort_order=filters.sort_order.value if filters.sort_order else "asc"
+    )
+    paginated_data = create_paginated_response(orders, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Active orders listed successfully.")
 
 
-@router.get("/history", response_model=ActiveOrderListResponse)
+@router.get("/history", response_model=ApiResponse[Any])
 def list_history_orders(
     status: OrderStatus | None = None,
     restaurant_id: int = Depends(get_current_restaurant_id),
+    pagination: PaginationParams = Depends(pagination_depends),
+    filters: FilterParams = Depends(),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
-) -> ActiveOrderListResponse:
+) -> ApiResponse:
     """List completed / paid / rejected orders for the restaurant."""
-    return service.list_history_orders(db, restaurant_id, status=status)
+    orders, total = service.list_history_orders(
+        db, 
+        restaurant_id, 
+        status=status,
+        skip=pagination.skip,
+        limit=pagination.limit,
+        search=filters.search,
+        sort_by=filters.sort_by,
+        sort_order=filters.sort_order.value if filters.sort_order else "desc"
+    )
+    paginated_data = create_paginated_response(orders, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="History orders listed successfully.")
 
 
 @router.get("/history/stats")

@@ -10,6 +10,10 @@ from app.modules.menus.schemas import (
     MenuResponse,
     MenuUpdateRequest,
 )
+from app.core.pagination import PaginationParams, FilterParams, create_paginated_response, pagination_depends
+from app.core.response_utils import success_response
+from app.core.response_schemas import ApiResponse
+from typing import Any
 from app.modules.users.model import User
 
 router = APIRouter()
@@ -17,12 +21,24 @@ router = APIRouter()
 _RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 
 
-@router.get("", response_model=list[MenuResponse])
+@router.get("", response_model=ApiResponse[Any])
 def list_menus(
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+    pagination: PaginationParams = Depends(pagination_depends),
+    filters: FilterParams = Depends(),
     db: Session = Depends(get_db),
-) -> list[MenuResponse]:
-    return service.list_menus(db, current_user.restaurant_id)  # type: ignore[arg-type]
+) -> ApiResponse:
+    menus, total = service.list_menus(
+        db, 
+        current_user.restaurant_id, # type: ignore[arg-type]
+        skip=pagination.skip,
+        limit=pagination.limit,
+        search=filters.search,
+        sort_by=filters.sort_by,
+        sort_order=filters.sort_order.value if filters.sort_order else "asc"
+    )
+    paginated_data = create_paginated_response(menus, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Menus listed successfully.")
 
 
 @router.post("", response_model=MenuResponse, status_code=status.HTTP_201_CREATED)

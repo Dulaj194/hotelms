@@ -26,10 +26,24 @@ def _is_currently_active(*, valid_from: date, valid_until: date, today: date) ->
     return valid_from <= today <= valid_until
 
 
-def list_promo_codes(db: Session) -> PromoCodeListResponse:
-    rows = repository.list_promo_codes(db)
+def list_promo_codes(
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "desc",
+) -> tuple[list[PromoCodeResponse], int]:
+    rows, total = repository.list_promo_codes(
+        db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
     items = [PromoCodeResponse.model_validate(row) for row in rows]
-    return PromoCodeListResponse(items=items, total=len(items))
+    return items, total
 
 
 def create_promo_code(db: Session, payload: PromoCodeCreateRequest) -> PromoCodeResponse:

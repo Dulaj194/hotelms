@@ -172,29 +172,68 @@ def list_pending_orders_by_restaurant(
     )
 
 
+from sqlalchemy import or_
+
 def list_active_orders_by_restaurant(
-    db: Session, restaurant_id: int
-) -> list[OrderHeader]:
+    db: Session, 
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
+) -> tuple[list[OrderHeader], int]:
     """Return all non-finalized orders (pending / confirmed / processing)."""
     active_statuses = {OrderStatus.pending, OrderStatus.confirmed, OrderStatus.processing}
-    return (
+    query = (
         db.query(OrderHeader)
         .options(joinedload(OrderHeader.items))
         .filter(
             OrderHeader.restaurant_id == restaurant_id,
             OrderHeader.status.in_(active_statuses),
         )
-        .order_by(OrderHeader.placed_at.asc())
-        .all()
     )
+    
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                OrderHeader.order_number.ilike(pattern),
+                OrderHeader.table_number.ilike(pattern),
+                OrderHeader.room_number.ilike(pattern),
+                OrderHeader.customer_name.ilike(pattern),
+            )
+        )
+        
+    total = query.count()
+    
+    # Sorting
+    if sort_by == "order_number":
+        order_col = OrderHeader.order_number
+    elif sort_by == "total_amount":
+        order_col = OrderHeader.total_amount
+    else:
+        order_col = OrderHeader.placed_at
+        
+    if sort_order.lower() == "desc":
+        query = query.order_by(order_col.desc())
+    else:
+        query = query.order_by(order_col.asc())
+        
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 
 def list_history_orders_by_restaurant(
     db: Session, 
     restaurant_id: int, 
     status: OrderStatus | None = None,
-    limit: int = 100
-) -> list[OrderHeader]:
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "desc",
+) -> tuple[list[OrderHeader], int]:
     """Return completed, paid, and rejected orders for a restaurant."""
     history_statuses = {OrderStatus.completed, OrderStatus.served, OrderStatus.paid, OrderStatus.rejected}
     try:
@@ -209,11 +248,38 @@ def list_history_orders_by_restaurant(
         else:
             query = query.filter(OrderHeader.status.in_(history_statuses))
             
-        return query.order_by(OrderHeader.placed_at.desc()).limit(limit).all()
+        if search:
+            pattern = f"%{search.strip()}%"
+            query = query.filter(
+                or_(
+                    OrderHeader.order_number.ilike(pattern),
+                    OrderHeader.table_number.ilike(pattern),
+                    OrderHeader.room_number.ilike(pattern),
+                    OrderHeader.customer_name.ilike(pattern),
+                )
+            )
+            
+        total = query.count()
+        
+        # Sorting
+        if sort_by == "order_number":
+            order_col = OrderHeader.order_number
+        elif sort_by == "total_amount":
+            order_col = OrderHeader.total_amount
+        else:
+            order_col = OrderHeader.placed_at
+            
+        if sort_order.lower() == "asc":
+            query = query.order_by(order_col.asc())
+        else:
+            query = query.order_by(order_col.desc())
+            
+        items = query.offset(skip).limit(limit).all()
+        return items, total
     except Exception as exc:
         from app.core.logging import get_logger
         get_logger(__name__).error("Failed to list history orders: %s", str(exc), exc_info=True)
-        return []
+        return [], 0
 
 
 def count_history_orders_by_restaurant(

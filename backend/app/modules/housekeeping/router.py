@@ -37,6 +37,10 @@ from app.modules.housekeeping.schemas import (
     HousekeepingStaffPerformanceResponse,
     HousekeepingSubmitRequest,
 )
+from app.core.pagination import PaginationParams, FilterParams, create_paginated_response, pagination_depends
+from app.core.response_utils import success_response
+from app.core.response_schemas import ApiResponse
+from typing import Any
 from app.modules.room_sessions.model import RoomSession
 from app.modules.users.model import User
 
@@ -159,26 +163,37 @@ def get_staff_performance(
     return service.get_staff_performance(db, restaurant_id=restaurant_id, report_date=report_date)
 
 
-@router.get("/history", response_model=HousekeepingRequestListResponse)
+@router.get("/history", response_model=ApiResponse[Any])
 def list_request_history(
+    pagination: PaginationParams = Depends(pagination_depends),
+    filters: FilterParams = Depends(),
     room_number: Optional[str] = Query(None, description="Filter by room number"),
     request_type: Optional[str] = Query(None, description="Filter by request type"),
     current_user=Depends(require_roles(*_HK_ROLES)),
     _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-) -> HousekeepingRequestListResponse:
-    return service.list_requests(
+) -> ApiResponse:
+    requests, total = service.list_requests(
         db,
         restaurant_id,
         status="ready",
         room_number=room_number,
         request_type=request_type,
+        skip=pagination.skip,
+        limit=pagination.limit,
+        search=filters.search,
+        sort_by=filters.sort_by,
+        sort_order=filters.sort_order.value if filters.sort_order else "desc",
     )
+    paginated_data = create_paginated_response(requests, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="History requests listed successfully.")
 
 
-@router.get("", response_model=HousekeepingRequestListResponse)
+@router.get("", response_model=ApiResponse[Any])
 def list_requests(
+    pagination: PaginationParams = Depends(pagination_depends),
+    filters: FilterParams = Depends(),
     status: Optional[str] = Query(None),
     room_number: Optional[str] = Query(None, description="Filter by room number"),
     request_type: Optional[str] = Query(None, description="Filter by request type"),
@@ -188,8 +203,8 @@ def list_requests(
     _=Depends(require_module_access("housekeeping")),
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
-) -> HousekeepingRequestListResponse:
-    return service.list_requests(
+) -> ApiResponse:
+    requests, total = service.list_requests(
         db,
         restaurant_id,
         status=status,
@@ -197,7 +212,14 @@ def list_requests(
         request_type=request_type,
         priority=priority,
         assigned_to_user_id=assigned_to_user_id,
+        skip=pagination.skip,
+        limit=pagination.limit,
+        search=filters.search,
+        sort_by=filters.sort_by,
+        sort_order=filters.sort_order.value if filters.sort_order else "desc",
     )
+    paginated_data = create_paginated_response(requests, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Housekeeping requests listed successfully.")
 
 
 @router.get("/{request_id}", response_model=HousekeepingRequestResponse)

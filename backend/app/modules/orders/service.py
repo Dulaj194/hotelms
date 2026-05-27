@@ -763,25 +763,47 @@ def list_pending_orders(
 
 
 def list_active_orders(
-    db: Session, restaurant_id: int
-) -> ActiveOrderListResponse:
-    orders = order_repo.list_active_orders_by_restaurant(db, restaurant_id)
-    return ActiveOrderListResponse(
-        orders=[_build_order_header(o) for o in orders],
-        total=len(orders),
+    db: Session, 
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
+) -> tuple[list[OrderHeaderResponse], int]:
+    orders, total = order_repo.list_active_orders_by_restaurant(
+        db, 
+        restaurant_id,
+        skip=skip,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
+    return [_build_order_header(o) for o in orders], total
 
 
 def list_history_orders(
     db: Session, 
     restaurant_id: int,
     status: OrderStatus | None = None,
-) -> ActiveOrderListResponse:
-    orders = order_repo.list_history_orders_by_restaurant(db, restaurant_id, status=status)
-    return ActiveOrderListResponse(
-        orders=[_build_order_header(o) for o in orders],
-        total=len(orders),
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "desc",
+) -> tuple[list[OrderHeaderResponse], int]:
+    orders, total = order_repo.list_history_orders_by_restaurant(
+        db, 
+        restaurant_id, 
+        status=status,
+        skip=skip,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
+    return [_build_order_header(o) for o in orders], total
 
 
 def get_history_stats(

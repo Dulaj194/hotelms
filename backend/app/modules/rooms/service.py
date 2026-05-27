@@ -25,9 +25,25 @@ def _to_response(room) -> RoomResponse:
     return RoomResponse.model_validate(room)
 
 
-def list_rooms(db: Session, restaurant_id: int) -> RoomListResponse:
-    rooms = repository.list_rooms_by_restaurant(db, restaurant_id)
-    return RoomListResponse(rooms=[_to_response(r) for r in rooms], total=len(rooms))
+def list_rooms(
+    db: Session, 
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
+) -> tuple[list[RoomResponse], int]:
+    rooms, total = repository.list_rooms_by_restaurant(
+        db, 
+        restaurant_id, 
+        skip=skip, 
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+    return [_to_response(r) for r in rooms], total
 
 
 def get_room(db: Session, room_id: int, restaurant_id: int) -> RoomResponse:

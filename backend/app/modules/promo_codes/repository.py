@@ -7,8 +7,43 @@ from sqlalchemy.orm import Session
 from app.modules.promo_codes.model import PromoCode, PromoCodeUsage
 
 
-def list_promo_codes(db: Session) -> list[PromoCode]:
-    return db.query(PromoCode).order_by(PromoCode.created_at.desc(), PromoCode.id.desc()).all()
+from sqlalchemy import or_
+
+def list_promo_codes(
+    db: Session,
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "desc",
+) -> tuple[list[PromoCode], int]:
+    query = db.query(PromoCode)
+    
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(PromoCode.code.ilike(pattern))
+        
+    total = query.count()
+    
+    # Sorting
+    if sort_by == "code":
+        order_col = PromoCode.code
+    elif sort_by == "discount_percent":
+        order_col = PromoCode.discount_percent
+    elif sort_by == "valid_from":
+        order_col = PromoCode.valid_from
+    elif sort_by == "valid_until":
+        order_col = PromoCode.valid_until
+    else:
+        order_col = PromoCode.created_at
+        
+    if sort_order.lower() == "asc":
+        query = query.order_by(order_col.asc(), PromoCode.id.asc())
+    else:
+        query = query.order_by(order_col.desc(), PromoCode.id.desc())
+        
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 
 def get_promo_code_by_id(db: Session, promo_code_id: int) -> PromoCode | None:

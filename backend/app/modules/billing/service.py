@@ -81,7 +81,7 @@ def _actor_role(current_user: object | None) -> str | None:
 
 def _actor_user_id(current_user: object | None) -> int | None:
     value = getattr(current_user, "id", None)
-    return int(value) if isinstance(value, int) else None
+    return value if isinstance(value, int) else None
 
 
 def _to_bill_record(bill: Bill) -> BillRecordResponse:
@@ -117,7 +117,7 @@ def _to_bill_record(bill: Bill) -> BillRecordResponse:
     )
 
 
-def _build_bill_order_response(order: object) -> BillOrderResponse:
+def _build_bill_order_response(order: Any) -> BillOrderResponse:
     return BillOrderResponse(
         id=order.id,
         order_number=order.order_number,
@@ -136,7 +136,7 @@ def _build_bill_order_response(order: object) -> BillOrderResponse:
     )
 
 
-def _load_user_map(db: Session, user_ids: set[int]) -> dict[int, User]:
+def _load_user_map(db: Session, user_ids: set[int]) -> dict[int, Any]:
     """Load users by IDs from database."""
     return billing_repo.get_users_by_ids(db, list(user_ids))
 

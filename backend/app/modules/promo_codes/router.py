@@ -21,6 +21,10 @@ from app.modules.promo_codes.schemas import (
     PromoCodeValidateRequest,
     PromoCodeValidationResponse,
 )
+from app.core.pagination import PaginationParams, FilterParams, create_paginated_response, pagination_depends
+from app.core.response_utils import success_response
+from app.core.response_schemas import ApiResponse
+from typing import Any
 from app.modules.users.model import User
 
 router = APIRouter()
@@ -28,12 +32,23 @@ router = APIRouter()
 _RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 
 
-@router.get("", response_model=PromoCodeListResponse)
+@router.get("", response_model=ApiResponse[Any])
 def list_promo_codes(
     _current_user: User = Depends(require_platform_scopes("ops_viewer", "billing_admin")),
+    pagination: PaginationParams = Depends(pagination_depends),
+    filters: FilterParams = Depends(),
     db: Session = Depends(get_db),
-) -> PromoCodeListResponse:
-    return service.list_promo_codes(db)
+) -> ApiResponse:
+    promo_codes, total = service.list_promo_codes(
+        db,
+        skip=pagination.skip,
+        limit=pagination.limit,
+        search=filters.search,
+        sort_by=filters.sort_by,
+        sort_order=filters.sort_order.value if filters.sort_order else "desc",
+    )
+    paginated_data = create_paginated_response(promo_codes, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Promo codes listed successfully.")
 
 
 @router.post("", response_model=PromoCodeResponse, status_code=status.HTTP_201_CREATED)

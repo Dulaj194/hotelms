@@ -10,14 +10,46 @@ from sqlalchemy.orm import Session
 from app.modules.rooms.model import Room
 
 
-def list_rooms_by_restaurant(db: Session, restaurant_id: int) -> list[Room]:
-    """Return all rooms for a restaurant, ordered by room_number."""
-    return (
-        db.query(Room)
-        .filter(Room.restaurant_id == restaurant_id)
-        .order_by(Room.room_number.asc())
-        .all()
-    )
+from sqlalchemy import or_
+
+def list_rooms_by_restaurant(
+    db: Session,
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
+) -> tuple[list[Room], int]:
+    """Return rooms for a restaurant with pagination and filtering."""
+    query = db.query(Room).filter(Room.restaurant_id == restaurant_id)
+    
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                Room.room_number.ilike(pattern),
+                Room.room_name.ilike(pattern),
+            )
+        )
+        
+    total = query.count()
+    
+    # Sorting
+    if sort_by == "room_name":
+        order_col = Room.room_name
+    elif sort_by == "floor_number":
+        order_col = Room.floor_number
+    else:
+        order_col = Room.room_number
+        
+    if sort_order.lower() == "desc":
+        query = query.order_by(order_col.desc())
+    else:
+        query = query.order_by(order_col.asc())
+        
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 
 def get_room_by_id_and_restaurant(

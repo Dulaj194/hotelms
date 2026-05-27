@@ -16,9 +16,25 @@ _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 _EXT_MAP = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 
 
-def list_menus(db: Session, restaurant_id: int) -> list[MenuResponse]:
-    menus = repository.list_by_restaurant(db, restaurant_id)
-    return [MenuResponse.model_validate(m) for m in menus]
+def list_menus(
+    db: Session, 
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
+) -> tuple[list[MenuResponse], int]:
+    menus, total = repository.list_by_restaurant(
+        db, 
+        restaurant_id,
+        skip=skip,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+    return [MenuResponse.model_validate(m) for m in menus], total
 
 
 def get_menu(db: Session, menu_id: int, restaurant_id: int) -> MenuResponse:

@@ -413,7 +413,7 @@ def get_bills_by_ids(
 def get_users_by_ids(
     db: Session,
     user_ids: list[int],
-) -> dict[int, object]:
+) -> dict[int, Any]:
     """Get users by IDs as a dictionary for lookup."""
     if not user_ids:
         return {}
@@ -498,7 +498,7 @@ def get_payment_method_summary_in_range(
     end_dt: datetime,
 ) -> list[tuple[str | None, int, float]]:
     """Group paid bills by payment method and return counts and sums."""
-    return (
+    rows = (
         db.query(
             Bill.payment_method,
             func.count(Bill.id),
@@ -514,6 +514,7 @@ def get_payment_method_summary_in_range(
         .order_by(func.coalesce(func.sum(Bill.total_amount), 0).desc())
         .all()
     )
+    return [(row[0], int(row[1]), float(row[2])) for row in rows]
 
 
 def list_recent_completed_room_folios(

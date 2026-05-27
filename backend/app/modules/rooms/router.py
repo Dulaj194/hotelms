@@ -18,6 +18,10 @@ from app.modules.rooms.schemas import (
     RoomStatusResponse,
     RoomUpdateRequest,
 )
+from app.core.pagination import PaginationParams, FilterParams, create_paginated_response, pagination_depends
+from app.core.response_utils import success_response
+from app.core.response_schemas import ApiResponse
+from typing import Any
 
 router = APIRouter()
 
@@ -25,14 +29,26 @@ _ROOM_READ_ROLES = role_catalog.ROOM_READ_ROLES
 _ROOM_WRITE_ROLES = role_catalog.ROOM_WRITE_ROLES
 
 
-@router.get("", response_model=RoomListResponse)
+@router.get("", response_model=ApiResponse[Any])
 def list_rooms(
     restaurant_id: int = Depends(get_current_restaurant_id),
+    pagination: PaginationParams = Depends(pagination_depends),
+    filters: FilterParams = Depends(),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_ROOM_READ_ROLES)),
-) -> RoomListResponse:
+) -> ApiResponse:
     """List all rooms in the current restaurant."""
-    return service.list_rooms(db, restaurant_id)
+    rooms, total = service.list_rooms(
+        db, 
+        restaurant_id,
+        skip=pagination.skip,
+        limit=pagination.limit,
+        search=filters.search,
+        sort_by=filters.sort_by,
+        sort_order=filters.sort_order.value if filters.sort_order else "asc"
+    )
+    paginated_data = create_paginated_response(rooms, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Rooms listed successfully.")
 
 
 @router.post("", response_model=RoomResponse, status_code=status.HTTP_201_CREATED)

@@ -519,10 +519,15 @@ def list_requests(
     request_type: str | None = None,
     priority: str | None = None,
     assigned_to_user_id: int | None = None,
-) -> HousekeepingRequestListResponse:
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "desc",
+) -> tuple[list[HousekeepingRequestResponse], int]:
     _cleanup_old_requests_for_restaurant(db, restaurant_id=restaurant_id)
 
-    reqs = repository.list_requests_by_restaurant(
+    reqs, total = repository.list_requests_by_restaurant(
         db,
         restaurant_id,
         status=status,
@@ -530,8 +535,13 @@ def list_requests(
         request_type=request_type,
         priority=priority,
         assigned_to_user_id=assigned_to_user_id,
+        skip=skip,
+        limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
     )
-    return HousekeepingRequestListResponse(requests=[_to_response(r) for r in reqs], total=len(reqs))
+    return [_to_response(r) for r in reqs], total
 
 
 def get_request(

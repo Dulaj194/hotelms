@@ -96,6 +96,8 @@ def get_request_by_id_and_session(
     )
 
 
+from sqlalchemy import or_
+
 def list_requests_by_restaurant(
     db: Session,
     restaurant_id: int,
@@ -105,7 +107,12 @@ def list_requests_by_restaurant(
     request_type: str | None = None,
     priority: str | None = None,
     assigned_to_user_id: int | None = None,
-) -> list[HousekeepingRequest]:
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "desc",
+) -> tuple[list[HousekeepingRequest], int]:
     q = db.query(HousekeepingRequest).filter(HousekeepingRequest.restaurant_id == restaurant_id)
     if status:
         q = q.filter(HousekeepingRequest.status == status)
@@ -117,7 +124,34 @@ def list_requests_by_restaurant(
         q = q.filter(HousekeepingRequest.priority == priority)
     if assigned_to_user_id is not None:
         q = q.filter(HousekeepingRequest.assigned_to_user_id == assigned_to_user_id)
-    return q.order_by(HousekeepingRequest.submitted_at.desc()).all()
+        
+    if search:
+        pattern = f"%{search.strip()}%"
+        q = q.filter(
+            or_(
+                HousekeepingRequest.room_number_snapshot.ilike(pattern),
+                HousekeepingRequest.guest_name.ilike(pattern),
+                HousekeepingRequest.message.ilike(pattern),
+            )
+        )
+        
+    total = q.count()
+    
+    # Sorting
+    if sort_by == "room_number":
+        order_col = HousekeepingRequest.room_number_snapshot
+    elif sort_by == "priority":
+        order_col = HousekeepingRequest.priority
+    else:
+        order_col = HousekeepingRequest.submitted_at
+        
+    if sort_order.lower() == "asc":
+        q = q.order_by(order_col.asc())
+    else:
+        q = q.order_by(order_col.desc())
+        
+    items = q.offset(skip).limit(limit).all()
+    return items, total
 
 
 def list_requests_by_session(

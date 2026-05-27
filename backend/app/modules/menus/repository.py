@@ -13,13 +13,45 @@ def get_by_id(db: Session, menu_id: int, restaurant_id: int) -> Menu | None:
     )
 
 
-def list_by_restaurant(db: Session, restaurant_id: int) -> list[Menu]:
-    return (
-        db.query(Menu)
-        .filter(Menu.restaurant_id == restaurant_id)
-        .order_by(Menu.sort_order.asc(), Menu.id.asc())
-        .all()
-    )
+from sqlalchemy import or_
+
+def list_by_restaurant(
+    db: Session, 
+    restaurant_id: int,
+    skip: int = 0,
+    limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
+) -> tuple[list[Menu], int]:
+    query = db.query(Menu).filter(Menu.restaurant_id == restaurant_id)
+    
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(
+            or_(
+                Menu.name.ilike(pattern),
+                Menu.description.ilike(pattern),
+            )
+        )
+        
+    total = query.count()
+    
+    # Sorting
+    if sort_by == "name":
+        order_col = Menu.name
+    elif sort_by == "created_at":
+        order_col = Menu.created_at
+    else:
+        order_col = Menu.sort_order
+        
+    if sort_order.lower() == "desc":
+        query = query.order_by(order_col.desc(), Menu.id.desc())
+    else:
+        query = query.order_by(order_col.asc(), Menu.id.asc())
+        
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 
 def create(db: Session, restaurant_id: int, data: MenuCreateRequest) -> Menu:
