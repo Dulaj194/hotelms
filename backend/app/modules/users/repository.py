@@ -308,3 +308,33 @@ def disable_platform_user(db: Session, user: User) -> User:
 def delete_platform_user(db: Session, user: User) -> None:
     db.delete(user)
     db.commit()
+
+
+def count_pending_kitchen_orders(db: Session, restaurant_id: int) -> int:
+    from sqlalchemy import func
+    from app.modules.orders.model import OrderHeader, OrderStatus
+    return int(
+        db.query(func.count(OrderHeader.id))
+        .filter(
+            OrderHeader.restaurant_id == restaurant_id,
+            OrderHeader.status.in_(
+                [OrderStatus.pending, OrderStatus.confirmed, OrderStatus.processing]
+            ),
+        )
+        .scalar()
+        or 0
+    )
+
+
+def count_pending_housekeeping_requests(db: Session, restaurant_id: int) -> int:
+    from sqlalchemy import func
+    from app.modules.housekeeping.model import HousekeepingRequest
+    return int(
+        db.query(func.count(HousekeepingRequest.id))
+        .filter(
+            HousekeepingRequest.restaurant_id == restaurant_id,
+            HousekeepingRequest.status.notin_(["ready", "cancelled", "done"]),
+        )
+        .scalar()
+        or 0
+    )

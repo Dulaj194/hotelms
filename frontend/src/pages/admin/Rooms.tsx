@@ -4,10 +4,10 @@ import { api } from "@/lib/api";
 import { getUser, normalizeRole } from "@/lib/auth";
 import type {
   RoomCreateRequest,
-  RoomListResponse,
   RoomResponse,
   RoomUpdateRequest,
 } from "@/types/room";
+import type { PaginatedResponse } from "@/lib/pagination";
 
 function Badge({ active }: { active: boolean }) {
   return (
@@ -43,18 +43,25 @@ export default function Rooms() {
   const [deleteTarget, setDeleteTarget] = useState<RoomResponse | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 20;
+
   const loadRooms = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.get<RoomListResponse>("/rooms");
-      setRooms(data.rooms);
+      const data = await api.get<PaginatedResponse<RoomResponse>>(`/rooms?page=${page}&limit=${limit}`);
+      setRooms(data.items || []);
+      setTotalItems(data.total || 0);
+      setTotalPages(data.total_pages || 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load rooms.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     void loadRooms();
@@ -288,6 +295,31 @@ export default function Rooms() {
               </tbody>
             </table>
           </div>
+          
+          {!loading && !error && totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
+              <p className="text-sm text-gray-600">
+                Showing page <span className="font-medium text-gray-900">{page}</span> of <span className="font-medium text-gray-900">{totalPages}</span>
+                {" "}({totalItems} total rooms)
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -442,9 +442,6 @@ def _serialize_subscription_change_history(
     db: Session,
     items: list[SubscriptionChangeLog],
 ) -> SubscriptionChangeHistoryResponse:
-    from app.modules.packages.model import Package
-    from app.modules.users.model import User
-
     user_ids = {item.actor_user_id for item in items if item.actor_user_id is not None}
     package_ids = {
         package_id
@@ -457,14 +454,14 @@ def _serialize_subscription_change_history(
     if user_ids:
         user_map = {
             user.id: user
-            for user in db.query(User).filter(User.id.in_(user_ids)).all()
+            for user in repository.get_users_by_ids(db, user_ids)
         }
 
     package_map = {}
     if package_ids:
         package_map = {
             package.id: package
-            for package in db.query(Package).filter(Package.id.in_(package_ids)).all()
+            for package in repository.get_packages_by_ids(db, package_ids)
         }
 
     history_items: list[SubscriptionChangeHistoryItemResponse] = []

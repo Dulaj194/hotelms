@@ -187,26 +187,9 @@ def list_staff_filtered(
 ) -> list[StaffListItemResponse]:
     users = list_by_restaurant(db, restaurant_id, role=role, is_active=is_active)
 
-    pending_kitchen = int(
-        db.query(func.count(OrderHeader.id))
-        .filter(
-            OrderHeader.restaurant_id == restaurant_id,
-            OrderHeader.status.in_(
-                [OrderStatus.pending, OrderStatus.confirmed, OrderStatus.processing]
-            ),
-        )
-        .scalar()
-        or 0
-    )
-    pending_housekeeping = int(
-        db.query(func.count(HousekeepingRequest.id))
-        .filter(
-            HousekeepingRequest.restaurant_id == restaurant_id,
-            HousekeepingRequest.status.notin_(["ready", "cancelled", "done"]),
-        )
-        .scalar()
-        or 0
-    )
+    from app.modules.users.repository import count_pending_kitchen_orders, count_pending_housekeeping_requests
+    pending_kitchen = count_pending_kitchen_orders(db, restaurant_id)
+    pending_housekeeping = count_pending_housekeeping_requests(db, restaurant_id)
 
     active_stewards = sum(1 for user in users if user.role == UserRole.steward and user.is_active)
     active_housekeepers = sum(

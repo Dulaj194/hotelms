@@ -151,7 +151,7 @@ def validate_promo_for_restaurant(
         valid=True,
         message=f"Promo code '{code}' applied.",
         code=code,
-        discount_percent=float(row.discount_percent),
+        discount_percent=row.discount_percent,
         usage_limit=row.usage_limit,
         global_used_count=row.used_count,
         restaurant_used_count=restaurant_used_count,

@@ -248,3 +248,14 @@ def list_subscription_change_logs(
         .limit(limit)
         .all()
     )
+
+
+def get_users_by_ids(db: Session, user_ids: set[int]) -> list:
+    from app.modules.users.model import User
+    return db.query(User).filter(User.id.in_(user_ids)).all()
+
+
+def get_packages_by_ids(db: Session, package_ids: set[int]) -> list:
+    from app.modules.packages.model import Package
+    return db.query(Package).filter(Package.id.in_(package_ids)).all()
+

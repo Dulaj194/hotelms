@@ -433,4 +433,4 @@ def delete_requests_by_ids(
         .delete(synchronize_session=False)
     )
     db.commit()
-    return int(deleted)
+    return deleted

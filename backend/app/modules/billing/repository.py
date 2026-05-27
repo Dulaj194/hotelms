@@ -21,11 +21,17 @@ from app.modules.billing.model import (
 )
 
 
-def get_bill_by_session(
-    db: Session,
-    session_id: str,
-    restaurant_id: int,
 ) -> Bill | None:
+    """Retrieves a bill by its session ID and restaurant ID.
+
+    Args:
+        db (Session): The database session.
+        session_id (str): The ID of the session.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        Bill | None: The found bill, or None if it doesn't exist.
+    """
     return (
         db.query(Bill)
         .filter(
@@ -36,11 +42,17 @@ def get_bill_by_session(
     )
 
 
-def get_bill_by_id(
-    db: Session,
-    bill_id: int,
-    restaurant_id: int,
 ) -> Bill | None:
+    """Retrieves a bill by its primary key ID and restaurant ID.
+
+    Args:
+        db (Session): The database session.
+        bill_id (int): The ID of the bill.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        Bill | None: The found bill, or None if it doesn't exist.
+    """
     return (
         db.query(Bill)
         .filter(
@@ -51,23 +63,28 @@ def get_bill_by_id(
     )
 
 
-def create_bill(
-    db: Session,
-    *,
-    restaurant_id: int,
-    session_id: str,
-    context_type: BillContextType,
-    table_number: str | None,
-    room_id: int | None,
-    room_number: str | None,
-    subtotal_amount: float,
-    tax_amount: float,
-    discount_amount: float,
-    total_amount: float,
-    payment_method: str,
-    transaction_reference: str | None,
-    notes: str | None,
 ) -> Bill:
+    """Creates a new bill record.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+        session_id (str): The session ID.
+        context_type (BillContextType): The context (table, room, etc.).
+        table_number (str | None): The table number, if any.
+        room_id (int | None): The room ID, if any.
+        room_number (str | None): The room number, if any.
+        subtotal_amount (float): Subtotal before tax/discount.
+        tax_amount (float): Tax applied.
+        discount_amount (float): Discount applied.
+        total_amount (float): Final total.
+        payment_method (str): Method of payment (cash, card, room_charge).
+        transaction_reference (str | None): External transaction ID.
+        notes (str | None): Optional notes.
+
+    Returns:
+        Bill: The created bill.
+    """
     bill = Bill(
         restaurant_id=restaurant_id,
         session_id=session_id,
@@ -91,11 +108,17 @@ def create_bill(
     return bill
 
 
-def mark_bill_paid(
-    db: Session,
-    bill: Bill,
-    settled_at: datetime | None = None,
 ) -> Bill:
+    """Marks a bill as paid.
+
+    Args:
+        db (Session): The database session.
+        bill (Bill): The bill instance to mark paid.
+        settled_at (datetime | None, optional): When it was settled. Defaults to now.
+
+    Returns:
+        Bill: The updated bill.
+    """
     bill.payment_status = BillStatus.paid
     bill.settled_at = settled_at or datetime.now(UTC)
     db.flush()

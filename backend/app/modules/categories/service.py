@@ -25,6 +25,9 @@ def list_categories(
     restaurant_id: int,
     skip: int = 0,
     limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
     menu_id: int | None = None,
 ) -> tuple[list[CategoryResponse], int]:
     """List categories for restaurant with pagination.
@@ -44,6 +47,9 @@ def list_categories(
         restaurant_id,
         skip=skip,
         limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
         menu_id=menu_id,
     )
     return [CategoryResponse.model_validate(c) for c in categories], total

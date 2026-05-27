@@ -82,6 +82,10 @@ export default function MenuItems() {
   const [filterCategoryId, setFilterCategoryId] = useState<number | "all">(
     initialCategoryId ? parseInt(initialCategoryId) : "all"
   );
+  const [page, setPage] = useState(1);
+  const limit = 20;
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -105,12 +109,24 @@ export default function MenuItems() {
     setLoading(true);
     setError(null);
     try {
+      let itemsUrl = `/items?page=${page}&limit=${limit}`;
+      if (filterCategoryId !== "all") {
+        itemsUrl += `&category_id=${filterCategoryId}`;
+      }
+
       const [itemsRes, catsRes, restaurantRes] = await Promise.all([
-        api.get<Item[] | PaginatedResponse<Item>>("/items?limit=500"),
+        api.get<PaginatedResponse<Item>>(itemsUrl),
         api.get<Category[] | PaginatedResponse<Category>>("/categories?limit=500"),
         api.get<RestaurantMeResponse>("/restaurants/me"),
       ]);
-      setItems(unwrapPaginated(itemsRes));
+      
+      const isPaginated = !Array.isArray(itemsRes) && "items" in itemsRes;
+      setItems(isPaginated ? itemsRes.items : (itemsRes as unknown as Item[]));
+      if (isPaginated) {
+        setTotalItems(itemsRes.total);
+        setTotalPages(itemsRes.total_pages);
+      }
+      
       setCategories(unwrapPaginated(catsRes));
       setRestaurantCurrency((restaurantRes.currency || "LKR").toUpperCase());
       setRestaurantInfo(restaurantRes);
@@ -119,16 +135,13 @@ export default function MenuItems() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, filterCategoryId]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const displayedItems =
-    filterCategoryId === "all"
-      ? items
-      : items.filter((item) => item.category_id === filterCategoryId);
+  const displayedItems = items;
 
   function categoryName(categoryId: number): string {
     return categories.find((c) => c.id === categoryId)?.name ?? "—";
@@ -411,6 +424,7 @@ export default function MenuItems() {
             onChange={(e) => {
               const value = e.target.value === "all" ? "all" : parseInt(e.target.value);
               setFilterCategoryId(value);
+              setPage(1); // Reset page on filter change
             }}
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm sm:w-auto"
           >
@@ -504,6 +518,31 @@ export default function MenuItems() {
               </div>
             </article>
           ))}
+        </div>
+      )}
+
+      {!loading && !error && totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4">
+          <p className="text-sm text-slate-600">
+            Showing page <span className="font-medium text-slate-900">{page}</span> of <span className="font-medium text-slate-900">{totalPages}</span>
+            {" "}({totalItems} total items)
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 

@@ -324,7 +324,7 @@ def _load_user_map(db: Session, user_ids: set[int | None]) -> dict[int, User]:
         return {}
     return {
         user.id: user
-        for user in db.query(User).filter(User.id.in_(normalized_ids)).all()
+        for user in repository.get_users_by_ids(db, normalized_ids)
     }
 
 
@@ -487,14 +487,7 @@ def _ensure_unique_blog_slug(
 def _set_published_featured_state(db: Session, active_post_id: int, is_featured: bool) -> None:
     if not is_featured:
         return
-    (
-        db.query(SiteBlogPost)
-        .filter(
-            SiteBlogPost.id != active_post_id,
-            SiteBlogPost.published_is_featured.is_(True),
-        )
-        .update({"published_is_featured": False}, synchronize_session=False)
-    )
+    repository.unset_other_featured_posts(db, active_post_id)
 
 
 def _get_valid_lead_assignee(db: Session, user_id: int | None) -> User | None:

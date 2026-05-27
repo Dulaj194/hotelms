@@ -20,8 +20,22 @@ def list_rooms_by_restaurant(
     search: str | None = None,
     sort_by: str | None = None,
     sort_order: str = "asc",
+    sort_order: str = "asc",
 ) -> tuple[list[Room], int]:
-    """Return rooms for a restaurant with pagination and filtering."""
+    """Retrieves a paginated list of rooms for a specific restaurant.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+        skip (int, optional): The number of records to skip. Defaults to 0.
+        limit (int, optional): The maximum number of records to return. Defaults to 50.
+        search (str | None, optional): An optional search term to filter rooms by number or name. Defaults to None.
+        sort_by (str | None, optional): The column to sort by. Defaults to None.
+        sort_order (str, optional): The sort order ("asc" or "desc"). Defaults to "asc".
+
+    Returns:
+        tuple[list[Room], int]: A tuple containing the list of rooms and the total count.
+    """
     query = db.query(Room).filter(Room.restaurant_id == restaurant_id)
     
     if search:
@@ -55,7 +69,16 @@ def list_rooms_by_restaurant(
 def get_room_by_id_and_restaurant(
     db: Session, room_id: int, restaurant_id: int
 ) -> Room | None:
-    """Fetch a room scoped to the restaurant. Returns None if not found or wrong tenant."""
+    """Fetches a specific room by its ID and restaurant ID.
+
+    Args:
+        db (Session): The database session.
+        room_id (int): The ID of the room.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        Room | None: The retrieved room, or None if not found.
+    """
     return (
         db.query(Room)
         .filter(Room.id == room_id, Room.restaurant_id == restaurant_id)
@@ -66,7 +89,16 @@ def get_room_by_id_and_restaurant(
 def get_room_by_number_and_restaurant(
     db: Session, room_number: str, restaurant_id: int
 ) -> Room | None:
-    """Fetch a room by room_number within a restaurant."""
+    """Fetches a specific room by its number and restaurant ID.
+
+    Args:
+        db (Session): The database session.
+        room_number (str): The room number.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        Room | None: The retrieved room, or None if not found.
+    """
     return (
         db.query(Room)
         .filter(Room.room_number == room_number, Room.restaurant_id == restaurant_id)
@@ -81,7 +113,18 @@ def create_room(
     room_name: str | None,
     floor_number: int | None,
 ) -> Room:
-    """Persist a new room record."""
+    """Creates a new room.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+        room_number (str): The room number.
+        room_name (str | None): The name of the room.
+        floor_number (int | None): The floor number.
+
+    Returns:
+        Room: The created room.
+    """
     room = Room(
         restaurant_id=restaurant_id,
         room_number=room_number,
@@ -101,7 +144,17 @@ def update_room_by_id(
     restaurant_id: int,
     data: dict,
 ) -> Room | None:
-    """Apply a dict of field updates to a room. Caller must ensure data is safe."""
+    """Updates an existing room's details.
+
+    Args:
+        db (Session): The database session.
+        room_id (int): The ID of the room.
+        restaurant_id (int): The ID of the restaurant.
+        data (dict): A dictionary of field updates.
+
+    Returns:
+        Room | None: The updated room, or None if not found.
+    """
     room = get_room_by_id_and_restaurant(db, room_id, restaurant_id)
     if not room:
         return None
@@ -115,7 +168,17 @@ def update_room_by_id(
 def set_room_active(
     db: Session, room_id: int, restaurant_id: int, is_active: bool
 ) -> Room | None:
-    """Toggle the is_active flag on a room."""
+    """Toggles the active status of a room.
+
+    Args:
+        db (Session): The database session.
+        room_id (int): The ID of the room.
+        restaurant_id (int): The ID of the restaurant.
+        is_active (bool): True to activate, False to disable.
+
+    Returns:
+        Room | None: The updated room, or None if not found.
+    """
     room = get_room_by_id_and_restaurant(db, room_id, restaurant_id)
     if not room:
         return None
@@ -128,7 +191,16 @@ def set_room_active(
 def delete_room_by_id(
     db: Session, room_id: int, restaurant_id: int
 ) -> bool:
-    """Delete a room. Returns True if deleted, False if not found."""
+    """Deletes a room permanently.
+
+    Args:
+        db (Session): The database session.
+        room_id (int): The ID of the room.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        bool: True if deleted, False if not found.
+    """
     room = get_room_by_id_and_restaurant(db, room_id, restaurant_id)
     if not room:
         return False

@@ -328,7 +328,7 @@ def submit_request(
     priority = _default_priority(payload.request_type)
     due_at = _default_due_at(requested_for_at=requested_for_at, priority=priority)
     checklist_template = CHECKLIST_TEMPLATES.get(payload.request_type, CHECKLIST_TEMPLATES["other"])
-    initial_status = "pending_assignment"
+    initial_status = RequestStatus.pending_assignment
 
     req = repository.create_housekeeping_request(
         db,
@@ -359,7 +359,7 @@ def submit_request(
 
     if payload.request_type == "maintenance":
         req = repository.get_request_by_id_and_restaurant(db, req.id, req.restaurant_id) or req
-        req.status = "blocked"
+        req.status = RequestStatus.blocked
         req.blocked_reason = "Guest maintenance issue reported"
         repository.save_request(db, req)
         repository.create_maintenance_ticket(
@@ -462,7 +462,7 @@ def cancel_my_request(
         )
 
     previous_status = req.status
-    req.status = "cancelled"
+    req.status = RequestStatus.cancelled
     req.cancelled_at = datetime.now(UTC)
     req = repository.save_request(db, req)
     _append_event(
@@ -581,11 +581,11 @@ def assign_request(
     req.assigned_to_user_id = payload.assigned_to_user_id
     req.assigned_by_user_id = actor_user.id
     req.assigned_at = datetime.now(UTC)
-    req.status = "assigned"
+    req.status = RequestStatus.assigned
     if payload.due_at is not None:
         req.due_at = payload.due_at
     if payload.priority is not None:
-        req.priority = payload.priority
+        req.priority = RequestPriority(payload.priority)
 
     req = repository.save_request(db, req)
     room_status, maintenance_required = _set_room_status(
@@ -632,7 +632,7 @@ def claim_request(
     previous_status = current_status
     req.assigned_to_user_id = actor_user.id
     req.assigned_at = req.assigned_at or datetime.now(UTC)
-    req.status = "assigned"
+    req.status = RequestStatus.assigned
     req = repository.save_request(db, req)
     room_status, maintenance_required = _set_room_status(
         db,
@@ -673,7 +673,7 @@ def start_request(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only assigned staff can start this task.")
 
     previous_status = current_status
-    req.status = "in_progress"
+    req.status = RequestStatus.in_progress
     req.started_at = datetime.now(UTC)
     req = repository.save_request(db, req)
     room_status, maintenance_required = _set_room_status(
@@ -776,7 +776,7 @@ def submit_for_inspection(
 
     previous_status = current_status
     now_utc = datetime.now(UTC)
-    req.status = "inspection"
+    req.status = RequestStatus.inspection
     req.inspection_submitted_at = now_utc
     req.remarks = payload.remarks
     req.delay_reason = payload.delay_reason
@@ -827,52 +827,31 @@ def inspect_request(
         )
 
     now_utc = datetime.now(UTC)
-    previous_status = current_status
-    req.inspected_at = now_utc
-    req.inspected_by_user_id = actor_user.id
-    req.inspection_notes = payload.notes
-
-    if payload.decision == "pass":
-        req.status = "ready"
-        req.done_at = now_utc
-        req = repository.save_request(db, req)
-        room_status, maintenance_required = _set_room_status(
-            db,
-            restaurant_id=restaurant_id,
-            room_id=req.room_id,
-            housekeeping_status=RoomHousekeepingStatus.ready.value,
-        )
-        _append_event(
-            db,
-            req=req,
-            actor_user_id=actor_user.id,
-            event_type="inspection_passed",
-            from_status=previous_status,
-            to_status="ready",
-            note=payload.notes,
-        )
-        return _to_status_response(req, room_housekeeping_status=room_status, maintenance_required=maintenance_required)
-
-    req.status = "rework_required"
-    req.rework_count += 1
-    if payload.reassign_to_user_id is not None:
-        req.assigned_to_user_id = payload.reassign_to_user_id
-        req.assigned_by_user_id = actor_user.id
-        req.assigned_at = now_utc
+    if payload.is_approved:
+        req.status = RequestStatus.ready
+        req.inspected_at = now_utc
+        req.inspected_by_user_id = actor_user.id
+        req.inspection_notes = payload.notes
+        if req.done_at is None:
+            req.done_at = now_utc
+    else:
+        req.status = RequestStatus.rework_required
+        req.inspection_notes = payload.notes
+        req.rework_count += 1
     req = repository.save_request(db, req)
     room_status, maintenance_required = _set_room_status(
         db,
         restaurant_id=restaurant_id,
         room_id=req.room_id,
-        housekeeping_status=RoomHousekeepingStatus.assigned.value,
+        housekeeping_status=RoomHousekeepingStatus.ready.value if payload.is_approved else RoomHousekeepingStatus.assigned.value,
     )
     _append_event(
         db,
         req=req,
         actor_user_id=actor_user.id,
-        event_type="inspection_failed",
-        from_status=previous_status,
-        to_status="rework_required",
+        event_type="inspection_passed" if payload.is_approved else "inspection_failed",
+        from_status=current_status,
+        to_status=req.status,
         note=payload.notes,
     )
     return _to_status_response(req, room_housekeeping_status=room_status, maintenance_required=maintenance_required)
@@ -895,8 +874,8 @@ def block_request_for_issue(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot block closed tasks.")
 
     previous_status = current_status
-    req.status = "blocked"
-    req.blocked_reason = payload.description
+    req.status = RequestStatus.blocked
+    req.blocked_reason = payload.reason
     req = repository.save_request(db, req)
     repository.create_maintenance_ticket(
         db,
@@ -961,9 +940,9 @@ def resolve_maintenance_ticket(
 
     previous_status = _normalize_status(req.status)
     if previous_status == "blocked":
-        req.status = "assigned" if req.assigned_to_user_id else "pending_assignment"
-        req.blocked_reason = None
-        req = repository.save_request(db, req)
+        req.status = RequestStatus.assigned if req.assigned_to_user_id else RequestStatus.pending_assignment
+    req.blocked_reason = None
+    req = repository.save_request(db, req)
 
     room_has_open_ticket = repository.has_open_maintenance_ticket_for_room(
         db,
@@ -1122,7 +1101,7 @@ def get_daily_summary(
                 durations.append(max(delta.total_seconds() / 60, 0))
         if normalized_status == "blocked":
             blocked_tasks += 1
-        rework_count += int(row.rework_count or 0)
+        rework_count += row.rework_count or 0
 
     avg_cleaning_minutes = round(sum(durations) / len(durations), 2) if durations else 0.0
     pending_tasks = len(pending_rows)

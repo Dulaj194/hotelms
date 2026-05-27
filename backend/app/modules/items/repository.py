@@ -15,6 +15,9 @@ def list_by_restaurant(
     restaurant_id: int,
     skip: int = 0,
     limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
     category_id: int | None = None,
 ) -> tuple[list[Item], int]:
     """List items for restaurant with pagination.
@@ -25,8 +28,23 @@ def list_by_restaurant(
     query = db.query(Item).filter(Item.restaurant_id == restaurant_id)
     if category_id is not None:
         query = query.filter(Item.category_id == category_id)
+    if search:
+        query = query.filter(Item.name.ilike(f"%{search}%"))
+
+    if sort_by == "name":
+        order_col = Item.name
+    elif sort_by == "price":
+        order_col = Item.price
+    else:
+        order_col = Item.name
+
+    if sort_order == "desc":
+        query = query.order_by(order_col.desc())
+    else:
+        query = query.order_by(order_col.asc())
+
     total = query.count()
-    items = query.order_by(Item.name.asc()).offset(skip).limit(limit).all()
+    items = query.offset(skip).limit(limit).all()
     return items, total
 
 

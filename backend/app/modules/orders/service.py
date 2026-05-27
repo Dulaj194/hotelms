@@ -36,6 +36,7 @@ from app.modules.orders.schemas import (
     OrderItemResponse,
     OrderStatusResponse,
     PlaceOrderRequest,
+    PlaceOrderItemRequest,
     PlaceOrderResponse,
 )
 from app.modules.table_sessions import repository as ts_repo
@@ -262,7 +263,7 @@ def _build_line_items_from_payload(
                 detail=f"Item '{item.name}' is currently unavailable.",
             )
 
-        unit_price = float(item.price)
+        unit_price = item.price
         line_total = unit_price * quantity
         subtotal += line_total
 
@@ -395,7 +396,7 @@ def _create_and_persist_order(
                 detail=validation.message,
             )
         applied_promo_code = validation.code
-        discount_amount = round(subtotal * float(validation.discount_percent) / 100, 2)
+        discount_amount = round(subtotal * validation.discount_percent / 100, 2)
 
     total_amount = subtotal + tax_amount - discount_amount
 
@@ -447,6 +448,8 @@ def _create_and_persist_order(
     placed = order_repo.get_order_by_id_and_session(
         db, order.id, session.session_id, session.restaurant_id
     )
+    if not placed:
+        raise RuntimeError("Failed to retrieve placed order.")
 
     try:
         if r is not None:
@@ -544,6 +547,8 @@ def place_staff_order(
     placed = order_repo.get_order_by_id_and_session(
         db, order.id, session.session_id, restaurant_id
     )
+    if not placed:
+        raise RuntimeError("Failed to retrieve placed order.")
 
     try:
         if r is not None:
@@ -565,10 +570,8 @@ def place_staff_order(
         pass
 
     return PlaceOrderResponse(
-        order_id=placed.id,
-        order_number=placed.order_number,
-        status=placed.status,
-        total_amount=float(placed.total_amount),
+        order=_build_order_detail(placed),
+        message="Order placed successfully by staff."
     )
 
 

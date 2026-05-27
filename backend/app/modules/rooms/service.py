@@ -21,7 +21,15 @@ from app.modules.rooms.schemas import (
 )
 
 
-def _to_response(room) -> RoomResponse:
+def _to_response(room: repository.Room) -> RoomResponse:
+    """Converts a Room SQLAlchemy model to a Pydantic RoomResponse model.
+
+    Args:
+        room: The Room SQLAlchemy model instance.
+
+    Returns:
+        RoomResponse: The Pydantic model representing the room.
+    """
     return RoomResponse.model_validate(room)
 
 
@@ -33,7 +41,22 @@ def list_rooms(
     search: str | None = None,
     sort_by: str | None = None,
     sort_order: str = "asc",
+    sort_order: str = "asc",
 ) -> tuple[list[RoomResponse], int]:
+    """Retrieves a paginated list of rooms for a specific restaurant.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+        skip (int, optional): The number of records to skip. Defaults to 0.
+        limit (int, optional): The maximum number of records to return. Defaults to 50.
+        search (str | None, optional): An optional search term to filter rooms by number or name. Defaults to None.
+        sort_by (str | None, optional): The column to sort by. Defaults to None.
+        sort_order (str, optional): The sort order ("asc" or "desc"). Defaults to "asc".
+
+    Returns:
+        tuple[list[RoomResponse], int]: A tuple containing the list of rooms and the total count.
+    """
     rooms, total = repository.list_rooms_by_restaurant(
         db, 
         restaurant_id, 
@@ -47,6 +70,19 @@ def list_rooms(
 
 
 def get_room(db: Session, room_id: int, restaurant_id: int) -> RoomResponse:
+    """Retrieves a specific room by its ID and restaurant ID.
+
+    Args:
+        db (Session): The database session.
+        room_id (int): The ID of the room.
+        restaurant_id (int): The ID of the restaurant.
+
+    Raises:
+        HTTPException: If the room is not found (404).
+
+    Returns:
+        RoomResponse: The retrieved room.
+    """
     room = repository.get_room_by_id_and_restaurant(db, room_id, restaurant_id)
     if room is None:
         raise HTTPException(
@@ -58,6 +94,19 @@ def get_room(db: Session, room_id: int, restaurant_id: int) -> RoomResponse:
 def create_room(
     db: Session, restaurant_id: int, data: RoomCreateRequest
 ) -> RoomResponse:
+    """Creates a new room for a specific restaurant.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+        data (RoomCreateRequest): The data for the new room.
+
+    Raises:
+        HTTPException: If a room with the same number already exists (409).
+
+    Returns:
+        RoomResponse: The created room.
+    """
     # Check for duplicate before attempting the insert
     existing = repository.get_room_by_number_and_restaurant(
         db, data.room_number, restaurant_id
@@ -87,6 +136,20 @@ def create_room(
 def update_room(
     db: Session, room_id: int, restaurant_id: int, data: RoomUpdateRequest
 ) -> RoomResponse:
+    """Updates an existing room's details.
+
+    Args:
+        db (Session): The database session.
+        room_id (int): The ID of the room to update.
+        restaurant_id (int): The ID of the restaurant.
+        data (RoomUpdateRequest): The new data for the room.
+
+    Raises:
+        HTTPException: If the room is not found (404) or if the new room number is already taken (409).
+
+    Returns:
+        RoomResponse: The updated room.
+    """
     room = repository.get_room_by_id_and_restaurant(db, room_id, restaurant_id)
     if room is None:
         raise HTTPException(
@@ -121,6 +184,19 @@ def update_room(
 
 
 def disable_room(db: Session, room_id: int, restaurant_id: int) -> RoomStatusResponse:
+    """Disables a room, marking it as inactive.
+
+    Args:
+        db (Session): The database session.
+        room_id (int): The ID of the room.
+        restaurant_id (int): The ID of the restaurant.
+
+    Raises:
+        HTTPException: If the room is not found (404).
+
+    Returns:
+        RoomStatusResponse: The updated status of the room.
+    """
     room = repository.set_room_active(db, room_id, restaurant_id, is_active=False)
     if room is None:
         raise HTTPException(
@@ -130,6 +206,19 @@ def disable_room(db: Session, room_id: int, restaurant_id: int) -> RoomStatusRes
 
 
 def enable_room(db: Session, room_id: int, restaurant_id: int) -> RoomStatusResponse:
+    """Enables a room, marking it as active.
+
+    Args:
+        db (Session): The database session.
+        room_id (int): The ID of the room.
+        restaurant_id (int): The ID of the restaurant.
+
+    Raises:
+        HTTPException: If the room is not found (404).
+
+    Returns:
+        RoomStatusResponse: The updated status of the room.
+    """
     room = repository.set_room_active(db, room_id, restaurant_id, is_active=True)
     if room is None:
         raise HTTPException(
@@ -139,6 +228,16 @@ def enable_room(db: Session, room_id: int, restaurant_id: int) -> RoomStatusResp
 
 
 def delete_room(db: Session, room_id: int, restaurant_id: int) -> None:
+    """Deletes a room permanently.
+
+    Args:
+        db (Session): The database session.
+        room_id (int): The ID of the room.
+        restaurant_id (int): The ID of the restaurant.
+
+    Raises:
+        HTTPException: If the room is not found (404).
+    """
     deleted = repository.delete_room_by_id(db, room_id, restaurant_id)
     if not deleted:
         raise HTTPException(

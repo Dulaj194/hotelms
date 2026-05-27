@@ -38,6 +38,28 @@ def create_order_header(
     customer_name: str | None,
     customer_phone: str | None,
 ) -> OrderHeader:
+    """Creates a new order header.
+
+    Args:
+        db (Session): The database session.
+        session_id (str): The ID of the session placing the order.
+        restaurant_id (int): The ID of the restaurant.
+        table_number (str | None): The table number, if applicable.
+        order_source (OrderSource | str, optional): The origin of the order. Defaults to OrderSource.table.
+        room_id (int | None, optional): The room ID, if applicable. Defaults to None.
+        room_number (str | None, optional): The room number, if applicable. Defaults to None.
+        initial_status (OrderStatus, optional): The starting status of the order. Defaults to OrderStatus.pending.
+        subtotal_amount (float): The subtotal before tax and discounts.
+        tax_amount (float): The applied tax.
+        discount_amount (float): The applied discount.
+        total_amount (float): The final total amount.
+        notes (str | None): Any special notes.
+        customer_name (str | None): The customer's name.
+        customer_phone (str | None): The customer's phone.
+
+    Returns:
+        OrderHeader: The created order header record.
+    """
     now = datetime.now(UTC)
     source_value = (
         order_source
@@ -86,10 +108,25 @@ def create_order_items(
     restaurant_id: int,
     items: list[dict],
 ) -> list[OrderItem]:
-    """Insert all order line items.
+    """Inserts all order line items for an order.
 
     Each dict in `items` must have:
-      item_id, item_name_snapshot, item_image_snapshot, unit_price_snapshot, quantity, line_total
+      - item_id (int)
+      - item_name_snapshot (str)
+      - item_image_snapshot (str | None)
+      - unit_price_snapshot (float)
+      - quantity (int)
+      - line_total (float)
+      - note (str | None)
+
+    Args:
+        db (Session): The database session.
+        order_id (int): The ID of the associated order.
+        restaurant_id (int): The ID of the restaurant.
+        items (list[dict]): A list of dictionaries containing item details.
+
+    Returns:
+        list[OrderItem]: A list of the created order items.
     """
     order_items = []
     for item_data in items:
@@ -116,7 +153,16 @@ def create_order_items(
 def get_order_by_id_and_restaurant(
     db: Session, order_id: int, restaurant_id: int
 ) -> OrderHeader | None:
-    """Load a full order (with items + payments) scoped to the restaurant."""
+    """Loads a full order (with items + payments) scoped to the restaurant.
+
+    Args:
+        db (Session): The database session.
+        order_id (int): The order ID.
+        restaurant_id (int): The restaurant ID.
+
+    Returns:
+        OrderHeader | None: The loaded order header, or None if not found.
+    """
     return (
         db.query(OrderHeader)
         .options(joinedload(OrderHeader.items), joinedload(OrderHeader.payments))
@@ -128,7 +174,17 @@ def get_order_by_id_and_restaurant(
 def get_order_by_id_and_session(
     db: Session, order_id: int, session_id: str, restaurant_id: int
 ) -> OrderHeader | None:
-    """Load order scoped to both session and restaurant (for guest access)."""
+    """Loads an order scoped to both session and restaurant (for guest access).
+
+    Args:
+        db (Session): The database session.
+        order_id (int): The order ID.
+        session_id (str): The session ID that placed the order.
+        restaurant_id (int): The restaurant ID.
+
+    Returns:
+        OrderHeader | None: The loaded order header, or None if not found.
+    """
     return (
         db.query(OrderHeader)
         .options(joinedload(OrderHeader.items), joinedload(OrderHeader.payments))
@@ -144,7 +200,17 @@ def get_order_by_id_and_session(
 def get_order_by_number_and_session(
     db: Session, order_number: str, session_id: str, restaurant_id: int
 ) -> OrderHeader | None:
-    """Load order by order_number scoped to the session (for guest polling)."""
+    """Loads an order by its order_number scoped to the session (for guest polling).
+
+    Args:
+        db (Session): The database session.
+        order_number (str): The human-readable order number.
+        session_id (str): The session ID that placed the order.
+        restaurant_id (int): The restaurant ID.
+
+    Returns:
+        OrderHeader | None: The loaded order header, or None if not found.
+    """
     return (
         db.query(OrderHeader)
         .options(joinedload(OrderHeader.items), joinedload(OrderHeader.payments))
@@ -160,6 +226,15 @@ def get_order_by_number_and_session(
 def list_pending_orders_by_restaurant(
     db: Session, restaurant_id: int
 ) -> list[OrderHeader]:
+    """Retrieves all pending orders for a given restaurant.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        list[OrderHeader]: A list of pending order headers.
+    """
     return (
         db.query(OrderHeader)
         .options(joinedload(OrderHeader.items))
@@ -183,7 +258,20 @@ def list_active_orders_by_restaurant(
     sort_by: str | None = None,
     sort_order: str = "asc",
 ) -> tuple[list[OrderHeader], int]:
-    """Return all non-finalized orders (pending / confirmed / processing)."""
+    """Returns all non-finalized orders (pending / confirmed / processing).
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The restaurant ID.
+        skip (int, optional): Pagination offset. Defaults to 0.
+        limit (int, optional): Pagination limit. Defaults to 50.
+        search (str | None, optional): Optional search filter. Defaults to None.
+        sort_by (str | None, optional): Column to sort by. Defaults to None.
+        sort_order (str, optional): Sorting order ("asc" or "desc"). Defaults to "asc".
+
+    Returns:
+        tuple[list[OrderHeader], int]: A tuple containing the list of orders and the total count.
+    """
     active_statuses = {OrderStatus.pending, OrderStatus.confirmed, OrderStatus.processing}
     query = (
         db.query(OrderHeader)
@@ -234,7 +322,21 @@ def list_history_orders_by_restaurant(
     sort_by: str | None = None,
     sort_order: str = "desc",
 ) -> tuple[list[OrderHeader], int]:
-    """Return completed, paid, and rejected orders for a restaurant."""
+    """Returns completed, paid, and rejected orders for a restaurant.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The restaurant ID.
+        status (OrderStatus | None, optional): A specific status to filter by. Defaults to None.
+        skip (int, optional): Pagination offset. Defaults to 0.
+        limit (int, optional): Pagination limit. Defaults to 50.
+        search (str | None, optional): Optional search filter. Defaults to None.
+        sort_by (str | None, optional): Column to sort by. Defaults to None.
+        sort_order (str, optional): Sorting order ("asc" or "desc"). Defaults to "desc".
+
+    Returns:
+        tuple[list[OrderHeader], int]: A tuple containing the list of orders and the total count.
+    """
     history_statuses = {OrderStatus.completed, OrderStatus.served, OrderStatus.paid, OrderStatus.rejected}
     try:
         query = (

@@ -35,6 +35,9 @@ def list_items(
     restaurant_id: int,
     skip: int = 0,
     limit: int = 50,
+    search: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
     category_id: int | None = None,
 ) -> tuple[list[ItemResponse], int]:
     """List items for restaurant with pagination.
@@ -54,6 +57,9 @@ def list_items(
         restaurant_id,
         skip=skip,
         limit=limit,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
         category_id=category_id,
     )
     return [ItemResponse.model_validate(i) for i in items], total

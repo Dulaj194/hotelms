@@ -50,6 +50,8 @@ export default function MenuCategories() {
     initialMenuId ? parseInt(initialMenuId, 10) : "all"
   );
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -69,51 +71,39 @@ export default function MenuCategories() {
     setLoading(true);
     setError(null);
     try {
+      let url = `/categories?page=${currentPage}&limit=${CARDS_PER_PAGE}`;
+      if (filterMenuId !== "all") {
+        url += `&menu_id=${filterMenuId}`;
+      }
+
       const [catsRes, menusRes] = await Promise.all([
-        api.get<Category[] | PaginatedResponse<Category>>("/categories?limit=500"),
+        api.get<PaginatedResponse<Category>>(url),
         api.get<Menu[]>("/menus"),
       ]);
-      setCategories(unwrapPaginated(catsRes));
+      
+      const isPaginated = !Array.isArray(catsRes) && "items" in catsRes;
+      setCategories(isPaginated ? catsRes.items : (catsRes as unknown as Category[]));
+      if (isPaginated) {
+        setTotalItems(catsRes.total);
+        setTotalPages(catsRes.total_pages);
+      }
       setMenus(menusRes);
     } catch {
       setError("Failed to load categories.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentPage, filterMenuId]);
 
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
 
-  const visibleCategories =
-    filterMenuId === "all"
-      ? categories
-      : categories.filter((category) => category.menu_id === filterMenuId);
 
-  const sortedVisibleCategories = [...visibleCategories].sort((a, b) => {
-    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
-    return a.id - b.id;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(sortedVisibleCategories.length / CARDS_PER_PAGE));
-  const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * CARDS_PER_PAGE;
-  const endIndex = startIndex + CARDS_PER_PAGE;
-  const paginatedCategories = sortedVisibleCategories.slice(startIndex, endIndex);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterMenuId]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   function handleFilterMenuChange(value: number | "all") {
     setFilterMenuId(value);
+    setCurrentPage(1);
 
     if (value === "all") {
       searchParams.delete("menuId");
@@ -287,7 +277,7 @@ export default function MenuCategories() {
 
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
           <span className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-            Total: {sortedVisibleCategories.length}
+            Total: {totalItems}
           </span>
           <TenantContextBadge tenantContext={tenantContext} />
           <select
@@ -329,16 +319,16 @@ export default function MenuCategories() {
       {error && <p className="text-sm text-red-500">{error}</p>}
       {tenantContextError && <p className="text-sm text-amber-600">{tenantContextError}</p>}
 
-      {!loading && !error && visibleCategories.length === 0 && (
+      {!loading && !error && categories.length === 0 && (
         <TenantScopeEmptyState
           tenantContext={tenantContext}
           message="No categories found for the current menu filter."
         />
       )}
 
-      {!loading && visibleCategories.length > 0 && (
+      {!loading && categories.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {paginatedCategories.map((category) => (
+          {categories.map((category) => (
             <article
               key={category.id}
               role="button"
@@ -428,28 +418,27 @@ export default function MenuCategories() {
         </div>
       )}
 
-      {!loading && sortedVisibleCategories.length > CARDS_PER_PAGE && (
+      {!loading && totalPages > 1 && (
         <div className="mt-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <p className="text-sm text-slate-600">
-            Showing {startIndex + 1}-{Math.min(endIndex, sortedVisibleCategories.length)} of{" "}
-            {sortedVisibleCategories.length} categories
+            Showing page {currentPage} of {totalPages} ({totalItems} total categories)
           </p>
           <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:flex">
             <button
               type="button"
               onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={safePage === 1}
+              disabled={currentPage === 1}
               className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Previous
             </button>
             <span className="text-sm font-medium text-slate-700">
-              Page {safePage} of {totalPages}
+              Page {currentPage} of {totalPages}
             </span>
             <button
               type="button"
               onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={safePage === totalPages}
+              disabled={currentPage === totalPages}
               className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Next

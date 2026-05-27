@@ -27,7 +27,7 @@ def start_table_session(
     db: Session,
     data: TableSessionStartRequest,
 ) -> TableSessionStartResponse:
-    """Create a signed guest table session.
+    """Creates a signed guest table session.
 
     Flow:
     1. Validate the restaurant exists and is active.
@@ -38,6 +38,16 @@ def start_table_session(
 
     SECURITY: The returned guest_token is the authorization credential.
     table_number and restaurant_id alone are never sufficient for cart operations.
+
+    Args:
+        db (Session): The database session.
+        data (TableSessionStartRequest): The request payload containing table and customer info.
+
+    Raises:
+        HTTPException: If validation fails or the restaurant/QR is invalid.
+
+    Returns:
+        TableSessionStartResponse: The response containing the new session ID and guest token.
     """
     table_number = data.table_number.strip()
     if not table_number:
@@ -139,7 +149,17 @@ def request_bill(
     session: TableSession,
     order_source: str | None = None,
 ) -> TableSession:
-    """Mark the table session as requesting the bill and alert staff."""
+    """Marks the table session as requesting the bill and alerts staff.
+
+    Args:
+        db (Session): The database session.
+        r (redis_lib.Redis): The Redis client instance.
+        session (TableSession): The table session model.
+        order_source (str | None, optional): The source of the request. Defaults to None.
+
+    Returns:
+        TableSession: The updated session.
+    """
     source = order_source or getattr(session, "order_source", "table")
     try:
         session.session_status = TableSessionStatus.BILL_REQUESTED
@@ -167,7 +187,15 @@ def list_bill_requests(
     db: Session,
     restaurant_id: int,
 ) -> list[TableSession]:
-    """Return all active sessions with status BILL_REQUESTED."""
+    """Returns all active sessions with status BILL_REQUESTED.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        list[TableSession]: A list of sessions that requested a bill.
+    """
     return repository.list_bill_requests_for_restaurant(db, restaurant_id)
 
 
@@ -179,7 +207,16 @@ def request_service(
     message: str | None = None,
     order_source: str | None = None,
 ) -> None:
-    """Publish a real-time service request from a guest table or room."""
+    """Publishes a real-time service request from a guest table or room.
+
+    Args:
+        db (Session): The database session.
+        r (redis_lib.Redis): The Redis client instance.
+        session (TableSession | object): The session requesting service.
+        service_type (str): The type of service requested.
+        message (str | None, optional): An optional message. Defaults to None.
+        order_source (str | None, optional): The source. Defaults to None.
+    """
     source = order_source or getattr(session, "order_source", "table")
     # For room sessions, we use room_number_snapshot as table_number
     table_num = getattr(session, "table_number", None) or getattr(session, "room_number_snapshot", "Unknown")
@@ -221,7 +258,15 @@ def list_service_requests(
     db: Session,
     restaurant_id: int,
 ) -> list[TableServiceRequest]:
-    """Return all active service requests for the restaurant."""
+    """Returns all active service requests for the restaurant.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        list[TableServiceRequest]: A list of service requests.
+    """
     return repository.list_active_service_requests(db, restaurant_id)
 
 
@@ -231,7 +276,17 @@ def resolve_service_request(
     request_id: int,
     restaurant_id: int,
 ) -> bool:
-    """Complete a service request."""
+    """Completes a service request.
+
+    Args:
+        db (Session): The database session.
+        r (redis_lib.Redis): The Redis client instance.
+        request_id (int): The ID of the request to complete.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     try:
         success = repository.complete_service_request(db, request_id, restaurant_id)
         if success:
@@ -254,7 +309,18 @@ def acknowledge_service_request(
     restaurant_id: int,
     user_id: int,
 ) -> bool:
-    """Mark a service request as acknowledged by a staff member and broadcast."""
+    """Marks a service request as acknowledged by a staff member and broadcasts.
+
+    Args:
+        db (Session): The database session.
+        r (redis_lib.Redis): The Redis client instance.
+        request_id (int): The ID of the request.
+        restaurant_id (int): The ID of the restaurant.
+        user_id (int): The staff user's ID.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     try:
         success = repository.acknowledge_service_request(db, request_id, restaurant_id, user_id)
         if success:
@@ -279,7 +345,18 @@ def acknowledge_bill(
     restaurant_id: int,
     user_id: int,
 ) -> bool:
-    """Mark a bill request as acknowledged and broadcast."""
+    """Marks a bill request as acknowledged and broadcasts.
+
+    Args:
+        db (Session): The database session.
+        r (redis_lib.Redis): The Redis client instance.
+        session_id (str): The session ID.
+        restaurant_id (int): The ID of the restaurant.
+        user_id (int): The staff user's ID.
+
+    Returns:
+        bool: True if acknowledged, False if not found.
+    """
     try:
         session = repository.get_session_by_id_and_restaurant(db, session_id, restaurant_id)
         if session and session.session_status == TableSessionStatus.BILL_REQUESTED:
@@ -307,7 +384,17 @@ def present_bill(
     session_id: str,
     restaurant_id: int,
 ) -> bool:
-    """Mark a bill as presented to the customer and notify them."""
+    """Marks a bill as presented to the customer and notifies them.
+
+    Args:
+        db (Session): The database session.
+        r (redis_lib.Redis): The Redis client instance.
+        session_id (str): The session ID.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
     try:
         session = repository.get_session_by_id_and_restaurant(db, session_id, restaurant_id)
         if not session:
@@ -342,7 +429,13 @@ def confirm_bill(
     r: redis_lib.Redis,
     session: TableSession,
 ) -> None:
-    """Mark a bill as confirmed by the guest and notify staff."""
+    """Marks a bill as confirmed by the guest and notifies staff.
+
+    Args:
+        db (Session): The database session.
+        r (redis_lib.Redis): The Redis client instance.
+        session (TableSession): The session object.
+    """
     try:
         session.session_status = TableSessionStatus.BILL_CONFIRMED
         session.updated_at = datetime.now(UTC)
@@ -367,7 +460,18 @@ def change_table(
     restaurant_id: int,
     new_table_number: str,
 ) -> bool:
-    """Move an active session and all its associated orders to a new table."""
+    """Moves an active session and all its associated orders to a new table.
+
+    Args:
+        db (Session): The database session.
+        r (redis_lib.Redis): The Redis client instance.
+        session_id (str): The session ID.
+        restaurant_id (int): The ID of the restaurant.
+        new_table_number (str): The new table number.
+
+    Returns:
+        bool: True if successfully moved, False otherwise.
+    """
     try:
         session = repository.get_session_by_id_and_restaurant(db, session_id, restaurant_id)
         if not session:
@@ -377,19 +481,7 @@ def change_table(
         session.table_number = new_table_number
         session.updated_at = datetime.now(UTC)
         
-        # Update all orders in this session so kitchen/steward knows where to go
-        from app.modules.orders.model import OrderHeader
-        db.query(OrderHeader).filter(
-            OrderHeader.session_id == session_id,
-            OrderHeader.restaurant_id == restaurant_id
-        ).update({"table_number": new_table_number}, synchronize_session=False)
-        
-        # Update any active service requests
-        from app.modules.table_sessions.model import TableServiceRequest
-        db.query(TableServiceRequest).filter(
-            TableServiceRequest.session_id == session_id,
-            TableServiceRequest.restaurant_id == restaurant_id
-        ).update({"table_number": new_table_number}, synchronize_session=False)
+        repository.update_table_number_for_session(db, session_id, restaurant_id, new_table_number)
         
         db.commit()
         

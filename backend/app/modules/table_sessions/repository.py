@@ -18,7 +18,20 @@ def create_session(
     expires_at: datetime,
     order_source: str = "table",
 ) -> TableSession:
-    """Persist a new table session record."""
+    """Persists a new table session record.
+
+    Args:
+        db (Session): The database session.
+        session_id (str): The unique session ID.
+        restaurant_id (int): The ID of the restaurant.
+        table_number (str): The table number.
+        customer_name (str): The name of the customer.
+        expires_at (datetime): The expiry time for the session.
+        order_source (str, optional): The source of the order. Defaults to "table".
+
+    Returns:
+        TableSession: The newly created session.
+    """
     session = TableSession(
         session_id=session_id,
         restaurant_id=restaurant_id,
@@ -40,10 +53,17 @@ def deactivate_active_sessions_for_table(
     restaurant_id: int,
     table_number: str,
 ) -> int:
-    """Deactivate currently active, non-expired sessions for a table.
+    """Deactivates currently active, non-expired sessions for a table.
 
-    Returns number of sessions deactivated.
-    Uses db.flush() — caller manages commit/rollback.
+    Uses `db.flush()` — caller manages commit/rollback.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+        table_number (str): The table number.
+
+    Returns:
+        int: The number of sessions deactivated.
     """
     now = datetime.now(UTC)
     sessions = (
@@ -70,7 +90,15 @@ def deactivate_active_sessions_for_table(
 def get_active_session_by_session_id(
     db: Session, session_id: str
 ) -> TableSession | None:
-    """Fetch an active, non-expired session by its session_id."""
+    """Fetches an active, non-expired session by its session_id.
+
+    Args:
+        db (Session): The database session.
+        session_id (str): The session ID.
+
+    Returns:
+        TableSession | None: The active session, or None if not found or expired.
+    """
     now = datetime.now(UTC)
     return (
         db.query(TableSession)
@@ -87,7 +115,12 @@ def get_active_session_by_session_id(
 
 
 def touch_session_activity(db: Session, session_id: str) -> None:
-    """Update last_activity_at for a session."""
+    """Updates `last_activity_at` for a session.
+
+    Args:
+        db (Session): The database session.
+        session_id (str): The session ID to touch.
+    """
     session = (
         db.query(TableSession)
         .filter(TableSession.session_id == session_id)
@@ -99,7 +132,12 @@ def touch_session_activity(db: Session, session_id: str) -> None:
 
 
 def deactivate_session(db: Session, session_id: str) -> None:
-    """Mark a session as inactive (logged out / expired)."""
+    """Marks a session as inactive (logged out / expired).
+
+    Args:
+        db (Session): The database session.
+        session_id (str): The session ID to deactivate.
+    """
     session = (
         db.query(TableSession)
         .filter(TableSession.session_id == session_id)
@@ -116,11 +154,19 @@ def get_session_by_id_and_restaurant(
     session_id: str,
     restaurant_id: int,
 ) -> TableSession | None:
-    """Fetch a session by its session_id scoped to a restaurant.
+    """Fetches a session by its session_id scoped to a restaurant.
 
-    Unlike get_active_session_by_session_id, this does NOT filter by
-    is_active or expiry — used by billing staff who need to access any
+    Unlike `get_active_session_by_session_id`, this does NOT filter by
+    `is_active` or expiry — used by billing staff who need to access any
     session state (active, expired, or already closed).
+
+    Args:
+        db (Session): The database session.
+        session_id (str): The session ID.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        TableSession | None: The session, or None if not found.
     """
     return (
         db.query(TableSession)
@@ -137,10 +183,18 @@ def get_latest_session_by_table_number(
     restaurant_id: int,
     table_number: str,
 ) -> TableSession | None:
-    """Return the most recent session for a table in a restaurant.
+    """Returns the most recent session for a table in a restaurant.
 
     Useful for staff billing flows where operators may enter table number
     instead of a full session_id.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+        table_number (str): The table number.
+
+    Returns:
+        TableSession | None: The most recent session, or None if no sessions exist.
     """
     return (
         db.query(TableSession)
@@ -159,10 +213,19 @@ def list_sessions_by_id_prefix(
     session_id_prefix: str,
     limit: int = 5,
 ) -> list[TableSession]:
-    """Return recent sessions where session_id starts with a prefix.
+    """Returns recent sessions where session_id starts with a prefix.
 
     Used by staff billing lookup to support short session id input.
     Caller is responsible for handling ambiguous prefix matches.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+        session_id_prefix (str): The prefix to match.
+        limit (int, optional): The max number of sessions to return. Defaults to 5.
+
+    Returns:
+        list[TableSession]: A list of matching table sessions.
     """
     prefix = (session_id_prefix or "").strip()
     if not prefix:
@@ -185,10 +248,18 @@ def close_session_by_id(
     session_id: str,
     restaurant_id: int,
 ) -> TableSession | None:
-    """Set is_active=False for a session.
+    """Sets is_active=False for a session.
 
     Called as part of the billing settlement transaction.
-    Uses db.flush() — the caller MUST commit.
+    Uses `db.flush()` — the caller MUST commit.
+
+    Args:
+        db (Session): The database session.
+        session_id (str): The session ID.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        TableSession | None: The closed session, or None if not found.
     """
     session = get_session_by_id_and_restaurant(db, session_id, restaurant_id)
     if session:
@@ -200,7 +271,15 @@ def list_bill_requests_for_restaurant(
     db: Session,
     restaurant_id: int,
 ) -> list[TableSession]:
-    """Return all active sessions that have requested a bill."""
+    """Returns all active sessions that have requested a bill.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        list[TableSession]: A list of sessions that requested a bill.
+    """
     now = datetime.now(UTC)
     return (
         db.query(TableSession)
@@ -225,7 +304,21 @@ def create_service_request(
     message: str | None = None,
     order_source: str = "table",
 ) -> TableServiceRequest:
-    """Create and persist a new guest service request."""
+    """Creates and persists a new guest service request.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+        session_id (str): The session ID.
+        table_number (str): The table number.
+        customer_name (str | None): The name of the customer.
+        service_type (str): The type of service requested.
+        message (str | None, optional): An optional message. Defaults to None.
+        order_source (str, optional): The source of the request. Defaults to "table".
+
+    Returns:
+        TableServiceRequest: The newly created service request.
+    """
     request = TableServiceRequest(
         restaurant_id=restaurant_id,
         session_id=session_id,
@@ -245,7 +338,15 @@ def list_active_service_requests(
     db: Session,
     restaurant_id: int,
 ) -> list[TableServiceRequest]:
-    """Return all non-completed service requests for a restaurant."""
+    """Returns all non-completed service requests for a restaurant.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        list[TableServiceRequest]: A list of active service requests.
+    """
     try:
         return (
             db.query(TableServiceRequest)
@@ -267,7 +368,16 @@ def complete_service_request(
     request_id: int,
     restaurant_id: int,
 ) -> bool:
-    """Mark a service request as completed/resolved."""
+    """Marks a service request as completed/resolved.
+
+    Args:
+        db (Session): The database session.
+        request_id (int): The ID of the service request.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        bool: True if marked as completed, False if not found.
+    """
     request = (
         db.query(TableServiceRequest)
         .filter(
@@ -290,7 +400,17 @@ def acknowledge_service_request(
     restaurant_id: int,
     user_id: int,
 ) -> bool:
-    """Mark a service request as acknowledged by a staff member."""
+    """Marks a service request as acknowledged by a staff member.
+
+    Args:
+        db (Session): The database session.
+        request_id (int): The ID of the service request.
+        restaurant_id (int): The ID of the restaurant.
+        user_id (int): The ID of the staff user acknowledging it.
+
+    Returns:
+        bool: True if acknowledged, False if not found.
+    """
     request = (
         db.query(TableServiceRequest)
         .filter(
@@ -308,7 +428,15 @@ def acknowledge_service_request(
 
 
 def count_active_requests_stats(db: Session, restaurant_id: int) -> int:
-    """Return the combined count of active bill requests and service requests."""
+    """Returns the combined count of active bill requests and service requests.
+
+    Args:
+        db (Session): The database session.
+        restaurant_id (int): The ID of the restaurant.
+
+    Returns:
+        int: The total count of active requests.
+    """
     now = datetime.now(UTC)
     try:
         bill_count = (
@@ -337,3 +465,30 @@ def count_active_requests_stats(db: Session, restaurant_id: int) -> int:
     except Exception as exc:
         logger.error("Failed to count active requests stats: %s", str(exc))
         return 0
+
+
+def update_table_number_for_session(
+    db: Session,
+    session_id: str,
+    restaurant_id: int,
+    new_table_number: str,
+) -> None:
+    """Updates the table number for all orders and service requests in a session.
+
+    Args:
+        db (Session): The database session.
+        session_id (str): The session ID.
+        restaurant_id (int): The ID of the restaurant.
+        new_table_number (str): The new table number.
+    """
+    from app.modules.orders.model import OrderHeader
+    
+    db.query(OrderHeader).filter(
+        OrderHeader.session_id == session_id,
+        OrderHeader.restaurant_id == restaurant_id
+    ).update({"table_number": new_table_number}, synchronize_session=False)
+    
+    db.query(TableServiceRequest).filter(
+        TableServiceRequest.session_id == session_id,
+        TableServiceRequest.restaurant_id == restaurant_id
+    ).update({"table_number": new_table_number}, synchronize_session=False)

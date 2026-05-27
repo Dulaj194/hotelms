@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
-from app.core.pagination import PaginationParams, create_paginated_response, pagination_depends
+from app.core.pagination import PaginationParams, FilterParams, create_paginated_response, pagination_depends
 from app.core.response_utils import success_response
 from app.core.response_schemas import ApiResponse, PaginatedResponse
 from app.modules.access import role_catalog
@@ -33,6 +33,7 @@ def _require_categories_restaurant_id(
 def list_categories(
     restaurant_id: int = Depends(_require_categories_restaurant_id),
     pagination: PaginationParams = Depends(pagination_depends),
+    filters: FilterParams = Depends(),
     menu_id: int | None = Query(None, gt=0),
     db: Session = Depends(get_db),
 ) -> ApiResponse:
@@ -42,6 +43,9 @@ def list_categories(
         restaurant_id,
         skip=pagination.skip,
         limit=pagination.limit,
+        search=filters.search,
+        sort_by=filters.sort_by,
+        sort_order=filters.sort_order.value if filters.sort_order else "asc",
         menu_id=menu_id,
     )
     paginated_data = create_paginated_response(categories, total, pagination.page, pagination.limit)
