@@ -41,7 +41,6 @@ def list_rooms(
     search: str | None = None,
     sort_by: str | None = None,
     sort_order: str = "asc",
-    sort_order: str = "asc",
 ) -> tuple[list[RoomResponse], int]:
     """Retrieves a paginated list of rooms for a specific restaurant.
 
@@ -180,6 +179,10 @@ def update_room(
         return _to_response(room)
 
     updated = repository.update_room_by_id(db, room_id, restaurant_id, update_data)
+    if updated is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Room not found."
+        )
     return _to_response(updated)
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -21,6 +22,10 @@ from app.modules.billing.model import (
 )
 
 
+def get_bill_by_session(
+    db: Session,
+    session_id: str,
+    restaurant_id: int,
 ) -> Bill | None:
     """Retrieves a bill by its session ID and restaurant ID.
 
@@ -42,6 +47,10 @@ from app.modules.billing.model import (
     )
 
 
+def get_bill_by_id(
+    db: Session,
+    bill_id: int,
+    restaurant_id: int,
 ) -> Bill | None:
     """Retrieves a bill by its primary key ID and restaurant ID.
 
@@ -63,6 +72,22 @@ from app.modules.billing.model import (
     )
 
 
+def create_bill(
+    db: Session,
+    *,
+    restaurant_id: int,
+    session_id: str,
+    context_type: BillContextType,
+    table_number: str | None = None,
+    room_id: int | None = None,
+    room_number: str | None = None,
+    subtotal_amount: float,
+    tax_amount: float,
+    discount_amount: float,
+    total_amount: float,
+    payment_method: str,
+    transaction_reference: str | None = None,
+    notes: str | None = None,
 ) -> Bill:
     """Creates a new bill record.
 
@@ -108,6 +133,10 @@ from app.modules.billing.model import (
     return bill
 
 
+def mark_bill_paid(
+    db: Session,
+    bill: Bill,
+    settled_at: datetime | None = None,
 ) -> Bill:
     """Marks a bill as paid.
 

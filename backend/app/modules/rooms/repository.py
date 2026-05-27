@@ -20,7 +20,6 @@ def list_rooms_by_restaurant(
     search: str | None = None,
     sort_by: str | None = None,
     sort_order: str = "asc",
-    sort_order: str = "asc",
 ) -> tuple[list[Room], int]:
     """Retrieves a paginated list of rooms for a specific restaurant.
 
