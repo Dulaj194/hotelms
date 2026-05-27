@@ -3,7 +3,7 @@ import time
 import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncGenerator, Callable
+from typing import Any, AsyncGenerator, Callable
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
@@ -278,7 +278,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         status_code=exc.status_code,
         content={
             "success": False,
-            "message": str(exc.detail),
+            "message": exc.detail,
             "detail": exc.detail,
             "error_code": f"HTTP_{exc.status_code}_ERROR",
             "error_id": str(error_id),
@@ -313,7 +313,7 @@ async def hotelms_exception_handler(request: Request, exc: HotelMSException):
         )
     
     from app.core.response_utils import get_timestamp
-    response_data = {
+    response_data: dict[str, Any] = {
         "success": False,
         "message": exc.detail,
         "detail": exc.detail,
