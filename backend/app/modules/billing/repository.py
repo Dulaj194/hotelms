@@ -582,3 +582,19 @@ def count_outstanding_folios(
     elif target_queue == "accountant":
         query = query.filter(Bill.handoff_status == BillHandoffStatus.sent_to_accountant)
     return query.count()
+
+
+def flush(db: Session) -> None:
+    """Flush pending changes to the database."""
+    db.flush()
+
+
+def commit(db: Session) -> None:
+    """Commit transaction."""
+    db.commit()
+
+
+def commit_and_refresh(db: Session, obj: object) -> None:
+    """Commit transaction and refresh the database object."""
+    db.commit()
+    db.refresh(obj)

@@ -835,8 +835,7 @@ def _commit_bill_workflow(
     r: redis_lib.Redis | None,
     action_type: str,
 ) -> BillRecordResponse:
-    db.commit()
-    db.refresh(bill)
+    billing_repo.commit_and_refresh(db, bill)
     _publish_billing_event(
         db,
         restaurant_id=restaurant_id,
@@ -1185,8 +1184,7 @@ def _settle_context_session(
                 last_error=None,
             )
 
-        db.commit()
-        db.refresh(bill)
+        billing_repo.commit_and_refresh(db, bill)
     except IntegrityError:
         db.rollback()
         raise HTTPException(
@@ -1210,7 +1208,7 @@ def _settle_context_session(
                     bill_id=None,
                     last_error=str(exc.detail),
                 )
-                db.commit()
+                billing_repo.commit(db)
         raise
     except Exception:
         db.rollback()
@@ -1229,7 +1227,7 @@ def _settle_context_session(
                     bill_id=None,
                     last_error="Settlement failed.",
                 )
-                db.commit()
+                billing_repo.commit(db)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Settlement failed. Please try again.",
@@ -1980,7 +1978,7 @@ def _reopen_context_session(db: Session, bill: Bill) -> None:
             session.is_active = True
             session.session_status = TableSessionStatus.OPEN
             session.last_activity_at = _utcnow()
-            db.flush()
+            billing_repo.flush(db)
         return
 
     session = room_session_repo.get_room_session_by_id_and_restaurant(
@@ -1991,7 +1989,7 @@ def _reopen_context_session(db: Session, bill: Bill) -> None:
     if session is not None:
         session.is_active = True
         session.last_activity_at = _utcnow()
-        db.flush()
+        billing_repo.flush(db)
 
 
 def reverse_bill(
@@ -2110,8 +2108,7 @@ def reverse_bill(
         },
     )
 
-    db.commit()
-    db.refresh(bill)
+    billing_repo.commit_and_refresh(db, bill)
     _publish_billing_event(
         db,
         restaurant_id=restaurant_id,

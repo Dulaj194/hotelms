@@ -14,7 +14,7 @@ from starlette.responses import Response
 
 from app.api.router import router
 from app.core.config import settings
-from app.core.exceptions import HotelMSException
+from app.core.exceptions import HotelMSException, RateLimitException
 from app.core.logging import configure_logging, get_logger
 from app.workers.subscription_expiry import run_subscription_expiry_loop
 
@@ -281,6 +281,32 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "message": exc.detail,
             "detail": exc.detail,
             "error_code": f"HTTP_{exc.status_code}_ERROR",
+            "error_id": str(error_id),
+            "timestamp": get_timestamp(),
+        },
+    )
+
+
+@app.exception_handler(RateLimitException)
+async def rate_limit_exception_handler(request: Request, exc: RateLimitException):
+    """Explicitly handle Rate Limit exceptions to return 429 status code."""
+    error_id = id(exc)
+    logger.warning(
+        "Rate Limit Exceeded [%s] - %s - %s %s - %s",
+        error_id,
+        exc.error_code,
+        request.method,
+        request.url.path,
+        exc.detail,
+    )
+    from app.core.response_utils import get_timestamp
+    return JSONResponse(
+        status_code=429,
+        content={
+            "success": False,
+            "message": "Too many requests. Please try again later.",
+            "detail": exc.detail,
+            "error_code": exc.error_code,
             "error_id": str(error_id),
             "timestamp": get_timestamp(),
         },
