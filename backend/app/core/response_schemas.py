@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 T = TypeVar("T")
 
 
-class ApiResponse(BaseModel):
+class ApiResponse(BaseModel, Generic[T]):
     """Standard API response wrapper for all endpoints.
     
     Provides consistent response structure with success/error handling.
@@ -19,7 +19,7 @@ class ApiResponse(BaseModel):
         }
     """
     success: bool = Field(..., description="Whether the request was successful")
-    data: Optional[Any] = Field(None, description="Response payload (null if error)")
+    data: Optional[T] = Field(None, description="Response payload (null if error)")
     message: str = Field(..., description="Human-readable message")
     error_code: Optional[str] = Field(None, description="Machine-readable error code")
     timestamp: str = Field(..., description="ISO 8601 timestamp of response")

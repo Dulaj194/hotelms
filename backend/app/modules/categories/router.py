@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
 from app.core.pagination import PaginationParams, create_paginated_response, pagination_depends
+from app.core.response_utils import success_response
+from app.core.response_schemas import ApiResponse, PaginatedResponse
 from app.modules.access import role_catalog
 from app.modules.categories import service
 from app.modules.categories.schemas import (
@@ -26,13 +28,13 @@ def _require_categories_restaurant_id(
     return current_user.restaurant_id
 
 
-@router.get("", response_model=dict)
+@router.get("", response_model=ApiResponse[Any])
 def list_categories(
     restaurant_id: int = Depends(_require_categories_restaurant_id),
     pagination: PaginationParams = Depends(pagination_depends),
     menu_id: int | None = Query(None, gt=0),
     db: Session = Depends(get_db),
-) -> dict:
+) -> ApiResponse:
     """List categories for restaurant with pagination."""
     categories, total = service.list_categories(
         db,
@@ -41,53 +43,59 @@ def list_categories(
         limit=pagination.limit,
         menu_id=menu_id,
     )
-    return create_paginated_response(categories, total, pagination.page, pagination.limit)
+    paginated_data = create_paginated_response(categories, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Categories listed successfully.")
 
 
-@router.post("", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApiResponse[CategoryResponse], status_code=status.HTTP_201_CREATED)
 def add_category(
     payload: CategoryCreateRequest,
     restaurant_id: int = Depends(_require_categories_restaurant_id),
     db: Session = Depends(get_db),
-) -> CategoryResponse:
+) -> ApiResponse:
     """SECURITY: restaurant_id comes from token, not payload."""
-    return service.add_category(db, restaurant_id, payload)
+    category = service.add_category(db, restaurant_id, payload)
+    return success_response(data=category, message="Category created successfully.")
 
 
-@router.get("/{category_id}", response_model=CategoryResponse)
+@router.get("/{category_id}", response_model=ApiResponse[CategoryResponse])
 def get_category(
     category_id: int,
     restaurant_id: int = Depends(_require_categories_restaurant_id),
     db: Session = Depends(get_db),
-) -> CategoryResponse:
-    return service.get_category(db, category_id, restaurant_id)
+) -> ApiResponse:
+    category = service.get_category(db, category_id, restaurant_id)
+    return success_response(data=category, message="Category retrieved successfully.")
 
 
-@router.patch("/{category_id}", response_model=CategoryResponse)
+@router.patch("/{category_id}", response_model=ApiResponse[CategoryResponse])
 def update_category(
     category_id: int,
     payload: CategoryUpdateRequest,
     restaurant_id: int = Depends(_require_categories_restaurant_id),
     db: Session = Depends(get_db),
-) -> CategoryResponse:
-    return service.update_category(db, category_id, restaurant_id, payload)
+) -> ApiResponse:
+    category = service.update_category(db, category_id, restaurant_id, payload)
+    return success_response(data=category, message="Category updated successfully.")
 
 
-@router.delete("/{category_id}")
+@router.delete("/{category_id}", response_model=ApiResponse[Any])
 def delete_category(
     category_id: int,
     restaurant_id: int = Depends(_require_categories_restaurant_id),
     db: Session = Depends(get_db),
-) -> dict:
-    return service.delete_category(db, category_id, restaurant_id)
+) -> ApiResponse:
+    result = service.delete_category(db, category_id, restaurant_id)
+    return success_response(data=result, message="Category deleted successfully.")
 
 
-@router.post("/{category_id}/media/{slot}", response_model=CategoryImageUploadResponse)
+@router.post("/{category_id}/media/{slot}", response_model=ApiResponse[CategoryImageUploadResponse])
 async def upload_category_image(
     category_id: int,
     slot: str,
     file: UploadFile = File(...),
     restaurant_id: int = Depends(_require_categories_restaurant_id),
     db: Session = Depends(get_db),
-) -> CategoryImageUploadResponse:
-    return await service.upload_category_image(db, category_id, restaurant_id, slot, file)
+) -> ApiResponse:
+    result = await service.upload_category_image(db, category_id, restaurant_id, slot, file)
+    return success_response(data=result, message="Category image uploaded successfully.")

@@ -192,9 +192,17 @@ async def dependency_failure_middleware(request: Request, call_next: Callable) -
             status_code = 502  # Bad Gateway
             detail = "Backend service error. Please try again."
         
+        from app.core.response_utils import get_timestamp
         return JSONResponse(
             status_code=status_code,
-            content={"detail": detail, "error_id": error_id},
+            content={
+                "success": False,
+                "message": detail,
+                "detail": detail,
+                "error_code": "DEPENDENCY_FAILURE",
+                "error_id": str(error_id),
+                "timestamp": get_timestamp(),
+            },
         )
 
 
@@ -219,9 +227,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     # Log full traceback for debugging
     logger.debug("Traceback for error [%s]:\n%s", error_id, traceback.format_exc())
     
+    from app.core.response_utils import get_timestamp
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal Server Error", "error_id": error_id},
+        content={
+            "success": False,
+            "message": "Internal Server Error",
+            "detail": "Internal Server Error",
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "error_id": str(error_id),
+            "timestamp": get_timestamp(),
+        },
     )
 
 
@@ -257,9 +273,17 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             exc.detail,
         )
     
+    from app.core.response_utils import get_timestamp
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail, "error_id": error_id},
+        content={
+            "success": False,
+            "message": str(exc.detail),
+            "detail": exc.detail,
+            "error_code": f"HTTP_{exc.status_code}_ERROR",
+            "error_id": str(error_id),
+            "timestamp": get_timestamp(),
+        },
     )
 
 
@@ -288,14 +312,20 @@ async def hotelms_exception_handler(request: Request, exc: HotelMSException):
             exc.detail,
         )
     
+    from app.core.response_utils import get_timestamp
     response_data = {
+        "success": False,
+        "message": exc.detail,
         "detail": exc.detail,
         "error_code": exc.error_code,
-        "error_id": error_id,
+        "error_id": str(error_id),
+        "timestamp": get_timestamp(),
     }
     
     # Include extra context if provided
     if exc.extra:
+        if "errors" in exc.extra:
+            response_data["errors"] = exc.extra["errors"]
         response_data["extra"] = exc.extra
     
     return JSONResponse(

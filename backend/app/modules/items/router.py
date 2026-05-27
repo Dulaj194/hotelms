@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_db, require_roles
 from app.core.pagination import PaginationParams, create_paginated_response, pagination_depends
+from app.core.response_utils import success_response
+from app.core.response_schemas import ApiResponse, PaginatedResponse
 from app.modules.access import role_catalog
 from app.modules.items import service
 from app.modules.items.schemas import (
@@ -27,13 +29,13 @@ def _require_items_restaurant_id(
     return current_user.restaurant_id
 
 
-@router.get("", response_model=dict)
+@router.get("", response_model=ApiResponse[Any])
 def list_items(
     restaurant_id: int = Depends(_require_items_restaurant_id),
     pagination: PaginationParams = Depends(pagination_depends),
     category_id: int | None = Query(None, gt=0),
     db: Session = Depends(get_db),
-) -> dict:
+) -> ApiResponse:
     """List items for restaurant with pagination."""
     items, total = service.list_items(
         db,
@@ -42,68 +44,75 @@ def list_items(
         limit=pagination.limit,
         category_id=category_id,
     )
-    return create_paginated_response(items, total, pagination.page, pagination.limit)
+    paginated_data = create_paginated_response(items, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Items listed successfully.")
 
 
-@router.post("", response_model=ItemResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApiResponse[ItemResponse], status_code=status.HTTP_201_CREATED)
 def add_item(
     payload: ItemCreateRequest,
     restaurant_id: int = Depends(_require_items_restaurant_id),
     db: Session = Depends(get_db),
-) -> ItemResponse:
+) -> ApiResponse:
     """SECURITY: restaurant_id comes from token. category ownership verified server-side."""
-    return service.add_item(db, restaurant_id, payload)
+    item = service.add_item(db, restaurant_id, payload)
+    return success_response(data=item, message="Item created successfully.")
 
 
-@router.get("/{item_id}", response_model=ItemResponse)
+@router.get("/{item_id}", response_model=ApiResponse[ItemResponse])
 def get_item(
     item_id: int,
     restaurant_id: int = Depends(_require_items_restaurant_id),
     db: Session = Depends(get_db),
-) -> ItemResponse:
-    return service.get_item(db, item_id, restaurant_id)
+) -> ApiResponse:
+    item = service.get_item(db, item_id, restaurant_id)
+    return success_response(data=item, message="Item retrieved successfully.")
 
 
-@router.patch("/{item_id}", response_model=ItemResponse)
+@router.patch("/{item_id}", response_model=ApiResponse[ItemResponse])
 def update_item(
     item_id: int,
     payload: ItemUpdateRequest,
     restaurant_id: int = Depends(_require_items_restaurant_id),
     db: Session = Depends(get_db),
-) -> ItemResponse:
-    return service.update_item(db, item_id, restaurant_id, payload)
+) -> ApiResponse:
+    item = service.update_item(db, item_id, restaurant_id, payload)
+    return success_response(data=item, message="Item updated successfully.")
 
 
-@router.delete("/{item_id}")
+@router.delete("/{item_id}", response_model=ApiResponse[Any])
 def delete_item(
     item_id: int,
     restaurant_id: int = Depends(_require_items_restaurant_id),
     db: Session = Depends(get_db),
-) -> dict:
-    return service.delete_item(db, item_id, restaurant_id)
+) -> ApiResponse:
+    result = service.delete_item(db, item_id, restaurant_id)
+    return success_response(data=result, message="Item deleted successfully.")
 
 
-@router.post("/{item_id}/image", response_model=ItemImageUploadResponse)
+@router.post("/{item_id}/image", response_model=ApiResponse[ItemImageUploadResponse])
 async def upload_item_image(
     item_id: int,
     file: UploadFile = File(...),
     restaurant_id: int = Depends(_require_items_restaurant_id),
     db: Session = Depends(get_db),
-) -> ItemImageUploadResponse:
+) -> ApiResponse:
     """Upload/replace item image. Owner/admin only.
 
     Multipart/form-data. Allowed: jpg, png, webp. Max: settings.max_upload_size_mb.
     SECURITY: filename is UUID-generated server-side; restaurant_id from token.
     """
-    return await service.upload_item_image(db, item_id, restaurant_id, file)
+    result = await service.upload_item_image(db, item_id, restaurant_id, file)
+    return success_response(data=result, message="Item image uploaded successfully.")
 
 
-@router.post("/{item_id}/media/{slot}", response_model=ItemMediaUploadResponse)
+@router.post("/{item_id}/media/{slot}", response_model=ApiResponse[ItemMediaUploadResponse])
 async def upload_item_media(
     item_id: int,
     slot: str,
     file: UploadFile = File(...),
     restaurant_id: int = Depends(_require_items_restaurant_id),
     db: Session = Depends(get_db),
-) -> ItemMediaUploadResponse:
-    return await service.upload_item_media(db, item_id, restaurant_id, slot, file)
+) -> ApiResponse:
+    result = await service.upload_item_media(db, item_id, restaurant_id, slot, file)
+    return success_response(data=result, message="Item media uploaded successfully.")

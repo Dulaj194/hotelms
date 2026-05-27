@@ -154,15 +154,24 @@ async function request<T>(
   if (!response.ok) {
     let detail = response.statusText;
     try {
-      const payload = (await response.json()) as { detail?: string };
-      if (payload?.detail) detail = payload.detail;
+      const payload = (await response.json()) as { message?: string, detail?: string };
+      if (payload?.message) {
+        detail = payload.message;
+      } else if (payload?.detail) {
+        detail = payload.detail;
+      }
     } catch {
       detail = response.statusText;
     }
     throw new ApiError(response.status, detail, method, path);
   }
 
-  return response.json() as Promise<T>;
+  const json = await response.json();
+  // Automatically unwrap standard ApiResponse payload
+  if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+    return json.data as Promise<T>;
+  }
+  return json as Promise<T>;
 }
 
 export async function refreshAccessToken(): Promise<string | null> {
