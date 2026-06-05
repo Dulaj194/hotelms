@@ -263,7 +263,7 @@ def _build_line_items_from_payload(
                 detail=f"Item '{item.name}' is currently unavailable.",
             )
 
-        unit_price = item.price
+        unit_price = float(item.price)  # type: ignore
         line_total = unit_price * quantity
         subtotal += line_total
 
@@ -463,13 +463,13 @@ def _create_and_persist_order(
                 room_id=placed.room_id,
                 room_number=placed.room_number,
                 status=placed.status.value,
-                total_amount=float(placed.total_amount),
+                total_amount=float(placed.total_amount),  # type: ignore
                 placed_at=placed.placed_at,
                 items=[
                     {
                         "item_name_snapshot": oi.item_name_snapshot,
                         "quantity": oi.quantity,
-                        "line_total": float(oi.line_total),
+                        "line_total": float(oi.line_total),  # type: ignore
                         "notes": oi.notes,
                     }
                     for oi in placed.items
@@ -562,7 +562,7 @@ def place_staff_order(
                 room_id=placed.room_id,
                 room_number=placed.room_number,
                 status=placed.status.value,
-                total_amount=float(placed.total_amount),
+                total_amount=float(placed.total_amount),  # type: ignore
                 placed_at=placed.placed_at,
                 items=[{"item_name": oi.item_name_snapshot, "quantity": oi.quantity} for oi in placed.items],
             )
