@@ -413,18 +413,18 @@ function OrderTimeline({ order }: { order: OrderDetailResponse }) {
   };
 
   return (
-    <div className="relative w-full overflow-x-auto pb-2 pt-2 scrollbar-hide">
-      <div className="min-w-[500px] relative">
-        {/* Background Line */}
-        <div className="absolute top-[22px] left-8 right-8 h-[2px] bg-slate-200" />
+    <div className="relative w-full pb-2 pt-2">
+      <div className="w-full relative">
+        {/* Line Container */}
+        <div className="absolute top-[15px] sm:top-[21px] left-[1.5rem] right-[1.5rem] sm:left-[2rem] sm:right-[2rem]">
+          <div className="w-full h-[2px] bg-slate-200 absolute top-0" />
+          <div 
+            className="absolute top-0 left-0 h-[3px] bg-gradient-to-r from-orange-400 to-emerald-400 transition-all duration-700 ease-out rounded-full" 
+            style={{ width: `${(Math.max(0, statusIndex) / (LIFECYCLE_STEPS.length - 1)) * 100}%` }}
+          />
+        </div>
         
-        {/* Progress Line */}
-        <div 
-          className="absolute top-[22px] left-8 h-[3px] bg-gradient-to-r from-orange-400 to-emerald-400 transition-all duration-700 ease-out rounded-full" 
-          style={{ width: `calc(${(Math.max(0, statusIndex) / (LIFECYCLE_STEPS.length - 1)) * 100}% - ${statusIndex === LIFECYCLE_STEPS.length - 1 ? '4rem' : '2rem'})` }}
-        />
-        
-        <ol className="relative z-10 flex justify-between px-2">
+        <ol className="relative z-10 flex justify-between w-full">
           {LIFECYCLE_STEPS.map((step, idx) => {
             const passed = idx < statusIndex;
             const current = idx === statusIndex;
@@ -439,9 +439,9 @@ function OrderTimeline({ order }: { order: OrderDetailResponse }) {
             else if (step.status === "paid") displayLabel = t("cart:paid_timeline");
 
             return (
-              <li key={step.status} className="group flex flex-col items-center gap-3 relative w-16">
+              <li key={step.status} className="group flex flex-col items-center gap-1.5 sm:gap-3 relative w-12 sm:w-16">
                 <div
-                  className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all duration-500 z-10 ${
+                  className={`relative flex h-8 w-8 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full transition-all duration-500 z-10 ${
                     passed
                       ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
                       : current
@@ -452,10 +452,10 @@ function OrderTimeline({ order }: { order: OrderDetailResponse }) {
                   {current && (
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75"></span>
                   )}
-                  <Icon className={`w-5 h-5 transition-transform ${current ? 'scale-110' : ''}`} strokeWidth={current ? 2.5 : 2} />
+                  <Icon className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform ${current ? 'scale-110' : ''}`} strokeWidth={current ? 2.5 : 2} />
                 </div>
                 <span
-                  className={`text-[10px] sm:text-[11px] leading-tight text-center transition-all duration-300 ${
+                  className={`text-[9px] sm:text-[11px] leading-tight text-center transition-all duration-300 ${
                     current
                       ? "font-bold text-slate-900 scale-105"
                       : passed
