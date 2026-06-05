@@ -128,23 +128,23 @@ class SubscriptionTransition:
         return next_subscription
 
 
-def _utcnow_naive() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+def _utcnow_aware() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _normalize_datetime(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if value.tzinfo is None:
-        return value
-    return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _effective_status(subscription: RestaurantSubscription | None) -> str:
     if subscription is None:
         return "none"
 
-    now = _utcnow_naive()
+    now = _utcnow_aware()
     effective_expires_at = subscription.trial_expires_at if subscription.is_trial else subscription.expires_at
     effective_expires_at = _normalize_datetime(effective_expires_at)
 
@@ -785,7 +785,7 @@ def assign_initial_trial_subscription(
             detail="Default trial package is not configured.",
         )
 
-    now = _utcnow_naive()
+    now = _utcnow_aware()
     trial_end = now + timedelta(days=settings.default_trial_days)
 
     subscription = repository.create_subscription(
@@ -847,7 +847,7 @@ def start_trial(
             detail="Default trial package is unavailable.",
         )
 
-    now = _utcnow_naive()
+    now = _utcnow_aware()
     trial_end = now + timedelta(days=settings.default_trial_days)
 
     previous_subscription = _clone_subscription_state(
@@ -935,7 +935,7 @@ def activate_paid_subscription(
             detail="Package not found or inactive.",
         )
 
-    now = _utcnow_naive()
+    now = _utcnow_aware()
     expires_at = now + timedelta(days=package.billing_period_days)
     previous_subscription = _clone_subscription_state(
         repository.get_latest_subscription_by_restaurant(db, restaurant_id)
@@ -989,7 +989,7 @@ def cancel_subscription(
             detail="No active subscription to cancel.",
         )
 
-    now = _utcnow_naive()
+    now = _utcnow_aware()
     previous_snapshot = _clone_subscription_state(
         repository.get_latest_subscription_by_restaurant(db, restaurant_id)
     )

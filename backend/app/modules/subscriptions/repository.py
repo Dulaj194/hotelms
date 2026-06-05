@@ -156,7 +156,7 @@ def get_overdue_open_subscriptions(
     db: Session,
 ) -> list[RestaurantSubscription]:
     """Return all active/trial subscriptions whose expiry has passed."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None) # Keep it naive for consistency if needed or use aware
+    now = datetime.now(timezone.utc)
     return (
         db.query(RestaurantSubscription)
         .filter(

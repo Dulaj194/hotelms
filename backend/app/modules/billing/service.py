@@ -93,10 +93,10 @@ def _to_bill_record(bill: Bill) -> BillRecordResponse:
         table_number=bill.table_number,
         room_id=bill.room_id,
         room_number=bill.room_number,
-        subtotal_amount=float(bill.subtotal_amount),
-        tax_amount=float(bill.tax_amount),
-        discount_amount=float(bill.discount_amount),
-        total_amount=float(bill.total_amount),
+        subtotal_amount=bill.subtotal_amount,
+        tax_amount=bill.tax_amount,
+        discount_amount=bill.discount_amount,
+        total_amount=bill.total_amount,
         payment_method=bill.payment_method,
         payment_status=bill.payment_status,
         transaction_reference=bill.transaction_reference,
@@ -229,7 +229,7 @@ def _build_payment_history_response(
                 id=payment.id,
                 order_id=payment.order_id,
                 restaurant_id=payment.restaurant_id,
-                amount=float(payment.amount),
+                amount=payment.amount,
                 payment_method=payment.payment_method,
                 payment_status=payment.payment_status,
                 transaction_reference=payment.transaction_reference,
@@ -254,7 +254,7 @@ def _get_stripe_module() -> Any:
 
 
 def _to_cents(amount: float) -> int:
-    return int(round(float(amount) * 100))
+    return round(amount * 100)
 
 
 def _compute_adjustment_amount(*, base: Decimal, mode: str, value: Decimal) -> Decimal:
@@ -391,7 +391,7 @@ def _build_allocation_responses(
         BillPaymentAllocationResponse(
             id=allocation.id,
             payment_method=allocation.payment_method,
-            amount=float(allocation.amount),
+            amount=allocation.amount,
             transaction_reference=allocation.transaction_reference,
             gateway_provider=allocation.gateway_provider,
             gateway_payment_intent_id=allocation.gateway_payment_intent_id,
@@ -540,10 +540,10 @@ def _build_summary_response(
             restaurant_id,
             statuses=[OrderStatus.paid],
         )
-        subtotal = float(existing_bill.subtotal_amount)
-        tax_amount = float(existing_bill.tax_amount)
-        discount_amount = float(existing_bill.discount_amount)
-        grand_total = float(existing_bill.total_amount)
+        subtotal = existing_bill.subtotal_amount
+        tax_amount = existing_bill.tax_amount
+        discount_amount = existing_bill.discount_amount
+        grand_total = existing_bill.total_amount
     else:
         summary_orders = order_repo.list_billable_orders_by_session(
             db,
@@ -596,7 +596,7 @@ def _build_status_response(
             restaurant_id,
             statuses=[OrderStatus.paid],
         )
-        grand_total = float(existing_bill.total_amount)
+        grand_total = existing_bill.total_amount
     else:
         relevant_orders = order_repo.list_billable_orders_by_session(db, session_id, restaurant_id)
         d_grand_total = sum((Decimal(str(order.total_amount)) for order in relevant_orders), Decimal("0.00"))
@@ -807,7 +807,7 @@ def _publish_billing_event(
             "table_number": bill.table_number,
             "room_id": bill.room_id,
             "room_number": bill.room_number,
-            "total_amount": float(bill.total_amount),
+            "total_amount": bill.total_amount,
             "payment_method": bill.payment_method,
             "payment_status": bill.payment_status.value,
             "handoff_status": bill.handoff_status.value,
@@ -864,7 +864,7 @@ def _build_settle_response_from_bill(
         bill_id=bill.id,
         restaurant_id=bill.restaurant_id,
     )
-    remaining_amount = round(max(float(bill.total_amount) - paid_amount, 0), 2)
+    remaining_amount = round(max(bill.total_amount - paid_amount, 0), 2)
 
     return SettleSessionResponse(
         bill_id=bill.id,
@@ -875,7 +875,7 @@ def _build_settle_response_from_bill(
         room_id=room_id,
         room_number=room_number,
         order_count=order_count,
-        total_amount=round(float(bill.total_amount), 2),
+        total_amount=round(bill.total_amount, 2),
         paid_amount=round(paid_amount, 2),
         remaining_amount=remaining_amount,
         payment_method=bill.payment_method or "manual",
@@ -938,7 +938,7 @@ def _settle_context_session(
             ),
         )
 
-    subtotal = sum(float(order.total_amount) for order in billable_orders)
+    subtotal = sum(order.total_amount for order in billable_orders)
     if (
         existing_bill is not None
         and payload.tax_rule_mode == "none"
@@ -946,8 +946,8 @@ def _settle_context_session(
         and payload.discount_rule_mode == "none"
         and payload.discount_rule_value == 0
     ):
-        tax_amount = round(float(existing_bill.tax_amount), 2)
-        discount_amount = round(float(existing_bill.discount_amount), 2)
+        tax_amount = round(existing_bill.tax_amount, 2)
+        discount_amount = round(existing_bill.discount_amount, 2)
         total_amount = round(subtotal + tax_amount - discount_amount, 2)
     else:
         tax_amount, discount_amount, total_amount = _calculate_totals(subtotal, payload)
@@ -966,11 +966,11 @@ def _settle_context_session(
         fallback_amount = payload.paid_amount
         if fallback_amount is None:
             fallback_amount = round(max(total_amount - existing_paid_amount, 0), 2)
-        if float(fallback_amount) > 0:
+        if fallback_amount > 0:
             requested_payments = [
                 type("AutoSettlementPayment", (), {
                     "payment_method": payload.payment_method,
-                    "amount": float(fallback_amount),
+                    "amount": fallback_amount,
                     "transaction_reference": payload.transaction_reference,
                     "gateway_provider": None,
                     "gateway_payment_intent_id": None,
@@ -978,8 +978,15 @@ def _settle_context_session(
                 })()
             ]
 
+    for payment in requested_payments:
+        if float(payment.amount) <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Payment amount must be greater than zero.",
+            )
+
     submitted_amount = round(sum(float(payment.amount) for payment in requested_payments), 2)
-    if payload.paid_amount is not None and submitted_amount != round(float(payload.paid_amount), 2):
+    if payload.paid_amount is not None and submitted_amount != round(payload.paid_amount, 2):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="paid_amount must match submitted split payment amount total.",
@@ -1206,7 +1213,7 @@ def _settle_context_session(
                     record=retry_record,
                     settle_status=BillSettleIdempotencyStatus.failed,
                     bill_id=None,
-                    last_error=str(exc.detail),
+                    last_error=exc.detail,
                 )
                 billing_repo.commit(db)
         raise
@@ -1508,7 +1515,7 @@ def get_folio_detail(
                 id=payment.id,
                 order_id=payment.order_id,
                 restaurant_id=payment.restaurant_id,
-                amount=float(payment.amount),
+                amount=payment.amount,
                 payment_method=payment.payment_method,
                 payment_status=payment.payment_status,
                 transaction_reference=payment.transaction_reference,
@@ -2148,12 +2155,12 @@ def get_daily_reconciliation(
         db, restaurant_id=restaurant_id, start_dt=start_dt, end_dt=end_dt, limit=_RECENT_COMPLETED_LIMIT
     )
 
-    total_paid_amount = sum(float(bill.total_amount) for bill in paid_bills)
+    total_paid_amount = sum(bill.total_amount for bill in paid_bills)
     room_paid_amount = sum(
-        float(bill.total_amount) for bill in paid_bills if bill.context_type == BillContextType.room
+        bill.total_amount for bill in paid_bills if bill.context_type == BillContextType.room
     )
     table_paid_amount = sum(
-        float(bill.total_amount) for bill in paid_bills if bill.context_type == BillContextType.table
+        bill.total_amount for bill in paid_bills if bill.context_type == BillContextType.table
     )
 
     return BillingReconciliationResponse(
@@ -2188,7 +2195,7 @@ def get_daily_reconciliation(
         payment_methods=[
             BillingReconciliationPaymentMethodResponse(
                 payment_method=payment_method or "unspecified",
-                folio_count=int(count),
+                folio_count=count,
                 total_amount=round(float(amount or 0), 2),
             )
             for payment_method, count, amount in payment_method_rows
