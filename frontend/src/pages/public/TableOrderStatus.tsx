@@ -14,6 +14,15 @@ import {
 import type { OrderDetailResponse } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 import LanguageSwitcher from "@/components/public/LanguageSwitcher";
+import { 
+  ClipboardList, 
+  CheckCircle2, 
+  ChefHat, 
+  BellRing, 
+  Utensils, 
+  CreditCard,
+  XCircle 
+} from "lucide-react";
 
 const CANCEL_WINDOW_SECONDS = 10;
 
@@ -384,67 +393,83 @@ function OrderTimeline({ order }: { order: OrderDetailResponse }) {
   const { t } = useTranslation(["common", "menu", "cart"]);
   if (order.status === "rejected") {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">
-        <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
-        <span className="text-sm font-medium">{t("cart:order_rejected_timeline")}</span>
+      <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-rose-700 shadow-sm backdrop-blur-md">
+        <XCircle className="h-6 w-6 text-red-500" />
+        <span className="text-sm font-semibold">{t("cart:order_rejected_timeline")}</span>
       </div>
     );
   }
 
   const statusIndex = LIFECYCLE_STEPS.findIndex((s) => s.status === order.status);
+  
+  // Custom icons mapping
+  const ICONS: Record<string, React.ElementType> = {
+    pending: ClipboardList,
+    confirmed: CheckCircle2,
+    processing: ChefHat,
+    completed: BellRing,
+    served: Utensils,
+    paid: CreditCard,
+  };
 
   return (
-    <div className="relative mt-2 pl-2">
-      <div className="absolute bottom-4 left-[11px] top-4 w-[2px] bg-gradient-to-b from-orange-200 via-slate-200 to-slate-100" />
-      <ol className="relative z-10 flex flex-col gap-5">
-        {LIFECYCLE_STEPS.map((step, idx) => {
-          const done = idx < statusIndex;
-          const current = idx === statusIndex;
-          
-          let displayLabel = step.label;
-          if (step.status === "pending") displayLabel = t("cart:order_placed_timeline");
-          else if (step.status === "confirmed") displayLabel = t("cart:confirmed_timeline");
-          else if (step.status === "processing") displayLabel = t("cart:being_prepared_timeline");
-          else if (step.status === "completed") displayLabel = t("cart:ready_timeline");
-          else if (step.status === "served") displayLabel = t("cart:served_timeline");
-          else if (step.status === "paid") displayLabel = t("cart:paid_timeline");
+    <div className="relative w-full overflow-x-auto pb-2 pt-2 scrollbar-hide">
+      <div className="min-w-[500px] relative">
+        {/* Background Line */}
+        <div className="absolute top-[22px] left-8 right-8 h-[2px] bg-slate-200" />
+        
+        {/* Progress Line */}
+        <div 
+          className="absolute top-[22px] left-8 h-[3px] bg-gradient-to-r from-orange-400 to-emerald-400 transition-all duration-700 ease-out rounded-full" 
+          style={{ width: `calc(${(Math.max(0, statusIndex) / (LIFECYCLE_STEPS.length - 1)) * 100}% - ${statusIndex === LIFECYCLE_STEPS.length - 1 ? '4rem' : '2rem'})` }}
+        />
+        
+        <ol className="relative z-10 flex justify-between px-2">
+          {LIFECYCLE_STEPS.map((step, idx) => {
+            const passed = idx < statusIndex;
+            const current = idx === statusIndex;
+            const Icon = ICONS[step.status] || ClipboardList;
+            
+            let displayLabel = step.label;
+            if (step.status === "pending") displayLabel = t("cart:order_placed_timeline");
+            else if (step.status === "confirmed") displayLabel = t("cart:confirmed_timeline");
+            else if (step.status === "processing") displayLabel = t("cart:being_prepared_timeline");
+            else if (step.status === "completed") displayLabel = t("cart:ready_timeline");
+            else if (step.status === "served") displayLabel = t("cart:served_timeline");
+            else if (step.status === "paid") displayLabel = t("cart:paid_timeline");
 
-          return (
-            <li key={step.status} className="group flex items-center gap-4">
-              <div
-                className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-500 ${
-                  done
-                    ? "bg-emerald-500 shadow-lg shadow-emerald-500/30"
-                    : current
-                    ? "bg-orange-500 shadow-lg shadow-orange-500/40 ring-4 ring-orange-100"
-                    : "bg-white border-2 border-slate-200"
-                }`}
-              >
-                {current && (
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75"></span>
-                )}
-                {done && (
-                  <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-                {current && <span className="h-2 w-2 rounded-full bg-white" />}
-              </div>
-              <span
-                className={`text-sm transition-all duration-300 ${
-                  current
-                    ? "font-bold text-slate-900 tracking-tight"
-                    : done
-                    ? "font-medium text-slate-500"
-                    : "font-medium text-slate-400"
-                }`}
-              >
-                {displayLabel}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+            return (
+              <li key={step.status} className="group flex flex-col items-center gap-3 relative w-16">
+                <div
+                  className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-all duration-500 z-10 ${
+                    passed
+                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
+                      : current
+                      ? "bg-orange-500 text-white shadow-lg shadow-orange-500/40 ring-4 ring-orange-100 scale-110"
+                      : "bg-white text-slate-400 border-2 border-slate-200"
+                  }`}
+                >
+                  {current && (
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75"></span>
+                  )}
+                  <Icon className={`w-5 h-5 transition-transform ${current ? 'scale-110' : ''}`} strokeWidth={current ? 2.5 : 2} />
+                </div>
+                <span
+                  className={`text-[10px] sm:text-[11px] leading-tight text-center transition-all duration-300 ${
+                    current
+                      ? "font-bold text-slate-900 scale-105"
+                      : passed
+                      ? "font-semibold text-slate-600"
+                      : "font-medium text-slate-400"
+                  }`}
+                >
+                  {displayLabel}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </div>
   );
 }
