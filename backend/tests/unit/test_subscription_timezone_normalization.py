@@ -14,22 +14,20 @@ from app.modules.subscriptions.service import (  # noqa: E402
 
 
 class SubscriptionTimezoneNormalizationTests(unittest.TestCase):
-    def test_normalize_datetime_converts_aware_value_to_naive_utc(self) -> None:
+    def test_normalize_datetime_converts_aware_value_to_aware_utc(self) -> None:
         source = datetime(2026, 3, 31, 12, 0, tzinfo=timezone(timedelta(hours=5, minutes=30)))
         normalized = _normalize_datetime(source)
 
-        self.assertEqual(normalized, datetime(2026, 3, 31, 6, 30))
-        self.assertIsNone(normalized.tzinfo)
+        self.assertEqual(normalized, datetime(2026, 3, 31, 6, 30, tzinfo=timezone.utc))
 
-    def test_normalize_datetime_keeps_naive_value_unchanged(self) -> None:
+    def test_normalize_datetime_makes_naive_value_aware_utc(self) -> None:
         source = datetime(2026, 3, 31, 12, 0)
         normalized = _normalize_datetime(source)
 
-        self.assertEqual(normalized, source)
-        self.assertIsNone(normalized.tzinfo)
+        self.assertEqual(normalized, source.replace(tzinfo=timezone.utc))
 
     def test_effective_status_uses_normalized_utc_for_aware_expiry(self) -> None:
-        now_utc = datetime(2026, 3, 31, 7, 0, 0)
+        now_utc = datetime(2026, 3, 31, 7, 0, 0, tzinfo=timezone.utc)
         sub = _SubscriptionStub(
             status=SubscriptionStatus.active,
             is_trial=False,
@@ -45,8 +43,8 @@ class SubscriptionTimezoneNormalizationTests(unittest.TestCase):
             trial_expires_at=None,
         )
 
-        with patch("app.modules.subscriptions.service._utcnow_naive", return_value=now_utc):
-            status_value = _effective_status(sub)
+        with patch("app.modules.subscriptions.service._utcnow_aware", return_value=now_utc):
+            status_value = _effective_status(sub)  # type: ignore
 
         self.assertEqual(status_value, SubscriptionStatus.expired.value)
 

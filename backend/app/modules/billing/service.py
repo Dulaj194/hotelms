@@ -864,7 +864,7 @@ def _build_settle_response_from_bill(
         bill_id=bill.id,
         restaurant_id=bill.restaurant_id,
     )
-    remaining_amount = round(max(bill.total_amount - paid_amount, 0), 2)
+    remaining_amount = round(max(float(bill.total_amount) - paid_amount, 0), 2)  # type: ignore
 
     return SettleSessionResponse(
         bill_id=bill.id,
@@ -875,7 +875,7 @@ def _build_settle_response_from_bill(
         room_id=room_id,
         room_number=room_number,
         order_count=order_count,
-        total_amount=round(bill.total_amount, 2),
+        total_amount=round(float(bill.total_amount), 2),  # type: ignore
         paid_amount=round(paid_amount, 2),
         remaining_amount=remaining_amount,
         payment_method=bill.payment_method or "manual",
@@ -938,7 +938,7 @@ def _settle_context_session(
             ),
         )
 
-    subtotal = sum(order.total_amount for order in billable_orders)
+    subtotal = sum(float(order.total_amount) for order in billable_orders)  # type: ignore
     if (
         existing_bill is not None
         and payload.tax_rule_mode == "none"
@@ -946,8 +946,8 @@ def _settle_context_session(
         and payload.discount_rule_mode == "none"
         and payload.discount_rule_value == 0
     ):
-        tax_amount = round(existing_bill.tax_amount, 2)
-        discount_amount = round(existing_bill.discount_amount, 2)
+        tax_amount = round(float(existing_bill.tax_amount), 2)  # type: ignore
+        discount_amount = round(float(existing_bill.discount_amount), 2)  # type: ignore
         total_amount = round(subtotal + tax_amount - discount_amount, 2)
     else:
         tax_amount, discount_amount, total_amount = _calculate_totals(subtotal, payload)
@@ -965,7 +965,7 @@ def _settle_context_session(
     if not requested_payments:
         fallback_amount = payload.paid_amount
         if fallback_amount is None:
-            fallback_amount = round(max(total_amount - existing_paid_amount, 0), 2)
+            fallback_amount = round(max(float(total_amount) - existing_paid_amount, 0), 2)  # type: ignore
         if fallback_amount > 0:
             requested_payments = [
                 type("AutoSettlementPayment", (), {
