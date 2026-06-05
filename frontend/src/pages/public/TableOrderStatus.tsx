@@ -213,9 +213,9 @@ export default function TableOrderStatus() {
   const statusLabel = ORDER_STATUS_LABEL[order.status];
   const statusColor = ORDER_STATUS_COLOR[order.status];
   return (
-    <div className="min-h-dvh bg-slate-50 flex flex-col">
+    <div className="min-h-dvh bg-gradient-to-br from-slate-50 via-white to-blue-50 flex flex-col selection:bg-orange-200">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-white/60 bg-white/70 shadow-sm backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-lg items-center justify-between px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <p className="truncate text-base font-semibold text-slate-900">{order.order_number}</p>
@@ -233,9 +233,9 @@ export default function TableOrderStatus() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col space-y-4 px-4 py-4 pb-28 sm:px-5 sm:py-6 sm:pb-8">
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col space-y-5 px-4 py-6 pb-28 sm:px-5 sm:py-8">
         {/* Status timeline */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <section className="rounded-[2rem] border border-white/80 bg-white/60 p-5 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:bg-white/80 sm:p-6">
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-sm">
             {t("cart:order_status_title")}
           </h2>
@@ -243,7 +243,7 @@ export default function TableOrderStatus() {
         </section>
 
         {/* Items */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <section className="rounded-[2rem] border border-white/80 bg-white/60 p-5 shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:bg-white/80 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 sm:text-sm">
             {t("cart:items")}
           </h2>
@@ -251,7 +251,7 @@ export default function TableOrderStatus() {
             {order.items.map((item) => (
               <div
                 key={item.id}
-                className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-sm"
+                className="group flex items-start justify-between gap-3 rounded-2xl border border-white/50 bg-white/50 px-4 py-3.5 text-sm shadow-sm transition-all duration-300 hover:scale-[1.02] hover:bg-white hover:shadow-md"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-slate-900">
@@ -273,7 +273,7 @@ export default function TableOrderStatus() {
         </section>
 
         {/* Totals */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5">
+        <section className="rounded-[2rem] border border-white/80 bg-white/60 p-5 text-sm shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:bg-white/80 sm:p-6">
           <div className="flex justify-between py-1">
             <span className="text-slate-500">{t("cart:subtotal")}</span>
             <span>${order.subtotal_amount.toFixed(2)}</span>
@@ -298,7 +298,7 @@ export default function TableOrderStatus() {
 
         {/* Notes */}
         {order.notes && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm sm:p-5">
+          <section className="rounded-[2rem] border border-white/80 bg-white/60 p-5 text-sm shadow-xl shadow-slate-200/40 backdrop-blur-xl transition-all duration-300 hover:bg-white/80 sm:p-6">
             <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               {t("cart:notes")}
             </p>
@@ -321,9 +321,12 @@ export default function TableOrderStatus() {
                   ? `/orders/my/${restaurantId}/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
                   : `/orders/my/${restaurantId}/${tableNumber}`
               }
-              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-50 border border-blue-200 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+              className="group relative inline-flex min-h-[3.25rem] w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 px-6 text-sm font-medium text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl active:scale-95"
             >
-              {t("cart:view_my_orders")}
+              <div className="absolute inset-0 flex h-full w-full justify-center [transform:skew(-12deg)_translateX(-100%)] group-hover:duration-1000 group-hover:[transform:skew(-12deg)_translateX(100%)]">
+                <div className="relative h-full w-8 bg-white/20" />
+              </div>
+              <span className="relative z-10">{t("cart:view_my_orders")}</span>
             </Link>
             <Link
               to={
@@ -331,7 +334,7 @@ export default function TableOrderStatus() {
                   ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
                   : `/menu/${restaurantId}/table/${tableNumber}`
               }
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-orange-200 px-4 text-sm font-semibold text-orange-700 transition hover:bg-orange-50"
+              className="inline-flex min-h-[3.25rem] w-full items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 text-sm font-medium text-slate-700 shadow-sm transition-all duration-300 hover:bg-slate-50 hover:text-slate-900 active:scale-95"
             >
               {t("cart:back_to_menu")}
             </Link>
@@ -340,7 +343,7 @@ export default function TableOrderStatus() {
       </main>
 
       {order.status === "pending" && cancelRemaining > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:static sm:mx-auto sm:w-full sm:max-w-lg sm:border-t-0 sm:bg-transparent sm:px-5 sm:pb-0 sm:pt-0 sm:shadow-none">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/40 bg-white/80 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-4 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl sm:static sm:mx-auto sm:w-full sm:max-w-lg sm:border-t-0 sm:bg-transparent sm:px-5 sm:pb-0 sm:pt-0 sm:shadow-none">
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 sm:mb-6 sm:bg-white">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">
@@ -354,7 +357,7 @@ export default function TableOrderStatus() {
               type="button"
               onClick={() => void handleCancelOrder()}
               disabled={canceling}
-              className="min-h-12 w-full rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+              className="min-h-[3.25rem] w-full rounded-2xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-600/30 transition-all duration-300 hover:bg-red-700 hover:shadow-xl hover:shadow-red-600/40 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {canceling ? t("cart:cancelling") : `${t("cart:cancel_order")} (${cancelRemaining}s)`}
             </button>
@@ -391,44 +394,57 @@ function OrderTimeline({ order }: { order: OrderDetailResponse }) {
   const statusIndex = LIFECYCLE_STEPS.findIndex((s) => s.status === order.status);
 
   return (
-    <ol className="flex flex-col gap-2.5">
-      {LIFECYCLE_STEPS.map((step, idx) => {
-        const done = idx < statusIndex;
-        const current = idx === statusIndex;
-        
-        let displayLabel = step.label;
-        if (step.status === "pending") displayLabel = t("cart:order_placed_timeline");
-        else if (step.status === "confirmed") displayLabel = t("cart:confirmed_timeline");
-        else if (step.status === "processing") displayLabel = t("cart:being_prepared_timeline");
-        else if (step.status === "completed") displayLabel = t("cart:ready_timeline");
-        else if (step.status === "served") displayLabel = t("cart:served_timeline");
-        else if (step.status === "paid") displayLabel = t("cart:paid_timeline");
+    <div className="relative mt-2 pl-2">
+      <div className="absolute bottom-4 left-[11px] top-4 w-[2px] bg-gradient-to-b from-orange-200 via-slate-200 to-slate-100" />
+      <ol className="relative z-10 flex flex-col gap-5">
+        {LIFECYCLE_STEPS.map((step, idx) => {
+          const done = idx < statusIndex;
+          const current = idx === statusIndex;
+          
+          let displayLabel = step.label;
+          if (step.status === "pending") displayLabel = t("cart:order_placed_timeline");
+          else if (step.status === "confirmed") displayLabel = t("cart:confirmed_timeline");
+          else if (step.status === "processing") displayLabel = t("cart:being_prepared_timeline");
+          else if (step.status === "completed") displayLabel = t("cart:ready_timeline");
+          else if (step.status === "served") displayLabel = t("cart:served_timeline");
+          else if (step.status === "paid") displayLabel = t("cart:paid_timeline");
 
-        return (
-          <li key={step.status} className="flex items-center gap-3 rounded-lg px-1 py-1 text-sm">
-            <span
-              className={`w-3 h-3 rounded-full shrink-0 ${
-                done
-                  ? "bg-green-500"
-                  : current
-                  ? "bg-orange-500 ring-2 ring-orange-200"
-                  : "bg-gray-200"
-              }`}
-            />
-            <span
-              className={
-                current
-                  ? "font-semibold text-gray-900"
-                  : done
-                  ? "text-gray-500 line-through"
-                  : "text-gray-400"
-              }
-            >
-              {displayLabel}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+          return (
+            <li key={step.status} className="group flex items-center gap-4">
+              <div
+                className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-500 ${
+                  done
+                    ? "bg-emerald-500 shadow-lg shadow-emerald-500/30"
+                    : current
+                    ? "bg-orange-500 shadow-lg shadow-orange-500/40 ring-4 ring-orange-100"
+                    : "bg-white border-2 border-slate-200"
+                }`}
+              >
+                {current && (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75"></span>
+                )}
+                {done && (
+                  <svg className="h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {current && <span className="h-2 w-2 rounded-full bg-white" />}
+              </div>
+              <span
+                className={`text-sm transition-all duration-300 ${
+                  current
+                    ? "font-bold text-slate-900 tracking-tight"
+                    : done
+                    ? "font-medium text-slate-500"
+                    : "font-medium text-slate-400"
+                }`}
+              >
+                {displayLabel}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
