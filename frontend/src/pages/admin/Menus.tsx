@@ -10,6 +10,7 @@ import {
 import { useTenantContext } from "@/hooks/useTenantContext";
 import { ApiError, api } from "@/lib/api";
 import type { Menu } from "@/types/menu";
+import type { PaginatedResponse } from "@/lib/pagination";
 
 interface FormData {
   name: string;
@@ -57,8 +58,8 @@ export default function Menus() {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get<Menu[]>("/menus");
-      setMenus(response);
+      const response = await api.get<PaginatedResponse<Menu>>("/menus?limit=500");
+      setMenus(response.items || []);
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Failed to load menus."));
     } finally {
