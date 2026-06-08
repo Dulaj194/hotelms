@@ -336,32 +336,31 @@ export default function ItemDetailSheet({
           </div>
         </div>
 
-        {/* Sticky Action Bar */}
-        <div className="shrink-0 border-t border-slate-100 bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom,24px))] shadow-[0_-10px_40px_rgba(0,0,0,0.04)]">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="flex h-16 items-center justify-between rounded-2xl bg-slate-100 p-1.5 sm:w-44">
+        <div className="shrink-0 border-t border-slate-100 bg-white p-4 sm:p-6 pb-[max(1.5rem,env(safe-area-inset-bottom,24px))] shadow-[0_-10px_40px_rgba(0,0,0,0.04)]">
+          <div className="flex items-center gap-3">
+            <div className="flex h-14 items-center justify-between rounded-2xl bg-slate-100 p-1.5 w-32 shrink-0">
               <button
                 onClick={decrement}
-                className="grid h-12 w-12 place-items-center rounded-xl bg-white text-slate-900 shadow-sm transition active:scale-90 disabled:opacity-30"
+                className="grid h-11 w-11 place-items-center rounded-xl bg-white text-slate-900 shadow-sm transition active:scale-90 disabled:opacity-30"
                 disabled={localQty <= 1}
               >
-                <Minus className="h-5 w-5" />
+                <Minus className="h-4 w-4" />
               </button>
-              <span className="text-xl font-black text-slate-900">
+              <span className="text-lg font-black text-slate-900">
                 {localQty}
               </span>
               <button
                 onClick={increment}
-                className="grid h-12 w-12 place-items-center rounded-xl bg-white text-slate-900 shadow-sm transition active:scale-90"
+                className="grid h-11 w-11 place-items-center rounded-xl bg-white text-slate-900 shadow-sm transition active:scale-90"
               >
-                <Plus className="h-5 w-5" />
+                <Plus className="h-4 w-4" />
               </button>
             </div>
 
             <button
               onClick={handleAdd}
               disabled={adding || !item.is_available}
-              className={`group relative flex h-16 flex-1 items-center justify-center gap-3 overflow-hidden rounded-2xl text-base font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] ${
+              className={`group relative flex h-14 flex-1 items-center justify-center gap-2 overflow-hidden rounded-2xl text-sm sm:text-base font-bold shadow-lg shadow-orange-500/20 transition-all active:scale-[0.98] ${
                 success
                   ? "bg-emerald-500 text-white shadow-emerald-500/20"
                   : "bg-orange-500 text-white hover:bg-orange-600 active:bg-orange-700"

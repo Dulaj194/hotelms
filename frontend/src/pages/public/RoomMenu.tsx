@@ -551,11 +551,11 @@ export default function RoomMenu() {
       <div
         key={item.id}
         onClick={() => setSelectedItem(item)}
-        className={`box-border flex h-full w-full max-w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition-all hover:shadow-md ${
+        className={`box-border flex h-full w-full max-w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-all hover:shadow-md ${
           !item.is_available ? "opacity-60" : ""
         } ${activeOffer ? "ring-2 ring-orange-500/30 border-orange-200" : ""}`}
       >
-        <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-50">
+        <div className="relative aspect-[16/9] sm:aspect-[4/3] w-full overflow-hidden bg-slate-50">
           <SafeMenuAsset
             path={item.image_path}
             alt={displayName}
@@ -908,7 +908,7 @@ export default function RoomMenu() {
                     <p className="text-sm font-medium text-gray-400">{t("menu:no_items_found")}</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3 min-[380px]:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 md:grid-cols-3">
                     {items.map(renderItemCard)}
                   </div>
                 )}

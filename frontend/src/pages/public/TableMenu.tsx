@@ -724,7 +724,7 @@ export default function TableMenu() {
         }`}
       >
         {/* 1. Image Section */}
-        <div className="relative w-full overflow-hidden rounded-[16px] bg-[#F8F9FB] h-[140px] sm:h-[160px] lg:h-[180px]">
+        <div className="relative w-full overflow-hidden rounded-[16px] bg-[#F8F9FB] aspect-[16/9] sm:aspect-auto sm:h-[160px] lg:h-[180px]">
           <SafeMenuAsset
             path={item.image_path}
             alt={displayName}
@@ -1145,7 +1145,7 @@ export default function TableMenu() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
                     {categoryTiles.map(renderItemCard)}
                   </div>
                 </div>
