@@ -15,6 +15,7 @@ import {
   UserRound,
   UtensilsCrossed,
   X,
+  Plus,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
@@ -816,20 +817,23 @@ export default function TableMenu() {
                   e.stopPropagation();
                   handleAddToCart(item.id);
                 }}
-                className={`flex h-[48px] w-full items-center justify-center gap-2 rounded-[16px] text-[16px] font-semibold transition-all duration-300 active:scale-[0.98] disabled:opacity-40 ${
+                className={`flex h-[44px] w-full items-center justify-center gap-2 rounded-xl border text-[14px] font-semibold transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
                   recentlyAddedItemId === item.id
-                    ? "bg-emerald-500 text-white"
-                    : "bg-[#FF7A00] text-white hover:brightness-105"
+                    ? "border-emerald-500 bg-emerald-500 text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300"
                 }`}
               >
                 {isAdding ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
                 ) : recentlyAddedItemId === item.id ? (
-                  <Check className="h-5 w-5 animate-in zoom-in-50" />
+                  <>
+                    <Check className="h-4 w-4 animate-in zoom-in-50" />
+                    <span>Added!</span>
+                  </>
                 ) : (
                   <>
+                    <Plus className="h-4 w-4 text-slate-400" />
                     <span>{t("menu:add_to_cart")}</span>
-                    <ShoppingCart className="h-4 w-4" />
                   </>
                 )}
               </button>

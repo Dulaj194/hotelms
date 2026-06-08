@@ -12,7 +12,7 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Check, ChefHat, ChevronRight, Menu as MenuIcon, Search, ShoppingCart, X } from "lucide-react";
+import { Bell, Check, ChefHat, Plus, Menu as MenuIcon, Search, ShoppingCart, X } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
@@ -646,23 +646,23 @@ export default function RoomMenu() {
                 e.stopPropagation();
                 handleAddToCart(item.id);
               }}
-              className={`box-border flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-semibold text-white transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
+              className={`box-border flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
                 recentlyAddedItemId === item.id
-                  ? "bg-emerald-500 shadow-md shadow-emerald-500/20"
-                  : "bg-orange-500 hover:bg-orange-600"
+                  ? "border-emerald-500 bg-emerald-500 text-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300"
               }`}
             >
               {isAdding ? (
-                "Adding..."
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
               ) : recentlyAddedItemId === item.id ? (
                 <>
                   <Check className="h-4 w-4 animate-in zoom-in-50" />
-                  Added!
+                  <span>Added!</span>
                 </>
               ) : (
                 <>
+                  <Plus className="h-3.5 w-3.5 text-slate-400" />
                   <span>{t("menu:add_to_cart")}</span>
-                  <ChevronRight className="h-3.5 w-3.5" />
                 </>
               )}
             </button>
