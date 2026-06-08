@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { api } from "@/lib/api";
-import type { RoomListResponse, RoomResponse } from "@/types/room";
+import type { RoomResponse } from "@/types/room";
+import type { PaginatedResponse } from "@/lib/pagination";
 import type { StaffListItemResponse } from "@/types/user";
 import type {
   HousekeepingDailySummaryResponse,
@@ -83,8 +84,8 @@ export function useHousekeepingData({
     }
 
     try {
-      const data = await api.get<RoomListResponse>("/rooms");
-      setRooms(data.rooms);
+      const data = await api.get<PaginatedResponse<RoomResponse>>("/rooms?limit=500");
+      setRooms(data.items);
     } catch {
       setRooms([]);
     }

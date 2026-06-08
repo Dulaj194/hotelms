@@ -42,9 +42,7 @@ class RoomResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class RoomListResponse(BaseModel):
-    rooms: list[RoomResponse]
-    total: int
+
 
 
 class RoomStatusResponse(BaseModel):

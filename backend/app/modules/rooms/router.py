@@ -13,7 +13,6 @@ from app.modules.access import role_catalog
 from app.modules.rooms import service
 from app.modules.rooms.schemas import (
     RoomCreateRequest,
-    RoomListResponse,
     RoomResponse,
     RoomStatusResponse,
     RoomUpdateRequest,

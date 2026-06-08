@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "@/lib/api";
-import type { RoomListResponse, RoomResponse } from "@/types/room";
+import type { RoomResponse } from "@/types/room";
 import type { BulkQRCodeResponse } from "@/types/publicMenu";
+import type { PaginatedResponse } from "@/lib/pagination";
 
 import {
   FeedbackAlert,
@@ -109,9 +110,9 @@ export default function GenerateRoomQRCodes() {
     setError(null);
 
     try {
-      const data = await api.get<RoomListResponse>("/rooms");
-      setRooms(data.rooms);
-      syncDefaultSelectedRooms(data.rooms);
+      const data = await api.get<PaginatedResponse<RoomResponse>>("/rooms?limit=500");
+      setRooms(data.items);
+      syncDefaultSelectedRooms(data.items);
     } catch (loadError) {
       setError(getApiErrorMessage(loadError, "Failed to load rooms."));
     } finally {

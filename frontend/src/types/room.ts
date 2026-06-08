@@ -12,10 +12,7 @@ export interface RoomResponse {
   updated_at: string;
 }
 
-export interface RoomListResponse {
-  rooms: RoomResponse[];
-  total: number;
-}
+
 
 export interface RoomStatusResponse {
   id: number;
