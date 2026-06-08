@@ -47,6 +47,8 @@ interface OrderCardProps {
   getItemImageUrl: (path: string | null | undefined) => string | undefined;
   t: any;
   guestSessionName: string | null;
+  isExpanded: boolean;
+  onToggle: () => void;
 }
 
 function OrderCard({
@@ -56,8 +58,9 @@ function OrderCard({
   getItemImageUrl,
   t,
   guestSessionName,
+  isExpanded,
+  onToggle,
 }: OrderCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const itemCount = order.item_previews?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
   
   const formatPlacedAt = (dateString: string): string => {
@@ -79,7 +82,7 @@ function OrderCard({
   return (
     <div className={`overflow-hidden rounded-3xl border transition-all duration-300 shadow-sm ${isExpanded ? 'border-orange-300 ring-4 ring-orange-50/50' : 'border-slate-200 hover:border-orange-200 hover:shadow-md'} bg-white`}>
       <div 
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={onToggle}
         className={`cursor-pointer p-4 transition-colors ${isExpanded ? 'bg-white' : 'hover:bg-slate-50/50'} flex flex-col gap-3 relative`}
       >
         <div className="absolute top-4 right-4 text-slate-400">
@@ -242,6 +245,7 @@ function OrderCard({
 export default function GuestOrdersList() {
   const { t, i18n } = useTranslation(["common", "menu", "cart"]);
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
 
   useEffect(() => {
     const handleLangChange = (lng: string) => {
@@ -427,6 +431,7 @@ export default function GuestOrdersList() {
     if (index === -1) return;
 
     setActiveTab(tab);
+    setExpandedOrderId(null); // Close any expanded card when switching tabs
 
     if (scrollRef.current) {
       isScrollingRef.current = true;
@@ -566,6 +571,8 @@ export default function GuestOrdersList() {
                       getItemImageUrl={getItemImageUrl}
                       t={t}
                       guestSessionName={guestName}
+                      isExpanded={expandedOrderId === order.id}
+                      onToggle={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
                     />
                   ))
                 )}
