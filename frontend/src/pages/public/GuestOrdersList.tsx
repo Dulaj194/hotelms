@@ -781,8 +781,14 @@ export default function GuestOrdersList() {
           </div>
 
           {showBillPopup && (
-            <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/40 backdrop-blur-sm sm:items-center sm:justify-center p-4">
-              <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+            <div 
+              className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/40 backdrop-blur-sm sm:items-center sm:justify-center p-4"
+              onClick={() => setShowBillPopup(false)}
+            >
+              <div 
+                className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <div className="flex items-center justify-between p-5 border-b border-slate-100">
                   <h2 className="text-lg font-black text-slate-900">{t("cart:your_bill_title", "Your Bill")}</h2>
                   <button 
