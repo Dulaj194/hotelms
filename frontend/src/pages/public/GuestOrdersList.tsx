@@ -465,6 +465,46 @@ export default function GuestOrdersList() {
     );
   }, [orders]);
 
+  const aggregatedBill = useMemo(() => {
+    const itemsMap = new Map<string, {
+      name: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+    }>();
+
+    let totalTax = 0;
+    let totalAmount = 0;
+
+    orders.filter(o => o.status !== 'rejected').forEach(order => {
+      totalTax += order.tax_amount || 0;
+      totalAmount += order.total_amount || 0;
+      
+      order.item_previews?.forEach(item => {
+        const key = `${item.item_name_snapshot}-${item.unit_price_snapshot}`; 
+        if (itemsMap.has(key)) {
+          const existing = itemsMap.get(key)!;
+          existing.quantity += item.quantity;
+          existing.totalPrice += item.quantity * item.unit_price_snapshot;
+        } else {
+          itemsMap.set(key, {
+            name: item.item_name_snapshot_localized || item.item_name_snapshot,
+            quantity: item.quantity,
+            unitPrice: item.unit_price_snapshot,
+            totalPrice: item.quantity * item.unit_price_snapshot,
+          });
+        }
+      });
+    });
+
+    return {
+      items: Array.from(itemsMap.values()),
+      totalTax,
+      totalAmount,
+      subtotal: totalAmount - totalTax,
+    };
+  }, [orders]);
+
   const sortedOrders = useMemo(
     () =>
       [...orders].sort((a, b) => {
@@ -753,43 +793,39 @@ export default function GuestOrdersList() {
                   </button>
                 </div>
                 
-                <div className="overflow-y-auto p-5 space-y-5 flex-1">
-                  {orders.filter(o => o.status !== 'rejected').map(order => (
-                    <div key={order.id} className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500">Order #{order.order_number}</span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ORDER_STATUS_COLOR[order.status]}`}>
-                          {ORDER_STATUS_LABEL[order.status]}
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {order.item_previews?.map((item, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-sm">
-                            <div className="flex items-start gap-2">
-                              <span className="font-semibold text-slate-800">{item.quantity}x</span>
-                              <span className="font-medium text-slate-600 line-clamp-2">
-                                {item.item_name_snapshot_localized || item.item_name_snapshot}
-                              </span>
-                            </div>
-                            <span className="font-bold text-slate-900 shrink-0 ml-4">
-                              ${(item.quantity * item.unit_price_snapshot).toFixed(2)}
+                <div className="overflow-y-auto p-5 space-y-4 flex-1">
+                  {aggregatedBill.items.length > 0 ? (
+                    <div className="space-y-3">
+                      {aggregatedBill.items.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-sm">
+                          <div className="flex items-start gap-2">
+                            <span className="font-semibold text-slate-800">{item.quantity}x</span>
+                            <span className="font-medium text-slate-600 line-clamp-2">
+                              {item.name}
                             </span>
                           </div>
-                        ))}
-                      </div>
-                      <div className="flex justify-between text-xs text-slate-500 border-t border-slate-100 pt-2">
-                        <span>Tax</span>
-                        <span>${order.tax_amount.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm font-black text-slate-800 border-b border-slate-100 pb-3">
-                        <span>Subtotal</span>
-                        <span>${order.total_amount.toFixed(2)}</span>
-                      </div>
+                          <span className="font-bold text-slate-900 shrink-0 ml-4">
+                            ${item.totalPrice.toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  {orders.filter(o => o.status !== 'rejected').length === 0 && (
+                  ) : (
                     <div className="text-center py-6 text-slate-500 text-sm">
                       {t("cart:no_active_orders", "No active orders right now")}
+                    </div>
+                  )}
+
+                  {aggregatedBill.items.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
+                      <div className="flex justify-between text-sm text-slate-500">
+                        <span>Subtotal</span>
+                        <span>${aggregatedBill.subtotal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-slate-500">
+                        <span>Tax</span>
+                        <span>${aggregatedBill.totalTax.toFixed(2)}</span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -797,7 +833,7 @@ export default function GuestOrdersList() {
                 <div className="p-5 bg-slate-50 border-t border-slate-100 space-y-4 shrink-0">
                   <div className="flex items-center justify-between">
                     <span className="text-base font-black text-slate-900">Total Due</span>
-                    <span className="text-xl font-black text-orange-600">{formatCurrency(totals.total)}</span>
+                    <span className="text-xl font-black text-orange-600">{formatCurrency(aggregatedBill.totalAmount)}</span>
                   </div>
                   
                   <button
