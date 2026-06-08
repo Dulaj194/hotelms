@@ -140,7 +140,6 @@ const POLL_INTERVAL_MS = 5_000;
 interface OrderCardProps {
   order: OrderHeaderResponse;
   tab: OrdersFilterTab;
-  effectiveQrAccessKey: string;
   getItemImageUrl: (path: string | null | undefined) => string | undefined;
   t: any;
   guestSessionName: string | null;
@@ -151,7 +150,6 @@ interface OrderCardProps {
 function OrderCard({
   order,
   tab,
-  effectiveQrAccessKey,
   getItemImageUrl,
   t,
   guestSessionName,
@@ -169,10 +167,6 @@ function OrderCard({
   const previews = order.item_previews || [];
   const imagesToShow = previews.slice(0, 3);
   const extraCount = Math.max(0, previews.length - 3);
-
-  const orderUrl = effectiveQrAccessKey
-      ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(effectiveQrAccessKey)}`
-      : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`;
 
   const displayGuestName = order.customer_name || guestSessionName;
 
@@ -252,39 +246,23 @@ function OrderCard({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-2">
-          {tab === "active" && (
-            <Link
-              to={orderUrl}
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-full bg-orange-500 px-4 py-1.5 text-[12px] font-bold text-white transition hover:bg-orange-600 shadow-sm flex items-center gap-1"
-            >
-              {t("cart:track_order_btn")}
-            </Link>
-          )}
-          {tab === "completed" && (
-            <>
+        {(tab === "completed" || tab === "canceled") && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {tab === "completed" && (
               <button 
                 onClick={(e) => { e.stopPropagation(); }}
                 className="rounded-full bg-orange-100 px-4 py-1.5 text-[12px] font-bold text-orange-600 hover:bg-orange-200 transition"
               >
                 {t("cart:leave_review_btn")}
               </button>
-              <Link
-                to={orderUrl}
-                onClick={(e) => e.stopPropagation()}
-                className="rounded-full bg-slate-900 px-4 py-1.5 text-[12px] font-bold text-white transition hover:bg-slate-800 shadow-sm"
-              >
-                {t("cart:order_again_btn")}
-              </Link>
-            </>
-          )}
-          {tab === "canceled" && (
-            <span className="rounded-full bg-orange-100 px-4 py-1.5 text-[12px] font-semibold text-orange-600">
-              {t("cart:order_canceled_btn")}
-            </span>
-          )}
-        </div>
+            )}
+            {tab === "canceled" && (
+              <span className="rounded-full bg-orange-100 px-4 py-1.5 text-[12px] font-semibold text-orange-600">
+                {t("cart:order_canceled_btn")}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {isExpanded && (
@@ -666,7 +644,6 @@ export default function GuestOrdersList() {
                       key={order.id}
                       order={order}
                       tab={tab}
-                      effectiveQrAccessKey={effectiveQrAccessKey}
                       getItemImageUrl={getItemImageUrl}
                       t={t}
                       guestSessionName={guestName}
