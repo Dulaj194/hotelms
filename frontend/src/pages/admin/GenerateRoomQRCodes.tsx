@@ -266,7 +266,15 @@ export default function GenerateRoomQRCodes() {
           {loading ? (
             <div className="py-10 text-center text-gray-400">Loading rooms...</div>
           ) : visibleRooms.length === 0 ? (
-            <div className="py-10 text-center text-gray-400">No rooms found.</div>
+            <div className="py-10 text-center">
+              <p className="text-gray-400 mb-4">No rooms found.</p>
+              <Link
+                to="/admin/housekeeping/rooms"
+                className="app-btn-base bg-orange-500 text-white hover:bg-orange-600 inline-block"
+              >
+                + Add Rooms First
+              </Link>
+            </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {visibleRooms.map((room) => (
