@@ -28,13 +28,13 @@ export function useOffers(enabled: boolean) {
     try {
       const [offersRes, menusRes, categoriesRes, itemsRes] = await Promise.all([
         api.get<OfferListResponse>("/offers"),
-        api.get<Menu[]>("/menus"),
+        api.get<Menu[] | PaginatedResponse<Menu>>("/menus?limit=500"),
         api.get<Category[] | PaginatedResponse<Category>>("/categories?limit=500"),
         api.get<Item[] | PaginatedResponse<Item>>("/items?limit=500"),
       ]);
 
       setOffers(offersRes.items);
-      setMenus(menusRes);
+      setMenus(unwrapPaginated(menusRes));
       setCategories(unwrapPaginated(categoriesRes));
       setItems(unwrapPaginated(itemsRes));
     } catch (error) {

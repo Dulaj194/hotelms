@@ -9,7 +9,7 @@ import {
 } from "@/components/shared/TenantScopeNotice";
 import { useTenantContext } from "@/hooks/useTenantContext";
 import { api } from "@/lib/api";
-import type { PaginatedResponse } from "@/lib/pagination";
+import { unwrapPaginated, type PaginatedResponse } from "@/lib/pagination";
 import type { Category, Menu } from "@/types/menu";
 
 interface FormData {
@@ -78,7 +78,7 @@ export default function MenuCategories() {
 
       const [catsRes, menusRes] = await Promise.all([
         api.get<PaginatedResponse<Category>>(url),
-        api.get<Menu[]>("/menus"),
+        api.get<PaginatedResponse<Menu>>("/menus?limit=500"),
       ]);
       
       const isPaginated = !Array.isArray(catsRes) && "items" in catsRes;
@@ -87,7 +87,7 @@ export default function MenuCategories() {
         setTotalItems(catsRes.total);
         setTotalPages(catsRes.total_pages);
       }
-      setMenus(menusRes);
+      setMenus(unwrapPaginated(menusRes));
     } catch {
       setError("Failed to load categories.");
     } finally {

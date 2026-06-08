@@ -24,12 +24,12 @@ export function useOfferLookups(enabled: boolean) {
 
     try {
       const [menusRes, categoriesRes, itemsRes] = await Promise.all([
-        api.get<Menu[]>("/menus"),
+        api.get<Menu[] | PaginatedResponse<Menu>>("/menus?limit=500"),
         api.get<Category[] | PaginatedResponse<Category>>("/categories?limit=500"),
         api.get<Item[] | PaginatedResponse<Item>>("/items?limit=500"),
       ]);
 
-      setMenus(menusRes);
+      setMenus(unwrapPaginated(menusRes));
       setCategories(unwrapPaginated(categoriesRes));
       setItems(unwrapPaginated(itemsRes));
     } catch (error) {
