@@ -491,6 +491,39 @@ export default function GuestOrdersList() {
 
   const tabs: OrdersFilterTab[] = ["active", "completed", "canceled"];
 
+  const initialTabSelectedRef = useRef(false);
+
+  useEffect(() => {
+    if (!loading && !initialTabSelectedRef.current) {
+      initialTabSelectedRef.current = true;
+      let targetTab: OrdersFilterTab = "active";
+      if (tabCounts.active > 0) {
+        targetTab = "active";
+      } else if (tabCounts.completed > 0) {
+        targetTab = "completed";
+      } else if (tabCounts.canceled > 0) {
+        targetTab = "canceled";
+      }
+
+      if (targetTab !== "active") {
+        setActiveTab(targetTab);
+        setTimeout(() => {
+          if (scrollRef.current) {
+            const targetIndex = targetTab === "completed" ? 1 : 2;
+            isScrollingRef.current = true;
+            scrollRef.current.scrollTo({
+              left: scrollRef.current.clientWidth * targetIndex,
+              behavior: "auto",
+            });
+            setTimeout(() => {
+              isScrollingRef.current = false;
+            }, 100);
+          }
+        }, 10);
+      }
+    }
+  }, [loading, tabCounts.active, tabCounts.completed, tabCounts.canceled]);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (isScrollingRef.current) return;
     const { scrollLeft, clientWidth } = e.currentTarget;
