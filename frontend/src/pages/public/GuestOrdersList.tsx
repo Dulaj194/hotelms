@@ -6,6 +6,13 @@ import {
   Receipt,
   ChevronDown,
   ChevronUp,
+  ClipboardList, 
+  CheckCircle2, 
+  ChefHat, 
+  BellRing, 
+  Utensils, 
+  CreditCard,
+  XCircle 
 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -18,7 +25,7 @@ import {
   resolveTableQrAccessKey,
   restoreTableGuestSession,
 } from "@/features/public/tableSession";
-import type { OrderHeaderResponse } from "@/types/order";
+import type { OrderHeaderResponse, OrderStatus } from "@/types/order";
 import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 import { toAssetUrl } from "@/lib/assets";
 import { useTranslation } from "react-i18next";
@@ -33,6 +40,96 @@ const TAB_TO_STATUSES: Record<OrdersFilterTab, OrderHeaderResponse["status"][]> 
   canceled: ["rejected"],
 };
 
+const LIFECYCLE_STEPS: Array<{ status: OrderStatus; label: string }> = [
+  { status: "pending", label: "Order placed" },
+  { status: "confirmed", label: "Confirmed" },
+  { status: "processing", label: "Being prepared" },
+  { status: "completed", label: "Ready" },
+  { status: "served", label: "Served" },
+  { status: "paid", label: "Paid" },
+];
+
+function OrderTimeline({ status, t }: { status: OrderStatus; t: any }) {
+  if (status === "rejected") {
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 text-rose-700 shadow-sm backdrop-blur-md mb-4 mx-2">
+        <XCircle className="h-6 w-6 text-red-500" />
+        <span className="text-sm font-semibold">{t("cart:order_rejected_timeline", "Order Rejected")}</span>
+      </div>
+    );
+  }
+
+  const statusIndex = LIFECYCLE_STEPS.findIndex((s) => s.status === status);
+  
+  const ICONS: Record<string, React.ElementType> = {
+    pending: ClipboardList,
+    confirmed: CheckCircle2,
+    processing: ChefHat,
+    completed: BellRing,
+    served: Utensils,
+    paid: CreditCard,
+  };
+
+  return (
+    <div className="relative w-full pb-4 pt-2 mb-4 bg-white rounded-3xl border border-slate-100/60 p-4 shadow-sm">
+      <div className="w-full relative">
+        <div className="absolute top-[15px] sm:top-[21px] left-[1rem] right-[1rem] sm:left-[2rem] sm:right-[2rem]">
+          <div className="w-full h-[2px] bg-slate-100 absolute top-0" />
+          <div 
+            className="absolute top-0 left-0 h-[3px] bg-gradient-to-r from-orange-400 to-emerald-400 transition-all duration-700 ease-out rounded-full" 
+            style={{ width: `${(Math.max(0, statusIndex) / (LIFECYCLE_STEPS.length - 1)) * 100}%` }}
+          />
+        </div>
+        
+        <ol className="relative z-10 flex justify-between w-full">
+          {LIFECYCLE_STEPS.map((step, idx) => {
+            const passed = idx < statusIndex;
+            const current = idx === statusIndex;
+            const Icon = ICONS[step.status] || ClipboardList;
+            
+            let displayLabel = step.label;
+            if (step.status === "pending") displayLabel = t("cart:order_placed_timeline", "Placed");
+            else if (step.status === "confirmed") displayLabel = t("cart:confirmed_timeline", "Confirmed");
+            else if (step.status === "processing") displayLabel = t("cart:being_prepared_timeline", "Preparing");
+            else if (step.status === "completed") displayLabel = t("cart:ready_timeline", "Ready");
+            else if (step.status === "served") displayLabel = t("cart:served_timeline", "Served");
+            else if (step.status === "paid") displayLabel = t("cart:paid_timeline", "Paid");
+
+            return (
+              <li key={step.status} className="group flex flex-col items-center gap-1.5 sm:gap-3 relative w-10 sm:w-16">
+                <div
+                  className={`relative flex h-8 w-8 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full transition-all duration-500 z-10 ${
+                    passed
+                      ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30"
+                      : current
+                      ? "bg-orange-500 text-white shadow-lg shadow-orange-500/40 ring-4 ring-orange-100 scale-110"
+                      : "bg-white text-slate-400 border-2 border-slate-100"
+                  }`}
+                >
+                  {current && (
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75"></span>
+                  )}
+                  <Icon className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform ${current ? 'scale-110' : ''}`} strokeWidth={current ? 2.5 : 2} />
+                </div>
+                <span
+                  className={`text-[9px] sm:text-[11px] leading-tight text-center transition-all duration-300 ${
+                    current
+                      ? "font-bold text-slate-900 scale-105"
+                      : passed
+                      ? "font-semibold text-slate-600"
+                      : "font-medium text-slate-400"
+                  }`}
+                >
+                  {displayLabel}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+    </div>
+  );
+}
 
 function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`;
@@ -191,7 +288,9 @@ function OrderCard({
       </div>
 
       {isExpanded && (
-        <div className="border-t border-slate-100 bg-slate-50 px-4 py-4">
+        <div className="border-t border-slate-100 bg-slate-50 px-4 py-4 sm:px-5">
+          <OrderTimeline status={order.status} t={t} />
+
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-3 pl-1">
             Order Items
           </p>
