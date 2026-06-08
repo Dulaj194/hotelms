@@ -12,7 +12,7 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Check, ChefHat, Plus, Menu as MenuIcon, Search, ShoppingCart, X } from "lucide-react";
+import { Bell, Check, ChefHat, Plus, Minus, Menu as MenuIcon, Search, ShoppingCart, X } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
@@ -613,60 +613,64 @@ export default function RoomMenu() {
             )}
           </div>
 
-          {qtyInCart > 0 ? (
-            <div className="box-border flex min-h-10 w-full max-w-full items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-1.5 py-1">
+          <div className="mt-auto pt-2">
+            {qtyInCart > 0 ? (
+              <div className="box-border flex h-10 w-[120px] ml-auto items-center justify-between rounded-full border border-slate-200 bg-slate-50 p-1 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    qtyInCart > 1
+                      ? updateItem(item.id, qtyInCart - 1)
+                      : removeItem(item.id);
+                  }}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-white text-slate-600 shadow-sm transition hover:bg-red-50 hover:text-red-500 active:scale-95"
+                  aria-label="Decrease"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="min-w-[20px] text-center text-sm font-bold text-slate-800">
+                  {qtyInCart}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateItem(item.id, qtyInCart + 1);
+                  }}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-white shadow-sm transition hover:bg-orange-600 hover:shadow-md active:scale-95"
+                  aria-label="Increase"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
               <button
+                disabled={isAdding || !sessionReady}
                 onClick={(e) => {
                   e.stopPropagation();
-                  qtyInCart > 1
-                    ? updateItem(item.id, qtyInCart - 1)
-                    : removeItem(item.id);
+                  handleAddToCart(item.id);
                 }}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-gray-600 transition-colors hover:bg-white"
-                aria-label="Decrease"
+                className={`box-border flex h-10 w-full items-center justify-center gap-2 rounded-full border text-xs font-semibold transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
+                  recentlyAddedItemId === item.id
+                    ? "border-emerald-500 bg-emerald-500 text-white shadow-sm"
+                    : "border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:border-orange-300"
+                }`}
               >
-                -
+                {isAdding ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-orange-400 border-t-transparent" />
+                ) : recentlyAddedItemId === item.id ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 animate-in zoom-in-50" />
+                    <span>Added!</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>{t("menu:add_to_cart")}</span>
+                  </>
+                )}
               </button>
-              <span className="text-sm font-semibold w-6 text-center">{qtyInCart}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  updateItem(item.id, qtyInCart + 1);
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-sm font-bold text-white transition-colors hover:bg-orange-600"
-                aria-label="Increase"
-              >
-                +
-              </button>
-            </div>
-          ) : (
-            <button
-              disabled={isAdding || !sessionReady}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAddToCart(item.id);
-              }}
-              className={`box-border flex min-h-10 w-full max-w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
-                recentlyAddedItemId === item.id
-                  ? "border-emerald-500 bg-emerald-500 text-white"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300"
-              }`}
-            >
-              {isAdding ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
-              ) : recentlyAddedItemId === item.id ? (
-                <>
-                  <Check className="h-4 w-4 animate-in zoom-in-50" />
-                  <span>Added!</span>
-                </>
-              ) : (
-                <>
-                  <Plus className="h-3.5 w-3.5 text-slate-400" />
-                  <span>{t("menu:add_to_cart")}</span>
-                </>
-              )}
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </div>
     );

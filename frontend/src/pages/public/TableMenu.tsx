@@ -16,6 +16,7 @@ import {
   UtensilsCrossed,
   X,
   Plus,
+  Minus,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
@@ -786,27 +787,29 @@ export default function TableMenu() {
           {/* 5. Add Button Section */}
           <div className="mt-auto pt-4">
             {qtyInCart > 0 ? (
-              <div className="flex h-[48px] w-full items-center justify-between rounded-[16px] bg-[#0F172A] p-1.5 text-white shadow-lg">
+              <div className="flex h-10 w-full max-w-[130px] ml-auto items-center justify-between rounded-full border border-slate-200 bg-slate-50 p-1 shadow-[inset_0_2px_4px_rgba(0,0,0,0.02)]">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDecreaseQty(item.id, qtyInCart);
                   }}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-xl transition hover:bg-white/20 active:scale-90"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-white text-slate-600 shadow-sm transition hover:bg-red-50 hover:text-red-500 active:scale-95"
                 >
-                  −
+                  <Minus className="h-4 w-4" />
                 </button>
-                <span className="text-[16px] font-bold">{qtyInCart}</span>
+                <span className="min-w-[20px] text-center text-sm font-bold text-slate-800">
+                  {qtyInCart}
+                </span>
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleIncreaseQty(item.id, qtyInCart);
                   }}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-[#FF7A00] text-xl transition hover:bg-[#FF7A00]/90 active:scale-90"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-white shadow-sm transition hover:bg-orange-600 hover:shadow-md active:scale-95"
                 >
-                  +
+                  <Plus className="h-4 w-4" />
                 </button>
               </div>
             ) : (
@@ -817,14 +820,14 @@ export default function TableMenu() {
                   e.stopPropagation();
                   handleAddToCart(item.id);
                 }}
-                className={`flex h-[44px] w-full items-center justify-center gap-2 rounded-xl border text-[14px] font-semibold transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
+                className={`flex h-10 w-full items-center justify-center gap-2 rounded-full border text-[14px] font-semibold transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
                   recentlyAddedItemId === item.id
-                    ? "border-emerald-500 bg-emerald-500 text-white"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                    ? "border-emerald-500 bg-emerald-500 text-white shadow-sm"
+                    : "border-orange-200 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:border-orange-300"
                 }`}
               >
                 {isAdding ? (
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-orange-400 border-t-transparent" />
                 ) : recentlyAddedItemId === item.id ? (
                   <>
                     <Check className="h-4 w-4 animate-in zoom-in-50" />
@@ -832,7 +835,7 @@ export default function TableMenu() {
                   </>
                 ) : (
                   <>
-                    <Plus className="h-4 w-4 text-slate-400" />
+                    <Plus className="h-4 w-4" />
                     <span>{t("menu:add_to_cart")}</span>
                   </>
                 )}
