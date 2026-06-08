@@ -117,6 +117,7 @@ def _build_order_header(order) -> OrderHeaderResponse:
     item_previews = [
         OrderItemPreviewResponse(
             item_name_snapshot=oi.item_name_snapshot,
+            item_name_snapshot_localized=oi.item_name_snapshot_localized,
             item_image_snapshot=oi.item_image_snapshot,
             unit_price_snapshot=float(oi.unit_price_snapshot),
             quantity=oi.quantity,

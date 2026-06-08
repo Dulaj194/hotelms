@@ -4,6 +4,8 @@ import {
   CheckCircle,
   Plus,
   Receipt,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -37,6 +39,205 @@ function formatCurrency(value: number): string {
 }
 
 const POLL_INTERVAL_MS = 5_000;
+
+interface OrderCardProps {
+  order: OrderHeaderResponse;
+  tab: OrdersFilterTab;
+  effectiveQrAccessKey: string;
+  getItemImageUrl: (path: string | null | undefined) => string | undefined;
+  t: any;
+  guestSessionName: string | null;
+}
+
+function OrderCard({
+  order,
+  tab,
+  effectiveQrAccessKey,
+  getItemImageUrl,
+  t,
+  guestSessionName,
+}: OrderCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const itemCount = order.item_previews?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  
+  const formatPlacedAt = (dateString: string): string => {
+    return new Date(dateString).toLocaleString([], {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+    });
+  };
+
+  const previews = order.item_previews || [];
+  const imagesToShow = previews.slice(0, 3);
+  const extraCount = Math.max(0, previews.length - 3);
+
+  const orderUrl = effectiveQrAccessKey
+      ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(effectiveQrAccessKey)}`
+      : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`;
+
+  const displayGuestName = order.customer_name || guestSessionName;
+
+  return (
+    <div className={`overflow-hidden rounded-3xl border transition-all duration-300 shadow-sm ${isExpanded ? 'border-orange-300 ring-4 ring-orange-50/50' : 'border-slate-200 hover:border-orange-200 hover:shadow-md'} bg-white`}>
+      <div 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`cursor-pointer p-4 transition-colors ${isExpanded ? 'bg-white' : 'hover:bg-slate-50/50'} flex flex-col gap-3 relative`}
+      >
+        <div className="absolute top-4 right-4 text-slate-400">
+          {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+        </div>
+
+        <div className="flex items-start gap-3 pr-6">
+          <div className="shrink-0 flex items-center pt-0.5">
+            {imagesToShow.length > 0 ? (
+              <div className="flex -space-x-3">
+                {imagesToShow.map((preview, idx) => (
+                  <div key={idx} className="relative h-12 w-12 rounded-2xl ring-2 ring-white overflow-hidden bg-slate-100 shadow-sm" style={{ zIndex: 3 - idx }}>
+                    {preview.item_image_snapshot ? (
+                      <img
+                        src={getItemImageUrl(preview.item_image_snapshot)}
+                        alt={preview.item_name_snapshot}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3C/svg%3E";
+                        }}
+                      />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center text-[8px] font-semibold text-slate-400">
+                        {t("cart:no_img")}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {extraCount > 0 && (
+                  <div className="relative h-12 w-12 rounded-2xl ring-2 ring-white bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shadow-sm z-0">
+                    +{extraCount}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-12 w-12 rounded-2xl bg-slate-100 ring-2 ring-white flex items-center justify-center text-[9px] font-semibold text-slate-400 shadow-sm">
+                {t("cart:no_img")}
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-col">
+              <p className="text-sm font-black text-slate-900 sm:text-[15px]">
+                Order #{order.order_number}
+              </p>
+              {displayGuestName && (
+                <p className="text-xs font-bold text-orange-600 mt-0.5 line-clamp-1">
+                  {displayGuestName}
+                </p>
+              )}
+            </div>
+            
+            <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-500">
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ORDER_STATUS_COLOR[order.status]}`}>
+                {ORDER_STATUS_LABEL[order.status]}
+              </span>
+              <span className="font-medium">{itemCount} {itemCount === 1 ? 'Item' : 'Items'}</span>
+            </div>
+            <div className="mt-1 text-[11px] text-slate-400 font-medium">
+              {formatPlacedAt(order.placed_at)}
+            </div>
+          </div>
+
+          <div className="shrink-0 flex flex-col items-end">
+             <p className="text-sm font-extrabold text-orange-600">
+               ${order.total_amount.toFixed(2)}
+             </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mt-2">
+          {tab === "active" && (
+            <Link
+              to={orderUrl}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-full bg-orange-500 px-4 py-1.5 text-[12px] font-bold text-white transition hover:bg-orange-600 shadow-sm flex items-center gap-1"
+            >
+              {t("cart:track_order_btn")}
+            </Link>
+          )}
+          {tab === "completed" && (
+            <>
+              <button 
+                onClick={(e) => { e.stopPropagation(); }}
+                className="rounded-full bg-orange-100 px-4 py-1.5 text-[12px] font-bold text-orange-600 hover:bg-orange-200 transition"
+              >
+                {t("cart:leave_review_btn")}
+              </button>
+              <Link
+                to={orderUrl}
+                onClick={(e) => e.stopPropagation()}
+                className="rounded-full bg-slate-900 px-4 py-1.5 text-[12px] font-bold text-white transition hover:bg-slate-800 shadow-sm"
+              >
+                {t("cart:order_again_btn")}
+              </Link>
+            </>
+          )}
+          {tab === "canceled" && (
+            <span className="rounded-full bg-orange-100 px-4 py-1.5 text-[12px] font-semibold text-orange-600">
+              {t("cart:order_canceled_btn")}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {isExpanded && (
+        <div className="border-t border-slate-100 bg-slate-50 px-4 py-4">
+          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-3 pl-1">
+            Order Items
+          </p>
+          <div className="flex flex-col gap-2.5">
+            {previews.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-3 bg-white p-2.5 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-slate-100/60">
+                {item.item_image_snapshot ? (
+                  <img 
+                    src={getItemImageUrl(item.item_image_snapshot)} 
+                    alt={item.item_name_snapshot}
+                    className="h-10 w-10 shrink-0 rounded-xl object-cover ring-1 ring-slate-100"
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3C/svg%3E";
+                    }}
+                  />
+                ) : (
+                  <div className="h-10 w-10 shrink-0 rounded-xl bg-slate-50 ring-1 ring-slate-100 flex items-center justify-center text-[8px] text-slate-400 font-medium">
+                    {t("cart:no_img")}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[13px] font-bold text-slate-800">
+                    {item.item_name_snapshot_localized || item.item_name_snapshot}
+                  </p>
+                  <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                    {item.quantity} × ${(item.unit_price_snapshot).toFixed(2)}
+                  </p>
+                </div>
+                <div className="shrink-0 text-[13px] font-black text-slate-800 pr-1">
+                  ${(item.quantity * item.unit_price_snapshot).toFixed(2)}
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-4 border-t border-slate-200/60 pt-3 flex items-center justify-between px-1">
+             <span className="text-xs font-bold text-slate-500">Tax</span>
+             <span className="text-xs font-bold text-slate-700">${order.tax_amount.toFixed(2)}</span>
+          </div>
+          <div className="mt-1 flex items-center justify-between px-1">
+             <span className="text-sm font-black text-slate-900">Total</span>
+             <span className="text-sm font-black text-orange-600">${order.total_amount.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function GuestOrdersList() {
   const { t, i18n } = useTranslation(["common", "menu", "cart"]);
@@ -248,39 +449,8 @@ export default function GuestOrdersList() {
     canceled: t("cart:no_canceled_orders"),
   };
 
-  const formatOrderItemTitle = (order: OrderHeaderResponse): string => {
-    const firstPreview = order.item_previews?.[0];
-    if (firstPreview?.item_name_snapshot_localized) return firstPreview.item_name_snapshot_localized;
-    const primaryName = order.primary_item_name?.trim();
-    if (primaryName) return primaryName;
-    if (firstPreview?.item_name_snapshot) return firstPreview.item_name_snapshot;
-    return order.order_number;
-  };
-
-  const formatPlacedAt = (dateString: string): string => {
-    return new Date(dateString).toLocaleString([], {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const getItemImageUrl = (imagePath: string | null | undefined): string | undefined => {
     return toAssetUrl(imagePath);
-  };
-
-  const formatBreakdownText = (order: OrderHeaderResponse): string => {
-    const previews = order.item_previews ?? [];
-    const taxLabel = t("cart:tax_label", "tax");
-    if (previews.length === 0) {
-      return `$${order.subtotal_amount.toFixed(2)} + $${order.tax_amount.toFixed(2)} ${taxLabel}`;
-    }
-    const parts = previews.map(
-      (item) => `${item.quantity} x $${item.unit_price_snapshot.toFixed(2)}`,
-    );
-    const leftSide = parts.join(" + ");
-    return `${leftSide} + $${order.tax_amount.toFixed(2)} ${taxLabel}`;
   };
 
   if (error) {
@@ -387,93 +557,17 @@ export default function GuestOrdersList() {
                     )}
                   </div>
                 ) : (
-                  groupedOrders[tab].map((order) => {
-                    const primaryPreview = order.item_previews?.[0];
-                    const itemCount = order.item_previews?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
-
-                    return (
-                      <Link
-                        key={order.id}
-                        to={
-                          effectiveQrAccessKey
-                            ? `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}?k=${encodeURIComponent(effectiveQrAccessKey)}`
-                            : `/menu/${order.restaurant_id}/table/${order.table_number}/order/${order.id}`
-                        }
-                        className="rounded-3xl border border-orange-100 bg-white p-4 shadow-sm transition hover:border-orange-200 hover:shadow-md"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="shrink-0">
-                            {primaryPreview?.item_image_snapshot ? (
-                              <img
-                                src={getItemImageUrl(primaryPreview.item_image_snapshot) ?? undefined}
-                                alt={formatOrderItemTitle(order)}
-                                className="h-16 w-16 rounded-2xl object-cover ring-1 ring-orange-100"
-                                onError={(e) => {
-                                  const img = e.currentTarget;
-                                  img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23f1f5f9' width='100' height='100'/%3E%3C/svg%3E";
-                                }}
-                              />
-                            ) : (
-                              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-[11px] font-semibold text-slate-400">
-                                {t("cart:no_img")}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="line-clamp-2 text-sm font-bold text-slate-900 sm:text-[15px]">
-                                {formatOrderItemTitle(order)}
-                              </p>
-                              <p className="shrink-0 text-sm font-extrabold text-orange-600">
-                                ${order.total_amount.toFixed(2)}
-                              </p>
-                            </div>
-
-                            <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
-                              <span>{formatPlacedAt(order.placed_at)}</span>
-                              <span>x{itemCount || 1}</span>
-                            </div>
-
-                            <div className="mt-2 flex items-center justify-between gap-2">
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${ORDER_STATUS_COLOR[order.status]
-                                  }`}
-                              >
-                                {ORDER_STATUS_LABEL[order.status]}
-                              </span>
-                              <span className="truncate text-[11px] text-slate-500">{formatBreakdownText(order)}</span>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {tab === "active" && (
-                                <span className="rounded-full bg-orange-500 px-3 py-1 text-[11px] font-bold text-white">
-                                  {t("cart:track_order_btn")}
-                                </span>
-                              )}
-                              {tab === "completed" && (
-                                <>
-                                  <span className="rounded-full bg-orange-100 px-3 py-1 text-[11px] font-bold text-orange-600">
-                                    {t("cart:leave_review_btn")}
-                                  </span>
-                                  {restaurantId && tableNumber && (
-                                    <span className="rounded-full bg-orange-500 px-3 py-1 text-[11px] font-bold text-white">
-                                      {t("cart:order_again_btn")}
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                              {tab === "canceled" && (
-                                <span className="rounded-full bg-orange-100 px-3 py-1 text-[11px] font-semibold text-orange-600">
-                                  {t("cart:order_canceled_btn")}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })
+                  groupedOrders[tab].map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      tab={tab}
+                      effectiveQrAccessKey={effectiveQrAccessKey}
+                      getItemImageUrl={getItemImageUrl}
+                      t={t}
+                      guestSessionName={guestName}
+                    />
+                  ))
                 )}
               </div>
             </div>
