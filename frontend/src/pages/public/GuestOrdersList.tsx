@@ -353,6 +353,7 @@ export default function GuestOrdersList() {
   const [activeTab, setActiveTab] = useState<OrdersFilterTab>("active");
   const scrollRef = useRef<HTMLDivElement>(null);
   const isScrollingRef = useRef(false);
+  const [showBillPopup, setShowBillPopup] = useState(false);
 
   const restoreGuestSession = useCallback(async (): Promise<boolean> => {
     const restored = await restoreTableGuestSession({
@@ -694,69 +695,152 @@ export default function GuestOrdersList() {
 
       {/* Senior Engineer Billing Dashboard - Sticky Footer */}
       {orders.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/95 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl">
-          {tabCounts.completed === 0 && (
-            <div className="bg-slate-900 py-1.5 px-4">
-              <p className="text-center text-[9px] font-black uppercase tracking-[0.12em] text-orange-500">
-                {t("cart:wait_bill_notice")}
-              </p>
-            </div>
-          )}
-          <div className="mx-auto flex w-full max-w-md items-center justify-between gap-4 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                {t("cart:running_bill")}
-              </p>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-black text-slate-900">{formatCurrency(totals.total)}</span>
-                <span className="text-[10px] font-bold text-slate-400">({totals.items} {t("cart:items_label")})</span>
+        <>
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/70 bg-white/95 shadow-[0_-12px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+            {tabCounts.completed === 0 && (
+              <div className="bg-slate-900 py-1.5 px-4">
+                <p className="text-center text-[9px] font-black uppercase tracking-[0.12em] text-orange-500">
+                  {t("cart:wait_bill_notice")}
+                </p>
+              </div>
+            )}
+            <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))] pt-3">
+              <div className="min-w-0 shrink-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  {t("cart:running_bill")}
+                </p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xl font-black text-slate-900">{formatCurrency(totals.total)}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-1 items-center gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const menuPath = effectiveQrAccessKey
+                      ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
+                      : `/menu/${restaurantId}/table/${tableNumber}`;
+                    navigate(menuPath);
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-orange-100 px-3 text-xs font-black text-orange-600 transition hover:bg-orange-200 active:scale-95"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t("cart:add_items_btn", "Add Item")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBillPopup(true)}
+                  className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-2xl bg-slate-900 px-4 text-xs font-black text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] transition hover:bg-slate-800 active:scale-95"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                  {t("cart:view_bill_btn", "View Bill")}
+                </button>
               </div>
             </div>
-
-            {tabCounts.completed > 0 ? (
-              <button
-                type="button"
-                disabled={requestingBill || billRequested}
-                onClick={handleRequestBill}
-                className={`inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black transition-all duration-300 active:scale-95 ${billRequested
-                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                    : "bg-slate-900 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] hover:bg-slate-800"
-                  }`}
-              >
-                {requestingBill ? (
-                  <span className="flex items-center gap-2">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    {t("cart:processing_btn")}
-                  </span>
-                ) : billRequested ? (
-                  <>
-                    <CheckCircle className="h-4 w-4" />
-                    {t("cart:bill_requested_btn")}
-                  </>
-                ) : (
-                  <>
-                    <Receipt className="h-4 w-4" />
-                    {t("cart:request_bill_btn")}
-                  </>
-                )}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  const menuPath = effectiveQrAccessKey
-                    ? `/menu/${restaurantId}/table/${tableNumber}?k=${encodeURIComponent(effectiveQrAccessKey)}`
-                    : `/menu/${restaurantId}/table/${tableNumber}`;
-                  navigate(menuPath);
-                }}
-                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-orange-500 px-6 text-sm font-black text-white shadow-[0_14px_28px_rgba(249,115,22,0.2)] transition hover:bg-orange-600 active:scale-95"
-              >
-                <Plus className="h-4 w-4" />
-                {t("cart:add_items_btn")}
-              </button>
-            )}
           </div>
-        </div>
+
+          {showBillPopup && (
+            <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/40 backdrop-blur-sm sm:items-center sm:justify-center p-4">
+              <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+                <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                  <h2 className="text-lg font-black text-slate-900">{t("cart:your_bill_title", "Your Bill")}</h2>
+                  <button 
+                    onClick={() => setShowBillPopup(false)}
+                    className="p-2 -mr-2 text-slate-400 hover:text-slate-600 transition-colors rounded-full hover:bg-slate-100"
+                  >
+                    <XCircle className="w-6 h-6" />
+                  </button>
+                </div>
+                
+                <div className="overflow-y-auto p-5 space-y-5 flex-1">
+                  {orders.filter(o => o.status !== 'rejected').map(order => (
+                    <div key={order.id} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-500">Order #{order.order_number}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ORDER_STATUS_COLOR[order.status]}`}>
+                          {ORDER_STATUS_LABEL[order.status]}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {order.item_previews?.map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <div className="flex items-start gap-2">
+                              <span className="font-semibold text-slate-800">{item.quantity}x</span>
+                              <span className="font-medium text-slate-600 line-clamp-2">
+                                {item.item_name_snapshot_localized || item.item_name_snapshot}
+                              </span>
+                            </div>
+                            <span className="font-bold text-slate-900 shrink-0 ml-4">
+                              ${(item.quantity * item.unit_price_snapshot).toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-between text-xs text-slate-500 border-t border-slate-100 pt-2">
+                        <span>Tax</span>
+                        <span>${order.tax_amount.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-black text-slate-800 border-b border-slate-100 pb-3">
+                        <span>Subtotal</span>
+                        <span>${order.total_amount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {orders.filter(o => o.status !== 'rejected').length === 0 && (
+                    <div className="text-center py-6 text-slate-500 text-sm">
+                      {t("cart:no_active_orders", "No active orders right now")}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-5 bg-slate-50 border-t border-slate-100 space-y-4 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-black text-slate-900">Total Due</span>
+                    <span className="text-xl font-black text-orange-600">{formatCurrency(totals.total)}</span>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    disabled={requestingBill || billRequested || tabCounts.completed === 0}
+                    onClick={async () => {
+                      await handleRequestBill();
+                      setTimeout(() => setShowBillPopup(false), 2000);
+                    }}
+                    className={`flex w-full min-h-12 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-black transition-all duration-300 active:scale-95 ${billRequested
+                        ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                        : tabCounts.completed === 0
+                        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                        : "bg-slate-900 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)] hover:bg-slate-800"
+                      }`}
+                  >
+                    {requestingBill ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        {t("cart:processing_btn")}
+                      </span>
+                    ) : billRequested ? (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        {t("cart:bill_requested_btn")}
+                      </>
+                    ) : (
+                      <>
+                        <Receipt className="h-4 w-4" />
+                        {t("cart:request_bill_btn", "Request Bill")}
+                      </>
+                    )}
+                  </button>
+                  {tabCounts.completed === 0 && totals.total > 0 && (
+                    <p className="text-center text-[11px] text-slate-500 font-medium">
+                      {t("cart:wait_bill_notice", "You can request the bill after your orders are completed.")}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       ) : (
         restaurantId && tableNumber && (
           <div className="fixed inset-x-0 bottom-0 z-30 border-t border-orange-100 bg-white/95 px-4 py-3 backdrop-blur sm:mx-auto sm:w-full sm:max-w-lg sm:px-5">
