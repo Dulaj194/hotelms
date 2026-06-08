@@ -92,6 +92,7 @@ def _build_order_detail(order) -> OrderDetailResponse:
                 quantity=oi.quantity,
                 line_total=float(oi.line_total),
                 notes=oi.notes,
+                status=oi.status,
             )
             for oi in order.items
         ],
@@ -182,6 +183,7 @@ def _build_kitchen_order_card(order) -> KitchenOrderCard:
                 unit_price_snapshot=float(oi.unit_price_snapshot),
                 line_total=float(oi.line_total),
                 notes=oi.notes,
+                status=oi.status,
             )
             for oi in order.items
         ],
@@ -888,6 +890,58 @@ def update_order_status(
             )
         except Exception:
             # Real-time failure must never break the status update response
+            pass
+
+    return OrderStatusResponse(
+        id=updated.id,
+        order_number=updated.order_number,
+        status=updated.status,
+        updated_at=updated.updated_at,
+    )
+
+
+def update_order_item_status(
+    db: Session,
+    order_id: int,
+    item_id: int,
+    restaurant_id: int,
+    new_status: OrderStatus,
+    r: redis_lib.Redis | None = None,
+) -> OrderStatusResponse:
+    """Update status of an individual item and auto-derive order status."""
+    item = order_repo.update_order_item_status(db, item_id, restaurant_id, new_status)
+    if not item or item.order_id != order_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order item not found.",
+        )
+        
+    order = order_repo.get_order_by_id_and_restaurant(db, order_id, restaurant_id)
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found.",
+        )
+        
+    updated = order_repo.auto_update_order_status_from_items(db, order)
+    db.commit()
+    db.refresh(updated)
+
+    if r is not None:
+        try:
+            realtime_service.publish_order_status_updated(
+                r,
+                restaurant_id=restaurant_id,
+                order_id=updated.id,
+                order_number=updated.order_number,
+                table_number=updated.table_number,
+                order_source=updated.order_source.value,
+                room_id=updated.room_id,
+                room_number=updated.room_number,
+                status=updated.status.value,
+                updated_at=datetime.now(UTC),
+            )
+        except Exception:
             pass
 
     return OrderStatusResponse(

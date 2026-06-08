@@ -181,6 +181,10 @@ class OrderItem(Base):
 
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    status: Mapped[OrderStatus] = mapped_column(
+        Enum(OrderStatus), nullable=False, default=OrderStatus.pending, server_default=OrderStatus.pending.value, index=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

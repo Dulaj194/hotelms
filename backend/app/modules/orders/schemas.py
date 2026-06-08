@@ -41,6 +41,10 @@ class UpdateOrderStatusRequest(BaseModel):
     status: OrderStatus
 
 
+class UpdateOrderItemStatusRequest(BaseModel):
+    status: OrderStatus
+
+
 # ── Response ──────────────────────────────────────────────────────────────────
 
 class OrderItemResponse(BaseModel):
@@ -53,6 +57,7 @@ class OrderItemResponse(BaseModel):
     quantity: int
     line_total: float
     notes: str | None
+    status: OrderStatus
 
     model_config = {"from_attributes": True}
 
@@ -145,6 +150,7 @@ class KitchenOrderItemSummary(BaseModel):
     unit_price_snapshot: float
     line_total: float
     notes: str | None
+    status: OrderStatus
 
     model_config = {"from_attributes": True}
 

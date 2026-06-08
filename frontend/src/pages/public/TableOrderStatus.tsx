@@ -271,9 +271,14 @@ export default function TableOrderStatus() {
                       “{item.notes}”
                     </p>
                   )}
-                  <p className="text-xs text-slate-500">
-                    {item.quantity} x ${item.unit_price_snapshot.toFixed(2)}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-slate-500">
+                      {item.quantity} x ${item.unit_price_snapshot.toFixed(2)}
+                    </p>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${ORDER_STATUS_COLOR[item.status]}`}>
+                      {ORDER_STATUS_LABEL[item.status]}
+                    </span>
+                  </div>
                 </div>
                 <p className="ml-2 shrink-0 font-semibold text-slate-900">${item.line_total.toFixed(2)}</p>
               </div>

@@ -37,6 +37,7 @@ from app.modules.orders.schemas import (
     PlaceOrderRequest,
     PlaceOrderResponse,
     UpdateOrderStatusRequest,
+    UpdateOrderItemStatusRequest,
 )
 from app.core.pagination import PaginationParams, FilterParams, create_paginated_response, pagination_depends
 from app.core.response_utils import success_response
@@ -249,6 +250,24 @@ def update_order_status(
     so connected kitchen clients receive the update instantly.
     """
     return service.update_order_status(db, order_id, restaurant_id, payload.status, r)
+
+
+@router.patch("/{order_id}/items/{item_id}/status", response_model=OrderStatusResponse)
+def update_order_item_status(
+    order_id: int,
+    item_id: int,
+    payload: UpdateOrderItemStatusRequest,
+    restaurant_id: int = Depends(get_current_restaurant_id),
+    db: Session = Depends(get_db),
+    r: redis_lib.Redis = Depends(get_redis),
+    _=Depends(require_roles(*_STAFF_ROLES)),
+    __=Depends(require_module_access("kds")),
+) -> OrderStatusResponse:
+    """Update an individual order item's status and derive parent order status.
+
+    Publishes a real-time event to the restaurant's Redis pub/sub channel.
+    """
+    return service.update_order_item_status(db, order_id, item_id, restaurant_id, payload.status, r)
 
 
 @router.post("/staff/place-order", response_model=PlaceOrderResponse, status_code=201)

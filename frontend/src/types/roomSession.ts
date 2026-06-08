@@ -1,4 +1,5 @@
 // ─── Room session types ────────────────────────────────────────────────────────
+import type { OrderStatus } from "./order";
 
 export interface RoomSessionStartRequest {
   restaurant_id: number;
@@ -79,6 +80,7 @@ export interface RoomOrderItemResponse {
   quantity: number;
   line_total: number;
   notes: string | null;
+  status: OrderStatus;
 }
 
 export interface RoomOrderDetailResponse {

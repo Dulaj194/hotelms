@@ -64,7 +64,7 @@ def create_order_header(
     source_value = (
         order_source
         if isinstance(order_source, OrderSource)
-        else OrderSource(str(order_source))
+        else OrderSource(order_source)
     )
     lifecycle_timestamps: dict[str, datetime] = {}
     if initial_status == OrderStatus.confirmed:
@@ -493,6 +493,55 @@ def update_order_status(
         setattr(order, field, now)
 
     db.flush()
+    return order
+
+
+def update_order_item_status(
+    db: Session,
+    item_id: int,
+    restaurant_id: int,
+    new_status: OrderStatus,
+) -> OrderItem | None:
+    """Update the status of a specific order item."""
+    item = (
+        db.query(OrderItem)
+        .filter(OrderItem.id == item_id, OrderItem.restaurant_id == restaurant_id)
+        .first()
+    )
+    if item:
+        item.status = new_status
+        db.flush()
+    return item
+
+
+def auto_update_order_status_from_items(
+    db: Session,
+    order: OrderHeader,
+) -> OrderHeader:
+    """Derive and update the OrderHeader status based on its items."""
+    if not order.items:
+        return order
+
+    statuses = [item.status for item in order.items]
+    
+    if all(s == OrderStatus.rejected for s in statuses):
+        new_status = OrderStatus.rejected
+    elif all(s == OrderStatus.paid for s in statuses):
+        new_status = OrderStatus.paid
+    elif all(s in (OrderStatus.served, OrderStatus.paid) for s in statuses):
+        new_status = OrderStatus.served
+    elif all(s in (OrderStatus.completed, OrderStatus.served, OrderStatus.paid) for s in statuses):
+        new_status = OrderStatus.completed
+    elif any(s == OrderStatus.processing for s in statuses):
+        new_status = OrderStatus.processing
+    elif any(s == OrderStatus.confirmed for s in statuses):
+        new_status = OrderStatus.confirmed
+    else:
+        new_status = OrderStatus.pending
+        
+    if new_status != order.status:
+        update_order_status(db, order, new_status)
+    
     return order
 
 

@@ -11,6 +11,7 @@ import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 interface OrderCardProps {
   order: KitchenOrderCard;
   onAction: (orderId: number, newStatus: string) => void;
+  onItemAction?: (orderId: number, itemId: number, newStatus: string) => void;
   actionLoading: boolean;
   renderActions?: (order: KitchenOrderCard, actionLoading: boolean) => ReactNode;
 }
@@ -31,6 +32,7 @@ function formatDateTime(isoDate: string): string {
 export default function OrderCard({
   order,
   onAction,
+  onItemAction,
   actionLoading,
   renderActions,
 }: OrderCardProps) {
@@ -67,14 +69,51 @@ export default function OrderCard({
       {/* Items */}
       <ul className="divide-y divide-gray-100 text-sm">
         {order.items.map((item) => (
-          <li key={item.id} className="flex justify-between py-1">
-            <span className="text-gray-800">
-              <span className="font-medium">{item.quantity}×</span>{" "}
-              {item.item_name_snapshot}
-            </span>
-            <span className="text-gray-500 tabular-nums">
-              {item.line_total.toFixed(2)}
-            </span>
+          <li key={item.id} className="flex flex-col py-2">
+            <div className="flex justify-between">
+              <span className="text-gray-800">
+                <span className="font-medium">{item.quantity}×</span>{" "}
+                {item.item_name_snapshot}
+              </span>
+              <span className="text-gray-500 tabular-nums">
+                {item.line_total.toFixed(2)}
+              </span>
+            </div>
+            {/* Item Status & Actions */}
+            <div className="flex items-center justify-between mt-1.5">
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-sm ${ORDER_STATUS_COLOR[item.status]}`}>
+                {ORDER_STATUS_LABEL[item.status]}
+              </span>
+              <div className="flex gap-2">
+                {item.status === "pending" && (
+                  <button 
+                    onClick={() => onItemAction?.(order.id, item.id, "processing")} 
+                    disabled={actionLoading} 
+                    className="text-xs text-orange-600 font-medium hover:underline disabled:opacity-50"
+                  >
+                    Prep
+                  </button>
+                )}
+                {(item.status === "pending" || item.status === "processing" || item.status === "confirmed") && (
+                  <button 
+                    onClick={() => onItemAction?.(order.id, item.id, "completed")} 
+                    disabled={actionLoading} 
+                    className="text-xs text-green-600 font-medium hover:underline disabled:opacity-50"
+                  >
+                    Done
+                  </button>
+                )}
+                {item.status === "completed" && (
+                  <button 
+                    onClick={() => onItemAction?.(order.id, item.id, "served")} 
+                    disabled={actionLoading} 
+                    className="text-xs text-blue-600 font-medium hover:underline disabled:opacity-50"
+                  >
+                    Serve
+                  </button>
+                )}
+              </div>
+            </div>
           </li>
         ))}
       </ul>

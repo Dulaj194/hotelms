@@ -37,6 +37,7 @@ export interface OrderItemResponse {
   quantity: number;
   line_total: number;
   notes: string | null;
+  status: OrderStatus;
 }
 
 export interface OrderItemPreviewResponse {
@@ -149,6 +150,7 @@ export interface KitchenOrderItemSummary {
   unit_price_snapshot: number;
   line_total: number;
   notes: string | null;
+  status: OrderStatus;
 }
 
 export interface KitchenOrderCard {

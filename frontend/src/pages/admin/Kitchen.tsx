@@ -18,6 +18,7 @@ import type {
   KitchenOrderCard,
   KitchenOrderListResponse,
 } from "@/types/order";
+import { ORDER_STATUS_COLOR, ORDER_STATUS_LABEL } from "@/types/order";
 
 const KITCHEN_ROLES = new Set<string>(QR_MENU_STAFF_ROLES);
 
@@ -98,6 +99,18 @@ function KitchenQueue({ restaurantId }: { restaurantId: number | null }) {
       void loadOrders(true);
     } catch (err) {
       console.error("KDS Action failed", err);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleItemAction = async (orderId: number, itemId: number, status: string) => {
+    setActionLoadingId(orderId);
+    try {
+      await api.patch(`/orders/${orderId}/items/${itemId}/status`, { status });
+      void loadOrders(true);
+    } catch (err) {
+      console.error("KDS Item Action failed", err);
     } finally {
       setActionLoadingId(null);
     }
@@ -186,6 +199,7 @@ function KitchenQueue({ restaurantId }: { restaurantId: number | null }) {
                 orders={group} 
                 currentTime={currentTime} 
                 onAction={handleAction}
+                onItemAction={handleItemAction}
                 loadingId={actionLoadingId}
               />
             ))}
@@ -216,6 +230,7 @@ function KitchenQueue({ restaurantId }: { restaurantId: number | null }) {
                 orders={group} 
                 currentTime={currentTime} 
                 onAction={handleAction}
+                onItemAction={handleItemAction}
                 loadingId={actionLoadingId}
               />
             ))}
@@ -236,11 +251,13 @@ function TableGroupedKitchenCard({
   orders, 
   currentTime, 
   onAction, 
+  onItemAction,
   loadingId 
 }: { 
   orders: KitchenOrderCard[], 
   currentTime: number, 
   onAction: (id: number, status: string) => void, 
+  onItemAction: (orderId: number, itemId: number, status: string) => void,
   loadingId: number | null 
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -309,6 +326,7 @@ function TableGroupedKitchenCard({
               order={order} 
               currentTime={currentTime} 
               onAction={onAction}
+              onItemAction={onItemAction}
               loading={loadingId === order.id}
             />
           ))}
@@ -325,10 +343,11 @@ function TableGroupedKitchenCard({
   );
 }
 
-function KitchenCard({ order, currentTime, onAction, loading }: { 
+function KitchenCard({ order, currentTime, onAction, onItemAction, loading }: { 
   order: KitchenOrderCard, 
   currentTime: number,
   onAction: (id: number, status: string) => void,
+  onItemAction: (orderId: number, itemId: number, status: string) => void,
   loading: boolean
 }) {
   const timeInQueue = Math.floor((currentTime - new Date(order.placed_at).getTime()) / 1000);
@@ -375,21 +394,49 @@ function KitchenCard({ order, currentTime, onAction, loading }: {
 
       {/* Item List */}
       <div className="flex-1 p-4">
-        <ul className="space-y-2">
+        <ul className="space-y-4">
           {order.items.map((item, idx) => (
-            <li key={idx} className="flex items-start gap-3">
-              <div className="h-6 min-w-[24px] bg-slate-900 text-white rounded-lg flex items-center justify-center text-xs font-black">
-                {item.quantity}
-              </div>
-              <div>
-                <p className="text-base font-bold text-slate-800 leading-tight">
-                  {item.item_name_snapshot}
-                </p>
-                {item.notes && (
-                  <p className="mt-1 text-[11px] font-medium text-orange-600 italic">
-                    Instr: {item.notes}
+            <li key={idx} className="flex flex-col gap-2">
+              <div className="flex items-start gap-3">
+                <div className="h-6 min-w-[24px] bg-slate-900 text-white rounded-lg flex items-center justify-center text-xs font-black shrink-0">
+                  {item.quantity}
+                </div>
+                <div className="flex-1">
+                  <p className="text-base font-bold text-slate-800 leading-tight">
+                    {item.item_name_snapshot}
                   </p>
-                )}
+                  {item.notes && (
+                    <p className="mt-1 text-[11px] font-medium text-orange-600 italic">
+                      Instr: {item.notes}
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between pl-9 mt-1">
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${ORDER_STATUS_COLOR[item.status]}`}>
+                  {ORDER_STATUS_LABEL[item.status]}
+                </span>
+                <div className="flex gap-2">
+                  {item.status === "pending" && (
+                    <button 
+                      onClick={() => onItemAction(order.id, item.id, "processing")} 
+                      disabled={loading} 
+                      className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded hover:bg-orange-200 font-bold transition-colors disabled:opacity-50"
+                    >
+                      Prep
+                    </button>
+                  )}
+                  {(item.status === "pending" || item.status === "processing" || item.status === "confirmed") && (
+                    <button 
+                      onClick={() => onItemAction(order.id, item.id, "completed")} 
+                      disabled={loading} 
+                      className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded hover:bg-emerald-200 font-bold transition-colors disabled:opacity-50"
+                    >
+                      Done
+                    </button>
+                  )}
+                </div>
               </div>
             </li>
           ))}
