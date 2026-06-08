@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session
 from app.modules.rooms import repository
 from app.modules.rooms.schemas import (
     RoomCreateRequest,
-    RoomListResponse,
     RoomResponse,
     RoomStatusResponse,
     RoomUpdateRequest,
