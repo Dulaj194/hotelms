@@ -644,7 +644,7 @@ export default function TableMenu() {
               <div className="mt-8 flex flex-wrap gap-2">
                 <div className="flex items-center gap-1.5 rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  {t("menu:room")} {tableNumber}
+                  {t("menu:table")} {tableNumber}
                 </div>
                 <span className="rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
                   {t("menu:qr_verified")}
@@ -868,7 +868,7 @@ export default function TableMenu() {
             />
             <div className="min-w-0">
               <p className="truncate text-base font-black text-slate-900">{menu.restaurant.name}</p>
-              <p className="text-[10px] font-bold text-slate-500">{t("menu:room")} {displayTableNumber}</p>
+              <p className="text-[10px] font-bold text-slate-500">{t("menu:table")} {displayTableNumber}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1306,7 +1306,7 @@ export default function TableMenu() {
                 {tableNumber && restaurantId && (
                   <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm">
                     <p className="text-slate-600">
-                      <span className="font-semibold text-slate-900">{t("menu:room")}:</span> {tableNumber}
+                      <span className="font-semibold text-slate-900">{t("menu:table")}:</span> {tableNumber}
                     </p>
                     <p className="break-words text-slate-600">
                       <span className="font-semibold text-slate-900">Restaurant:</span> {menu?.restaurant.name}
