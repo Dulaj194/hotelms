@@ -12,7 +12,7 @@
  * 6. Confirmation shown with order number.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Check, ChefHat, Plus, Minus, Menu as MenuIcon, Search, ShoppingCart, X } from "lucide-react";
+import { Bell, Check, ChefHat, Plus, Minus, Menu as MenuIcon, Search, ShoppingCart } from "lucide-react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import PublicMenuDropdown from "@/components/public/PublicMenuDropdown";
@@ -29,7 +29,8 @@ import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import QuickServiceDrawer, { type QuickServiceItem } from "@/components/public/QuickServiceDrawer";
 import { getRoomToken, getRoomGuestDisplayName, setRoomGuestDisplayName } from "@/hooks/useRoomSession";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
-import type { RoomOrderDetailResponse } from "@/types/roomSession";
+
+// ─── Local Components ──────────────────────────────────────────────────────────
 
 function FloatingCartButton({ itemCount, onOpenCart }: { itemCount: number; onOpenCart: () => void }) {
   const { t } = useTranslation("cart");
@@ -47,258 +48,6 @@ function FloatingCartButton({ itemCount, onOpenCart }: { itemCount: number; onOp
         </span>
       )}
     </button>
-  );
-}
-
-interface RoomCartDrawerProps {
-  open: boolean;
-  onClose: () => void;
-  onContinueBrowsing: () => void;
-  onTrackOrder: () => void;
-  cart: import("@/types/roomSession").RoomCartResponse | null;
-  onUpdateItem: (itemId: number, quantity: number) => Promise<void>;
-  onRemoveItem: (itemId: number) => Promise<void>;
-  onClearCart: () => Promise<void>;
-  onPlaceOrder: () => Promise<void>;
-  placing: boolean;
-  orderPlaced: RoomOrderDetailResponse | null;
-}
-
-function RoomCartDrawer({
-  open,
-  onClose,
-  onContinueBrowsing,
-  onTrackOrder,
-  cart,
-  onUpdateItem,
-  onRemoveItem,
-  onClearCart,
-  onPlaceOrder,
-  placing,
-  orderPlaced,
-}: RoomCartDrawerProps) {
-  const { t } = useTranslation(["common", "menu", "cart"]);
-  const [placeError, setPlaceError] = useState<string | null>(null);
-  const itemCount = cart?.item_count ?? 0;
-  const total = cart?.total ?? 0;
-
-  const handlePlaceOrder = async () => {
-    setPlaceError(null);
-    try {
-      await onPlaceOrder();
-    } catch (err: any) {
-      setPlaceError(translateError(err.message || "Failed to place order."));
-    }
-  };
-
-  return (
-    <>
-      {open && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-      )}
-
-      <div
-        className={`fixed top-0 right-0 z-50 box-border flex h-full w-full max-w-[min(24rem,100%)] flex-col bg-white shadow-xl
-          transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Room cart"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <h2 className="text-lg font-semibold">
-            {t("cart:title")}{itemCount > 0 ? ` (${itemCount})` : ""}
-          </h2>
-          <button
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-full transition-colors hover:bg-gray-100"
-            aria-label={t("common:close")}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* Order confirmation */}
-        {orderPlaced && (
-          <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-8 w-8 text-green-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">{t("cart:order_placed")}</h3>
-            <p className="text-gray-500 text-sm mb-3">
-              {t("cart:order_sent")}
-            </p>
-            <div className="bg-gray-50 rounded-lg px-4 py-3 w-full mb-4">
-              <p className="text-xs text-gray-500 mb-1">{t("cart:order_number")}</p>
-              <p className="font-bold text-gray-900">{orderPlaced.order_number}</p>
-            </div>
-            <p className="text-xs text-gray-400 mb-4">
-              {t("cart:total")}: ${orderPlaced.total_amount.toFixed(2)}
-            </p>
-            <div className="w-full space-y-2">
-              <button
-                onClick={onTrackOrder}
-                className="min-h-11 w-full rounded-xl bg-orange-500 py-2.5 text-sm font-semibold text-white
-                           hover:bg-orange-600 transition-colors"
-              >
-                {t("cart:track_order")}
-              </button>
-              <button
-                onClick={onContinueBrowsing}
-                className="min-h-11 w-full rounded-xl border border-orange-200 py-2 text-sm font-semibold text-orange-600
-                           hover:bg-orange-50 transition-colors"
-              >
-                {t("cart:continue_browsing")}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Cart items */}
-        {!orderPlaced && (
-          <>
-            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-              {!cart || cart.items.length === 0 ? (
-                <p className="text-center text-gray-400 mt-8">{t("cart:empty")}</p>
-              ) : (
-                cart.items.map((item) => (
-                  <div
-                    key={item.item_id}
-                    className="flex gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm"
-                  >
-                    <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-50 bg-slate-50">
-                      <SafeMenuAsset
-                        path={item.image_path}
-                        alt={item.name}
-                        className="h-full w-full object-cover"
-                        fallback={
-                          <div className="flex h-full w-full items-center justify-center text-slate-300">
-                            <ChefHat className="h-6 w-6" />
-                          </div>
-                        }
-                      />
-                    </div>
-                    <div className="flex flex-1 min-w-0 flex-col justify-between">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm text-slate-900 break-words line-clamp-1">{item.name}</p>
-                          <p className="text-xs font-medium text-slate-500 mt-0.5">
-                            ${item.unit_price.toFixed(2)} {t("cart:each")}
-                          </p>
-                          {!item.is_available && (
-                            <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-wider">{t("cart:unavailable")}</p>
-                          )}
-                          {item.note && (
-                            <p className="mt-1.5 flex items-start gap-1 text-[10px] font-semibold text-orange-600 bg-orange-50 p-1.5 rounded-lg border border-orange-100">
-                              <span className="shrink-0 mt-0.5">{t("cart:note")}:</span>
-                              <span className="line-clamp-2">{item.note}</span>
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => onRemoveItem(item.item_id)}
-                          className="grid h-8 w-8 place-items-center rounded-full text-slate-300 transition-colors hover:bg-red-50 hover:text-red-500"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2 mt-2">
-                        <div className="flex items-center gap-1 rounded-full border border-slate-100 bg-slate-50 p-1">
-                          <button
-                            onClick={() =>
-                              item.quantity > 1
-                                ? onUpdateItem(item.item_id, item.quantity - 1)
-                                : onRemoveItem(item.item_id)
-                            }
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm font-bold shadow-sm transition active:scale-90"
-                          >
-                            -
-                          </button>
-                          <span className="w-6 text-center text-xs font-bold text-slate-900">
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() => onUpdateItem(item.item_id, item.quantity + 1)}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white shadow-sm transition active:scale-90"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <div className="text-sm font-black text-slate-900">
-                          ${item.line_total.toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {cart && cart.items.length > 0 && (
-              <div className="space-y-3 border-t px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                <div className="flex justify-between font-semibold text-base">
-                  <span>{t("cart:total")}</span>
-                  <span>${total.toFixed(2)}</span>
-                </div>
-
-                {placeError && (
-                  <p className="text-xs text-red-600 text-center">{placeError}</p>
-                )}
-
-                <button
-                  onClick={handlePlaceOrder}
-                  disabled={placing}
-                  className="min-h-12 w-full rounded-xl bg-orange-500 py-3 text-sm font-semibold text-white
-                             hover:bg-orange-600 transition-colors disabled:opacity-60"
-                >
-                  {placing ? "Placing order..." : `Place Order - $${total.toFixed(2)}`}
-                </button>
-
-                <button
-                  onClick={onClearCart}
-                  disabled={placing}
-                  className="min-h-11 w-full rounded-lg border border-red-200 py-2 text-sm font-semibold text-red-600
-                             hover:bg-red-50 transition-colors disabled:opacity-50"
-                >
-                  Clear cart
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </>
   );
 }
 
@@ -334,10 +83,8 @@ export default function RoomMenu() {
   const [guestName, setGuestName] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
   const [recentlyAddedItemId, setRecentlyAddedItemId] = useState<number | null>(null);
-  const [placedOrder, setPlacedOrder] = useState<RoomOrderDetailResponse | null>(null);
   const [headerVisible, setHeaderVisible] = useState(true);
   const [menuDropdownOpen, setMenuDropdownOpen] = useState(false);
   const lastMenuScrollYRef = useRef(0);
@@ -350,7 +97,7 @@ export default function RoomMenu() {
   const [selectedItem, setSelectedItem] = useState<PublicItemSummaryResponse | null>(null);
   const [quickServices, setQuickServices] = useState<QuickServiceItem[]>([]);
 
-  const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing } =
+  const { cart, addItem, updateItem, removeItem } =
     useLocalRoomCart({
       restaurantId: restaurantContextId,
       roomId: null,
@@ -494,25 +241,11 @@ export default function RoomMenu() {
     [addItem]
   );
 
-  const handlePlaceOrder = useCallback(async () => {
-    const result = await placeOrder({});
-    setPlacedOrder(result.order);
-    setCartOpen(true); // keep drawer open to show confirmation
-  }, [placeOrder]);
-
-  const handleTrackOrder = useCallback(() => {
-    if (!restaurantId || !roomNumber || !placedOrder) return;
-    const basePath = `/menu/${restaurantId}/room/${roomNumber}/order/${placedOrder.id}`;
-    const nextPath = qrAccessKey
-      ? `${basePath}?k=${encodeURIComponent(qrAccessKey)}`
-      : basePath;
-    navigate(nextPath);
-  }, [navigate, placedOrder, qrAccessKey, restaurantId, roomNumber]);
-
-  const handleContinueBrowsing = useCallback(() => {
-    setPlacedOrder(null);
-    setCartOpen(false);
-  }, []);
+  const handleOpenCart = useCallback(() => {
+    if (!restaurantId || !roomNumber) return;
+    const basePath = `/menu/${restaurantId}/room/${roomNumber}/cart`;
+    navigate(qrAccessKey ? `${basePath}?k=${encodeURIComponent(qrAccessKey)}` : basePath);
+  }, [navigate, qrAccessKey, restaurantId, roomNumber]);
 
   const handleScrollTo = useCallback((elementId: string) => {
     const element = document.getElementById(elementId);
@@ -837,9 +570,8 @@ export default function RoomMenu() {
               </Link>
             )}
             <LanguageSwitcher />
-          {/* Cart button */}
           <button
-            onClick={() => setCartOpen(true)}
+            onClick={handleOpenCart}
             className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
             aria-label="Open cart"
           >
@@ -1062,7 +794,7 @@ export default function RoomMenu() {
 
           <FloatingCartButton 
             itemCount={cart?.item_count ?? 0} 
-            onOpenCart={() => setCartOpen(true)} 
+            onOpenCart={handleOpenCart} 
           />
 
           <button
@@ -1128,20 +860,6 @@ export default function RoomMenu() {
         formatPrice={(p) => `$${p.toFixed(2)}`}
       />
 
-      {/* Room cart drawer */}
-      <RoomCartDrawer
-        open={cartOpen}
-        onClose={handleContinueBrowsing}
-        onContinueBrowsing={handleContinueBrowsing}
-        onTrackOrder={handleTrackOrder}
-        cart={cart}
-        onUpdateItem={updateItem}
-        onRemoveItem={removeItem}
-        onClearCart={clearCart}
-        onPlaceOrder={handlePlaceOrder}
-        placing={placing}
-        orderPlaced={placedOrder}
-      />
     </div>
   );
 }

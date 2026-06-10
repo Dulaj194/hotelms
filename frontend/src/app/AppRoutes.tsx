@@ -60,6 +60,7 @@ const Pricing = lazy(() => import("@/pages/public/Pricing"));
 const QRResolve = lazy(() => import("@/pages/public/QRResolve"));
 const GuestOrdersList = lazy(() => import("@/pages/public/GuestOrdersList"));
 const RoomMenu = lazy(() => import("@/pages/public/RoomMenu"));
+const RoomCartCheckout = lazy(() => import("@/pages/public/RoomCartCheckout"));
 const RoomOrdersList = lazy(() => import("@/pages/public/RoomOrdersList"));
 const RoomOrderStatus = lazy(() => import("@/pages/public/RoomOrderStatus"));
 const TableMenu = lazy(() => import("@/pages/public/TableMenu"));
@@ -142,6 +143,10 @@ function AppRoutes() {
         />
         <Route path="/orders/my/:restaurantId/:tableNumber" element={<GuestOrdersList />} />
         <Route path="/menu/:restaurantId/room/:roomNumber" element={<RoomMenu />} />
+        <Route
+          path="/menu/:restaurantId/room/:roomNumber/cart"
+          element={<RoomCartCheckout />}
+        />
         <Route
           path="/menu/:restaurantId/room/:roomNumber/order/:orderId"
           element={<RoomOrderStatus />}
