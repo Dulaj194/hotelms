@@ -9,7 +9,6 @@ import {
   Plus,
   ShoppingBag,
   Sparkles,
-  Tag,
   Trash2,
   UtensilsCrossed,
   MessageSquareText,
@@ -26,7 +25,7 @@ import { useLocalRoomCart } from "@/hooks/useLocalMenuCart";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import LanguageSwitcher from "@/components/public/LanguageSwitcher";
-import { publicGet, publicPost } from "@/lib/publicApi";
+import { publicGet } from "@/lib/publicApi";
 import type { CartItemResponse } from "@/types/cart";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
 
@@ -34,10 +33,7 @@ type MenuItemWithCategory = PublicItemSummaryResponse & {
   categoryName: string | null;
 };
 
-type AppliedCoupon = {
-  code: string;
-  discountPercent: number;
-};
+
 
 function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`;
@@ -88,10 +84,6 @@ export default function RoomCartCheckout() {
   const [sessionReady, setSessionReady] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
-  const [couponInput, setCouponInput] = useState("");
-  const [couponError, setCouponError] = useState<string | null>(null);
-  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
-  const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PublicItemSummaryResponse | null>(null);
@@ -103,7 +95,7 @@ export default function RoomCartCheckout() {
   const effectiveQrAccessKey =
     qrAccessKey || (
       restaurantContextId && roomNumber
-        ? getRoomToken(restaurantContextId, roomNumber) ?? ""
+        ? getRoomToken() ?? ""
         : ""
     );
   const { cart, addItem, updateItem, removeItem, clearCart, placeOrder, placing } =
@@ -127,9 +119,7 @@ export default function RoomCartCheckout() {
   }, [cartItems]);
   const itemCount = cart?.item_count ?? 0;
   const subtotal = cart?.total ?? 0;
-  const discount = appliedCoupon
-    ? roundCurrency(subtotal * appliedCoupon.discountPercent / 100)
-    : 0;
+  const discount = 0;
   const taxesAndCharges = 0;
   const grandTotal = Math.max(roundCurrency(subtotal + taxesAndCharges - discount), 0);
 
@@ -187,59 +177,7 @@ export default function RoomCartCheckout() {
     void loadMenu();
   }, [restaurantId, currentLanguage]);
 
-  useEffect(() => {
-    if (itemCount === 0) {
-      setAppliedCoupon(null);
-      setCouponError(null);
-    }
-  }, [itemCount]);
-
-
-  const handleApplyCoupon = useCallback(async () => {
-    const code = couponInput.trim();
-    if (!code) {
-      setCouponError(t("cart:enter_coupon_error"));
-      setAppliedCoupon(null);
-      return;
-    }
-
-    if (!restaurantId) {
-      setCouponError(t("cart:invalid_restaurant_context"));
-      return;
-    }
-
-    setApplyingCoupon(true);
-    setCouponError(null);
-    try {
-      type PromoCodeValidationResponse = {
-        valid: boolean;
-        message: string;
-        code?: string;
-        discount_percent?: number;
-      };
-
-      const result = await publicPost<PromoCodeValidationResponse>(
-        `/public/restaurants/${restaurantId}/coupon/validate`,
-        { code },
-      );
-
-      if (result.valid) {
-        setAppliedCoupon({
-          code: result.code ?? code,
-          discountPercent: result.discount_percent ?? 0,
-        });
-        setCouponInput(result.code ?? code);
-      } else {
-        setCouponError(result.message || t("cart:invalid_coupon"));
-        setAppliedCoupon(null);
-      }
-    } catch (err) {
-      setCouponError(err instanceof Error ? err.message : t("cart:failed_apply_coupon"));
-      setAppliedCoupon(null);
-    } finally {
-      setApplyingCoupon(false);
-    }
-  }, [couponInput, restaurantId, t]);
+  // Coupon logic removed as it's not supported for rooms yet
 
   const handleAddRecommendation = useCallback(
     async (itemId: number) => {
@@ -273,7 +211,7 @@ export default function RoomCartCheckout() {
         setPlaceError(msg);
       }
     }
-  }, [appliedCoupon, itemCount, placeOrder, restaurantId, roomNumber, hasUnavailableItems, t]);
+  }, [itemCount, placeOrder, restaurantId, roomNumber, hasUnavailableItems, t]);
 
   const renderImage = (path: string | undefined | null, name: string) => {
     return (
