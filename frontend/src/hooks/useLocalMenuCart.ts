@@ -284,8 +284,9 @@ export function useLocalRoomCart(params: {
   roomNumber: string | null;
   qrAccessKey: string;
   menu: PublicMenuResponse | null;
+  customerName?: string | null;
 }) {
-  const { restaurantId, roomId, roomNumber, qrAccessKey, menu } = params;
+  const { restaurantId, roomId, roomNumber, qrAccessKey, menu, customerName } = params;
   const storageKey = `hotelms:room-cart:${restaurantId ?? "unknown"}:${roomNumber ?? "unknown"}`;
   const { quantities, setQuantities, addItem, updateItem, removeItem, clearCart } =
     useLocalQuantities(storageKey);
@@ -345,7 +346,11 @@ export function useLocalRoomCart(params: {
           : null;
         const response = await postJson<PlaceRoomOrderResponse>(
           "/room-orders",
-          { ...data, items: orderItems },
+          {
+            ...data,
+            customer_name: data.customer_name ?? customerName ?? undefined,
+            items: orderItems,
+          },
           roomToken ? { "X-Room-Session": roomToken } : { "X-Room-Key": qrAccessKey },
         );
         if (response.room_session_token) {
@@ -362,7 +367,7 @@ export function useLocalRoomCart(params: {
         setPlacing(false);
       }
     },
-    [qrAccessKey, quantities, restaurantId, roomId, roomNumber, setQuantities],
+    [customerName, qrAccessKey, quantities, restaurantId, roomId, roomNumber, setQuantities],
   );
 
   return {

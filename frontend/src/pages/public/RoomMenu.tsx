@@ -27,7 +27,7 @@ import { publicGet, publicPost } from "@/lib/publicApi";
 import SafeMenuAsset from "@/components/public/SafeMenuAsset";
 import ItemDetailSheet from "@/components/public/ItemDetailSheet";
 import QuickServiceDrawer, { type QuickServiceItem } from "@/components/public/QuickServiceDrawer";
-import { getRoomToken } from "@/hooks/useRoomSession";
+import { getRoomToken, getRoomGuestDisplayName, setRoomGuestDisplayName } from "@/hooks/useRoomSession";
 import type { PublicItemSummaryResponse, PublicMenuResponse } from "@/types/publicMenu";
 import type { RoomOrderDetailResponse } from "@/types/roomSession";
 
@@ -330,6 +330,9 @@ export default function RoomMenu() {
 
   const [menu, setMenu] = useState<PublicMenuResponse | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [guestNameInput, setGuestNameInput] = useState("");
+  const [guestName, setGuestName] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [addingItemId, setAddingItemId] = useState<number | null>(null);
@@ -354,6 +357,7 @@ export default function RoomMenu() {
       roomNumber: roomNumber ?? null,
       qrAccessKey,
       menu,
+      customerName: guestName,
     });
 
   const {
@@ -371,15 +375,43 @@ export default function RoomMenu() {
     onSwipeRight: selectPreviousCategory,
   });
 
-  // 1. Preserve QR context locally. Cart mutations stay client-side until checkout.
   useEffect(() => {
     if (!restaurantId || !roomNumber) return;
+    const parsedRestaurantId = Number(restaurantId);
+    if (Number.isNaN(parsedRestaurantId)) return;
+    const existingName = getRoomGuestDisplayName(parsedRestaurantId, roomNumber);
+    if (existingName) {
+      setGuestName(existingName);
+      setGuestNameInput(existingName);
+    }
+  }, [restaurantId, roomNumber]);
+
+  // 1. Preserve QR context locally. Cart mutations stay client-side until checkout.
+  useEffect(() => {
+    if (!restaurantId || !roomNumber || !guestName) return;
     if (!qrAccessKey) {
       setPageError(t("menu:invalid_qr"));
       return;
     }
     setSessionReady(true);
-  }, [restaurantId, roomNumber, qrAccessKey]);
+  }, [restaurantId, roomNumber, qrAccessKey, guestName]);
+
+  const handleNameSubmit = useCallback(() => {
+    const trimmed = guestNameInput.trim();
+    if (!trimmed) {
+      setNameError(translateError(t("menu:name_error")));
+      if (window.navigator.vibrate) window.navigator.vibrate([30, 100, 30]);
+      return;
+    }
+    setNameError(null);
+    setGuestName(trimmed);
+
+    if (window.navigator.vibrate) window.navigator.vibrate(20);
+
+    if (restaurantContextId && roomNumber) {
+      setRoomGuestDisplayName(restaurantContextId, roomNumber, trimmed);
+    }
+  }, [guestNameInput, restaurantContextId, roomNumber, t]);
 
   // 2. Fetch public menu
   useEffect(() => {
@@ -533,6 +565,88 @@ export default function RoomMenu() {
     return (
       <div className="min-h-dvh flex items-center justify-center">
         <p className="text-gray-400 animate-pulse">{t("menu:loading_menu")}</p>
+      </div>
+    );
+  }
+
+  if (!guestName) {
+    return (
+      <div className="box-border min-h-dvh w-full overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.15),_transparent_45%),linear-gradient(180deg,#fffaf5_0%,#ffffff_35%,#f8fafc_100%)] px-4 py-6 text-slate-900 pb-[env(safe-area-inset-bottom,24px)] pt-[env(safe-area-inset-top,24px)]">
+        <div className="mx-auto flex min-h-[calc(100dvh-6rem)] w-full max-w-md items-center justify-center">
+          <div className="w-full overflow-hidden rounded-[2.5rem] border border-orange-100 bg-white shadow-[0_32px_64px_-16px_rgba(15,23,42,0.15)] backdrop-blur-xl">
+            <div className="bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 px-6 pb-10 pt-8 text-white">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/70">
+                    {t("menu:room_session", "Room Session")}
+                  </p>
+                  <h1 className="mt-3 text-3xl font-black leading-[1.1] tracking-tight sm:text-4xl">
+                    {menu?.restaurant.name ?? "Luminous Hotel"}
+                  </h1>
+                </div>
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/20 shadow-inner backdrop-blur-md ring-1 ring-white/30 animate-bounce [animation-duration:3s]">
+                  <ChefHat className="h-7 w-7 text-white" />
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {t("menu:room")} {roomNumber}
+                </div>
+                <span className="rounded-full bg-black/10 px-3.5 py-1.5 text-[11px] font-bold backdrop-blur-md ring-1 ring-white/20">
+                  {t("menu:qr_verified")}
+                </span>
+                <span className="rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-[11px] font-bold text-emerald-100 backdrop-blur-md ring-1 ring-emerald-500/30">
+                  {t("menu:fast_ordering")}
+                </span>
+              </div>
+            </div>
+
+            <div className="px-7 py-8">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                  {t("menu:your_name")}
+                </label>
+                <input
+                  value={guestNameInput}
+                  onChange={(event) => setGuestNameInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleNameSubmit();
+                    }
+                  }}
+                  placeholder={t("menu:name_placeholder")}
+                  className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-5 py-4 text-base font-medium outline-none transition-all placeholder:text-slate-300 focus:border-orange-500/30 focus:bg-white focus:ring-4 focus:ring-orange-500/10"
+                />
+                {nameError && (
+                  <p className="flex items-center gap-1.5 px-1 text-[11px] font-semibold text-red-500">
+                    <span className="h-1 w-1 rounded-full bg-red-500" />
+                    {nameError}
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleNameSubmit}
+                className="mt-8 group relative inline-flex w-full items-center justify-center overflow-hidden rounded-2xl bg-slate-900 py-4 text-base font-bold text-white transition-all active:scale-[0.98] hover:bg-slate-800"
+              >
+                <span className="relative z-10 flex items-center gap-2">
+                  {t("menu:start_session")}
+                </span>
+                <div className="absolute inset-0 z-0 bg-gradient-to-r from-orange-500 to-amber-500 opacity-0 transition-opacity group-hover:opacity-10" />
+              </button>
+
+              <div className="mt-8 rounded-2xl bg-slate-50 p-4 text-center">
+                <p className="text-[11px] leading-relaxed font-medium text-slate-500">
+                  {t("menu:name_hint")}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

@@ -5,6 +5,7 @@ type RoomSessionProfile = {
   restaurant_id: number;
   room_id: number;
   room_number: string;
+  customer_name?: string;
 };
 
 /** Returns the raw room session token string, or null if not present. */
@@ -110,4 +111,51 @@ export function hasRoomSessionForContext(restaurantId: number, roomNumber: strin
   } catch {
     return false;
   }
+}
+
+export function getRoomGuestDisplayName(
+  restaurantId: number,
+  roomNumber: string,
+): string | null {
+  const raw = sessionStorage.getItem(ROOM_SESSION_PROFILE_KEY);
+  if (!raw) return null;
+
+  try {
+    const profile = JSON.parse(raw) as RoomSessionProfile;
+    if (
+      profile.restaurant_id !== restaurantId
+      || profile.room_number !== roomNumber
+    ) {
+      return null;
+    }
+    const name = (profile.customer_name ?? "").trim();
+    return name || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setRoomGuestDisplayName(
+  restaurantId: number,
+  roomNumber: string,
+  customerName: string,
+): void {
+  const raw = sessionStorage.getItem(ROOM_SESSION_PROFILE_KEY);
+  let profile: RoomSessionProfile = {
+    restaurant_id: restaurantId,
+    room_id: 0,
+    room_number: roomNumber,
+    customer_name: customerName,
+  };
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as RoomSessionProfile;
+      if (parsed.restaurant_id === restaurantId && parsed.room_number === roomNumber) {
+        profile = { ...parsed, customer_name: customerName };
+      }
+    } catch {
+      // Ignore
+    }
+  }
+  sessionStorage.setItem(ROOM_SESSION_PROFILE_KEY, JSON.stringify(profile));
 }
