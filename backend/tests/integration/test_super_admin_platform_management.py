@@ -506,7 +506,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
 
         cashier_token = auth_service.login_staff(
             self.db,
-            _FakeRedis(),
+            _FakeRedis(),  # type: ignore[arg-type]
             Response(),
             cashier.email,
             "Password1",
@@ -515,7 +515,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         )
         accountant_token = auth_service.login_staff(
             self.db,
-            _FakeRedis(),
+            _FakeRedis(),  # type: ignore[arg-type]
             Response(),
             accountant.email,
             "Password1",
@@ -551,7 +551,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         )
         self.assertEqual(
             [module.key for module in access_summary.enabled_modules],
-            ["orders", "qr", "kds", "steward_ops", "reports", "billing", "housekeeping"],
+            ["orders", "qr", "qr_tables", "qr_rooms", "kds", "steward_ops", "reports", "billing", "housekeeping"],
         )
 
         updated = subscriptions_service.update_subscription_for_super_admin(
@@ -915,7 +915,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         first_restaurant, first_owner = self._create_pending_restaurant()
         second_restaurant = self._create_active_restaurant()
         second_owner = self._create_owner_for_restaurant(second_restaurant)
-        second_cashier_target = not bool(second_restaurant.enable_cashier)
+        second_cashier_target = not second_restaurant.enable_cashier
 
         settings_service.create_settings_request(
             self.db,
