@@ -37,6 +37,8 @@ describe("IntegrationPanel", () => {
             reports: true,
             accountant: true,
             cashier: true,
+            tables: true,
+            rooms: true,
           },
           integration: {
             api_key: {

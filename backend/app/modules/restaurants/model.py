@@ -72,6 +72,8 @@ class Restaurant(Base):
     enable_reports: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     enable_accountant: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     enable_cashier: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    enable_tables: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    enable_rooms: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     integration_api_key_hash: Mapped[str | None] = mapped_column(
         String(128),
         nullable=True,

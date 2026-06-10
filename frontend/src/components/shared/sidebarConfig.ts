@@ -175,7 +175,7 @@ export const qrSubItems: MenuSubItem[] = [
     icon: QrCode,
     roles: RESTAURANT_ADMIN_ROLES,
     privilege: "QR_MENU",
-    moduleKey: "qr",
+    moduleKey: "qr_tables",
   },
   {
     path: "/admin/qr/tables/generate",
@@ -183,7 +183,7 @@ export const qrSubItems: MenuSubItem[] = [
     icon: LayoutGrid,
     roles: RESTAURANT_ADMIN_ROLES,
     privilege: "QR_MENU",
-    moduleKey: "qr",
+    moduleKey: "qr_tables",
   },
   {
     path: "/admin/qr/rooms",
@@ -191,7 +191,7 @@ export const qrSubItems: MenuSubItem[] = [
     icon: QrCode,
     roles: RESTAURANT_ADMIN_ROLES,
     privilege: "QR_MENU",
-    moduleKey: "qr",
+    moduleKey: "qr_rooms",
   },
   {
     path: "/admin/qr/rooms/generate",
@@ -199,7 +199,7 @@ export const qrSubItems: MenuSubItem[] = [
     icon: LayoutGrid,
     roles: RESTAURANT_ADMIN_ROLES,
     privilege: "QR_MENU",
-    moduleKey: "qr",
+    moduleKey: "qr_rooms",
   },
 ];
 

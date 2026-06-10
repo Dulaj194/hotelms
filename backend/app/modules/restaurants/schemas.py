@@ -72,6 +72,8 @@ class RestaurantFeatureFlagsResponse(BaseModel):
     reports: bool
     accountant: bool
     cashier: bool
+    tables: bool
+    rooms: bool
 
 
 class RestaurantFeatureFlagsUpdateRequest(BaseModel):
@@ -81,6 +83,8 @@ class RestaurantFeatureFlagsUpdateRequest(BaseModel):
     reports: bool | None = None
     accountant: bool | None = None
     cashier: bool | None = None
+    tables: bool | None = None
+    rooms: bool | None = None
 
 
 class RestaurantApiKeySummaryResponse(BaseModel):

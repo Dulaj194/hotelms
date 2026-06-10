@@ -23,11 +23,15 @@ class UserFeatureFlagResponse(BaseModel):
     reports: bool = False
     accountant: bool = False
     cashier: bool = False
+    tables: bool = True
+    rooms: bool = True
 
 
 class UserModuleAccessResponse(BaseModel):
     orders: bool = False
     qr: bool = False
+    qr_tables: bool = False
+    qr_rooms: bool = False
     kds: bool = False
     steward_ops: bool = False
     reports: bool = False

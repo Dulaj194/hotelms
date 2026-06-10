@@ -12,11 +12,15 @@ const EMPTY_FEATURE_FLAGS: FeatureFlagSnapshot = {
   reports: false,
   accountant: false,
   cashier: false,
+  tables: false,
+  rooms: false,
 };
 
 const EMPTY_MODULE_ACCESS: ModuleAccessSnapshot = {
   orders: false,
   qr: false,
+  qr_tables: false,
+  qr_rooms: false,
   kds: false,
   steward_ops: false,
   reports: false,

@@ -131,10 +131,11 @@ export default function RoomMenu() {
 
   const { cart, addItem, updateItem, removeItem } = useLocalRoomCart({
     restaurantId: restaurantContextId,
+    roomId: null,
     roomNumber: roomNumber ?? null,
     qrAccessKey: qrAccessKey || (
       restaurantContextId && roomNumber
-        ? getRoomToken(restaurantContextId, roomNumber) ?? ""
+        ? getRoomToken() ?? ""
         : ""
     ),
     menu,

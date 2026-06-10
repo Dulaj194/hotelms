@@ -78,6 +78,20 @@ _MODULE_DEFINITIONS = {
         description="Promotional offers, discount campaigns, and marketing content.",
         package_privileges=("OFFERS",),
     ),
+    "qr_tables": AccessModuleDefinition(
+        key="qr_tables",
+        label="QR Tables",
+        description="Table QR generation and management.",
+        package_privileges=("QR_MENU",),
+        feature_flags=("TABLES",),
+    ),
+    "qr_rooms": AccessModuleDefinition(
+        key="qr_rooms",
+        label="QR Rooms",
+        description="Room QR generation and management.",
+        package_privileges=("QR_MENU",),
+        feature_flags=("ROOMS",),
+    ),
 }
 
 _FEATURE_FLAG_DEFINITIONS = {
@@ -129,6 +143,22 @@ _FEATURE_FLAG_DEFINITIONS = {
         column_name="enable_cashier",
         modules=("billing",),
     ),
+    "tables": RestaurantFeatureFlagDefinition(
+        code="TABLES",
+        key="tables",
+        label="Tables",
+        description="Allow generating and managing Table QRs.",
+        column_name="enable_tables",
+        modules=("qr_tables",),
+    ),
+    "rooms": RestaurantFeatureFlagDefinition(
+        code="ROOMS",
+        key="rooms",
+        label="Rooms",
+        description="Allow generating and managing Room QRs.",
+        column_name="enable_rooms",
+        modules=("qr_rooms",),
+    ),
 }
 
 _FEATURE_FLAG_DEFINITIONS_BY_CODE = {
@@ -169,7 +199,7 @@ def flatten_feature_flag_updates(feature_flags: dict[str, bool | None]) -> dict[
         definition = get_feature_flag_definition(key)
         if definition is None or value is None:
             continue
-        flattened[definition.column_name] = bool(value)
+        flattened[definition.column_name] = value
     return flattened
 
 
@@ -188,7 +218,7 @@ def is_module_enabled_by_feature_flags(
         return True
 
     flag_values = [
-        bool(feature_flags.get(get_feature_flag_key(code), False))
+        feature_flags.get(get_feature_flag_key(code), False)
         for code in module.feature_flags
     ]
     if module.feature_flag_match == "any":

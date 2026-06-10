@@ -43,6 +43,16 @@ export const FEATURE_FLAG_CATALOG: FeatureFlagCatalogItem[] = [
     label: "Cashier",
     description: "Allow cashier billing and payment-settlement access.",
   },
+  {
+    key: "tables",
+    label: "Tables",
+    description: "Allow generating and managing Table QRs.",
+  },
+  {
+    key: "rooms",
+    label: "Rooms",
+    description: "Allow generating and managing Room QRs.",
+  },
 ];
 
 export const MODULE_ACCESS_CATALOG: Record<keyof ModuleAccessSnapshot, ModuleCatalogItem> = {
@@ -55,6 +65,16 @@ export const MODULE_ACCESS_CATALOG: Record<keyof ModuleAccessSnapshot, ModuleCat
     key: "qr",
     label: "QR Codes",
     description: "Table and room QR generation and management.",
+  },
+  qr_tables: {
+    key: "qr_tables",
+    label: "QR Tables",
+    description: "Table QR generation and management.",
+  },
+  qr_rooms: {
+    key: "qr_rooms",
+    label: "QR Rooms",
+    description: "Room QR generation and management.",
   },
   kds: {
     key: "kds",
@@ -96,6 +116,8 @@ export function createEmptyFeatureFlags(): FeatureFlagSnapshot {
     reports: false,
     accountant: false,
     cashier: false,
+    tables: false,
+    rooms: false,
   };
 }
 
@@ -103,6 +125,8 @@ export function createEmptyModuleAccess(): ModuleAccessSnapshot {
   return {
     orders: false,
     qr: false,
+    qr_tables: false,
+    qr_rooms: false,
     kds: false,
     steward_ops: false,
     reports: false,

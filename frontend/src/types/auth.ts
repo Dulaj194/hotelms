@@ -6,6 +6,30 @@ export interface LoginRequest {
   password: string;
 }
 
+export interface UserFeatureFlagResponse {
+  steward: boolean;
+  housekeeping: boolean;
+  kds: boolean;
+  reports: boolean;
+  accountant: boolean;
+  cashier: boolean;
+  tables: boolean;
+  rooms: boolean;
+}
+
+export interface UserModuleAccessResponse {
+  orders: boolean;
+  qr: boolean;
+  qr_tables: boolean;
+  qr_rooms: boolean;
+  kds: boolean;
+  steward_ops: boolean;
+  reports: boolean;
+  billing: boolean;
+  housekeeping: boolean;
+  offers: boolean;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;
