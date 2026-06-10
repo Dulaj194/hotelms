@@ -551,7 +551,7 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         )
         self.assertEqual(
             [module.key for module in access_summary.enabled_modules],
-            ["orders", "qr", "qr_tables", "qr_rooms", "kds", "steward_ops", "reports", "billing", "housekeeping"],
+            ["orders", "qr", "kds", "steward_ops", "reports", "billing", "housekeeping", "qr_tables", "qr_rooms"],
         )
 
         updated = subscriptions_service.update_subscription_for_super_admin(
