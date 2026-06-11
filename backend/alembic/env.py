@@ -53,9 +53,9 @@ def safe_create_index(self, index_name, table_name, columns, **kw):
         else:
             raise
 
-Operations.add_column = safe_add_column
-Operations.create_table = safe_create_table
-Operations.create_index = safe_create_index
+Operations.add_column = safe_add_column  # type: ignore
+Operations.create_table = safe_create_table  # type: ignore
+Operations.create_index = safe_create_index  # type: ignore
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
