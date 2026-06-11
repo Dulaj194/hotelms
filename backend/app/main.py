@@ -80,6 +80,31 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
             "DB auto schema sync is disabled. Apply migrations with Alembic before running the API."
         )
 
+    # Seed default super admin if none exists
+    from app.db.session import SessionLocal
+    from app.modules.users.model import User, UserRole
+    from app.core.security import hash_password
+    from app.modules.platform_access.catalog import DEFAULT_PLATFORM_SCOPES
+    
+    try:
+        with SessionLocal() as db:
+            admin_exists = db.query(User).filter(User.role == UserRole.super_admin).first()
+            if not admin_exists:
+                default_admin = User(
+                    email="dulaj@hotelms.com",
+                    password_hash=hash_password("Dulaj7237"),
+                    full_name="Dulaj Admin",
+                    role=UserRole.super_admin,
+                    is_active=True,
+                    restaurant_id=None,
+                )
+                default_admin.set_super_admin_scopes(list(DEFAULT_PLATFORM_SCOPES))
+                db.add(default_admin)
+                db.commit()
+                logger.info("Successfully created default super admin: dulaj@hotelms.com")
+    except Exception as e:
+        logger.error(f"Failed to seed default super admin: {e}")
+
     # Start background worker: mark overdue subscriptions as expired hourly.
     expiry_task = asyncio.create_task(run_subscription_expiry_loop())
 
