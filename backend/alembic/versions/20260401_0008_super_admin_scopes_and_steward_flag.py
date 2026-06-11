@@ -25,19 +25,27 @@ DEFAULT_PLATFORM_SCOPES = json.dumps(
 
 
 def upgrade() -> None:
-    op.add_column(
-        "users",
-        sa.Column("platform_scopes_json", sa.Text(), nullable=True),
-    )
-    op.add_column(
-        "restaurants",
-        sa.Column(
-            "enable_steward",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.true(),
-        ),
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    users_columns = [c["name"] for c in inspector.get_columns("users")]
+    if "platform_scopes_json" not in users_columns:
+        op.add_column(
+            "users",
+            sa.Column("platform_scopes_json", sa.Text(), nullable=True),
+        )
+
+    restaurants_columns = [c["name"] for c in inspector.get_columns("restaurants")]
+    if "enable_steward" not in restaurants_columns:
+        op.add_column(
+            "restaurants",
+            sa.Column(
+                "enable_steward",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.true(),
+            ),
+        )
 
     connection = op.get_bind()
     connection.execute(
