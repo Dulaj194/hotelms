@@ -1284,6 +1284,30 @@ export default function SuperAdminRestaurants() {
               />
             )}
 
+            {selected && canManageTenants && (
+              <StaffPanel
+                hotelUsers={hotelUsers}
+                usersLoading={usersLoading}
+                showAddUser={showAddUser}
+                addUserForm={addUserForm}
+                addingUser={addingUser}
+                addUserMsg={addUserMsg}
+                availableRoles={availableStaffRoles}
+                deletingUserId={deletingUserId}
+                togglingUserId={togglingUserId}
+                resettingUserId={resettingUserId}
+                onToggleAddUser={() => {
+                  setShowAddUser((current) => !current);
+                  setAddUserMsg(null);
+                }}
+                onFormChange={setAddUserForm}
+                onSubmit={(event) => void handleAddUser(event)}
+                onToggleUser={(userId, isActive) => void handleToggleUser(userId, isActive)}
+                onDeleteUser={handleDeleteUser}
+                onResetUserPassword={handleResetUserPassword}
+              />
+            )}
+
             {selected && canManageSecurity && (
               <IntegrationPanel
                 selected={selected}
@@ -1310,30 +1334,6 @@ export default function SuperAdminRestaurants() {
                 onRevokeWebhookSecret={() => void handleRevokeWebhookSecret()}
                 onSendTestDelivery={() => void handleSendTestDelivery()}
                 onRetryDelivery={(deliveryId) => void handleRetryDelivery(deliveryId)}
-              />
-            )}
-
-            {selected && canManageTenants && (
-              <StaffPanel
-                hotelUsers={hotelUsers}
-                usersLoading={usersLoading}
-                showAddUser={showAddUser}
-                addUserForm={addUserForm}
-                addingUser={addingUser}
-                addUserMsg={addUserMsg}
-                availableRoles={availableStaffRoles}
-                deletingUserId={deletingUserId}
-                togglingUserId={togglingUserId}
-                resettingUserId={resettingUserId}
-                onToggleAddUser={() => {
-                  setShowAddUser((current) => !current);
-                  setAddUserMsg(null);
-                }}
-                onFormChange={setAddUserForm}
-                onSubmit={(event) => void handleAddUser(event)}
-                onToggleUser={(userId, isActive) => void handleToggleUser(userId, isActive)}
-                onDeleteUser={handleDeleteUser}
-                onResetUserPassword={handleResetUserPassword}
               />
             )}
           </div>
