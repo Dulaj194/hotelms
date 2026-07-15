@@ -35,6 +35,8 @@ from app.modules.restaurants.schemas import (
     RestaurantStaffPasswordRevealRequest,
     RestaurantStaffPasswordRevealResponse,
     RestaurantStaffPasswordResetResponse,
+    RestaurantStatusUpdatePayload,
+    RestaurantStatusUpdateResponse,
     RestaurantUpdateRequest,
     RestaurantWebhookDeliveryActionResponse,
     RestaurantWebhookSecretProvisionResponse,
@@ -436,6 +438,26 @@ def delete_restaurant_by_id(
         restaurant_id,
         current_user_id=current_user.id,
         reason=reason,
+    )
+
+
+@router.patch(
+    "/{restaurant_id}/status",
+    response_model=RestaurantStatusUpdateResponse,
+)
+def update_restaurant_status(
+    restaurant_id: int,
+    payload: RestaurantStatusUpdatePayload,
+    current_user: User = Depends(require_platform_scopes("tenant_admin")),
+    db: Session = Depends(get_db),
+) -> RestaurantStatusUpdateResponse:
+    """Toggle restaurant active status. Super-admin only."""
+    return service.update_restaurant_status(
+        db,
+        restaurant_id=restaurant_id,
+        is_active=payload.is_active,
+        current_user_id=current_user.id,
+        reason=payload.reason,
     )
 
 

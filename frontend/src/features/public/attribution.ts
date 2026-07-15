@@ -46,7 +46,6 @@ export function inferSourcePage(pathname: string): string {
   if (pathname.startsWith("/blog")) return "blog";
   if (pathname.startsWith("/about")) return "about";
   if (pathname.startsWith("/contact")) return "contact";
-  if (pathname.startsWith("/pricing")) return "pricing";
   if (pathname.startsWith("/login")) return "login";
 
   const segment = pathname.split("/").filter(Boolean)[0];

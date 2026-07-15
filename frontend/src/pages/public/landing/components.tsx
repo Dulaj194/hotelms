@@ -623,7 +623,6 @@ export function PublicFooter({ footer }: { footer: SiteFooter }) {
         <FooterColumn title="Product">
           <a href={buildTrackedPath("/#features")} className="block">Features</a>
           <a href={buildTrackedPath("/#how-it-works")} className="block">How it works</a>
-          <Link to={buildTrackedPath("/pricing")} className="block">Pricing</Link>
         </FooterColumn>
 
         <FooterColumn title="Company">

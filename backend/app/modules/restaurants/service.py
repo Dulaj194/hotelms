@@ -68,6 +68,7 @@ from app.modules.restaurants.schemas import (
     RestaurantStaffPasswordRevealResponse,
     RestaurantStaffPasswordResetRequest,
     RestaurantStaffPasswordResetResponse,
+    RestaurantStatusUpdateResponse,
     RestaurantSubscriptionSnapshotResponse,
     RestaurantUpdateRequest,
     RestaurantWebhookSecretSummaryResponse,
@@ -184,7 +185,7 @@ def _write_restaurant_mutation_audit(
     extra_metadata: dict[str, object] | None = None,
 ) -> None:
     delta = _build_change_delta(before_state, after_state)
-    metadata = {
+    metadata: dict[str, object] = {
         "restaurant_id": restaurant_id,
         "reason": _normalize_reason(reason, default_reason=default_reason),
         "before": before_state,
@@ -558,14 +559,14 @@ def _build_subscription_snapshot(
     if (
         status_value in {SubscriptionStatus.active.value, SubscriptionStatus.trial.value}
         and effective_expires_at is not None
-        and effective_expires_at <= datetime.utcnow()
+        and effective_expires_at <= datetime.now(UTC).replace(tzinfo=None)
     ):
         status_value = SubscriptionStatus.expired.value
 
     return RestaurantSubscriptionSnapshotResponse(
         restaurant_id=restaurant_id,
         status=status_value,
-        is_trial=bool(subscription.is_trial),
+        is_trial=subscription.is_trial,
         is_active=status_value in {SubscriptionStatus.active.value, SubscriptionStatus.trial.value},
         is_expired=status_value == SubscriptionStatus.expired.value,
         package_id=subscription.package_id,
@@ -698,7 +699,7 @@ def create_restaurant(
     current_user_id: int | None = None,
 ) -> RestaurantMeResponse:
     """Create a new restaurant tenant. Restricted to super_admin use only."""
-    if payload.email and get_user_by_email(db, str(payload.email)):
+    if payload.email and get_user_by_email(db, payload.email):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="A user with this restaurant email already exists.",
@@ -1348,7 +1349,7 @@ def bulk_review_restaurant_registrations(
                 RestaurantRegistrationBulkReviewResultItem(
                     restaurant_id=restaurant_id,
                     status="error",
-                    message=str(exc.detail),
+                    message=exc.detail,
                 )
             )
 
@@ -1505,6 +1506,54 @@ def _serialize_registration_summary_with_db(
         registration_reviewed_by_id=restaurant.registration_reviewed_by_id,
         registration_review_notes=restaurant.registration_review_notes,
         registration_reviewed_at=restaurant.registration_reviewed_at,
+    )
+
+
+def update_restaurant_status(
+    db: Session,
+    restaurant_id: int,
+    is_active: bool,
+    *,
+    current_user_id: int,
+    reason: str | None = None,
+) -> RestaurantStatusUpdateResponse:
+    """Toggle a restaurant's active status. Super admin only."""
+    current_restaurant = repository.get_by_id_for_super_admin(db, restaurant_id)
+    if current_restaurant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restaurant not found.",
+        )
+
+    before_state = _restaurant_lifecycle_snapshot(current_restaurant)
+    
+    current_restaurant.is_active = is_active
+    users = list_by_restaurant(db, current_restaurant.id)
+    for user in users:
+        user.is_active = is_active
+
+    db.commit()
+    db.refresh(current_restaurant)
+
+    status_str = "activated" if is_active else "deactivated"
+    _write_restaurant_mutation_audit(
+        db,
+        event_type=f"restaurant_{status_str}_by_super_admin",
+        current_user_id=current_user_id,
+        restaurant_id=restaurant_id,
+        reason=reason,
+        default_reason=f"Restaurant tenant {status_str} by super admin.",
+        before_state=before_state,
+        after_state={
+            "restaurant_id": restaurant_id,
+            "is_active": is_active,
+        },
+    )
+
+    return RestaurantStatusUpdateResponse(
+        message=f"Hotel successfully {status_str}.",
+        restaurant_id=restaurant_id,
+        is_active=is_active,
     )
 
 

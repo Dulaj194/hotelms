@@ -147,7 +147,7 @@ export const landingFallbackContent: LandingPageContent = {
     title: "Start your free trial with R.LUMINUOUS",
     message: "No setup friction. Launch your QR menu flow quickly and onboard your team in days.",
     action_label: "Start Free Trial",
-    action_to: "/pricing",
+    action_to: "/register",
   },
   trust_message:
     "Trusted by hospitality teams with stable uptime, secure access, and operational support.",

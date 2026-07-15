@@ -76,6 +76,16 @@ export async function deleteRestaurant(
   return api.delete<RestaurantDeleteResponse>(`/restaurants/${restaurantId}`);
 }
 
+export async function updateRestaurantStatus(
+  restaurantId: number,
+  isActive: boolean,
+): Promise<{ message: string; restaurant_id: number; is_active: boolean }> {
+  return api.patch<{ message: string; restaurant_id: number; is_active: boolean }>(
+    `/restaurants/${restaurantId}/status`,
+    { is_active: isActive },
+  );
+}
+
 export async function updateRestaurantIntegration(
   restaurantId: number,
   payload: RestaurantIntegrationUpdateRequest,

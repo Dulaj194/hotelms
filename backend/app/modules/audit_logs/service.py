@@ -180,8 +180,8 @@ def _write_audit_export_csv_file(
                         item.actor.user_id,
                         item.actor.full_name,
                         item.actor.email,
-                        item.ip_address,
-                        item.user_agent,
+                        getattr(item, "ip_address", None),
+                        getattr(item, "user_agent", None),
                         json.dumps(item.metadata, ensure_ascii=True, sort_keys=True),
                     ]
                 )
@@ -431,7 +431,7 @@ def _build_audit_logs_query(
     )
 
 
-def _safe_int(value: object) -> int | None:
+def _safe_int(value: Any) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -445,7 +445,10 @@ def _effective_restaurant_id(log: AuditLog, metadata: dict[str, Any]) -> int | N
 def _is_notification_snoozed(notification_state: SuperAdminNotificationState | None) -> bool:
     if notification_state is None or notification_state.snoozed_until is None:
         return False
-    return bool(_normalize_datetime(notification_state.snoozed_until) > _utcnow())
+    snoozed = _normalize_datetime(notification_state.snoozed_until)
+    if snoozed is None:
+        return False
+    return snoozed > _utcnow()
 
 
 def _build_notification_queue_status(
@@ -468,7 +471,7 @@ def _load_context_maps(
     db: Session,
     logs: list[AuditLog],
     notification_state_map: dict[int, SuperAdminNotificationState] | None = None,
-) -> tuple[dict[int, object], dict[int, object]]:
+) -> tuple[dict[int, Any], dict[int, Any]]:
     """Load user and restaurant context maps for audit log serialization."""
     from app.modules.restaurants.model import Restaurant
     from app.modules.users.model import User
@@ -505,8 +508,8 @@ def _load_context_maps(
 def _serialize_audit_entry(
     *,
     log: AuditLog,
-    user_map: dict[int, object],
-    restaurant_map: dict[int, object],
+    user_map: dict[int, Any],
+    restaurant_map: dict[int, Any],
     notification_state: SuperAdminNotificationState | None = None,
 ) -> AuditLogEntryResponse | SuperAdminNotificationResponse:
     """Serialize an audit log entry with optional notification fields.
@@ -596,7 +599,7 @@ def _serialize_audit_entry(
         restaurant=base_fields["restaurant"],
         metadata=base_fields["metadata"],
         queue_status=_build_notification_queue_status(notification_state),
-        is_read=bool(notification_state.is_read),
+        is_read=notification_state.is_read,
         read_at=notification_state.read_at,
         read_by=AuditLogActorResponse(
             user_id=getattr(read_by, "id", None),
@@ -633,20 +636,21 @@ def _serialize_notification_entry(
     *,
     log: AuditLog,
     notification_state: SuperAdminNotificationState | None,
-    user_map: dict[int, object],
-    restaurant_map: dict[int, object],
+    user_map: dict[int, Any],
+    restaurant_map: dict[int, Any],
 ) -> SuperAdminNotificationResponse:
     """DEPRECATED: Use _serialize_audit_entry with notification_state parameter.
 
     This function is kept for backward compatibility.
     Calls _serialize_audit_entry with notification_state parameter.
     """
-    return _serialize_audit_entry(
+    import typing
+    return typing.cast(SuperAdminNotificationResponse, _serialize_audit_entry(
         log=log,
         user_map=user_map,
         restaurant_map=restaurant_map,
         notification_state=notification_state,
-    )
+    ))
 
 
 def _get_notification_state_map(
@@ -1232,7 +1236,7 @@ def bulk_update_super_admin_notifications(
                 SuperAdminNotificationBulkUpdateResultItem(
                     notification_id=notification_id,
                     status="error",
-                    message=str(exc.detail),
+                    message=exc.detail,
                 )
             )
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Sequence
 
 from sqlalchemy import and_, or_
@@ -48,7 +48,7 @@ def update_banner(
     for field, value in banner_dict.items():
         setattr(db_banner, field, value)
     
-    db_banner.updated_at = datetime.utcnow()
+    db_banner.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(db_banner)
     return db_banner
@@ -61,7 +61,7 @@ def delete_banner(db: Session, db_banner: PlatformBanner) -> None:
 
 def get_active_banners(db: Session) -> Sequence[PlatformBanner]:
     """Fetch active banners that are currently scheduled to be displayed."""
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     return (
         db.query(PlatformBanner)
         .filter(

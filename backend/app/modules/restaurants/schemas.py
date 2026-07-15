@@ -374,6 +374,18 @@ class RestaurantStaffPasswordRevealResponse(BaseModel):
     revealed_at: datetime
 
 
+class RestaurantStatusUpdatePayload(BaseModel):
+    is_active: bool
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class RestaurantStatusUpdateResponse(BaseModel):
+    message: str
+    restaurant_id: int
+    is_active: bool
+
+
+
 class RestaurantRegistrationSummaryResponse(BaseModel):
     restaurant_id: int
     name: str

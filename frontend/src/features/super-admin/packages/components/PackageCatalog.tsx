@@ -29,9 +29,9 @@ export function PackageCatalog({
           No packages created yet.
         </div>
       ) : (
-        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+        <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {items.map((pkg) => (
-            <article key={pkg.id} className="rounded-xl border border-slate-200 p-5">
+            <article key={pkg.id} className="rounded-xl border border-slate-200 p-5 shadow-sm transition-shadow hover:shadow-md bg-white">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">

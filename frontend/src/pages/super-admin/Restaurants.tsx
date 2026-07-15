@@ -5,7 +5,7 @@ import { hasAnyPlatformScope } from "@/features/platform-access/catalog";
 import {
   createRestaurant,
   createRestaurantUser,
-  deleteRestaurant,
+  updateRestaurantStatus,
   deleteRestaurantUser,
   expireOverdueSubscriptions,
   generateRestaurantApiKey,
@@ -152,7 +152,7 @@ export default function SuperAdminRestaurants() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<RestaurantAdminUpdateRequest>(EMPTY_EDIT_FORM);
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [actionMsg, setActionMsg] = useState<InlineMessage>(null);
 
   const [editingSub, setEditingSub] = useState(false);
@@ -510,43 +510,46 @@ export default function SuperAdminRestaurants() {
     }
   }
 
-  async function deleteRestaurantRecord(restaurantId: number) {
+  async function updateRestaurantStatusRecord(restaurantId: number, isActive: boolean) {
     if (!canManageTenants) {
       setActionMsg({
         type: "err",
-        text: "Tenant Admin scope is required to delete hotels.",
+        text: "Tenant Admin scope is required to manage hotels.",
       });
       return;
     }
 
-    setDeletingId(restaurantId);
+    setUpdatingStatusId(restaurantId);
     setActionMsg(null);
     try {
-      const result = await deleteRestaurant(restaurantId);
-      setList((current) => current.filter((item) => item.id !== restaurantId));
-      setSubscriptionStatusByHotel((current) => {
-        const next = { ...current };
-        delete next[restaurantId];
-        return next;
-      });
+      const result = await updateRestaurantStatus(restaurantId, isActive);
+      setList((current) =>
+        current.map((item) =>
+          item.id === restaurantId ? { ...item, is_active: isActive } : item
+        )
+      );
       if (selected?.id === restaurantId) {
-        closeSelectedPanel();
+        setSelected((current) =>
+          current ? { ...current, is_active: isActive } : current
+        );
       }
       setActionMsg({ type: "ok", text: result.message });
     } finally {
-      setDeletingId(null);
+      setUpdatingStatusId(null);
     }
   }
 
-  function handleDelete(restaurantId: number, restaurantName: string) {
+  function handleUpdateStatus(restaurantId: number, restaurantName: string, isActive: boolean) {
     setConfirmError(null);
     setConfirmAction({
-      title: "Delete Hotel",
-      description: `Delete "${restaurantName}" permanently? This cannot be undone.`,
-      confirmLabel: "Delete Hotel",
-      confirmTone: "danger",
+      title: isActive ? "Activate Hotel" : "Deactivate Hotel",
+      description: isActive 
+        ? `Activate "${restaurantName}"? The tenant will regain access to the system.`
+        : `Deactivate "${restaurantName}"? The tenant and all its users will lose access to the system.`,
+      confirmLabel: isActive ? "Activate Hotel" : "Deactivate Hotel",
+      confirmTone: isActive ? "primary" : "danger",
       onConfirm: async () => {
-        await deleteRestaurantRecord(restaurantId);
+        await updateRestaurantStatusRecord(restaurantId, isActive);
       },
     });
   }
@@ -1231,12 +1234,12 @@ export default function SuperAdminRestaurants() {
           fetchError={fetchError}
           list={list}
           selectedId={selected?.id ?? null}
-          deletingId={deletingId}
+          updatingStatusId={updatingStatusId}
           canManageTenants={canManageTenants}
           subscriptionStatusByHotel={subscriptionStatusByHotel}
-          onView={(restaurantId) => void handleView(restaurantId)}
-          onEdit={(restaurantId) => void handleStartEdit(restaurantId)}
-          onDelete={handleDelete}
+          onView={(id) => void handleView(id)}
+          onEdit={(id) => void handleStartEdit(id)}
+          onUpdateStatus={handleUpdateStatus}
         />
 
         {(selectedLoading || selectedError || selected) && (
