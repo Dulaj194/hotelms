@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { buildEnabledModules, buildPrivilegeSummaries } from "@/features/subscriptions/privilegeCatalog";
 import { InfoItem } from "@/features/super-admin/restaurants/components/FormField";
 import type { InlineMessage, SubscriptionFormState } from "@/features/super-admin/restaurants/types";
@@ -39,6 +41,8 @@ export function SubscriptionPanel({
   onFormChange,
   onSave,
 }: SubscriptionPanelProps) {
+  const [isTimelineExpanded, setIsTimelineExpanded] = useState(false);
+
   const currentPackage = selectedSub?.package_id
     ? packages.find((pkg) => pkg.id === selectedSub.package_id) ?? null
     : null;
@@ -423,11 +427,16 @@ export function SubscriptionPanel({
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setIsTimelineExpanded((prev) => !prev)}
+              className="w-full p-4 flex flex-wrap items-start justify-between gap-3 text-left hover:bg-slate-50 transition-colors"
+            >
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 flex items-center gap-2">
                   Access Timeline
+                  {isTimelineExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
                   Track who changed package access, when it changed, and why the update happened.
@@ -436,66 +445,70 @@ export function SubscriptionPanel({
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                 {historyItems.length} event{historyItems.length === 1 ? "" : "s"}
               </span>
-            </div>
+            </button>
 
-            {historyItems.length === 0 ? (
-              <div className="mt-3 rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-                No subscription history is available for this hotel yet.
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {historyItems.map((item) => (
-                  <article key={item.id} className="rounded-lg border border-slate-200 p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">
-                          {formatHistoryAction(item)}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {new Date(item.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                          item.next_status === "active"
-                            ? "bg-green-100 text-green-700"
-                            : item.next_status === "trial"
-                              ? "bg-blue-100 text-blue-700"
-                              : item.next_status === "expired"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {item.next_status ?? item.action}
-                      </span>
-                    </div>
+            {isTimelineExpanded && (
+              <div className="p-4 pt-0 border-t border-slate-100">
+                {historyItems.length === 0 ? (
+                  <div className="mt-3 rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                    No subscription history is available for this hotel yet.
+                  </div>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {historyItems.map((item) => (
+                      <article key={item.id} className="rounded-lg border border-slate-200 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {formatHistoryAction(item)}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {new Date(item.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              item.next_status === "active"
+                                ? "bg-green-100 text-green-700"
+                                : item.next_status === "trial"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : item.next_status === "expired"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {item.next_status ?? item.action}
+                          </span>
+                        </div>
 
-                    <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
-                      <p>
-                        Actor: {item.actor.full_name ?? item.actor.email ?? "System"}
-                      </p>
-                      <p>Source: {item.source.replace(/_/g, " ")}</p>
-                      <p>
-                        Package: {formatPackageSnapshot(item.previous_package_name, item.previous_package_code)} {"->"}{" "}
-                        {formatPackageSnapshot(item.next_package_name, item.next_package_code)}
-                      </p>
-                      <p>
-                        Expiry:{" "}
-                        {item.previous_expires_at
-                          ? new Date(item.previous_expires_at).toLocaleDateString()
-                          : "-"}{" "}
-                        {"->"}{" "}
-                        {item.next_expires_at
-                          ? new Date(item.next_expires_at).toLocaleDateString()
-                          : "-"}
-                      </p>
-                    </div>
+                        <div className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
+                          <p>
+                            Actor: {item.actor.full_name ?? item.actor.email ?? "System"}
+                          </p>
+                          <p>Source: {item.source.replace(/_/g, " ")}</p>
+                          <p>
+                            Package: {formatPackageSnapshot(item.previous_package_name, item.previous_package_code)} {"->"}{" "}
+                            {formatPackageSnapshot(item.next_package_name, item.next_package_code)}
+                          </p>
+                          <p>
+                            Expiry:{" "}
+                            {item.previous_expires_at
+                              ? new Date(item.previous_expires_at).toLocaleDateString()
+                              : "-"}{" "}
+                            {"->"}{" "}
+                            {item.next_expires_at
+                              ? new Date(item.next_expires_at).toLocaleDateString()
+                              : "-"}
+                          </p>
+                        </div>
 
-                    <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
-                      {item.change_reason?.trim() || "No explicit change reason was recorded."}
-                    </div>
-                  </article>
-                ))}
+                        <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+                          {item.change_reason?.trim() || "No explicit change reason was recorded."}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

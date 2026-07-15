@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { RestaurantMeResponse } from "@/types/restaurant";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -34,6 +34,21 @@ export function RestaurantList({
   onUpdateStatus,
 }: RestaurantListProps) {
   const [showDeactivated, setShowDeactivated] = useState(false);
+  const accordionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (accordionRef.current && !accordionRef.current.contains(event.target as Node)) {
+        setShowDeactivated(false);
+      }
+    };
+    if (showDeactivated) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showDeactivated]);
 
   if (loading) {
     return <p className="text-slate-400">Loading...</p>;
@@ -192,7 +207,7 @@ export function RestaurantList({
 
       {/* Deactivated Hotels Accordion */}
       {deactivatedHotels.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden mt-6">
+        <div ref={accordionRef} className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden mt-6">
           <button
             type="button"
             className="flex w-full items-center justify-between px-5 py-4 text-left focus:outline-none hover:bg-slate-100 transition-colors"
