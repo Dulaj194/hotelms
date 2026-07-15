@@ -1266,6 +1266,24 @@ export default function SuperAdminRestaurants() {
               onLogoUpload={(file) => void handleEditLogoUpload(file)}
             />
 
+            {selected && (
+              <SubscriptionPanel
+                selectedSub={selectedSub}
+                accessSummary={selectedAccess}
+                historyItems={selectedSubHistory}
+                packages={packages}
+                canManageBilling={canManageBilling}
+                subLoading={subLoading}
+                editingSub={editingSub}
+                savingSub={savingSub}
+                subForm={subForm}
+                subMsg={subMsg}
+                onEditToggle={setEditingSub}
+                onFormChange={setSubForm}
+                onSave={() => void handleSaveSub()}
+              />
+            )}
+
             {selected && canManageSecurity && (
               <IntegrationPanel
                 selected={selected}
@@ -1292,24 +1310,6 @@ export default function SuperAdminRestaurants() {
                 onRevokeWebhookSecret={() => void handleRevokeWebhookSecret()}
                 onSendTestDelivery={() => void handleSendTestDelivery()}
                 onRetryDelivery={(deliveryId) => void handleRetryDelivery(deliveryId)}
-              />
-            )}
-
-            {selected && (
-              <SubscriptionPanel
-                selectedSub={selectedSub}
-                accessSummary={selectedAccess}
-                historyItems={selectedSubHistory}
-                packages={packages}
-                canManageBilling={canManageBilling}
-                subLoading={subLoading}
-                editingSub={editingSub}
-                savingSub={savingSub}
-                subForm={subForm}
-                subMsg={subMsg}
-                onEditToggle={setEditingSub}
-                onFormChange={setSubForm}
-                onSave={() => void handleSaveSub()}
               />
             )}
 

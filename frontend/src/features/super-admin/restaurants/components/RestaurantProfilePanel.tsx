@@ -442,10 +442,12 @@ export function RestaurantProfilePanel({
                         <Calendar className="h-4 w-4" /> Registered
                       </dt>
                       <dd className="text-sm font-medium text-slate-900">
-                        {new Date(selected.created_at).toLocaleDateString(undefined, {
+                        {new Date(selected.created_at).toLocaleString(undefined, {
                           year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit'
                         })}
                       </dd>
                     </div>
@@ -454,10 +456,12 @@ export function RestaurantProfilePanel({
                         <Clock className="h-4 w-4" /> Last Updated
                       </dt>
                       <dd className="text-sm font-medium text-slate-900">
-                        {new Date(selected.updated_at).toLocaleDateString(undefined, {
+                        {new Date(selected.updated_at).toLocaleString(undefined, {
                           year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit'
                         })}
                       </dd>
                     </div>
