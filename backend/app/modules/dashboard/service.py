@@ -115,9 +115,9 @@ def _build_module_lanes(*, role: str, privileges: list[str]) -> list[DashboardMo
         privilege_ok = all(req.upper() in normalized_privileges for req in lane["required_privileges"])
         lanes.append(
             DashboardModuleLane(
-                key=lane["key"],
-                label=lane["label"],
-                path=lane["path"],
+                key=str(lane["key"]),
+                label=str(lane["label"]),
+                path=str(lane["path"]),
                 visible=role_ok and privilege_ok,
             )
         )

@@ -134,7 +134,8 @@ def get_charts_overview(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Restaurant context is required.",
         )
-    return service.get_charts_data(db, restaurant_id=restaurant_id)
+    data = service.get_charts_data(db, restaurant_id=restaurant_id)
+    return DashboardChartsData(**data)
 
 
 @router.websocket("/ws/charts")
