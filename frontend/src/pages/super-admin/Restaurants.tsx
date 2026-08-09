@@ -12,7 +12,6 @@ import {
   generateRestaurantWebhookSecret,
   getRestaurant,
   getRestaurantIntegrationOps,
-  getRestaurantPackageAccess,
   getRestaurantSubscription,
   getRestaurantSubscriptionHistory,
   listPackages,
@@ -56,7 +55,6 @@ import type {
 } from "@/types/restaurant";
 import type {
   PackageDetailResponse,
-  SubscriptionAccessSummaryResponse,
   SubscriptionChangeHistoryItemResponse,
   SubscriptionResponse,
 } from "@/types/subscription";
@@ -130,8 +128,6 @@ export default function SuperAdminRestaurants() {
   const [hotelUsers, setHotelUsers] = useState<StaffDetailResponse[]>([]);
   const [selected, setSelected] = useState<RestaurantMeResponse | null>(null);
   const [selectedSub, setSelectedSub] = useState<SubscriptionResponse | null>(null);
-  const [selectedAccess, setSelectedAccess] =
-    useState<SubscriptionAccessSummaryResponse | null>(null);
   const [selectedSubHistory, setSelectedSubHistory] = useState<
     SubscriptionChangeHistoryItemResponse[]
   >([]);
@@ -281,7 +277,6 @@ export default function SuperAdminRestaurants() {
     setUsersLoading(canManageTenants);
     setIntegrationOpsLoading(canManageSecurity);
     setSelectedSub(null);
-    setSelectedAccess(null);
     setSelectedSubHistory([]);
     setHotelUsers([]);
     setSelectedIntegrationOps(null);
@@ -294,10 +289,9 @@ export default function SuperAdminRestaurants() {
     setEditingSub(false);
     setShowAddUser(false);
 
-    const [subResult, accessResult, integrationOpsResult, usersResult, historyResult] =
+    const [subResult, integrationOpsResult, usersResult, historyResult] =
       await Promise.allSettled([
       getRestaurantSubscription(restaurantId),
-      getRestaurantPackageAccess(restaurantId),
       canManageSecurity
         ? getRestaurantIntegrationOps(restaurantId)
         : Promise.resolve<RestaurantIntegrationOpsResponse | null>(null),
@@ -318,9 +312,6 @@ export default function SuperAdminRestaurants() {
         package_id: subscription.package_id?.toString() ?? "",
         change_reason: "",
       });
-    }
-    if (accessResult.status === "fulfilled") {
-      setSelectedAccess(accessResult.value);
     }
     if (integrationOpsResult.status === "fulfilled") {
       setSelectedIntegrationOps(integrationOpsResult.value);
@@ -479,10 +470,8 @@ export default function SuperAdminRestaurants() {
     setActionMsg(null);
     try {
       const updated = await updateRestaurant(editingId, editForm);
-      const accessSummary = await getRestaurantPackageAccess(editingId);
       setList((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       applySelectedRestaurant(updated);
-      setSelectedAccess(accessSummary);
       setEditingId(null);
       setActionMsg({ type: "ok", text: `Hotel "${updated.name}" updated.` });
     } catch (error) {
@@ -580,12 +569,8 @@ export default function SuperAdminRestaurants() {
     setSubMsg(null);
     try {
       const updated = await updateRestaurantSubscription(selected.id, payload);
-      const [accessSummary, history] = await Promise.all([
-        getRestaurantPackageAccess(selected.id),
-        getRestaurantSubscriptionHistory(selected.id),
-      ]);
+      const history = await getRestaurantSubscriptionHistory(selected.id);
       setSelectedSub(updated);
-      setSelectedAccess(accessSummary);
       setSelectedSubHistory(history.items);
       setSubscriptionStatusByHotel((current) => ({ ...current, [selected.id]: updated.status }));
       setEditingSub(false);
@@ -1141,7 +1126,6 @@ export default function SuperAdminRestaurants() {
     setEditingId(null);
     setEditLogoMsg(null);
     setSelectedSub(null);
-    setSelectedAccess(null);
     setSelectedSubHistory([]);
     setSelectedIntegrationOps(null);
     setIntegrationOpsLoading(false);
@@ -1269,7 +1253,6 @@ export default function SuperAdminRestaurants() {
             {selected && (
               <SubscriptionPanel
                 selectedSub={selectedSub}
-                accessSummary={selectedAccess}
                 historyItems={selectedSubHistory}
                 packages={packages}
                 canManageBilling={canManageBilling}

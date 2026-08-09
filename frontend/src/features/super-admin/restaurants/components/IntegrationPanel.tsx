@@ -8,8 +8,7 @@ import {
   Send, 
   Save,
   CheckCircle2,
-  XCircle,
-  Copy
+  XCircle
 } from "lucide-react";
 
 import { FormField } from "@/features/super-admin/restaurants/components/FormField";

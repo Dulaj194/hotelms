@@ -5,14 +5,12 @@ import { InfoItem } from "@/features/super-admin/restaurants/components/FormFiel
 import type { InlineMessage, SubscriptionFormState } from "@/features/super-admin/restaurants/types";
 import type {
   PackageDetailResponse,
-  SubscriptionAccessSummaryResponse,
   SubscriptionChangeHistoryItemResponse,
   SubscriptionResponse,
 } from "@/types/subscription";
 
 type SubscriptionPanelProps = {
   selectedSub: SubscriptionResponse | null;
-  accessSummary: SubscriptionAccessSummaryResponse | null;
   historyItems: SubscriptionChangeHistoryItemResponse[];
   packages: PackageDetailResponse[];
   canManageBilling: boolean;
@@ -28,7 +26,6 @@ type SubscriptionPanelProps = {
 
 export function SubscriptionPanel({
   selectedSub,
-  accessSummary,
   historyItems,
   packages,
   canManageBilling,
@@ -51,16 +48,8 @@ export function SubscriptionPanel({
     ? packages.find((pkg) => pkg.id === draftPackageId) ?? null
     : currentPackage;
 
-  const activePrivileges = accessSummary
-    ? accessSummary.privileges
-    : buildPrivilegeSummaries(currentPackage?.privileges ?? []);
-  const activeModules = accessSummary
-    ? accessSummary.enabled_modules
-    : buildEnabledModules(currentPackage?.privileges ?? []);
   const draftPrivileges = buildPrivilegeSummaries(draftPackage?.privileges ?? []);
   const draftModules = buildEnabledModules(draftPackage?.privileges ?? []);
-  const featureFlags = accessSummary?.feature_flags ?? [];
-  const moduleAccess = accessSummary?.module_access ?? activeModules;
   const isEditing = editingSub && canManageBilling;
 
   function formatHistoryAction(item: SubscriptionChangeHistoryItemResponse): string {
