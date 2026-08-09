@@ -11,9 +11,13 @@ from app.modules.dashboard import service
 from app.modules.dashboard.schemas import (
     AdminDashboardOverviewResponse,
     AlertDismissRequest,
+    DashboardChartsData,
     GenericDashboardMessage,
     SetupProgressUpdateRequest,
 )
+
+from fastapi import WebSocket, WebSocketDisconnect
+import asyncio
 
 router = APIRouter()
 
@@ -116,3 +120,31 @@ def update_setup_progress(
         metadata={"current_step": payload.current_step, "completed_keys": payload.completed_keys},
     )
     return GenericDashboardMessage(message="Setup progress updated.")
+
+
+@router.get("/charts-overview", response_model=DashboardChartsData)
+def get_charts_overview(
+    current_user=Depends(require_restaurant_user),
+    db: Session = Depends(get_db),
+    _=Depends(require_roles(*_TENANT_STAFF_ROLES)),
+) -> DashboardChartsData:
+    restaurant_id = current_user.restaurant_id
+    if restaurant_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Restaurant context is required.",
+        )
+    return service.get_charts_data(db, restaurant_id=restaurant_id)
+
+
+@router.websocket("/ws/charts")
+async def websocket_charts(websocket: WebSocket):
+    # Basic websocket implementation for real-time dashboard
+    await websocket.accept()
+    try:
+        while True:
+            # We would typically subscribe to a Redis channel here
+            # For now, we keep the connection alive
+            await asyncio.sleep(1)
+    except WebSocketDisconnect:
+        pass

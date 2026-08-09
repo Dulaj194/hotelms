@@ -12,6 +12,13 @@ import type {
   DashboardModuleLane,
   DashboardSetupRequirement,
 } from "@/types/dashboard";
+import RevenueChart from "@/components/dashboard/RevenueChart";
+import RoomStatusChart from "@/components/dashboard/RoomStatusChart";
+
+interface ChartData {
+  revenue_chart: { date: string; revenue: number }[];
+  room_status_chart: { status: string; count: number }[];
+}
 
 const ROLE_LABELS: Record<string, string> = {
   owner: "Owner",
@@ -132,6 +139,8 @@ export default function Dashboard() {
   const [wizardSaving, setWizardSaving] = useState(false);
   const [wizardError, setWizardError] = useState<string | null>(null);
   const [dismissingAlertKey, setDismissingAlertKey] = useState<string | null>(null);
+  const [chartsData, setChartsData] = useState<ChartData | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
 
   function markVisibleAlertsShown(data: AdminDashboardOverviewResponse) {
     const visibleAlerts = data.alerts.filter((alert) => alert.should_show);
@@ -172,9 +181,46 @@ export default function Dashboard() {
       }
     }
 
+    async function loadCharts() {
+      try {
+        const data = await api.get<ChartData>("/dashboard/charts-overview");
+        if (active) {
+          setChartsData(data);
+        }
+      } catch (error) {
+        console.error("Failed to load charts:", error);
+      }
+    }
+
     void loadOverview();
+    void loadCharts();
+    
+    // Setup WebSocket
+    let ws: WebSocket | null = null;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    // Assuming backend is on the same host or from env. For local it is usually localhost:8000
+    // But since api base URL is used in `api` wrapper, we can derive ws URL from it.
+    // For simplicity, we'll try to connect relative to current host/port or a configured ws endpoint.
+    const wsUrl = import.meta.env.VITE_API_URL 
+      ? import.meta.env.VITE_API_URL.replace("http", "ws") + "/dashboard/ws/charts" 
+      : `${protocol}//${window.location.host}/api/v1/dashboard/ws/charts`;
+      
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => setWsConnected(true);
+      ws.onclose = () => setWsConnected(false);
+      ws.onmessage = (event) => {
+        // Here we could parse incoming events and update chartsData dynamically
+        console.log("WebSocket message received:", event.data);
+        // e.g., if (event.data === 'update_charts') loadCharts();
+      };
+    } catch (e) {
+      console.error("WebSocket connection error:", e);
+    }
+
     return () => {
       active = false;
+      if (ws) ws.close();
     };
   }, []);
 
@@ -458,6 +504,37 @@ export default function Dashboard() {
                 value={overview.metrics.pending_housekeeping_tasks}
               />
               <MetricCard label="Exceptions" value={overview.metrics.exception_count} />
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">
+                    Revenue (Last 7 Days)
+                  </h2>
+                  {wsConnected && (
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" title="Real-time updates active"></span>
+                  )}
+                </div>
+                <div className="mt-4">
+                  {chartsData ? <RevenueChart data={chartsData.revenue_chart} /> : <div className="flex h-[300px] items-center justify-center text-sm text-gray-400">Loading chart...</div>}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-700">
+                    Room Status Overview
+                  </h2>
+                  {wsConnected && (
+                    <span className="flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" title="Real-time updates active"></span>
+                  )}
+                </div>
+                <div className="mt-4">
+                  {chartsData ? <RoomStatusChart data={chartsData.room_status_chart} /> : <div className="flex h-[300px] items-center justify-center text-sm text-gray-400">Loading chart...</div>}
+                </div>
+              </div>
             </div>
 
             <div className="rounded-xl border border-gray-200 bg-white px-6 py-5">

@@ -25,6 +25,7 @@ from app.modules.dashboard.schemas import (
 from app.modules.housekeeping.model import HousekeepingRequest
 from app.modules.orders.model import OrderHeader, OrderStatus
 from app.modules.restaurants.model import Restaurant
+from app.modules.rooms.model import Room
 from app.modules.subscriptions import service as subscriptions_service
 from app.modules.users.model import User, UserRole
 
@@ -325,3 +326,59 @@ def get_admin_dashboard_overview(
         sla_priority_model=SLA_PRIORITY_MODEL,
         default_module=default_module,
     )
+
+
+def get_charts_data(db: Session, *, restaurant_id: int) -> dict:
+    now = datetime.now(UTC)
+    seven_days_ago = now - timedelta(days=7)
+    
+    # Revenue Chart Data (Last 7 Days)
+    revenue_data_query = (
+        db.query(
+            func.date(OrderHeader.placed_at).label("date"),
+            func.sum(OrderHeader.total_amount).label("revenue")
+        )
+        .filter(
+            OrderHeader.restaurant_id == restaurant_id,
+            OrderHeader.status == OrderStatus.paid,
+            OrderHeader.placed_at >= seven_days_ago
+        )
+        .group_by(func.date(OrderHeader.placed_at))
+        .order_by(func.date(OrderHeader.placed_at))
+        .all()
+    )
+    
+    # Fill in missing dates with 0 revenue
+    revenue_chart = []
+    revenue_dict = {str(row.date): float(row.revenue) for row in revenue_data_query}
+    for i in range(7):
+        current_date = (now - timedelta(days=6 - i)).date()
+        date_str = str(current_date)
+        revenue_chart.append({
+            "date": date_str,
+            "revenue": revenue_dict.get(date_str, 0.0)
+        })
+
+    # Room Status Chart Data
+    room_status_query = (
+        db.query(
+            Room.housekeeping_status.label("status"),
+            func.count(Room.id).label("count")
+        )
+        .filter(
+            Room.restaurant_id == restaurant_id,
+            Room.is_active == True
+        )
+        .group_by(Room.housekeeping_status)
+        .all()
+    )
+    
+    room_status_chart = [
+        {"status": row.status, "count": row.count}
+        for row in room_status_query
+    ]
+    
+    return {
+        "revenue_chart": revenue_chart,
+        "room_status_chart": room_status_chart
+    }
