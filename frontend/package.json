@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.0.2",
+    "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
     "framer-motion": "^12.38.0",
@@ -21,6 +22,7 @@
     "i18next-browser-languagedetector": "^8.2.1",
     "lucide-react": "^0.363.0",
     "react": "^18.2.0",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.2.0",
     "react-i18next": "^17.0.8",
     "react-router-dom": "^6.22.3",

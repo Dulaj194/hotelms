@@ -110,6 +110,21 @@ class GenericDashboardMessage(BaseModel):
     message: str
 
 
+class RevenueChartData(BaseModel):
+    date: str
+    revenue: float
+
+
+class RoomStatusChartData(BaseModel):
+    status: str
+    count: int
+
+
+class DashboardChartsData(BaseModel):
+    revenue_chart: list[RevenueChartData]
+    room_status_chart: list[RoomStatusChartData]
+
+
 class AdminDashboardOverviewResponse(BaseModel):
     restaurant: DashboardRestaurantSummary
     subscription: DashboardSubscriptionSummary
