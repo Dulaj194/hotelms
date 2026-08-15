@@ -66,5 +66,8 @@ jobs:
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d
           
+          # Ensure super admin is properly configured
+          docker exec hotelms-backend python scripts/create_super_admin.py admin@hms.com Password123 "Admin User" || true
+          
           # Final cleanup of dangling images
           docker image prune -f

@@ -15,7 +15,15 @@ def create_super_admin(email: str, password: str, full_name: str):
     with SessionLocal() as db:
         user = db.query(User).filter(User.email == email).first()
         if user:
-            print(f"Error: User with email '{email}' already exists.")
+            print(f"User with email '{email}' already exists. Updating password and role to super_admin.")
+            user.password_hash = hash_password(password)
+            user.full_name = full_name
+            user.role = UserRole.super_admin
+            user.is_active = True
+            user.restaurant_id = None
+            user.set_super_admin_scopes(DEFAULT_PLATFORM_SCOPES)
+            db.commit()
+            print("Successfully updated existing super admin user.")
             return
 
         new_user = User(
