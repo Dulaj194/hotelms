@@ -183,17 +183,17 @@ class SiteContentAdminTests(unittest.TestCase):
         self.assertEqual(updated_lead.status.value, "qualified")
         self.assertEqual(updated_lead.assigned_to.user_id, self.assignee.id)
 
-        lead_list = site_content_service.list_contact_leads_admin(
+        items, total, summary = site_content_service.list_contact_leads_admin(
             self.db,
             status_filter="qualified",
             assigned_to_user_id=self.assignee.id,
         )
-        self.assertEqual(lead_list.total, 1)
-        self.assertEqual(lead_list.items[0].email, "prospect@example.com")
-        self.assertEqual(lead_list.summary.qualified_count, 1)
-        self.assertEqual(lead_list.items[0].entry_point, "blog_bottom_cta")
-        self.assertEqual(lead_list.items[0].utm_source, "google")
-        self.assertEqual(lead_list.items[0].login_intent, "cashier")
+        self.assertEqual(total, 1)
+        self.assertEqual(items[0].email, "prospect@example.com")
+        self.assertEqual(summary.qualified_count, 1)
+        self.assertEqual(items[0].entry_point, "blog_bottom_cta")
+        self.assertEqual(items[0].utm_source, "google")
+        self.assertEqual(items[0].login_intent, "cashier")
 
         admin_users = site_content_service.list_site_content_admin_users(self.db)
         self.assertEqual(admin_users.total, 2)

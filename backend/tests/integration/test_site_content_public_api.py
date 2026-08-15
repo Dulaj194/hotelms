@@ -78,7 +78,7 @@ class SiteContentPublicApiTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-        payload = response.json()
+        payload = response.json()["data"]
         self.assertGreater(payload["id"], 0)
 
         db = self.SessionLocal()
@@ -97,7 +97,7 @@ class SiteContentPublicApiTests(unittest.TestCase):
         response = self.client.get("/api/v1/public/site/blogs?search=room&category=Operations")
 
         self.assertEqual(response.status_code, 200)
-        payload = response.json()
+        payload = response.json()["data"]
         self.assertEqual(payload["page_title"], "Hospitality Insights and Practical Guides")
         self.assertIn("categories", payload)
         self.assertIn("items", payload)

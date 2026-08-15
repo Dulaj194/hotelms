@@ -753,6 +753,7 @@ def create_restaurant(
                 role=UserRole.admin,
                 restaurant_id=restaurant.id,
             ),
+            password=temporary_password,
             must_change_password=True,
         )
 
@@ -811,6 +812,12 @@ def reset_restaurant_staff_password(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Staff member not found.",
+        )
+
+    if user.role not in (UserRole.owner, UserRole.admin):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Temporary password reset is allowed only for owner/admin accounts.",
         )
 
 
@@ -1249,7 +1256,7 @@ def review_restaurant_registration(
     restaurant.registration_review_notes = payload.review_notes
     restaurant.registration_reviewed_at = datetime.now(UTC)
 
-    users = list_by_restaurant(db, restaurant.id)
+    users, _ = list_by_restaurant(db, restaurant.id)
 
     approved = payload.status == RegistrationStatus.APPROVED.value
     if approved:
@@ -1524,7 +1531,7 @@ def update_restaurant_status(
     before_state = _restaurant_lifecycle_snapshot(current_restaurant)
     
     current_restaurant.is_active = is_active
-    users = list_by_restaurant(db, current_restaurant.id)
+    users, _ = list_by_restaurant(db, current_restaurant.id)
     for user in users:
         user.is_active = is_active
 
