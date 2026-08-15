@@ -813,11 +813,7 @@ def reset_restaurant_staff_password(
             detail="Staff member not found.",
         )
 
-    if user.role not in _RESETTABLE_HOTEL_STAFF_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="Temporary password reset is allowed only for owner/admin accounts.",
-        )
+
 
     temporary_password = (
         payload.temporary_password.strip()

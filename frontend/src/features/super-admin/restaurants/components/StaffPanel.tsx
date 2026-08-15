@@ -141,16 +141,14 @@ export function StaffPanel({
                   <p>Role: {ROLE_LABELS[user.role]}</p>
                 </div>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                  {(user.role === "owner" || user.role === "admin") && (
-                    <button
-                      type="button"
-                      onClick={() => onResetUserPassword(user.id, user.full_name, user.role)}
-                      disabled={resettingUserId === user.id}
-                      className="w-full rounded border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 sm:w-auto"
-                    >
-                      {resettingUserId === user.id ? "Resetting..." : "Reset Password"}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => onResetUserPassword(user.id, user.full_name, user.role)}
+                    disabled={resettingUserId === user.id}
+                    className="w-full rounded border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 sm:w-auto"
+                  >
+                    {resettingUserId === user.id ? "Resetting..." : "Reset Password"}
+                  </button>
                   <button
                     type="button"
                     onClick={() => onToggleUser(user.id, user.is_active)}
@@ -208,16 +206,14 @@ export function StaffPanel({
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-1.5">
-                        {(user.role === "owner" || user.role === "admin") && (
-                          <button
-                            type="button"
-                            onClick={() => onResetUserPassword(user.id, user.full_name, user.role)}
-                            disabled={resettingUserId === user.id}
-                            className="rounded border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                          >
-                            {resettingUserId === user.id ? "Resetting..." : "Reset Password"}
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => onResetUserPassword(user.id, user.full_name, user.role)}
+                          disabled={resettingUserId === user.id}
+                          className="rounded border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                        >
+                          {resettingUserId === user.id ? "Resetting..." : "Reset Password"}
+                        </button>
                         <button
                           type="button"
                           onClick={() => onToggleUser(user.id, user.is_active)}
