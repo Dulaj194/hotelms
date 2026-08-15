@@ -812,14 +812,14 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
             actor_user_id=self.current_super_admin.id,
         )
 
-        history = subscriptions_service.get_subscription_change_history_for_super_admin(
+        items, total = subscriptions_service.get_subscription_change_history_for_super_admin(
             self.db,
             restaurant.id,
             limit=10,
         )
 
-        self.assertGreaterEqual(history.total, 2)
-        latest = history.items[0]
+        self.assertGreaterEqual(total, 2)
+        latest = items[0]
         self.assertEqual(latest.action, "updated")
         self.assertEqual(latest.next_package_name, "Standard")
         self.assertEqual(latest.change_reason, "Customer upgraded to a higher package.")
@@ -857,13 +857,13 @@ class SuperAdminPlatformManagementTests(unittest.TestCase):
         standard_package.code = "premium-standard"
         self.db.commit()
 
-        history = subscriptions_service.get_subscription_change_history_for_super_admin(
+        items, total = subscriptions_service.get_subscription_change_history_for_super_admin(
             self.db,
             restaurant.id,
             limit=10,
         )
 
-        latest = history.items[0]
+        latest = items[0]
         self.assertEqual(latest.previous_package_name, "Basic")
         self.assertEqual(latest.previous_package_code, "basic")
         self.assertEqual(latest.next_package_name, "Standard")

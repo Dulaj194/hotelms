@@ -4,7 +4,7 @@ import csv
 import json
 from datetime import UTC, datetime
 from io import StringIO
-from typing import Any
+from typing import Any, TypeVar, cast
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -61,7 +61,7 @@ def _normalize_reason(reason: str | None, *, default_reason: str) -> str:
 
 
 def _to_json_safe_dict(value: dict[str, object]) -> dict[str, object]:
-    return json.loads(json.dumps(value, ensure_ascii=True, default=str))
+    return cast(dict[str, object], json.loads(json.dumps(value, ensure_ascii=True, default=str)))
 
 
 def _build_change_delta(
@@ -216,14 +216,14 @@ def _parse_json_document(raw_value: str | None, fallback):
     return parsed
 
 
-def _load_page_payload(page: SitePage, schema_type, *, published: bool):
+def _load_page_payload(page: SitePage, schema_type: Any, *, published: bool) -> Any:
     raw_payload = (
         page.published_payload_json if published and page.published_payload_json else page.payload_json
     )
     return schema_type.model_validate(_parse_json_document(raw_payload, {}))
 
 
-def _page_schema_for_slug(slug: str):
+def _page_schema_for_slug(slug: str) -> Any:
     schema_type = _PAGE_SCHEMA_MAP.get(slug)
     if schema_type is None:
         raise HTTPException(
@@ -233,7 +233,10 @@ def _page_schema_for_slug(slug: str):
     return schema_type
 
 
-def _require_page(db: Session, slug: str, schema_type):
+T = TypeVar("T")
+
+
+def _require_page(db: Session, slug: str, schema_type: type[T]) -> T:
     ensure_seeded(db)
     page = repository.get_page_by_slug(db, slug)
     if not page:
@@ -241,7 +244,7 @@ def _require_page(db: Session, slug: str, schema_type):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Site page not found.",
         )
-    return _load_page_payload(page, schema_type, published=True)
+    return cast(T, _load_page_payload(page, schema_type, published=True))
 
 
 def _require_admin_page(db: Session, slug: str) -> SitePage:
@@ -425,9 +428,10 @@ def _serialize_contact_lead(
     )
 
 
-def _validate_page_payload(slug: str, payload: dict) -> dict:
+def _validate_page_payload(slug: str, payload: dict) -> dict[str, Any]:
     schema_type = _page_schema_for_slug(slug)
-    return schema_type.model_validate(payload).model_dump(mode="json")
+    result: dict[str, Any] = schema_type.model_validate(payload).model_dump(mode="json")
+    return result
 
 
 def _prepare_blog_upsert_payload(
@@ -998,7 +1002,7 @@ def delete_blog_post_admin(
 def list_site_content_admin_users(db: Session) -> SiteContentAdminUserListResponse:
     users = [
         user
-        for user in users_repository.list_platform_users(db, is_active=True)
+        for user in users_repository.list_platform_users(db, is_active=True)[0]
         if platform_access_catalog.user_has_any_platform_scope(user, ("tenant_admin",))
     ]
     items = [
