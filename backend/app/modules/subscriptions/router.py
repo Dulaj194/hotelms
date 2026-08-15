@@ -23,6 +23,9 @@ from app.modules.subscriptions.schemas import (
     SubscriptionStatusResponse,
     SuperAdminSubscriptionUpdateRequest,
 )
+from app.core.response_schemas import ApiResponse
+from app.core.response_utils import success_response
+from app.core.pagination import PaginationParams, pagination_depends, create_paginated_response
 from app.modules.users.model import User, UserRole
 
 router = APIRouter()
@@ -31,100 +34,100 @@ _RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 _SUPER_ADMIN_SOURCE = UserRole.super_admin.value
 
 
-@router.get("/me", response_model=SubscriptionResponse)
+@router.get("/me", response_model=ApiResponse[SubscriptionResponse])
 def get_my_subscription(
     restaurant_user=Depends(require_restaurant_user),
     db: Session = Depends(get_db),
-) -> SubscriptionResponse:
-    return service.get_current_subscription(db, restaurant_user.restaurant_id)
+) -> ApiResponse:
+    return success_response(data=service.get_current_subscription(db, restaurant_user.restaurant_id), message="Subscription retrieved")
 
 
-@router.get("/me/status", response_model=SubscriptionStatusResponse)
+@router.get("/me/status", response_model=ApiResponse[SubscriptionStatusResponse])
 def get_my_subscription_status(
     restaurant_user=Depends(require_restaurant_user),
     db: Session = Depends(get_db),
-) -> SubscriptionStatusResponse:
-    return service.get_current_subscription_status(db, restaurant_user.restaurant_id)
+) -> ApiResponse:
+    return success_response(data=service.get_current_subscription_status(db, restaurant_user.restaurant_id), message="Subscription status retrieved")
 
 
-@router.get("/me/privileges", response_model=SubscriptionPrivilegeResponse)
+@router.get("/me/privileges", response_model=ApiResponse[SubscriptionPrivilegeResponse])
 def get_my_subscription_privileges(
     restaurant_user=Depends(require_restaurant_user),
     db: Session = Depends(get_db),
-) -> SubscriptionPrivilegeResponse:
-    return service.get_effective_privileges(db, restaurant_user.restaurant_id)
+) -> ApiResponse:
+    return success_response(data=service.get_effective_privileges(db, restaurant_user.restaurant_id), message="Privileges retrieved")
 
 
-@router.get("/me/access", response_model=SubscriptionAccessSummaryResponse)
+@router.get("/me/access", response_model=ApiResponse[SubscriptionAccessSummaryResponse])
 def get_my_subscription_access(
     restaurant_user=Depends(require_restaurant_user),
     db: Session = Depends(get_db),
-) -> SubscriptionAccessSummaryResponse:
-    return service.get_package_access_summary(db, restaurant_user.restaurant_id)
+) -> ApiResponse:
+    return success_response(data=service.get_package_access_summary(db, restaurant_user.restaurant_id), message="Access summary retrieved")
 
 
-@router.post("/start-trial", response_model=StartTrialResponse)
+@router.post("/start-trial", response_model=ApiResponse[StartTrialResponse])
 def start_trial(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
-) -> StartTrialResponse:
-    return service.start_trial(
+) -> ApiResponse:
+    return success_response(data=service.start_trial(
         db,
         restaurant_id,
         actor_user_id=current_user.id,
-    )
+    ), message="Trial started")
 
 
-@router.post("/activate", response_model=ActivateSubscriptionResponse)
+@router.post("/activate", response_model=ApiResponse[ActivateSubscriptionResponse])
 def activate_subscription(
     payload: ActivateSubscriptionRequest,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
-) -> ActivateSubscriptionResponse:
-    return service.activate_subscription(
+) -> ApiResponse:
+    return success_response(data=service.activate_subscription(
         db,
         restaurant_id,
         payload,
         actor_user_id=current_user.id,
-    )
+    ), message="Subscription activated")
 
 
-@router.post("/cancel", response_model=CancelSubscriptionResponse)
+@router.post("/cancel", response_model=ApiResponse[CancelSubscriptionResponse])
 def cancel_subscription(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
-) -> CancelSubscriptionResponse:
-    return service.cancel_subscription(
+) -> ApiResponse:
+    return success_response(data=service.cancel_subscription(
         db,
         restaurant_id,
         actor_user_id=current_user.id,
-    )
+    ), message="Subscription cancelled")
 
 
 # ─── Super-admin endpoints ────────────────────────────────────────────────────
 
 
-@router.post("/admin/expire-overdue", response_model=ExpireOverdueResponse)
+@router.post("/admin/expire-overdue", response_model=ApiResponse[ExpireOverdueResponse])
 def expire_overdue_subscriptions(
     current_user: User = Depends(require_platform_scopes("billing_admin")),
     db: Session = Depends(get_db),
-) -> ExpireOverdueResponse:
+) -> ApiResponse:
     """Manually trigger the expiry check that the background worker also runs."""
     count = service.expire_overdue_subscriptions(
         db,
         actor_user_id=current_user.id,
         source=_SUPER_ADMIN_SOURCE,
     )
-    return ExpireOverdueResponse(
+    return success_response(data=ExpireOverdueResponse(
         message=f"Expired {count} overdue subscription(s).",
         expired_count=count,
-    )
+    ), message="Checked overdue subscriptions")
 
 
-@router.get("/admin/{restaurant_id}", response_model=SubscriptionResponse)
+@router.get("/admin/{restaurant_id}", response_model=ApiResponse[SubscriptionResponse])
 def get_subscription_for_hotel(
     restaurant_id: int,
     _: object = Depends(
@@ -136,12 +139,12 @@ def get_subscription_for_hotel(
         )
     ),
     db: Session = Depends(get_db),
-) -> SubscriptionResponse:
+) -> ApiResponse:
     """Return the current subscription for any restaurant (super_admin only)."""
-    return service.get_subscription_for_super_admin(db, restaurant_id)
+    return success_response(data=service.get_subscription_for_super_admin(db, restaurant_id), message="Subscription retrieved")
 
 
-@router.get("/admin/{restaurant_id}/access", response_model=SubscriptionAccessSummaryResponse)
+@router.get("/admin/{restaurant_id}/access", response_model=ApiResponse[SubscriptionAccessSummaryResponse])
 def get_subscription_access_for_hotel(
     restaurant_id: int,
     _: object = Depends(
@@ -153,18 +156,18 @@ def get_subscription_access_for_hotel(
         )
     ),
     db: Session = Depends(get_db),
-) -> SubscriptionAccessSummaryResponse:
+) -> ApiResponse:
     """Return the effective package-access summary for any restaurant."""
-    return service.get_package_access_summary_for_super_admin(db, restaurant_id)
+    return success_response(data=service.get_package_access_summary_for_super_admin(db, restaurant_id), message="Access retrieved")
 
 
 @router.get(
     "/admin/{restaurant_id}/history",
-    response_model=SubscriptionChangeHistoryResponse,
+    response_model=ApiResponse,
 )
 def get_subscription_history_for_hotel(
     restaurant_id: int,
-    limit: int = 100,
+    pagination: PaginationParams = Depends(pagination_depends),
     _: object = Depends(
         require_platform_scopes(
             "ops_viewer",
@@ -174,25 +177,28 @@ def get_subscription_history_for_hotel(
         )
     ),
     db: Session = Depends(get_db),
-) -> SubscriptionChangeHistoryResponse:
-    return service.get_subscription_change_history_for_super_admin(
+) -> ApiResponse:
+    items, total = service.get_subscription_change_history_for_super_admin(
         db,
         restaurant_id,
-        limit=limit,
+        skip=pagination.skip,
+        limit=pagination.limit,
     )
+    paginated_data = create_paginated_response(items, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="History retrieved")
 
 
-@router.patch("/admin/{restaurant_id}", response_model=SubscriptionResponse)
+@router.patch("/admin/{restaurant_id}", response_model=ApiResponse[SubscriptionResponse])
 def update_subscription_for_hotel(
     restaurant_id: int,
     payload: SuperAdminSubscriptionUpdateRequest,
     current_user: User = Depends(require_platform_scopes("billing_admin")),
     db: Session = Depends(get_db),
-) -> SubscriptionResponse:
+) -> ApiResponse:
     """Update status, expiry, or package for any restaurant (super_admin only)."""
-    return service.update_subscription_for_super_admin(
+    return success_response(data=service.update_subscription_for_super_admin(
         db,
         restaurant_id,
         payload,
         actor_user_id=current_user.id,
-    )
+    ), message="Subscription updated")

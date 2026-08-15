@@ -796,7 +796,7 @@ def list_audit_logs(
     category: str | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
-) -> AuditLogListResponse:
+) -> tuple[list[AuditLogEntryResponse], int]:
     query = _build_audit_logs_query(
         db,
         event_type=event_type,
@@ -818,17 +818,14 @@ def list_audit_logs(
     )
     user_map, restaurant_map = _load_context_maps(db, items)
 
-    return AuditLogListResponse(
-        items=[
-            _serialize_audit_entry(
-                log=log,
-                user_map=user_map,
-                restaurant_map=restaurant_map,
-            )
-            for log in items
-        ],
-        total=total,
-    )
+    return [
+        _serialize_audit_entry(
+            log=log,
+            user_map=user_map,
+            restaurant_map=restaurant_map,
+        )
+        for log in items
+    ], total
 
 def list_super_admin_notifications(
     db: Session,

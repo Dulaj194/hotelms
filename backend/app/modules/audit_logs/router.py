@@ -19,14 +19,16 @@ from app.modules.audit_logs.schemas import (
     SuperAdminNotificationResponse,
     SuperAdminNotificationUpdateRequest,
 )
+from app.core.response_schemas import ApiResponse
+from app.core.response_utils import success_response
+from app.core.pagination import PaginationParams, pagination_depends, create_paginated_response
 
 router = APIRouter()
 
 
-@router.get("", response_model=AuditLogListResponse)
+@router.get("", response_model=ApiResponse)
 def list_audit_logs(
-    limit: int = Query(default=100, ge=1, le=500),
-    offset: int = Query(default=0, ge=0),
+    pagination: PaginationParams = Depends(pagination_depends),
     event_type: str | None = Query(default=None),
     restaurant_id: int | None = Query(default=None, ge=1),
     search: str | None = Query(default=None, min_length=1, max_length=200),
@@ -37,11 +39,11 @@ def list_audit_logs(
     created_to: datetime | None = Query(default=None),
     _current_user=Depends(require_platform_action("audit_logs", "view")),
     db: Session = Depends(get_db),
-) -> AuditLogListResponse:
-    return service.list_audit_logs(
+) -> ApiResponse:
+    items, total = service.list_audit_logs(
         db,
-        limit=limit,
-        offset=offset,
+        limit=pagination.limit,
+        offset=pagination.skip,
         event_type=event_type,
         restaurant_id=restaurant_id,
         search=search,
@@ -51,6 +53,8 @@ def list_audit_logs(
         created_from=created_from,
         created_to=created_to,
     )
+    paginated_data = create_paginated_response(items, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Audit logs retrieved successfully")
 
 
 @router.get("/export")

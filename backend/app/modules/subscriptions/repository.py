@@ -239,15 +239,18 @@ def list_subscription_change_logs(
     db: Session,
     *,
     restaurant_id: int,
+    skip: int = 0,
     limit: int = 100,
-) -> list[SubscriptionChangeLog]:
-    return (
-        db.query(SubscriptionChangeLog)
-        .filter(SubscriptionChangeLog.restaurant_id == restaurant_id)
-        .order_by(SubscriptionChangeLog.created_at.desc(), SubscriptionChangeLog.id.desc())
+) -> tuple[list[SubscriptionChangeLog], int]:
+    query = db.query(SubscriptionChangeLog).filter(SubscriptionChangeLog.restaurant_id == restaurant_id)
+    total = query.count()
+    items = (
+        query.order_by(SubscriptionChangeLog.created_at.desc(), SubscriptionChangeLog.id.desc())
+        .offset(skip)
         .limit(limit)
         .all()
     )
+    return items, total
 
 
 def get_users_by_ids(db: Session, user_ids: set[int]) -> list:

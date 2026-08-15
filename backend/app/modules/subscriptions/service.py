@@ -1070,20 +1070,23 @@ def get_subscription_change_history_for_super_admin(
     db: Session,
     restaurant_id: int,
     *,
+    skip: int = 0,
     limit: int = 100,
-) -> SubscriptionChangeHistoryResponse:
+) -> tuple[list[SubscriptionChangeHistoryItemResponse], int]:
     restaurant = restaurants_repo.get_by_id_for_super_admin(db, restaurant_id)
     if restaurant is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Restaurant not found.",
         )
-    items = repository.list_subscription_change_logs(
+    items, total = repository.list_subscription_change_logs(
         db,
         restaurant_id=restaurant_id,
+        skip=skip,
         limit=limit,
     )
-    return _serialize_subscription_change_history(db, items)
+    history_response = _serialize_subscription_change_history(db, items)
+    return history_response.items, total
 
 
 def update_subscription_for_super_admin(

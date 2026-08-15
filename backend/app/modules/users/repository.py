@@ -55,28 +55,38 @@ def list_by_restaurant(
     *,
     role: UserRole | None = None,
     is_active: bool | None = None,
-) -> list[User]:
+    skip: int = 0,
+    limit: int = 50,
+) -> tuple[list[User], int]:
     """List users belonging to a specific restaurant."""
     query = db.query(User).filter(User.restaurant_id == restaurant_id)
     if role is not None:
         query = query.filter(User.role == role)
     if is_active is not None:
         query = query.filter(User.is_active == is_active)
-    return query.order_by(User.created_at.desc()).all()
+    
+    total = query.count()
+    items = query.order_by(User.created_at.desc()).offset(skip).limit(limit).all()
+    return items, total
 
 
 def list_platform_users(
     db: Session,
     *,
     is_active: bool | None = None,
-) -> list[User]:
+    skip: int = 0,
+    limit: int = 50,
+) -> tuple[list[User], int]:
     query = db.query(User).filter(
         User.role == UserRole.super_admin,
         User.restaurant_id.is_(None),
     )
     if is_active is not None:
         query = query.filter(User.is_active == is_active)
-    return query.order_by(User.created_at.desc(), User.id.desc()).all()
+    
+    total = query.count()
+    items = query.order_by(User.created_at.desc(), User.id.desc()).offset(skip).limit(limit).all()
+    return items, total
 
 
 def get_platform_user_for_super_admin(db: Session, user_id: int) -> User | None:

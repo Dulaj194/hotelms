@@ -19,6 +19,9 @@ from app.modules.users.schemas import (
     StaffStatusResponse,
     StaffUpdateRequest,
 )
+from app.core.response_schemas import ApiResponse
+from app.core.response_utils import success_response
+from app.core.pagination import PaginationParams, pagination_depends, create_paginated_response
 
 router = APIRouter()
 
@@ -29,154 +32,167 @@ _RESTAURANT_ADMIN_ROLES = role_catalog.RESTAURANT_ADMIN_ROLES
 # and never accepted from request body or query params.
 
 
-@router.get("/platform", response_model=PlatformUserListResponse)
+@router.get("/platform", response_model=ApiResponse)
 def list_platform_users(
+    pagination: PaginationParams = Depends(pagination_depends),
     is_active: bool | None = Query(default=None),
     current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
-) -> PlatformUserListResponse:
-    return service.list_platform_users(db, is_active=is_active)
+) -> ApiResponse:
+    items, total = service.list_platform_users(
+        db, 
+        is_active=is_active,
+        skip=pagination.skip,
+        limit=pagination.limit
+    )
+    paginated_data = create_paginated_response(items, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Platform users retrieved")
 
 
-@router.post("/platform", response_model=PlatformUserDetailResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/platform", response_model=ApiResponse[PlatformUserDetailResponse], status_code=status.HTTP_201_CREATED)
 def create_platform_user(
     payload: PlatformUserCreateRequest,
     current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
-) -> PlatformUserDetailResponse:
-    return service.create_platform_user(db, payload, current_user)
+) -> ApiResponse:
+    return success_response(data=service.create_platform_user(db, payload, current_user), message="Platform user created")
 
 
-@router.get("/platform/{user_id}", response_model=PlatformUserDetailResponse)
+@router.get("/platform/{user_id}", response_model=ApiResponse[PlatformUserDetailResponse])
 def get_platform_user(
     user_id: int,
     current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
-) -> PlatformUserDetailResponse:
-    return service.get_platform_user(db, user_id)
+) -> ApiResponse:
+    return success_response(data=service.get_platform_user(db, user_id), message="Platform user retrieved")
 
 
-@router.patch("/platform/{user_id}", response_model=PlatformUserDetailResponse)
+@router.patch("/platform/{user_id}", response_model=ApiResponse[PlatformUserDetailResponse])
 def update_platform_user(
     user_id: int,
     payload: PlatformUserUpdateRequest,
     current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
-) -> PlatformUserDetailResponse:
-    return service.update_platform_user(db, user_id, payload, current_user)
+) -> ApiResponse:
+    return success_response(data=service.update_platform_user(db, user_id, payload, current_user), message="Platform user updated")
 
 
-@router.patch("/platform/{user_id}/disable", response_model=StaffStatusResponse)
+@router.patch("/platform/{user_id}/disable", response_model=ApiResponse[StaffStatusResponse])
 def disable_platform_user(
     user_id: int,
     current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
-) -> StaffStatusResponse:
-    return service.disable_platform_user(db, user_id, current_user)
+) -> ApiResponse:
+    return success_response(data=service.disable_platform_user(db, user_id, current_user), message="Platform user disabled")
 
 
-@router.patch("/platform/{user_id}/enable", response_model=StaffStatusResponse)
+@router.patch("/platform/{user_id}/enable", response_model=ApiResponse[StaffStatusResponse])
 def enable_platform_user(
     user_id: int,
     current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
-) -> StaffStatusResponse:
-    return service.enable_platform_user(db, user_id, current_user)
+) -> ApiResponse:
+    return success_response(data=service.enable_platform_user(db, user_id, current_user), message="Platform user enabled")
 
 
-@router.delete("/platform/{user_id}", response_model=GenericMessageResponse)
+@router.delete("/platform/{user_id}", response_model=ApiResponse[GenericMessageResponse])
 def delete_platform_user(
     user_id: int,
     current_user: User = Depends(require_platform_scopes("security_admin")),
     db: Session = Depends(get_db),
-) -> GenericMessageResponse:
-    return service.delete_platform_user(db, user_id, current_user)
+) -> ApiResponse:
+    return success_response(data=service.delete_platform_user(db, user_id, current_user), message="Platform user deleted")
 
 
-@router.get("", response_model=list[StaffListItemResponse])
+@router.get("", response_model=ApiResponse)
 def list_staff(
+    pagination: PaginationParams = Depends(pagination_depends),
     role: UserRole | None = Query(default=None),
     is_active: bool | None = Query(default=None),
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
-) -> list[StaffListItemResponse]:
+) -> ApiResponse:
     """List all staff for the current restaurant. Owner/admin only."""
-    return service.list_staff_filtered(  # type: ignore[arg-type]
+    items, total = service.list_staff_filtered(  # type: ignore[arg-type]
         db,
         current_user.restaurant_id,
         role=role,
         is_active=is_active,
+        skip=pagination.skip,
+        limit=pagination.limit,
     )
+    paginated_data = create_paginated_response(items, total, pagination.page, pagination.limit)
+    return success_response(data=paginated_data, message="Staff listed successfully")
 
 
-@router.get("/management-policy", response_model=StaffManagementPolicyResponse)
+@router.get("/management-policy", response_model=ApiResponse[StaffManagementPolicyResponse])
 def get_staff_management_policy(
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
-) -> StaffManagementPolicyResponse:
-    return service.get_staff_management_policy(current_user)
+) -> ApiResponse:
+    return success_response(data=service.get_staff_management_policy(current_user), message="Policy retrieved")
 
 
-@router.post("", response_model=StaffDetailResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ApiResponse[StaffDetailResponse], status_code=status.HTTP_201_CREATED)
 def add_staff(
     payload: StaffCreateRequest,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
-) -> StaffDetailResponse:
+) -> ApiResponse:
     """Add a new staff member to the current restaurant. Owner/admin only.
 
     SECURITY: restaurant_id comes from authenticated user context, not the request.
     StaffCreateRequest has no restaurant_id field.
     """
-    return service.add_staff(db, current_user.restaurant_id, payload, current_user)  # type: ignore[arg-type]
+    return success_response(data=service.add_staff(db, current_user.restaurant_id, payload, current_user), message="Staff added")  # type: ignore[arg-type]
 
 
-@router.get("/{user_id}", response_model=StaffDetailResponse)
+@router.get("/{user_id}", response_model=ApiResponse[StaffDetailResponse])
 def get_staff(
     user_id: int,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
-) -> StaffDetailResponse:
+) -> ApiResponse:
     """Get a single staff member from the current restaurant."""
-    return service.get_staff_member(db, user_id, current_user.restaurant_id)  # type: ignore[arg-type]
+    return success_response(data=service.get_staff_member(db, user_id, current_user.restaurant_id), message="Staff member retrieved")  # type: ignore[arg-type]
 
 
-@router.patch("/{user_id}", response_model=StaffDetailResponse)
+@router.patch("/{user_id}", response_model=ApiResponse[StaffDetailResponse])
 def update_staff(
     user_id: int,
     payload: StaffUpdateRequest,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
-) -> StaffDetailResponse:
+) -> ApiResponse:
     """Update a staff member in the current restaurant."""
-    return service.update_staff(db, user_id, current_user.restaurant_id, payload, current_user)  # type: ignore[arg-type]
+    return success_response(data=service.update_staff(db, user_id, current_user.restaurant_id, payload, current_user), message="Staff updated")  # type: ignore[arg-type]
 
 
-@router.patch("/{user_id}/disable", response_model=StaffStatusResponse)
+@router.patch("/{user_id}/disable", response_model=ApiResponse[StaffStatusResponse])
 def disable_staff(
     user_id: int,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
-) -> StaffStatusResponse:
+) -> ApiResponse:
     """Disable (deactivate) a staff member in the current restaurant."""
-    return service.disable_staff(db, user_id, current_user.restaurant_id, current_user)  # type: ignore[arg-type]
+    return success_response(data=service.disable_staff(db, user_id, current_user.restaurant_id, current_user), message="Staff disabled")  # type: ignore[arg-type]
 
 
-@router.patch("/{user_id}/enable", response_model=StaffStatusResponse)
+@router.patch("/{user_id}/enable", response_model=ApiResponse[StaffStatusResponse])
 def enable_staff(
     user_id: int,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
-) -> StaffStatusResponse:
+) -> ApiResponse:
     """Re-enable a previously disabled staff member."""
-    return service.enable_staff(db, user_id, current_user.restaurant_id, current_user)  # type: ignore[arg-type]
+    return success_response(data=service.enable_staff(db, user_id, current_user.restaurant_id, current_user), message="Staff enabled")  # type: ignore[arg-type]
 
 
-@router.delete("/{user_id}", response_model=GenericMessageResponse)
+@router.delete("/{user_id}", response_model=ApiResponse[GenericMessageResponse])
 def delete_staff(
     user_id: int,
     current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
     db: Session = Depends(get_db),
-) -> GenericMessageResponse:
+) -> ApiResponse:
     """Permanently delete a staff member from the current restaurant."""
-    return service.delete_staff(db, user_id, current_user.restaurant_id, current_user)  # type: ignore[arg-type]
+    return success_response(data=service.delete_staff(db, user_id, current_user.restaurant_id, current_user), message="Staff deleted")  # type: ignore[arg-type]
 

@@ -155,7 +155,7 @@ def create_user(db: Session, data: UserCreate) -> UserResponse:
 # ─── Staff list ───────────────────────────────────────────────────────────────
 
 
-def list_staff(db: Session, restaurant_id: int) -> list[StaffListItemResponse]:
+def list_staff(db: Session, restaurant_id: int) -> tuple[list[StaffListItemResponse], int]:
     """List all staff for the current tenant restaurant."""
     return list_staff_filtered(db, restaurant_id)
 
@@ -186,8 +186,10 @@ def list_staff_filtered(
     restaurant_id: int,
     role: UserRole | None = None,
     is_active: bool | None = None,
-) -> list[StaffListItemResponse]:
-    users = list_by_restaurant(db, restaurant_id, role=role, is_active=is_active)
+    skip: int = 0,
+    limit: int = 50,
+) -> tuple[list[StaffListItemResponse], int]:
+    users, total = list_by_restaurant(db, restaurant_id, role=role, is_active=is_active, skip=skip, limit=limit)
 
     from app.modules.users.repository import count_pending_kitchen_orders, count_pending_housekeeping_requests
     pending_kitchen = count_pending_kitchen_orders(db, restaurant_id)
@@ -222,7 +224,7 @@ def list_staff_filtered(
             setattr(item, "load_per_staff", 0.0)
         result.append(item)
 
-    return result
+    return result, total
 
 
 # ─── Staff CRUD ───────────────────────────────────────────────────────────────
@@ -529,12 +531,11 @@ def list_platform_users(
     db: Session,
     *,
     is_active: bool | None = None,
-) -> PlatformUserListResponse:
-    users = repo_list_platform_users(db, is_active=is_active)
-    return PlatformUserListResponse(
-        items=[PlatformUserListItemResponse.model_validate(user) for user in users],
-        total=len(users),
-    )
+    skip: int = 0,
+    limit: int = 50,
+) -> tuple[list[PlatformUserListItemResponse], int]:
+    users, total = repo_list_platform_users(db, is_active=is_active, skip=skip, limit=limit)
+    return [PlatformUserListItemResponse.model_validate(user) for user in users], total
 
 
 def get_platform_user(

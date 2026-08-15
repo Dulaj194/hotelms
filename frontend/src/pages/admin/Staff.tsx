@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import type { PaginatedResponse } from "@/lib/pagination";
 import ActionDialog from "@/components/shared/ActionDialog";
 import type {
   AssignedArea,
@@ -91,8 +92,8 @@ export default function Staff() {
     setLoading(true);
     setFetchError(null);
     api
-      .get<StaffListItemResponse[]>("/users")
-      .then(setStaffList)
+      .get<PaginatedResponse<StaffListItemResponse>>("/users")
+      .then((res) => setStaffList(res.items))
       .catch((err: unknown) => {
         const msg =
           err instanceof ApiError

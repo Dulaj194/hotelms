@@ -68,10 +68,10 @@ export function useHousekeepingData({
     }
 
     try {
-      const data = await api.get<StaffListItemResponse[]>(
+      const data = await api.get<PaginatedResponse<StaffListItemResponse>>(
         "/users?role=housekeeper&is_active=true"
       );
-      setStaff(data);
+      setStaff(data.items);
     } catch {
       setStaff([]);
     }

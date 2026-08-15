@@ -53,7 +53,7 @@ _STAFF_ROLES = role_catalog.QR_MENU_STAFF_ROLES
 
 # ── Guest endpoints ───────────────────────────────────────────────────────────
 
-@router.post("", response_model=PlaceOrderResponse, status_code=201)
+@router.post("", response_model=ApiResponse[PlaceOrderResponse], status_code=201)
 def place_order(
     payload: PlaceOrderRequest,
     request: Request,
@@ -61,7 +61,7 @@ def place_order(
     x_table_key: str | None = Header(default=None, alias="X-Table-Key"),
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
-) -> PlaceOrderResponse:
+) -> ApiResponse:
     """Place a table order at checkout.
 
     Accepts either an existing X-Guest-Session token or the original X-Table-Key
@@ -70,85 +70,85 @@ def place_order(
     lang = get_language(request)
     if x_guest_session:
         session = resolve_guest_session_token(x_guest_session, db)
-        return service.place_order(db, r, session, payload, lang=lang)
+        return success_response(data=service.place_order(db, r, session, payload, lang=lang), message="Order placed successfully")
     if x_table_key:
-        return service.place_order_from_qr_key(db, r, x_table_key, payload, lang=lang)
+        return success_response(data=service.place_order_from_qr_key(db, r, x_table_key, payload, lang=lang), message="Order placed successfully")
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Missing table checkout credential.",
     )
 
 
-@router.get("/my", response_model=ActiveOrderListResponse)
+@router.get("/my", response_model=ApiResponse[ActiveOrderListResponse])
 def list_my_orders(
     session: TableSession = Depends(get_current_guest_session),
     db: Session = Depends(get_db),
-) -> ActiveOrderListResponse:
+) -> ApiResponse:
     """Return all orders for the guest's current session.
 
     Includes all order statuses (pending, confirmed, processing, completed, paid, rejected).
     Scoped to the guest session — a guest can only see their own orders.
     """
-    return service.list_orders_for_guest(db, session)
+    return success_response(data=service.list_orders_for_guest(db, session), message="Guest orders retrieved")
 
 
-@router.get("/my/{order_id}", response_model=OrderDetailResponse)
+@router.get("/my/{order_id}", response_model=ApiResponse[OrderDetailResponse])
 def get_my_order(
     order_id: int,
     session: TableSession = Depends(get_current_guest_session),
     db: Session = Depends(get_db),
-) -> OrderDetailResponse:
+) -> ApiResponse:
     """Return order details for the guest who placed it.
 
     Scoped to the guest session — a guest cannot view another session's order.
     """
-    return service.get_order_for_guest(db, order_id, session)
+    return success_response(data=service.get_order_for_guest(db, order_id, session), message="Order detail retrieved")
 
 
-@router.post("/my/{order_id}/cancel", response_model=OrderStatusResponse)
+@router.post("/my/{order_id}/cancel", response_model=ApiResponse[OrderStatusResponse])
 def cancel_my_order(
     order_id: int,
     session: TableSession = Depends(get_current_guest_session),
     db: Session = Depends(get_db),
     r: redis_lib.Redis = Depends(get_redis),
-) -> OrderStatusResponse:
+) -> ApiResponse:
     """Cancel a guest's own pending order within the 5-second grace window."""
-    return service.cancel_order_for_guest(db, order_id, session, r)
+    return success_response(data=service.cancel_order_for_guest(db, order_id, session, r), message="Order cancelled")
 
 
 # ── Kitchen dashboard endpoints ───────────────────────────────────────────────
 
-@router.get("/pending", response_model=KitchenOrderListResponse)
+@router.get("/pending", response_model=ApiResponse[KitchenOrderListResponse])
 def list_pending_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
-) -> KitchenOrderListResponse:
+) -> ApiResponse:
     """List pending orders with item summaries for the kitchen dashboard."""
-    return service.list_pending_orders(db, restaurant_id)
+    return success_response(data=service.list_pending_orders(db, restaurant_id), message="Pending orders retrieved")
 
 
-@router.get("/processing", response_model=KitchenOrderListResponse)
+@router.get("/processing", response_model=ApiResponse[KitchenOrderListResponse])
 def list_processing_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
-) -> KitchenOrderListResponse:
+) -> ApiResponse:
     """List confirmed + processing orders with item summaries for the kitchen."""
-    return service.list_processing_orders(db, restaurant_id)
+    return success_response(data=service.list_processing_orders(db, restaurant_id), message="Processing orders retrieved")
 
 
-@router.get("/completed", response_model=KitchenOrderListResponse)
+@router.get("/completed", response_model=ApiResponse[KitchenOrderListResponse])
 def list_completed_orders(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
-) -> KitchenOrderListResponse:
+) -> ApiResponse:
     """List recently completed orders for the kitchen completed section."""
-    return service.list_kitchen_completed_orders(db, restaurant_id)
+    return success_response(data=service.list_kitchen_completed_orders(db, restaurant_id), message="Completed orders retrieved")
 
 
 # ── Staff / admin list endpoints ──────────────────────────────────────────────
@@ -201,40 +201,40 @@ def list_history_orders(
     return success_response(data=paginated_data, message="History orders listed successfully.")
 
 
-@router.get("/history/stats")
+@router.get("/history/stats", response_model=ApiResponse[dict[str, int]])
 def get_history_stats(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
-) -> dict[str, int]:
+) -> ApiResponse:
     """Return counts for history order statuses."""
-    return service.get_history_stats(db, restaurant_id)
+    return success_response(data=service.get_history_stats(db, restaurant_id), message="Stats retrieved")
 
 
-@router.get("/badge-counts")
+@router.get("/badge-counts", response_model=ApiResponse[dict[str, int]])
 def get_badge_counts(
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
-) -> dict[str, int]:
+) -> ApiResponse:
     """Return counts for sidebar notification badges."""
-    return service.get_badge_counts(db, restaurant_id)
+    return success_response(data=service.get_badge_counts(db, restaurant_id), message="Badge counts retrieved")
 
 
-@router.get("/{order_id}", response_model=OrderDetailResponse)
+@router.get("/{order_id}", response_model=ApiResponse[OrderDetailResponse])
 def get_order_detail(
     order_id: int,
     restaurant_id: int = Depends(get_current_restaurant_id),
     db: Session = Depends(get_db),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
-) -> OrderDetailResponse:
+) -> ApiResponse:
     """Return full order details for staff/admin, scoped to their restaurant."""
-    return service.get_order_for_staff(db, order_id, restaurant_id)
+    return success_response(data=service.get_order_for_staff(db, order_id, restaurant_id), message="Order detail retrieved")
 
 
-@router.patch("/{order_id}/status", response_model=OrderStatusResponse)
+@router.patch("/{order_id}/status", response_model=ApiResponse[OrderStatusResponse])
 def update_order_status(
     order_id: int,
     payload: UpdateOrderStatusRequest,
@@ -243,16 +243,16 @@ def update_order_status(
     r: redis_lib.Redis = Depends(get_redis),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
-) -> OrderStatusResponse:
+) -> ApiResponse:
     """Update order status with transition validation.
 
     Publishes a real-time event to the restaurant's Redis pub/sub channel
     so connected kitchen clients receive the update instantly.
     """
-    return service.update_order_status(db, order_id, restaurant_id, payload.status, r)
+    return success_response(data=service.update_order_status(db, order_id, restaurant_id, payload.status, r), message="Order status updated")
 
 
-@router.patch("/{order_id}/items/{item_id}/status", response_model=OrderStatusResponse)
+@router.patch("/{order_id}/items/{item_id}/status", response_model=ApiResponse[OrderStatusResponse])
 def update_order_item_status(
     order_id: int,
     item_id: int,
@@ -262,15 +262,15 @@ def update_order_item_status(
     r: redis_lib.Redis = Depends(get_redis),
     _=Depends(require_roles(*_STAFF_ROLES)),
     __=Depends(require_module_access("kds")),
-) -> OrderStatusResponse:
+) -> ApiResponse:
     """Update an individual order item's status and derive parent order status.
 
     Publishes a real-time event to the restaurant's Redis pub/sub channel.
     """
-    return service.update_order_item_status(db, order_id, item_id, restaurant_id, payload.status, r)
+    return success_response(data=service.update_order_item_status(db, order_id, item_id, restaurant_id, payload.status, r), message="Item status updated")
 
 
-@router.post("/staff/place-order", response_model=PlaceOrderResponse, status_code=201)
+@router.post("/staff/place-order", response_model=ApiResponse[PlaceOrderResponse], status_code=201)
 def staff_place_order(
     payload: PlaceOrderRequest,
     session_id: str,
@@ -278,6 +278,6 @@ def staff_place_order(
     r: redis_lib.Redis = Depends(get_redis),
     restaurant_id: int = Depends(get_current_restaurant_id),
     _current_user=Depends(require_roles(*role_catalog.QR_MENU_STAFF_ROLES)),
-) -> PlaceOrderResponse:
+) -> ApiResponse:
     """Place an order for a guest session as a staff member."""
-    return service.place_staff_order(db, r, restaurant_id, session_id, payload)
+    return success_response(data=service.place_staff_order(db, r, restaurant_id, session_id, payload), message="Order placed successfully")

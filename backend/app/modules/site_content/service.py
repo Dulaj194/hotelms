@@ -621,7 +621,7 @@ def submit_contact_lead(
     )
 
 
-def list_site_pages_admin(db: Session) -> AdminSitePageListResponse:
+def list_site_pages_admin(db: Session) -> tuple[list[AdminSitePageSummaryResponse], int]:
     ensure_seeded(db)
     pages = repository.list_site_pages(db)
     user_map = _load_user_map(
@@ -629,7 +629,7 @@ def list_site_pages_admin(db: Session) -> AdminSitePageListResponse:
         {page.updated_by_user_id for page in pages} | {page.published_by_user_id for page in pages},
     )
     items = [_serialize_page_summary(page, user_map) for page in pages]
-    return AdminSitePageListResponse(items=items, total=len(items))
+    return items, len(items)
 
 
 def get_site_page_admin(db: Session, slug: str) -> AdminSitePageDetailResponse:
@@ -761,9 +761,9 @@ def list_blog_posts_admin(
     search: str | None = None,
     category: str | None = None,
     is_published: bool | None = None,
+    skip: int = 0,
     limit: int = 50,
-    offset: int = 0,
-) -> AdminBlogPostListResponse:
+) -> tuple[list[AdminBlogPostSummaryResponse], int]:
     ensure_seeded(db)
     posts, total = repository.list_blog_posts_admin(
         db,
@@ -771,14 +771,14 @@ def list_blog_posts_admin(
         category=category,
         is_published=is_published,
         limit=limit,
-        offset=offset,
+        offset=skip,
     )
     user_map = _load_user_map(
         db,
         {post.updated_by_user_id for post in posts} | {post.published_by_user_id for post in posts},
     )
     items = [_serialize_blog_summary(post, user_map) for post in posts]
-    return AdminBlogPostListResponse(items=items, total=total)
+    return items, total
 
 
 def get_blog_post_admin(db: Session, slug: str) -> AdminBlogPostDetailResponse:
@@ -1019,9 +1019,9 @@ def list_contact_leads_admin(
     search: str | None = None,
     status_filter: str | None = None,
     assigned_to_user_id: int | None = None,
+    skip: int = 0,
     limit: int = 50,
-    offset: int = 0,
-) -> AdminContactLeadListResponse:
+) -> tuple[list[AdminContactLeadResponse], int, AdminContactLeadSummaryResponse]:
     ensure_seeded(db)
     leads, total = repository.list_contact_leads(
         db,
@@ -1029,7 +1029,7 @@ def list_contact_leads_admin(
         status=status_filter,
         assigned_to_user_id=assigned_to_user_id,
         limit=limit,
-        offset=offset,
+        offset=skip,
     )
     summary = repository.summarize_contact_leads(
         db,
@@ -1039,11 +1039,7 @@ def list_contact_leads_admin(
     )
     user_map = _load_user_map(db, {lead.assigned_to_user_id for lead in leads})
     items = [_serialize_contact_lead(lead, user_map) for lead in leads]
-    return AdminContactLeadListResponse(
-        items=items,
-        total=total,
-        summary=AdminContactLeadSummaryResponse(**summary),
-    )
+    return items, total, AdminContactLeadSummaryResponse(**summary)
 
 
 def update_contact_lead_admin(
