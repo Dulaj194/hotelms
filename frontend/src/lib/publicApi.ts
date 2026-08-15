@@ -26,7 +26,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
     throw new Error(detail);
   }
-  return response.json() as Promise<T>;
+  const json = await response.json();
+  if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+    return json.data as Promise<T>;
+  }
+  return json as Promise<T>;
 }
 
 export async function publicGet<T>(path: string, options?: PublicApiOptions): Promise<T> {

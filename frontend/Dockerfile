@@ -4,7 +4,8 @@ WORKDIR /app
 
 # Install dependencies first (layer caching)
 COPY package.json package-lock.json* ./
-RUN npm install
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+RUN npm ci
 
 # Copy application source
 COPY . .
