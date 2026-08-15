@@ -316,6 +316,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-white placeholder:text-white/20 outline-none ring-2 ring-transparent focus:ring-emerald-500/20 focus:bg-white/10 focus:border-white/30 transition-all"
                 />
               </div>
