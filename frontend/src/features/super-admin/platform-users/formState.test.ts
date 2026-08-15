@@ -13,7 +13,6 @@ describe("platform user form state helpers", () => {
       email: "admin@example.com ",
       username: " root.admin ",
       phone: " 0711234567 ",
-      password: "Password1",
       is_active: true,
       must_change_password: true,
       super_admin_scopes: [
@@ -29,7 +28,6 @@ describe("platform user form state helpers", () => {
       email: "admin@example.com",
       username: "root.admin",
       phone: "0711234567",
-      password: "Password1",
       is_active: true,
       must_change_password: true,
       super_admin_scopes: [
@@ -41,19 +39,17 @@ describe("platform user form state helpers", () => {
     });
   });
 
-  it("omits empty passwords from update payloads", () => {
+  it("normalizes update payload optional fields", () => {
     const payload = buildPlatformUserUpdatePayload({
       full_name: "Ops Admin",
       email: "ops@example.com",
       username: "",
       phone: "",
-      password: "",
       is_active: false,
       must_change_password: false,
       super_admin_scopes: ["security_admin"],
     });
 
-    expect(payload.password).toBeUndefined();
     expect(payload.username).toBeNull();
     expect(payload.phone).toBeNull();
     expect(payload.super_admin_scopes).toEqual(["security_admin"]);
@@ -75,7 +71,6 @@ describe("platform user form state helpers", () => {
       updated_at: "2026-04-01T00:00:00Z",
     });
 
-    expect(form.password).toBe("");
     expect(form.username).toBe("");
     expect(form.phone).toBe("");
     expect(form.super_admin_scopes).toEqual(["ops_viewer", "security_admin"]);
