@@ -165,6 +165,7 @@ def create_staff(
     db: Session,
     restaurant_id: int,
     data: StaffCreateRequest,
+    password: str,
     *,
     must_change_password: bool = False,
 ) -> User:
@@ -174,7 +175,7 @@ def create_staff(
         email=data.email,
         username=data.username,
         phone=data.phone,
-        password_hash=hash_password(data.password),
+        password_hash=hash_password(password),
         role=data.role,
         assigned_area=data.assigned_area,
         restaurant_id=restaurant_id,

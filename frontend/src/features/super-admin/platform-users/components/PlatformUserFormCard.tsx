@@ -80,12 +80,6 @@ export function PlatformUserFormFields({
         value={form.phone}
         onChange={(value) => onChange({ ...form, phone: value })}
       />
-      <LabeledInput
-        label="Password"
-        type="password"
-        value={form.password}
-        onChange={(value) => onChange({ ...form, password: value })}
-      />
       <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
         <input
           type="checkbox"

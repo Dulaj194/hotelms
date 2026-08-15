@@ -15,7 +15,6 @@ export type PlatformUserFormState = {
   email: string;
   username: string;
   phone: string;
-  password: string;
   is_active: boolean;
   must_change_password: boolean;
   super_admin_scopes: PlatformScopeValue[];
@@ -26,7 +25,6 @@ export const EMPTY_PLATFORM_USER_FORM: PlatformUserFormState = {
   email: "",
   username: "",
   phone: "",
-  password: "",
   is_active: true,
   must_change_password: true,
   super_admin_scopes: [...DEFAULT_PLATFORM_SCOPES],
@@ -40,7 +38,6 @@ export function buildPlatformUserCreatePayload(
     email: form.email.trim(),
     username: form.username.trim() || null,
     phone: form.phone.trim() || null,
-    password: form.password,
     is_active: form.is_active,
     must_change_password: form.must_change_password,
     super_admin_scopes: normalizePlatformScopes(form.super_admin_scopes),
@@ -59,9 +56,6 @@ export function buildPlatformUserUpdatePayload(
     must_change_password: form.must_change_password,
     super_admin_scopes: normalizePlatformScopes(form.super_admin_scopes),
   };
-  if (form.password.trim()) {
-    payload.password = form.password;
-  }
   return payload;
 }
 
@@ -73,7 +67,6 @@ export function mapPlatformUserToFormState(
     email: user.email,
     username: user.username ?? "",
     phone: user.phone ?? "",
-    password: "",
     is_active: user.is_active,
     must_change_password: user.must_change_password,
     super_admin_scopes: normalizePlatformScopes(user.super_admin_scopes),

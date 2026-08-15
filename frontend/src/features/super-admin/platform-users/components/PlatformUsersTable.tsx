@@ -9,6 +9,7 @@ export function PlatformUsersTable({
   statusBusyId,
   deleteBusyId,
   onEdit,
+  onResetPassword,
   onToggleStatus,
   onDelete,
 }: {
@@ -16,6 +17,7 @@ export function PlatformUsersTable({
   statusBusyId: number | null;
   deleteBusyId: number | null;
   onEdit: (user: PlatformUserListItemResponse) => void;
+  onResetPassword: (user: PlatformUserListItemResponse) => void;
   onToggleStatus: (userId: number, isActive: boolean) => void;
   onDelete: (userId: number) => void;
 }) {
@@ -97,6 +99,13 @@ export function PlatformUsersTable({
                         className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                       >
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onResetPassword(user)}
+                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Reset Password
                       </button>
                       <button
                         type="button"

@@ -56,7 +56,6 @@ class StaffCreateRequest(BaseModel):
     email: EmailStr
     username: str | None = Field(None, min_length=3, max_length=64)
     phone: str | None = Field(None, min_length=7, max_length=32)
-    password: str = Field(..., min_length=8)
     role: UserRole = Field(
         ...,
         description="Must be one of: owner, admin, steward, housekeeper, cashier, accountant",
@@ -77,7 +76,6 @@ class StaffUpdateRequest(BaseModel):
     email: EmailStr | None = None
     username: str | None = Field(None, min_length=3, max_length=64)
     phone: str | None = Field(None, min_length=7, max_length=32)
-    password: str | None = Field(None, min_length=8, description="Leave blank to keep current")
     role: UserRole | None = None
     assigned_area: AssignedArea | None = None
     is_active: bool | None = None
@@ -112,6 +110,7 @@ class StaffDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     last_login_at: datetime | None
+    temporary_password: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -133,12 +132,16 @@ class GenericMessageResponse(BaseModel):
     message: str
 
 
+class PasswordResetResponse(BaseModel):
+    message: str
+    new_password: str
+
+
 class PlatformUserCreateRequest(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255)
     email: EmailStr
     username: str | None = Field(None, min_length=3, max_length=64)
     phone: str | None = Field(None, min_length=7, max_length=32)
-    password: str = Field(..., min_length=8)
     is_active: bool = True
     must_change_password: bool = False
     super_admin_scopes: list[PlatformScopeValue] = Field(default_factory=list)
@@ -149,7 +152,6 @@ class PlatformUserUpdateRequest(BaseModel):
     email: EmailStr | None = None
     username: str | None = Field(None, min_length=3, max_length=64)
     phone: str | None = Field(None, min_length=7, max_length=32)
-    password: str | None = Field(None, min_length=8)
     is_active: bool | None = None
     must_change_password: bool | None = None
     super_admin_scopes: list[PlatformScopeValue] | None = None
@@ -174,6 +176,7 @@ class PlatformUserListItemResponse(BaseModel):
 
 class PlatformUserDetailResponse(PlatformUserListItemResponse):
     restaurant_id: int | None
+    temporary_password: str | None = None
 
 
 class PlatformUserListResponse(BaseModel):

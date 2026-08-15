@@ -6,8 +6,10 @@ import type {
   AssignedArea,
   StaffManagementPolicyResponse,
   StaffListItemResponse,
+  StaffDetailResponse,
   StaffCreateRequest,
   StaffUpdateRequest,
+  PasswordResetResponse,
   UserRole,
 } from "@/types/user";
 import {
@@ -31,7 +33,6 @@ const EMPTY_CREATE: StaffCreateRequest = {
   email: "",
   username: "",
   phone: "",
-  password: "",
   role: "steward",
   assigned_area: null,
   is_active: true,
@@ -54,6 +55,8 @@ export default function Staff() {
   const [confirmAction, setConfirmAction] = useState<ConfirmActionState>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
 
   const allowedRoles = useMemo<UserRole[]>(() => {
     const policyRoles = (staffManagementPolicy?.manageable_roles ?? []).filter(isUserRole);
@@ -148,7 +151,6 @@ export default function Staff() {
       email: s.email,
       username: s.username ?? "",
       phone: s.phone ?? "",
-      password: "",
       role: s.role,
       assigned_area: s.assigned_area,
       is_active: s.is_active,
@@ -190,8 +192,11 @@ export default function Staff() {
 
     try {
       if (dialog.type === "add") {
-        await api.post<StaffListItemResponse>("/users", formData);
+        const res = await api.post<StaffDetailResponse>("/users", formData);
         setPageMsg({ type: "ok", text: "Staff member added successfully." });
+        if (res.temporary_password) {
+          setGeneratedPassword(res.temporary_password);
+        }
       } else {
         const payload: StaffUpdateRequest = {
           full_name: formData.full_name || undefined,
@@ -202,7 +207,6 @@ export default function Staff() {
           assigned_area: formData.assigned_area,
           is_active: formData.is_active,
         };
-        if (formData.password) payload.password = formData.password;
         await api.patch<StaffListItemResponse>(`/users/${dialog.staff.id}`, payload);
         setPageMsg({ type: "ok", text: "Staff member updated successfully." });
       }
@@ -218,10 +222,6 @@ export default function Staff() {
 
     if (!formData.full_name.trim() || !formData.email.trim() || !formData.username.trim() || !formData.phone.trim()) {
       setFormError("Name, email, username, and contact are required.");
-      return;
-    }
-    if (dialog.type === "add" && !formData.password.trim()) {
-      setFormError("Password is required for new staff accounts.");
       return;
     }
 
@@ -296,6 +296,22 @@ export default function Staff() {
         await api.delete(`/users/${id}`);
         setPageMsg({ type: "ok", text: "Staff member deleted." });
         loadStaff();
+      },
+    });
+  }
+
+  async function handleResetPassword(id: number, name: string) {
+    setConfirmError(null);
+    setConfirmAction({
+      title: "Reset Password",
+      description: `Reset password for "${name}"? A new random password will be generated and they will be forced to change it on next login.`,
+      confirmLabel: "Reset Password",
+      confirmTone: "warning",
+      onConfirm: async () => {
+        setPageMsg(null);
+        const res = await api.post<PasswordResetResponse>(`/users/${id}/reset-password`, {});
+        setGeneratedPassword(res.new_password);
+        setPageMsg({ type: "ok", text: "Password reset successfully." });
       },
     });
   }
@@ -450,6 +466,12 @@ export default function Staff() {
                           </button>
                         )}
                         <button
+                          onClick={() => handleResetPassword(s.id, s.full_name)}
+                          className="w-full rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 sm:w-auto"
+                        >
+                          Reset Password
+                        </button>
+                        <button
                           onClick={() => handleDelete(s.id, s.full_name)}
                           className="w-full rounded-md border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 sm:w-auto"
                         >
@@ -536,6 +558,12 @@ export default function Staff() {
                               </button>
                             )}
                             <button
+                              onClick={() => handleResetPassword(s.id, s.full_name)}
+                              className="text-xs font-medium text-gray-600 hover:underline"
+                            >
+                              Reset Password
+                            </button>
+                            <button
                               onClick={() => handleDelete(s.id, s.full_name)}
                               className="text-xs font-medium text-red-600 hover:underline"
                             >
@@ -586,12 +614,6 @@ export default function Staff() {
               label="Contact Number *"
               value={formData.phone}
               onChange={(v) => setFormData((f) => ({ ...f, phone: v }))}
-            />
-            <StaffFormField
-              label={dialog.type === "add" ? "Password *" : "New password (leave blank to keep)"}
-              type="password"
-              value={formData.password}
-              onChange={(v) => setFormData((f) => ({ ...f, password: v }))}
             />
             <div className="space-y-1">
               <label className="text-sm font-medium">Role *</label>
@@ -685,6 +707,26 @@ export default function Staff() {
           confirmLabel={confirmBusy || submitting ? "Processing..." : confirmAction.confirmLabel}
           confirmTone={confirmAction.confirmTone}
         />
+      )}
+
+      {generatedPassword && (
+        <div className="app-modal-shell z-[60]">
+          <div className="app-modal-panel max-w-sm space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Password Generated</h2>
+            <p className="text-sm text-gray-600">
+              Please share this temporary password with the user. They will be required to change it on their first login.
+            </p>
+            <div className="bg-gray-100 p-3 rounded-md text-center font-mono text-xl font-bold tracking-wider select-all">
+              {generatedPassword}
+            </div>
+            <button
+              onClick={() => setGeneratedPassword(null)}
+              className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+            >
+              Done
+            </button>
+          </div>
+        </div>
       )}
     </>
   );

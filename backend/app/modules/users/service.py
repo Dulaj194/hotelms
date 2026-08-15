@@ -1,4 +1,8 @@
+import secrets
+import string
 from typing import Any
+
+from app.core.security import hash_password
 
 from fastapi import HTTPException, status
 from sqlalchemy import func
@@ -34,6 +38,7 @@ from app.modules.users.repository import (
     list_platform_users as repo_list_platform_users,
     update_platform_user as repo_update_platform_user,
     update_by_id,
+    update_password,
 )
 from app.modules.users.schemas import (
     GenericMessageResponse,
@@ -42,6 +47,7 @@ from app.modules.users.schemas import (
     PlatformUserListItemResponse,
     PlatformUserListResponse,
     PlatformUserUpdateRequest,
+    PasswordResetResponse,
     StaffCreateRequest,
     StaffDetailResponse,
     StaffListItemResponse,
@@ -140,6 +146,11 @@ def _assert_role_feature_enabled_for_restaurant(
 
 
 # ─── Internal helpers ─────────────────────────────────────────────────────────
+
+
+def generate_temporary_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    return "".join(secrets.choice(alphabet) for i in range(length))
 
 
 def get_user(db: Session, user_id: int) -> User | None:
@@ -311,10 +322,12 @@ def add_staff(
         )
 
     require_password_change = True
+    generated_password = generate_temporary_password()
     user = create_staff(
         db,
         target_restaurant_id,
         data,
+        password=generated_password,
         must_change_password=require_password_change,
     )
 
@@ -330,7 +343,9 @@ def add_staff(
         },
     )
 
-    return StaffDetailResponse.model_validate(user)
+    response = StaffDetailResponse.model_validate(user)
+    response.temporary_password = generated_password
+    return response
 
 
 def update_staff(
@@ -455,6 +470,38 @@ def disable_staff(
     return StaffStatusResponse(id=user.id, is_active=False, message="Staff member disabled.")
 
 
+def reset_staff_password(
+    db: Session,
+    user_id: int,
+    restaurant_id: int,
+    current_user: User,
+) -> PasswordResetResponse:
+    existing = get_by_id(db, user_id, restaurant_id)
+    if not existing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Staff member not found.",
+        )
+    _assert_can_manage_role(current_user, existing.role)
+
+    new_password = generate_temporary_password()
+    update_password(db, existing, hash_password(new_password))
+    existing.must_change_password = True
+    db.commit()
+
+    write_audit_log(
+        db,
+        event_type="staff_password_reset",
+        user_id=current_user.id,
+        metadata={"reset_user_id": user_id},
+    )
+
+    return PasswordResetResponse(
+        message="Password reset successfully.",
+        new_password=new_password,
+    )
+
+
 def enable_staff(
     db: Session,
     user_id: int,
@@ -576,15 +623,16 @@ def create_platform_user(
             detail="A user with this contact number already exists.",
         )
 
+    generated_password = generate_temporary_password()
     user = repo_create_platform_user(
         db,
         full_name=data.full_name,
         email=data.email,
         username=normalized_username,
         phone=normalized_phone,
-        password=data.password,
+        password=generated_password,
         is_active=data.is_active,
-        must_change_password=data.must_change_password,
+        must_change_password=True,
         super_admin_scopes=normalized_scopes,
     )
 
@@ -597,7 +645,9 @@ def create_platform_user(
             "super_admin_scopes": normalized_scopes,
         },
     )
-    return PlatformUserDetailResponse.model_validate(user)
+    response = PlatformUserDetailResponse.model_validate(user)
+    response.temporary_password = generated_password
+    return response
 
 
 def update_platform_user(
@@ -708,6 +758,36 @@ def disable_platform_user(
         id=updated.id,
         is_active=updated.is_active,
         message="Platform user disabled.",
+    )
+
+
+def reset_platform_user_password(
+    db: Session,
+    user_id: int,
+    current_user: User,
+) -> PasswordResetResponse:
+    user = get_platform_user_for_super_admin(db, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Platform user not found.",
+        )
+    
+    new_password = generate_temporary_password()
+    update_password(db, user, hash_password(new_password))
+    user.must_change_password = True
+    db.commit()
+
+    write_audit_log(
+        db,
+        event_type="platform_user_password_reset",
+        user_id=current_user.id,
+        metadata={"reset_user_id": user_id},
+    )
+
+    return PasswordResetResponse(
+        message="Platform user password reset successfully.",
+        new_password=new_password,
     )
 
 

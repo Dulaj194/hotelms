@@ -19,8 +19,10 @@ import { getApiErrorMessage } from "@/pages/super-admin/utils";
 import type {
   GenericMessageResponse,
   PlatformUserListItemResponse,
+  PlatformUserDetailResponse,
   PlatformUserListResponse,
   StaffStatusResponse,
+  PasswordResetResponse,
 } from "@/types/user";
 
 type PageMessage = {
@@ -46,6 +48,11 @@ export default function PlatformUsersPage() {
   const [statusBusyId, setStatusBusyId] = useState<number | null>(null);
   const [deleteBusyId, setDeleteBusyId] = useState<number | null>(null);
 
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [resetConfirmUser, setResetConfirmUser] = useState<PlatformUserListItemResponse | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+
   useEffect(() => {
     void loadUsers();
   }, []);
@@ -68,7 +75,7 @@ export default function PlatformUsersPage() {
     setCreateBusy(true);
     setPageMessage(null);
     try {
-      const created = await api.post<PlatformUserListItemResponse>(
+      const created = await api.post<PlatformUserDetailResponse>(
         "/users/platform",
         buildPlatformUserCreatePayload(createForm),
       );
@@ -76,6 +83,9 @@ export default function PlatformUsersPage() {
       setShowCreateForm(false);
       setCreateForm(EMPTY_PLATFORM_USER_FORM);
       setPageMessage({ type: "ok", text: `Platform user ${created.full_name} created.` });
+      if (created.temporary_password) {
+        setGeneratedPassword(created.temporary_password);
+      }
     } catch (createError) {
       setPageMessage({
         type: "err",
@@ -151,6 +161,27 @@ export default function PlatformUsersPage() {
       });
     } finally {
       setDeleteBusyId(null);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!resetConfirmUser) return;
+    setResetBusy(true);
+    setResetError(null);
+    try {
+      const response = await api.post<PasswordResetResponse>(`/users/platform/${resetConfirmUser.id}/reset-password`, {});
+      setGeneratedPassword(response.new_password);
+      setResetConfirmUser(null);
+      setPageMessage({ type: "ok", text: "Password reset successfully." });
+      setItems((current) =>
+        current.map((item) =>
+          item.id === resetConfirmUser.id ? { ...item, must_change_password: true } : item
+        )
+      );
+    } catch (err) {
+      setResetError(getApiErrorMessage(err, "Failed to reset password."));
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -257,6 +288,7 @@ export default function PlatformUsersPage() {
             statusBusyId={statusBusyId}
             deleteBusyId={deleteBusyId}
             onEdit={openEditDialog}
+            onResetPassword={setResetConfirmUser}
             onToggleStatus={(userId, isActive) => void handleToggleStatus(userId, isActive)}
             onDelete={(userId) => void handleDelete(userId)}
           />
@@ -280,6 +312,43 @@ export default function PlatformUsersPage() {
           >
             <PlatformUserFormFields form={editForm} onChange={setEditForm} />
           </ActionDialog>
+        )}
+
+        {resetConfirmUser && (
+          <ActionDialog
+            title="Reset Password"
+            description={`Reset password for "${resetConfirmUser.full_name}"? A new random password will be generated and they will be forced to change it on next login.`}
+            error={resetError}
+            busy={resetBusy}
+            onClose={() => {
+              if (resetBusy) return;
+              setResetConfirmUser(null);
+              setResetError(null);
+            }}
+            onConfirm={() => void handleResetPassword()}
+            confirmLabel={resetBusy ? "Resetting..." : "Reset Password"}
+            confirmTone="warning"
+          />
+        )}
+
+        {generatedPassword && (
+          <div className="app-modal-shell z-[60]">
+            <div className="app-modal-panel max-w-sm space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900">Password Generated</h2>
+              <p className="text-sm text-gray-600">
+                Please share this temporary password with the user. They will be required to change it on their first login.
+              </p>
+              <div className="bg-gray-100 p-3 rounded-md text-center font-mono text-xl font-bold tracking-wider select-all">
+                {generatedPassword}
+              </div>
+              <button
+                onClick={() => setGeneratedPassword(null)}
+                className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </>

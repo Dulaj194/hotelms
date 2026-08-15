@@ -8,6 +8,7 @@ from app.modules.users.model import User
 from app.modules.users.model import UserRole
 from app.modules.users.schemas import (
     GenericMessageResponse,
+    PasswordResetResponse,
     PlatformUserCreateRequest,
     PlatformUserDetailResponse,
     PlatformUserListResponse,
@@ -104,6 +105,18 @@ def delete_platform_user(
     return success_response(data=service.delete_platform_user(db, user_id, current_user), message="Platform user deleted")
 
 
+@router.post("/platform/{user_id}/reset-password", response_model=ApiResponse[PasswordResetResponse])
+def reset_platform_user_password(
+    user_id: int,
+    current_user: User = Depends(require_platform_scopes("security_admin")),
+    db: Session = Depends(get_db),
+) -> ApiResponse:
+    return success_response(
+        data=service.reset_platform_user_password(db, user_id, current_user), 
+        message="Platform user password reset successfully"
+    )
+
+
 @router.get("", response_model=ApiResponse)
 def list_staff(
     pagination: PaginationParams = Depends(pagination_depends),
@@ -113,7 +126,8 @@ def list_staff(
     db: Session = Depends(get_db),
 ) -> ApiResponse:
     """List all staff for the current restaurant. Owner/admin only."""
-    items, total = service.list_staff_filtered(  # type: ignore[arg-type]
+    assert current_user.restaurant_id is not None
+    items, total = service.list_staff_filtered(
         db,
         current_user.restaurant_id,
         role=role,
@@ -143,7 +157,8 @@ def add_staff(
     SECURITY: restaurant_id comes from authenticated user context, not the request.
     StaffCreateRequest has no restaurant_id field.
     """
-    return success_response(data=service.add_staff(db, current_user.restaurant_id, payload, current_user), message="Staff added")  # type: ignore[arg-type]
+    assert current_user.restaurant_id is not None
+    return success_response(data=service.add_staff(db, current_user.restaurant_id, payload, current_user), message="Staff added")
 
 
 @router.get("/{user_id}", response_model=ApiResponse[StaffDetailResponse])
@@ -153,7 +168,8 @@ def get_staff(
     db: Session = Depends(get_db),
 ) -> ApiResponse:
     """Get a single staff member from the current restaurant."""
-    return success_response(data=service.get_staff_member(db, user_id, current_user.restaurant_id), message="Staff member retrieved")  # type: ignore[arg-type]
+    assert current_user.restaurant_id is not None
+    return success_response(data=service.get_staff_member(db, user_id, current_user.restaurant_id), message="Staff member retrieved")
 
 
 @router.patch("/{user_id}", response_model=ApiResponse[StaffDetailResponse])
@@ -164,7 +180,8 @@ def update_staff(
     db: Session = Depends(get_db),
 ) -> ApiResponse:
     """Update a staff member in the current restaurant."""
-    return success_response(data=service.update_staff(db, user_id, current_user.restaurant_id, payload, current_user), message="Staff updated")  # type: ignore[arg-type]
+    assert current_user.restaurant_id is not None
+    return success_response(data=service.update_staff(db, user_id, current_user.restaurant_id, payload, current_user), message="Staff updated")
 
 
 @router.patch("/{user_id}/disable", response_model=ApiResponse[StaffStatusResponse])
@@ -174,7 +191,8 @@ def disable_staff(
     db: Session = Depends(get_db),
 ) -> ApiResponse:
     """Disable (deactivate) a staff member in the current restaurant."""
-    return success_response(data=service.disable_staff(db, user_id, current_user.restaurant_id, current_user), message="Staff disabled")  # type: ignore[arg-type]
+    assert current_user.restaurant_id is not None
+    return success_response(data=service.disable_staff(db, user_id, current_user.restaurant_id, current_user), message="Staff disabled")
 
 
 @router.patch("/{user_id}/enable", response_model=ApiResponse[StaffStatusResponse])
@@ -184,7 +202,8 @@ def enable_staff(
     db: Session = Depends(get_db),
 ) -> ApiResponse:
     """Re-enable a previously disabled staff member."""
-    return success_response(data=service.enable_staff(db, user_id, current_user.restaurant_id, current_user), message="Staff enabled")  # type: ignore[arg-type]
+    assert current_user.restaurant_id is not None
+    return success_response(data=service.enable_staff(db, user_id, current_user.restaurant_id, current_user), message="Staff enabled")
 
 
 @router.delete("/{user_id}", response_model=ApiResponse[GenericMessageResponse])
@@ -194,5 +213,20 @@ def delete_staff(
     db: Session = Depends(get_db),
 ) -> ApiResponse:
     """Permanently delete a staff member from the current restaurant."""
-    return success_response(data=service.delete_staff(db, user_id, current_user.restaurant_id, current_user), message="Staff deleted")  # type: ignore[arg-type]
+    assert current_user.restaurant_id is not None
+    return success_response(data=service.delete_staff(db, user_id, current_user.restaurant_id, current_user), message="Staff deleted")
+
+
+@router.post("/{user_id}/reset-password", response_model=ApiResponse[PasswordResetResponse])
+def reset_staff_password(
+    user_id: int,
+    current_user: User = Depends(require_roles(*_RESTAURANT_ADMIN_ROLES)),
+    db: Session = Depends(get_db),
+) -> ApiResponse:
+    """Reset the password of a staff member."""
+    assert current_user.restaurant_id is not None
+    return success_response(
+        data=service.reset_staff_password(db, user_id, current_user.restaurant_id, current_user),
+        message="Staff password reset successfully"
+    )
 

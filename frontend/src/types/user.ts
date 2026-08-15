@@ -42,6 +42,7 @@ export interface StaffDetailResponse {
   created_at: string;
   updated_at: string;
   last_login_at: string | null;
+  temporary_password?: string | null;
 }
 
 /**
@@ -53,7 +54,6 @@ export interface StaffCreateRequest {
   email: string;
   username: string;
   phone: string;
-  password: string;
   role: UserRole;
   assigned_area: AssignedArea | null;
   is_active: boolean;
@@ -64,7 +64,6 @@ export interface StaffUpdateRequest {
   email?: string;
   username?: string;
   phone?: string;
-  password?: string;
   role?: UserRole;
   assigned_area?: AssignedArea | null;
   is_active?: boolean;
@@ -85,6 +84,11 @@ export interface StaffManagementPolicyResponse {
 
 export interface GenericMessageResponse {
   message: string;
+}
+
+export interface PasswordResetResponse {
+  message: string;
+  new_password: string;
 }
 
 export interface RestaurantStaffPasswordResetResponse {
@@ -122,6 +126,7 @@ export interface PlatformUserListItemResponse {
 
 export interface PlatformUserDetailResponse extends PlatformUserListItemResponse {
   restaurant_id: number | null;
+  temporary_password?: string | null;
 }
 
 export interface PlatformUserListResponse {
@@ -134,7 +139,6 @@ export interface PlatformUserCreateRequest {
   email: string;
   username?: string | null;
   phone?: string | null;
-  password: string;
   is_active: boolean;
   must_change_password: boolean;
   super_admin_scopes: PlatformScopeValue[];
@@ -145,7 +149,6 @@ export interface PlatformUserUpdateRequest {
   email?: string;
   username?: string | null;
   phone?: string | null;
-  password?: string;
   is_active?: boolean;
   must_change_password?: boolean;
   super_admin_scopes?: PlatformScopeValue[];
